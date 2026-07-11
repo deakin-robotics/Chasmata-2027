@@ -3,25 +3,25 @@
 }
 
 .connection-card {
-  --status-color: #7d8998;
+  --status-color: var(--dcr-color-offline);
 
   width: min(100%, 34rem);
   overflow: hidden;
-  border-color: color-mix(in srgb, var(--status-color) 35%, #303844);
-  background: #181d23;
+  border-color: color-mix(in srgb, var(--status-color) 35%, var(--dcr-color-border));
+  background: var(--dcr-color-surface);
   box-shadow: 0 1rem 3rem rgb(0 0 0 / 22%);
 
   &[data-status='connected'] {
-    --status-color: #55b987;
+    --status-color: var(--dcr-color-normal);
   }
 
   &[data-status='connecting'],
   &[data-status='reconnecting'] {
-    --status-color: #62a8e5;
+    --status-color: var(--dcr-color-info);
   }
 
   &[data-status='error'] {
-    --status-color: #e05b65;
+    --status-color: var(--dcr-color-critical);
   }
 }
 
@@ -38,7 +38,7 @@ mat-card-header {
 }
 
 mat-card-title {
-  color: #d8dee9;
+  color: var(--dcr-color-text);
   font-size: 1.1rem;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -46,7 +46,7 @@ mat-card-title {
 
 mat-card-subtitle {
   margin-top: 0.15rem;
-  color: #8f9baa;
+  color: var(--dcr-color-neutral);
   font-family: monospace;
   font-size: 0.75rem;
 }
@@ -82,7 +82,7 @@ mat-card-content {
 .description {
   min-height: 2.5rem;
   margin: 0 0 1rem;
-  color: #aeb7c4;
+  color: var(--dcr-color-neutral);
   line-height: 1.5;
 }
 
@@ -107,11 +107,11 @@ mat-form-field {
   align-items: flex-start;
   gap: 0.5rem;
   margin-top: 1rem;
-  border: 1px solid rgb(224 91 101 / 35%);
+  border: 1px solid color-mix(in srgb, var(--dcr-color-critical) 35%, transparent);
   border-radius: 0.5rem;
   padding: 0.75rem;
-  background: rgb(224 91 101 / 8%);
-  color: #f19aa1;
+  background: color-mix(in srgb, var(--dcr-color-critical) 8%, transparent);
+  color: var(--dcr-color-critical);
   font-size: 0.8rem;
 
   mat-icon {
@@ -125,10 +125,10 @@ mat-card-footer {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  border-top: 1px solid #303844;
+  border-top: 1px solid var(--dcr-color-border);
   padding: 0.75rem 1.25rem;
-  background: #14181d;
-  color: #8f9baa;
+  background: var(--dcr-color-background);
+  color: var(--dcr-color-neutral);
   font-size: 0.72rem;
 }
 
@@ -139,7 +139,7 @@ mat-card-footer {
 
 code {
   overflow: hidden;
-  color: #b8c5d6;
+  color: var(--dcr-color-text);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

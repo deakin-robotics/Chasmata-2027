@@ -22,7 +22,7 @@ This project is an Angular replacement for the previous Next.js GUI. The migrati
 
 The mission-control interface is inspired by the Airbus ECAM system-display philosophy: a calm symbolic overview during normal operation and consistent colour semantics for operational state.
 
-- [Design system and colour semantics](docs/design-system.md)
+- [Design system and colour semantics](docs/color-palette.md)
 - [Pilot and Arm operator layouts](docs/operator-layouts.md)
 
 ## System overview
@@ -96,7 +96,6 @@ src/app/
 ├── features/
 │   ├── arm/                     # Arm control and motor telemetry
 │   ├── cameras/
-│   │   ├── camera-grid/         # Multi-camera arrangement
 │   │   └── camera-stream/       # Individual resilient stream viewer
 │   ├── connection/              # Rover connection controls and status
 │   ├── drive/                   # Drivetrain controls and status

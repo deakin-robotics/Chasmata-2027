@@ -1,4 +1,4 @@
-# DCR Mission Control Design System
+# DCR Mission Control UI Colour Palette
 
 ## Design intent
 
