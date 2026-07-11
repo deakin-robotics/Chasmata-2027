@@ -18,6 +18,13 @@ This project is an Angular replacement for the previous Next.js GUI. The migrati
 - HTTP MJPEG camera streams
 - Vitest for unit testing
 
+## Design language
+
+The mission-control interface is inspired by the Airbus ECAM system-display philosophy: a calm symbolic overview during normal operation and consistent colour semantics for operational state.
+
+- [Design system and colour semantics](docs/design-system.md)
+- [Pilot and Arm operator layouts](docs/operator-layouts.md)
+
 ## System overview
 
 ```text
