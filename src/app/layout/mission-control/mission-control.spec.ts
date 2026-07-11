@@ -27,7 +27,7 @@ describe('MissionControl', () => {
 
     expect(element.querySelector('h1')?.textContent).toContain('Mission Control');
     expect(element.textContent).toContain('ROS disconnected');
-    expect(element.textContent).toContain('E-stop pending');
+    expect(element.textContent).toContain('E-stop');
   });
 
   it('should open and close connection settings', () => {

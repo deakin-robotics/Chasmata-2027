@@ -83,6 +83,11 @@
   border-radius: 0.65rem;
   padding: 0.2rem;
   background: #181d23;
+
+  .active {
+    background: rgb(98 168 229 / 14%);
+    color: #76b9ee;
+  }
 }
 
 .global-actions {
@@ -123,49 +128,6 @@
   display: grid;
   min-height: 0;
   overflow: auto;
-}
-
-.workspace-placeholder {
-  display: grid;
-  max-width: 34rem;
-  place-self: center;
-  justify-items: center;
-  padding: 2rem;
-  text-align: center;
-
-  > mat-icon {
-    width: 3rem;
-    height: 3rem;
-    margin-bottom: 1rem;
-    color: #556272;
-    font-size: 3rem;
-  }
-
-  h2,
-  p {
-    margin: 0;
-  }
-
-  h2 {
-    margin-top: 0.35rem;
-    color: #d8dee9;
-    font-size: clamp(1.4rem, 4vw, 2rem);
-    font-weight: 600;
-  }
-
-  p:last-child {
-    margin-top: 0.75rem;
-    color: #8f9baa;
-    line-height: 1.6;
-  }
-}
-
-.eyebrow {
-  color: #62a8e5;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
 }
 
 .status-bar {

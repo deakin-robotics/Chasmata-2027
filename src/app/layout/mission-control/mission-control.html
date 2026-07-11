@@ -9,14 +9,14 @@
     </div>
 
     <nav class="operator-navigation" aria-label="Operator views">
-      <button matButton type="button" disabled>
+      <a matButton routerLink="/pilot" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
         <mat-icon aria-hidden="true">sports_esports</mat-icon>
         Pilot
-      </button>
-      <button matButton type="button" disabled>
+      </a>
+      <a matButton routerLink="/arm" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
         <mat-icon aria-hidden="true">precision_manufacturing</mat-icon>
         Arm
-      </button>
+      </a>
     </nav>
 
     <div class="global-actions">
@@ -51,17 +51,6 @@
 
   <main id="main-content" class="workspace">
     <router-outlet />
-
-    <!-- Removed when the first operator dashboard route is implemented. -->
-    <section class="workspace-placeholder" aria-labelledby="workspace-title">
-      <mat-icon aria-hidden="true">dashboard_customize</mat-icon>
-      <p class="eyebrow">Shared layout ready</p>
-      <h2 id="workspace-title">Operator dashboards coming next</h2>
-      <p>
-        Pilot and Arm views will render in this workspace while retaining the
-        shared connection and safety header.
-      </p>
-    </section>
   </main>
 
   <footer class="status-bar">
