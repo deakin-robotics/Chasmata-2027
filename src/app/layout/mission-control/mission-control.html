@@ -1,0 +1,101 @@
+<div class="mission-control-shell">
+  <header class="top-bar">
+    <div class="brand" aria-label="Deakin Rover Mission Control">
+      <div class="brand-mark" aria-hidden="true">DCR</div>
+      <div>
+        <p>Deakin Rover</p>
+        <h1>Mission Control</h1>
+      </div>
+    </div>
+
+    <nav class="operator-navigation" aria-label="Operator views">
+      <button matButton type="button" disabled>
+        <mat-icon aria-hidden="true">sports_esports</mat-icon>
+        Pilot
+      </button>
+      <button matButton type="button" disabled>
+        <mat-icon aria-hidden="true">precision_manufacturing</mat-icon>
+        Arm
+      </button>
+    </nav>
+
+    <div class="global-actions">
+      <button
+        matButton="outlined"
+        type="button"
+        class="connection-trigger"
+        [attr.data-status]="rosConnection.status()"
+        [attr.aria-expanded]="connectionPanelOpen()"
+        aria-controls="connection-panel"
+        (click)="toggleConnectionPanel()"
+      >
+        <mat-icon
+          aria-hidden="true"
+          [class.spinning]="rosConnection.isConnecting()"
+        >{{ connectionIcon() }}</mat-icon>
+        <span>{{ connectionLabel() }}</span>
+      </button>
+
+      <button
+        matButton="outlined"
+        type="button"
+        class="estop-placeholder"
+        disabled
+        matTooltip="Emergency stop is not implemented yet"
+      >
+        <mat-icon aria-hidden="true">emergency</mat-icon>
+        E-stop
+      </button>
+    </div>
+  </header>
+
+  <main id="main-content" class="workspace">
+    <router-outlet />
+
+    <!-- Removed when the first operator dashboard route is implemented. -->
+    <section class="workspace-placeholder" aria-labelledby="workspace-title">
+      <mat-icon aria-hidden="true">dashboard_customize</mat-icon>
+      <p class="eyebrow">Shared layout ready</p>
+      <h2 id="workspace-title">Operator dashboards coming next</h2>
+      <p>
+        Pilot and Arm views will render in this workspace while retaining the
+        shared connection and safety header.
+      </p>
+    </section>
+  </main>
+
+  <footer class="status-bar">
+    <span class="footer-endpoint">
+      ROSbridge:
+      <code>{{ rosConnection.url() ?? 'not configured' }}</code>
+    </span>
+  </footer>
+
+  @if (connectionPanelOpen()) {
+    <button
+      type="button"
+      class="panel-backdrop"
+      aria-label="Close connection settings"
+      (click)="closeConnectionPanel()"
+    ></button>
+
+    <aside id="connection-panel" class="connection-panel" aria-label="ROS connection settings">
+      <div class="panel-heading">
+        <div>
+          <p>System</p>
+          <h2>Connection settings</h2>
+        </div>
+        <button
+          matIconButton
+          type="button"
+          aria-label="Close connection settings"
+          (click)="closeConnectionPanel()"
+        >
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <app-connection-manager />
+    </aside>
+  }
+</div>
