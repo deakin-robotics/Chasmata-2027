@@ -103,7 +103,9 @@ src/app/
 │   └── telemetry/               # Rover and subsystem health
 │
 ├── layout/
-│   └── mission-control/         # Complete operator dashboard arrangement
+│   ├── mission-control/         # Shared shell, navigation, and router outlet
+│   ├── pilot-dashboard/         # Pilot panel arrangement
+│   └── arm-dashboard/           # Arm operator panel arrangement
 │
 └── shared/
     ├── confirmation-dialog/     # Reusable confirmation UI

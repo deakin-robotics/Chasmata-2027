@@ -20,10 +20,9 @@ export type CameraStreamStatus =
   | 'reconnecting'
   | 'error';
 
-const INITIAL_RETRY_DELAY_MS = 1_000;
-const MAX_RETRY_DELAY_MS = 30_000;
-const MAX_RETRY_ATTEMPTS = 10;
-const LOAD_TIMEOUT_MS = 10_000;
+const RETRY_DELAY_MS = 5_000;
+const MAX_RETRY_ATTEMPTS = 10; // Max attempts before giving up
+const LOAD_TIMEOUT_MS = 10_000; // Max wait for stream to load before giving up
 
 /**
  * Displays and recovers one HTTP/MJPEG camera stream.
@@ -147,6 +146,7 @@ export class CameraStream implements OnChanges, OnDestroy {
     this.isFullscreen.set(document.fullscreenElement === this.streamFrame?.nativeElement);
   }
 
+  /** Starts a fresh stream request and its load-timeout watchdog. */
   private beginLoading(): void {
     const url = this.url.trim();
     this.clearTimers();
@@ -168,6 +168,7 @@ export class CameraStream implements OnChanges, OnDestroy {
     this.scheduleRetry();
   }
 
+  /** Schedules the next stream load attempt after a fixed delay. */
   private scheduleRetry(): void {
     if (!this.url.trim()) {
       this.status.set('not-configured');
@@ -181,17 +182,13 @@ export class CameraStream implements OnChanges, OnDestroy {
       return;
     }
 
-    const delay = Math.min(
-      INITIAL_RETRY_DELAY_MS * 2 ** previousAttempt,
-      MAX_RETRY_DELAY_MS,
-    );
-
     this.clearTimers();
     this.retryAttempt.set(previousAttempt + 1);
     this.status.set('reconnecting');
-    this.retryTimer = setTimeout(() => this.beginLoading(), delay);
+    this.retryTimer = setTimeout(() => this.beginLoading(), RETRY_DELAY_MS);
   }
 
+  /** Cancels any pending stream-load timeout and reconnect retry. */
   private clearTimers(): void {
     this.clearLoadTimer();
 
@@ -201,6 +198,7 @@ export class CameraStream implements OnChanges, OnDestroy {
     }
   }
 
+  /** Cancels only the timeout that detects a stream which never loads. */
   private clearLoadTimer(): void {
     if (this.loadTimer) {
       clearTimeout(this.loadTimer);
@@ -208,11 +206,13 @@ export class CameraStream implements OnChanges, OnDestroy {
     }
   }
 
+  /** Adds a changing query value so browsers request a fresh stream URL. */
   private withCacheBuster(url: string): string {
     const separator = url.includes('?') ? '&' : '?';
     return `${url}${separator}_retry=${Date.now()}_${this.retryAttempt()}`;
   }
 
+  /** Keeps a rotation value within the standard 0–359 degree range. */
   private normalizeRotation(rotation: number): number {
     return ((rotation % 360) + 360) % 360;
   }

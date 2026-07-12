@@ -57,7 +57,7 @@ describe('CameraStream', () => {
     expect(component.status()).toBe('reconnecting');
     expect(component.retryAttempt()).toBe(1);
 
-    vi.advanceTimersByTime(1_000);
+    vi.advanceTimersByTime(5_000);
 
     expect(component.status()).toBe('loading');
   });

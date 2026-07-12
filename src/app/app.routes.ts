@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
-import { ArmDashboard } from './features/arm/arm-dashboard/arm-dashboard';
-import { PilotDashboard } from './features/pilot/pilot-dashboard/pilot-dashboard';
+import { ArmDashboard } from './layout/arm-dashboard/arm-dashboard';
 import { MissionControl } from './layout/mission-control/mission-control';
+import { PilotDashboard } from './layout/pilot-dashboard/pilot-dashboard';
 
 export const routes: Routes = [
   {

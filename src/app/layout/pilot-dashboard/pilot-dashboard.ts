@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { RoverSchematic } from '../../telemetry/rover-schematic/rover-schematic';
+import { RoverSchematic } from '../../features/telemetry/rover-schematic/rover-schematic';
 
 /**
  * Pilot operator workspace.
