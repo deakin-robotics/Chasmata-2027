@@ -33,4 +33,8 @@ describe('PilotDashboard', () => {
     expect(fixture.nativeElement.textContent).toContain('Right side camera');
     expect(fixture.nativeElement.textContent).toContain('Rear camera');
   });
+
+  it('should render the bird\'s-eye view panel', () => {
+    expect(fixture.nativeElement.querySelector('app-bird-view')).toBeTruthy();
+  });
 });

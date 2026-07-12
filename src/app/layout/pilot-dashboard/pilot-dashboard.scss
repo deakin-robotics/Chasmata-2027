@@ -5,7 +5,27 @@
 }
 
 .pilot-dashboard {
+  display: grid;
   height: 100%;
   min-height: 0;
+  grid-template-columns: minmax(0, 2fr) minmax(18rem, 1fr);
+  gap: clamp(0.75rem, 1.5vw, 2rem);
   overflow: hidden;
+}
+
+app-pilot-camera-layout {
+  min-width: 0;
+  min-height: 0;
+}
+
+.bird-view-panel {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  margin-right: clamp(0.75rem, 1.5vw, 2rem);
+  place-items: center;
+}
+
+app-bird-view {
+  width: 100%;
 }
