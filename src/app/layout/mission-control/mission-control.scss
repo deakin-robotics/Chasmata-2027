@@ -1,11 +1,13 @@
 :host {
   display: block;
+  height: 100dvh;
   min-height: 100dvh;
 }
 
 .mission-control-shell {
   display: grid;
   min-width: 20rem;
+  height: 100dvh;
   min-height: 100dvh;
   grid-template-rows: auto 1fr auto;
   overflow: hidden;
@@ -131,7 +133,7 @@
   position: relative;
   display: grid;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .status-bar {

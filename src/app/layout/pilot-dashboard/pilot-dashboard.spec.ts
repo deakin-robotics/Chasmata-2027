@@ -23,4 +23,14 @@ describe('PilotDashboard', () => {
   it('should render the rover schematic', () => {
     expect(fixture.nativeElement.querySelector('app-rover-schematic')).toBeTruthy();
   });
+
+  it('should render the front, side, and rear camera positions', () => {
+    const cameras = fixture.nativeElement.querySelectorAll('app-camera-stream');
+
+    expect(cameras).toHaveLength(4);
+    expect(fixture.nativeElement.textContent).toContain('Front camera');
+    expect(fixture.nativeElement.textContent).toContain('Left side camera');
+    expect(fixture.nativeElement.textContent).toContain('Right side camera');
+    expect(fixture.nativeElement.textContent).toContain('Rear camera');
+  });
 });

@@ -1,16 +1,15 @@
 import { Component } from '@angular/core';
-import { RoverSchematic } from '../../features/telemetry/rover-schematic/rover-schematic';
+import { PilotCameraLayout } from './pilot-camera-layout/pilot-camera-layout';
 
 /**
  * Pilot operator workspace.
  *
- * Camera feeds, drive telemetry, and controls will be added here in later
- * milestones. It currently establishes the Pilot-owned location for the
- * reusable rover schematic.
+ * It composes Pilot-specific visual layouts, including the camera layout and
+ * a future bird's-eye view. Drive telemetry and controls will be added later.
  */
 @Component({
   selector: 'app-pilot-dashboard',
-  imports: [RoverSchematic],
+  imports: [PilotCameraLayout],
   templateUrl: './pilot-dashboard.html',
   styleUrl: './pilot-dashboard.scss',
 })
