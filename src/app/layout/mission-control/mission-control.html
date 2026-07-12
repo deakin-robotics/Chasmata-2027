@@ -13,6 +13,10 @@
         <mat-icon aria-hidden="true">sports_esports</mat-icon>
         Pilot
       </a>
+      <a matButton routerLink="/ecam" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+        <mat-icon aria-hidden="true">warning_amber</mat-icon>
+        ECAM
+      </a>
       <a matButton routerLink="/arm" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
         <mat-icon aria-hidden="true">precision_manufacturing</mat-icon>
         Arm
@@ -52,13 +56,6 @@
   <main id="main-content" class="workspace">
     <router-outlet />
   </main>
-
-  <footer class="status-bar">
-    <span class="footer-endpoint">
-      ROSbridge:
-      <code>{{ rosConnection.url() ?? 'not configured' }}</code>
-    </span>
-  </footer>
 
   @if (connectionPanelOpen()) {
     <button

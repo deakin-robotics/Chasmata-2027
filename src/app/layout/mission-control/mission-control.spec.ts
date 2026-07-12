@@ -27,6 +27,7 @@ describe('MissionControl', () => {
 
     expect(element.querySelector('h1')?.textContent).toContain('Mission Control');
     expect(element.textContent).toContain('ROS disconnected');
+    expect(element.textContent).toContain('ECAM');
     expect(element.textContent).toContain('E-stop');
   });
 
