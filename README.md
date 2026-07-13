@@ -4,7 +4,7 @@ The browser-based mission-control interface for the Deakin Competitive Robotics 
 
 This project is an Angular replacement for the previous Next.js GUI. The migration will preserve the rover's existing ROS topics, services, gamepad mappings, and camera interfaces while introducing a more structured and maintainable frontend architecture.
 
-> This project is currently in its initial proof-of-concept and migration stage. The existing Next.js GUI remains the working reference until this application reaches feature parity and passes rover testing.
+> This project is currently in its migration stage. The existing Next.js GUI remains the working reference until this application reaches feature parity and passes rover testing.
 
 ## Technology stack
 
