@@ -31,16 +31,8 @@ describe('MissionControl', () => {
     expect(element.textContent).toContain('E-stop');
   });
 
-  it('should open and close connection settings', () => {
-    expect(component.connectionPanelOpen()).toBe(false);
-
-    component.toggleConnectionPanel();
-    fixture.detectChanges();
-    expect(component.connectionPanelOpen()).toBe(true);
-    expect(fixture.nativeElement.querySelector('app-connection-manager')).toBeTruthy();
-
-    component.closeConnectionPanel();
-    fixture.detectChanges();
-    expect(component.connectionPanelOpen()).toBe(false);
+  it('should show a non-interactive ROS connection status', () => {
+    expect(fixture.nativeElement.querySelector('.connection-status')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.connection-status button')).toBeNull();
   });
 });

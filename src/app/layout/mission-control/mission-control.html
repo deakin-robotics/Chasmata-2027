@@ -24,21 +24,18 @@
     </nav>
 
     <div class="global-actions">
-      <button
-        matButton="outlined"
-        type="button"
-        class="connection-trigger"
+      <div
+        class="connection-status"
         [attr.data-status]="rosConnection.status()"
-        [attr.aria-expanded]="connectionPanelOpen()"
-        aria-controls="connection-panel"
-        (click)="toggleConnectionPanel()"
+        role="status"
+        aria-live="polite"
       >
         <mat-icon
           aria-hidden="true"
           [class.spinning]="rosConnection.isConnecting()"
         >{{ connectionIcon() }}</mat-icon>
         <span>{{ connectionLabel() }}</span>
-      </button>
+      </div>
 
       <button
         matButton="outlined"
@@ -56,32 +53,4 @@
   <main id="main-content" class="workspace">
     <router-outlet />
   </main>
-
-  @if (connectionPanelOpen()) {
-    <button
-      type="button"
-      class="panel-backdrop"
-      aria-label="Close connection settings"
-      (click)="closeConnectionPanel()"
-    ></button>
-
-    <aside id="connection-panel" class="connection-panel" aria-label="ROS connection settings">
-      <div class="panel-heading">
-        <div>
-          <p>System</p>
-          <h2>Connection settings</h2>
-        </div>
-        <button
-          matIconButton
-          type="button"
-          aria-label="Close connection settings"
-          (click)="closeConnectionPanel()"
-        >
-          <mat-icon>close</mat-icon>
-        </button>
-      </div>
-
-      <app-connection-manager />
-    </aside>
-  }
 </div>

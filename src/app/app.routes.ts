@@ -1,8 +1,8 @@
 import { Routes } from '@angular/router';
-import { ArmDashboard } from './layout/arm-dashboard/arm-dashboard';
+import { ArmDashboard } from './layout/arm/arm-dashboard/arm-dashboard';
 import { EcamPanel } from './layout/ecam-panel/ecam-panel';
 import { MissionControl } from './layout/mission-control/mission-control';
-import { PilotDashboard } from './layout/pilot-dashboard/pilot-dashboard';
+import { PilotDashboard } from './layout/pilot/pilot-dashboard/pilot-dashboard';
 import {
   armControlGuard,
   pilotControlExitGuard,

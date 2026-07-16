@@ -100,10 +100,19 @@
   justify-content: flex-end;
 }
 
-.connection-trigger {
+.connection-status {
   --connection-color: var(--dcr-color-offline);
 
+  display: inline-flex;
+  min-height: 2.25rem;
+  align-items: center;
+  gap: 0.4rem;
   border-color: color-mix(in srgb, var(--connection-color) 42%, var(--dcr-color-border)) !important;
+  border-style: solid;
+  border-width: 1px;
+  border-radius: 999px;
+  padding: 0 0.8rem;
+  background: color-mix(in srgb, var(--connection-color) 8%, transparent);
   color: var(--connection-color) !important;
 
   &[data-status='connected'] {
@@ -136,74 +145,9 @@
   overflow: hidden;
 }
 
-.panel-backdrop {
-  position: fixed;
-  z-index: 30;
-  inset: 0;
-  border: 0;
-  background: rgb(0 0 0 / 58%);
-  cursor: default;
-}
-
-.connection-panel {
-  position: fixed;
-  z-index: 40;
-  top: 0;
-  right: 0;
-  display: flex;
-  width: min(100%, 38rem);
-  height: 100dvh;
-  box-sizing: border-box;
-  flex-direction: column;
-  gap: 1.25rem;
-  overflow-y: auto;
-  border-left: 1px solid var(--dcr-color-border);
-  padding: 1rem;
-  background: var(--dcr-color-background);
-  box-shadow: -1.5rem 0 3rem rgb(0 0 0 / 35%);
-  animation: slide-in 180ms ease-out;
-}
-
-.panel-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-
-  p,
-  h2 {
-    margin: 0;
-  }
-
-  p {
-    color: var(--dcr-color-info);
-    font-size: 0.68rem;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-
-  h2 {
-    margin-top: 0.2rem;
-    font-size: 1.25rem;
-    font-weight: 600;
-  }
-}
-
-app-connection-manager {
-  width: 100%;
-}
-
 @keyframes spin {
   to {
     transform: rotate(360deg);
-  }
-}
-
-@keyframes slide-in {
-  from {
-    transform: translateX(1.5rem);
-    opacity: 0;
   }
 }
 
@@ -233,7 +177,7 @@ app-connection-manager {
     }
   }
 
-  .connection-trigger span,
+  .connection-status span,
   .estop-placeholder {
     font-size: 0.7rem;
   }
@@ -241,8 +185,7 @@ app-connection-manager {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .spinning,
-  .connection-panel {
+  .spinning {
     animation: none;
   }
 }

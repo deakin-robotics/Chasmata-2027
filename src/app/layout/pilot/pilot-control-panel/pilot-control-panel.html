@@ -1,0 +1,49 @@
+<section class="pilot-control-panel" aria-label="Pilot control panel">
+  <div
+    class="gamepad-status"
+    [attr.data-state]="gamepadConnected() ? 'connected' : 'unavailable'"
+    role="status"
+    aria-live="polite"
+  >
+    <span class="status-label">Gamepad</span>
+    <span class="status-value"><span class="status-dot"></span>{{ gamepadStatusLabel() }}</span>
+  </div>
+
+  <app-action-button
+    label="ROS Link"
+    [actionLabel]="rosActionLabel()"
+    [tone]="rosActionTone()"
+    [busy]="rosActionBusy()"
+    (pressed)="openRosConnectionSettings()"
+  />
+
+  <app-control-flow-connector
+    class="gamepad-stem"
+    variant="vertical"
+    [tone]="gamepadFlowTone()"
+  />
+
+  <app-control-flow-connector
+    class="gamepad-flow"
+    variant="top-right"
+    [tone]="gamepadFlowTone()"
+  />
+
+  <app-control-flow-connector
+    class="ros-flow"
+    variant="vertical"
+    [tone]="rosFlowTone()"
+  />
+
+  <app-control-switch
+    label="Master Drive"
+    [checked]="masterDriveEnabled()"
+    [tone]="masterDriveTone"
+    [disabled]="!masterDriveEnabled() && (!gamepadConnected() || !rosConnected())"
+    (checkedChange)="toggleMasterDriveControl($event)"
+  />
+
+  @if (readinessError(); as error) {
+    <p class="control-readiness" role="status">{{ error }}</p>
+  }
+</section>

@@ -1,10 +1,9 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { RosConnection } from '../../core/ros/ros-connection';
-import { ConnectionManager } from '../../features/connection/connection-manager/connection-manager';
 
 @Component({
   selector: 'app-mission-control',
@@ -15,14 +14,12 @@ import { ConnectionManager } from '../../features/connection/connection-manager/
     MatButtonModule,
     MatIconModule,
     MatTooltipModule,
-    ConnectionManager,
   ],
   templateUrl: './mission-control.html',
   styleUrl: './mission-control.scss',
 })
 export class MissionControl {
   readonly rosConnection = inject(RosConnection);
-  readonly connectionPanelOpen = signal(false);
 
   readonly connectionLabel = computed(() => {
     switch (this.rosConnection.status()) {
@@ -53,11 +50,4 @@ export class MissionControl {
     }
   });
 
-  toggleConnectionPanel(): void {
-    this.connectionPanelOpen.update((open) => !open);
-  }
-
-  closeConnectionPanel(): void {
-    this.connectionPanelOpen.set(false);
-  }
 }

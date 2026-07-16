@@ -24,7 +24,4 @@ describe('GamepadControlPanel', () => {
     expect(fixture.nativeElement.querySelector('app-gamepad-schematic')).toBeTruthy();
   });
 
-  it('should render the Master Drive Control switch', () => {
-    expect(fixture.nativeElement.querySelector('[role="switch"]')).toBeTruthy();
-  });
 });

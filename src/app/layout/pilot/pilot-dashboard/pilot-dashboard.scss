@@ -19,7 +19,7 @@ app-pilot-camera-layout {
   min-height: 0;
 }
 
-.operator-sidebar {
+.bird-view-sidebar {
   display: grid;
   min-width: 0;
   min-height: 0;
@@ -29,15 +29,23 @@ app-pilot-camera-layout {
   margin-right: clamp(0.75rem, 1.5vw, 2rem);
 }
 
-.gamepad-control-overlay {
+app-gamepad-control-panel {
   position: absolute;
   bottom: clamp(0.75rem, 1.5vw, 2rem);
   left: clamp(0.75rem, 1.5vw, 2rem);
   z-index: 1;
   width: clamp(10rem, 16vw, 16rem);
   height: auto;
-  aspect-ratio: 420 / 290;
+  aspect-ratio: 420 / 230;
   pointer-events: auto;
+}
+
+app-pilot-control-panel {
+  position: absolute;
+  top: clamp(0.75rem, 1.5vw, 2rem);
+  left: clamp(0.4rem, 0.8vw, 1rem);
+  z-index: 1;
+  width: clamp(14rem, 17vw, 17rem);
 }
 
 app-bird-view {

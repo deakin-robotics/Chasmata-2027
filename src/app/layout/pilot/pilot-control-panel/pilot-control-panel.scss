@@ -1,0 +1,94 @@
+:host {
+  display: block;
+}
+
+.pilot-control-panel {
+  display: grid;
+  grid-template-areas:
+    'gamepad ros'
+    'gamepad-stem ros-flow'
+    'gamepad-flow master'
+    'error error';
+  grid-template-columns: 1fr 1fr;
+  column-gap: 0.5rem;
+  row-gap: 0.6rem;
+  min-height: 4rem;
+  padding: 0.75rem;
+  border: 1px solid var(--dcr-color-border);
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--dcr-color-surface-raised) 92%, transparent);
+}
+
+.gamepad-status,
+app-action-button,
+app-control-flow-connector,
+app-control-switch {
+  justify-self: center;
+}
+
+.gamepad-status {
+  grid-area: gamepad;
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+}
+
+.status-label {
+  color: var(--dcr-color-neutral);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.status-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--dcr-color-offline);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.status-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.gamepad-status[data-state='connected'] .status-value {
+  color: var(--dcr-color-normal);
+}
+
+app-action-button {
+  grid-area: ros;
+}
+
+.gamepad-flow {
+  grid-area: gamepad-flow;
+  justify-self: center;
+}
+
+.gamepad-stem {
+  grid-area: gamepad-stem;
+  justify-self: center;
+}
+
+.ros-flow {
+  grid-area: ros-flow;
+}
+
+app-control-switch {
+  grid-area: master;
+}
+
+.control-readiness {
+  grid-area: error;
+  margin: 0;
+  color: var(--dcr-color-caution);
+  font-size: 0.65rem;
+  line-height: 1.2;
+}
