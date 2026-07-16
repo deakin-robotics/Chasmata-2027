@@ -11,6 +11,7 @@
   grid-template-columns: minmax(0, 2fr) minmax(18rem, 1fr);
   gap: clamp(0.75rem, 1.5vw, 2rem);
   overflow: hidden;
+  position: relative;
 }
 
 app-pilot-camera-layout {
@@ -18,12 +19,25 @@ app-pilot-camera-layout {
   min-height: 0;
 }
 
-.bird-view-panel {
+.operator-sidebar {
   display: grid;
   min-width: 0;
   min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
   margin-right: clamp(0.75rem, 1.5vw, 2rem);
-  place-items: center;
+}
+
+.gamepad-control-overlay {
+  position: absolute;
+  bottom: clamp(0.75rem, 1.5vw, 2rem);
+  left: clamp(0.75rem, 1.5vw, 2rem);
+  z-index: 1;
+  width: clamp(10rem, 16vw, 16rem);
+  height: auto;
+  aspect-ratio: 420 / 290;
+  pointer-events: auto;
 }
 
 app-bird-view {

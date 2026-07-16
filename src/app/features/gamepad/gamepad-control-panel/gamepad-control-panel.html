@@ -1,0 +1,20 @@
+<app-gamepad-schematic />
+
+<div class="master-drive-control">
+  <span>Master Drive Control</span>
+  <button
+    class="master-drive-switch"
+    type="button"
+    role="switch"
+    [class.active]="masterDriveEnabled()"
+    [attr.aria-checked]="masterDriveEnabled()"
+    [attr.aria-label]="masterDriveEnabled() ? 'Disable Master Drive Control' : 'Enable Master Drive Control'"
+    (click)="toggleMasterDriveControl()"
+  >
+    <span>{{ masterDriveEnabled() ? 'ON' : 'OFF' }}</span>
+  </button>
+</div>
+
+@if (readinessError(); as error) {
+  <p class="control-readiness" role="status">{{ error }}</p>
+}

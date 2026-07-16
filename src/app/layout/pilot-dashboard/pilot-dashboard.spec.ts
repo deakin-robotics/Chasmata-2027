@@ -37,4 +37,8 @@ describe('PilotDashboard', () => {
   it('should render the bird\'s-eye view panel', () => {
     expect(fixture.nativeElement.querySelector('app-bird-view')).toBeTruthy();
   });
+
+  it('should render the controller input overlay', () => {
+    expect(fixture.nativeElement.querySelector('app-gamepad-control-panel')).toBeTruthy();
+  });
 });

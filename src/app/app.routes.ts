@@ -3,6 +3,11 @@ import { ArmDashboard } from './layout/arm-dashboard/arm-dashboard';
 import { EcamPanel } from './layout/ecam-panel/ecam-panel';
 import { MissionControl } from './layout/mission-control/mission-control';
 import { PilotDashboard } from './layout/pilot-dashboard/pilot-dashboard';
+import {
+  armControlGuard,
+  pilotControlExitGuard,
+  pilotControlGuard,
+} from './core/control/control-guards';
 
 export const routes: Routes = [
   {
@@ -12,10 +17,13 @@ export const routes: Routes = [
       {
         path: 'pilot',
         component: PilotDashboard,
+        canActivate: [pilotControlGuard],
+        canDeactivate: [pilotControlExitGuard],
       },
       {
         path: 'arm',
         component: ArmDashboard,
+        canActivate: [armControlGuard],
       },
       {
         path: 'ecam',
@@ -24,7 +32,7 @@ export const routes: Routes = [
       {
         path: '',
         pathMatch: 'full',
-        redirectTo: 'pilot',
+        redirectTo: 'ecam',
       },
     ],
   },
