@@ -18,11 +18,15 @@ import {
   ControlFlowConnector,
   ControlFlowConnectorTone,
 } from '../../../shared/control-flow-connector/control-flow-connector';
+import {
+  StatusIndicator,
+  StatusIndicatorTone,
+} from '../../../shared/status-indicator/status-indicator';
 
 /** Groups the Pilot workspace's operational controls. */
 @Component({
   selector: 'app-pilot-control-panel',
-  imports: [ActionButton, ControlFlowConnector, ControlSwitch],
+  imports: [ActionButton, ControlFlowConnector, ControlSwitch, StatusIndicator],
   templateUrl: './pilot-control-panel.html',
   styleUrl: './pilot-control-panel.scss',
 })
@@ -39,6 +43,9 @@ export class PilotControlPanel {
   readonly gamepadConnected = this.gamepad.connected;
   readonly gamepadStatusLabel = computed(() =>
     this.gamepadConnected() ? 'Connected' : 'Not detected',
+  );
+  readonly gamepadStatusTone = computed<StatusIndicatorTone>(() =>
+    this.gamepadConnected() ? 'normal' : 'neutral',
   );
   readonly gamepadFlowTone = computed<ControlFlowConnectorTone>(() =>
     this.gamepadConnected() ? 'normal' : 'neutral',

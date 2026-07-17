@@ -23,9 +23,10 @@ app-pilot-camera-layout {
   display: grid;
   min-width: 0;
   min-height: 0;
-  grid-template-rows: minmax(0, 1fr);
-  align-items: center;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-items: stretch;
   gap: 1rem;
+  margin-block: 0.5rem;
   margin-right: clamp(0.75rem, 1.5vw, 2rem);
 }
 
@@ -41,11 +42,8 @@ app-gamepad-control-panel {
 }
 
 app-pilot-control-panel {
-  position: absolute;
-  top: clamp(0.75rem, 1.5vw, 2rem);
-  left: clamp(0.4rem, 0.8vw, 1rem);
-  z-index: 1;
-  width: clamp(14rem, 17vw, 17rem);
+  height: 100%;
+  min-width: 0;
 }
 
 app-bird-view {

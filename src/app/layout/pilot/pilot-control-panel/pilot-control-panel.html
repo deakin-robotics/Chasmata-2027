@@ -1,13 +1,13 @@
 <section class="pilot-control-panel" aria-label="Pilot control panel">
-  <div
-    class="gamepad-status"
-    [attr.data-state]="gamepadConnected() ? 'connected' : 'unavailable'"
-    role="status"
-    aria-live="polite"
-  >
-    <span class="status-label">Gamepad</span>
-    <span class="status-value"><span class="status-dot"></span>{{ gamepadStatusLabel() }}</span>
-  </div>
+  <nav class="control-page-tabs" aria-label="Pilot control pages">
+    <span class="active-tab" aria-current="page">Drive</span>
+  </nav>
+
+  <app-status-indicator
+    label="Gamepad"
+    [status]="gamepadStatusLabel()"
+    [tone]="gamepadStatusTone()"
+  />
 
   <app-action-button
     label="ROS Link"
