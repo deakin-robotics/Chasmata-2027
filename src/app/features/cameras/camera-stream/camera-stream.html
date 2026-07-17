@@ -12,7 +12,6 @@
       <img
         class="stream-image"
         [src]="activeUrl"
-        [alt]="label + ' live feed'"
         [style.transform]="'rotate(' + rotation() + 'deg)'"
         (load)="onImageLoad()"
         (error)="onImageError()"
@@ -43,6 +42,9 @@
       </button>
       <button matIconButton type="button" aria-label="Rotate camera right" (click)="rotateClockwise()">
         <mat-icon>rotate_right</mat-icon>
+      </button>
+      <button matIconButton type="button" aria-label="Camera stream settings" (click)="openSettings()">
+        <mat-icon>settings</mat-icon>
       </button>
       <button matIconButton type="button" [attr.aria-label]="isFullscreen() ? 'Exit fullscreen' : 'View camera fullscreen'" (click)="toggleFullscreen()">
         <mat-icon>{{ isFullscreen() ? 'fullscreen_exit' : 'fullscreen' }}</mat-icon>

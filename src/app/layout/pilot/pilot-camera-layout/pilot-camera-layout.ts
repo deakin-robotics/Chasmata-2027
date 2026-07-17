@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { CameraStream } from '../../../features/cameras/camera-stream/camera-stream';
 import { RoverSchematic } from '../../../features/telemetry/rover-schematic/rover-schematic';
 
@@ -15,6 +15,8 @@ import { RoverSchematic } from '../../../features/telemetry/rover-schematic/rove
   styleUrl: './pilot-camera-layout.scss',
 })
 export class PilotCameraLayout {
-  readonly frontCameraUrl = 'http://dcr-rover.local:8080/?action=stream';
-  readonly rearCameraUrl = 'http://dcr-rover.local:8090/?action=stream';
+  readonly frontCameraUrl = signal('http://dcr-rover.local:8080/?action=stream');
+  readonly leftCameraUrl = signal('');
+  readonly rightCameraUrl = signal('');
+  readonly rearCameraUrl = signal('http://dcr-rover.local:8090/?action=stream');
 }

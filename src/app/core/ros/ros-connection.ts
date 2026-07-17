@@ -135,7 +135,7 @@ export class RosConnection implements OnDestroy {
 
       if (this.allowReconnect) {
         this.scheduleReconnect();
-      } else {
+      } else if (this.statusState() !== 'error') {
         this.statusState.set('disconnected');
       }
     });
@@ -156,7 +156,7 @@ export class RosConnection implements OnDestroy {
         `Unable to reconnect after ${MAX_RECONNECT_ATTEMPTS} attempts.`,
       );
       this.allowReconnect = false;
-      this.statusState.set('disconnected');
+      this.statusState.set('error');
       return;
     }
 

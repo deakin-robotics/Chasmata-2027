@@ -1,9 +1,12 @@
 import {
   Component,
   ElementRef,
+  EventEmitter,
   HostListener,
   Input,
+  inject,
   OnChanges,
+  Output,
   OnDestroy,
   SimpleChanges,
   ViewChild,
@@ -11,7 +14,9 @@ import {
   signal,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
+import { CameraStreamSettingsDialog } from './camera-stream-settings-dialog/camera-stream-settings-dialog';
 
 export type CameraStreamStatus =
   | 'not-configured'
@@ -41,17 +46,20 @@ export class CameraStream implements OnChanges, OnDestroy {
   @Input() label = 'Camera';
   @Input() url = '';
   @Input() initialRotation = 0; // The initial rotation of the camera in degree. In case the camera is mounted upside down
+  @Output() readonly urlChange = new EventEmitter<string>();
 
   @ViewChild('streamFrame') private streamFrame?: ElementRef<HTMLElement>;
 
   private loadTimer: ReturnType<typeof setTimeout> | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly dialog = inject(MatDialog);
 
   readonly status = signal<CameraStreamStatus>('not-configured');
   readonly retryAttempt = signal(0);
   readonly rotation = signal(0);
   readonly streamUrl = signal<string | null>(null);
   readonly isFullscreen = signal(false);
+  private readonly configuredUrl = signal('');
 
   readonly statusLabel = computed(() => {
     switch (this.status()) {
@@ -93,6 +101,7 @@ export class CameraStream implements OnChanges, OnDestroy {
     }
 
     if (changes['url']) {
+      this.configuredUrl.set(this.url);
       this.retryAttempt.set(0);
       this.beginLoading();
     }
@@ -127,6 +136,22 @@ export class CameraStream implements OnChanges, OnDestroy {
     this.rotation.update((rotation) => this.normalizeRotation(rotation - 90));
   }
 
+  openSettings(): void {
+    this.dialog
+      .open(CameraStreamSettingsDialog, {
+        data: { label: this.label, url: this.configuredUrl() },
+      })
+      .afterClosed()
+      .subscribe((url: string | undefined) => {
+        if (url === undefined || url === this.configuredUrl()) return;
+
+        this.configuredUrl.set(url);
+        this.urlChange.emit(url);
+        this.retryAttempt.set(0);
+        this.beginLoading();
+      });
+  }
+
   async toggleFullscreen(): Promise<void> {
     const frame = this.streamFrame?.nativeElement;
     if (!frame) return;
@@ -148,7 +173,7 @@ export class CameraStream implements OnChanges, OnDestroy {
 
   /** Starts a fresh stream request and its load-timeout watchdog. */
   private beginLoading(): void {
-    const url = this.url.trim();
+    const url = this.configuredUrl().trim();
     this.clearTimers();
 
     if (!url) {
@@ -170,7 +195,7 @@ export class CameraStream implements OnChanges, OnDestroy {
 
   /** Schedules the next stream load attempt after a fixed delay. */
   private scheduleRetry(): void {
-    if (!this.url.trim()) {
+    if (!this.configuredUrl().trim()) {
       this.status.set('not-configured');
       return;
     }

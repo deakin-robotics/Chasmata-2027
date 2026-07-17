@@ -5,6 +5,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatDialogRef } from '@angular/material/dialog';
 import {
   RosConnection,
   RosConnectionStatus,
@@ -25,6 +26,7 @@ import {
 })
 export class ConnectionManager {
   readonly rosConnection = inject(RosConnection);
+  private readonly dialogRef = inject(MatDialogRef<ConnectionManager>, { optional: true });
 
   readonly endpoint = new FormControl('localhost:9090', {
     nonNullable: true,
@@ -69,6 +71,7 @@ export class ConnectionManager {
     if (this.endpoint.invalid || this.rosConnection.isConnecting()) return;
 
     this.rosConnection.connect(this.endpoint.value);
+    this.dialogRef?.close();
   }
 
   disconnect(): void {

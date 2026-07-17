@@ -1,0 +1,19 @@
+<h2 mat-dialog-title>{{ data.label }} settings</h2>
+
+<mat-dialog-content>
+  <form (submit)="$event.preventDefault(); apply()">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Stream URL</mat-label>
+      <input matInput type="url" autocomplete="url" spellcheck="false" [formControl]="url" />
+      <mat-icon matPrefix aria-hidden="true">videocam</mat-icon>
+      @if (url.hasError('pattern')) {
+        <mat-error>Enter a valid HTTP or HTTPS URL.</mat-error>
+      }
+    </mat-form-field>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button matButton type="button" [mat-dialog-close]="undefined">Cancel</button>
+  <button matButton="filled" type="button" [disabled]="url.invalid" (click)="apply()">Apply</button>
+</mat-dialog-actions>

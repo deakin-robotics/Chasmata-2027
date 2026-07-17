@@ -22,8 +22,8 @@ function openConfirmation(data: ControlConfirmationDialogData) {
 /** Requires explicit confirmation before opening the Pilot workspace. */
 export const pilotControlGuard: CanActivateFn = () => {
   return openConfirmation({
-    title: 'Open Pilot workspace?',
-    confirmLabel: 'Open workspace',
+    title: 'Enter Pilot Station?',
+    confirmLabel: 'Enter',
   }).pipe(map((confirmed) => confirmed === true));
 };
 
@@ -36,7 +36,7 @@ export const pilotControlExitGuard: CanDeactivateFn<unknown> = () => {
 /** Requires explicit confirmation before opening the Arm workspace. */
 export const armControlGuard: CanActivateFn = () => {
   return openConfirmation({
-    title: 'Open Arm workspace?',
-    confirmLabel: 'Open workspace',
+    title: 'Enter Arm Station?',
+    confirmLabel: 'Enter',
   }).pipe(map((confirmed) => confirmed === true));
 };
