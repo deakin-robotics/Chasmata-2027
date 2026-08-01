@@ -1,0 +1,34 @@
+name: GUI Pull Request Build
+
+on:
+  pull_request:
+    paths:
+      - 'gui/**'
+
+jobs:
+  build-gui:
+    name: Build GUI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: gui/package-lock.json
+
+      - name: Install dependencies
+        working-directory: gui
+        run: npm ci
+
+      - name: Build GUI
+        working-directory: gui
+        run: npm run build
+
+      - name: Run GUI tests
+        working-directory: gui
+        run: npm test
