@@ -1,0 +1,15 @@
+<div class="control-switch">
+  <span class="control-switch-label">{{ label() }}</span>
+  <button
+    type="button"
+    role="switch"
+    [class]="'tone-' + tone() + (checked() ? ' active' : '')"
+    [attr.aria-checked]="checked()"
+    [attr.aria-label]="label()"
+    [disabled]="disabled()"
+    (click)="toggle()"
+  >
+    <span class="state-off">OFF</span>
+    <span class="state-on">ON</span>
+  </button>
+</div>

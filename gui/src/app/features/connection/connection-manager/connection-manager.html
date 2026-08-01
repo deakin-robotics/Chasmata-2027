@@ -1,0 +1,78 @@
+<mat-card
+  class="connection-card"
+  appearance="outlined"
+  [attr.data-status]="rosConnection.status()"
+>
+  <mat-card-header>
+    <div class="header-content">
+      <div>
+        <mat-card-title>Rover connection</mat-card-title>
+        <mat-card-subtitle>ROSbridge WebSocket</mat-card-subtitle>
+      </div>
+
+      <div class="status" role="status" aria-live="polite">
+        <mat-icon
+          aria-hidden="true"
+          [class.spinning]="rosConnection.isConnecting()"
+        >{{ statusIcon() }}</mat-icon>
+        <span>{{ statusLabel() }}</span>
+      </div>
+    </div>
+  </mat-card-header>
+
+  <mat-card-content>
+    <p class="description">{{ statusDescription() }}</p>
+
+    <form (submit)="$event.preventDefault(); connect()">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>ROSbridge endpoint</mat-label>
+        <input
+          matInput
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="localhost:9090"
+          [formControl]="endpoint"
+          [readonly]="canDisconnect()"
+        />
+        <mat-icon matPrefix aria-hidden="true">lan</mat-icon>
+
+        @if (endpoint.hasError('required')) {
+          <mat-error>A ROSbridge endpoint is required.</mat-error>
+        }
+      </mat-form-field>
+
+      <div class="actions">
+        @if (canDisconnect()) {
+          @if (rosConnection.status() === 'reconnecting') {
+            <button matButton="outlined" type="button" (click)="disconnect()">
+              <mat-icon aria-hidden="true">cancel</mat-icon>
+              Stop reconnecting
+            </button>
+          } @else {
+            <button matButton="outlined" type="button" (click)="disconnect()">
+              <mat-icon aria-hidden="true">link_off</mat-icon>
+              Disconnect
+            </button>
+          }
+        } @else {
+          <button matButton="filled" type="submit" [disabled]="endpoint.invalid">
+            Connect
+          </button>
+        }
+      </div>
+    </form>
+
+    @if (rosConnection.error(); as error) {
+      <div class="error-message" role="alert">
+        <mat-icon aria-hidden="true">warning</mat-icon>
+        <span>{{ error }}</span>
+      </div>
+    }
+  </mat-card-content>
+
+  <mat-card-footer>
+    <span class="endpoint-label">Endpoint</span>
+    <code>{{ rosConnection.url() ?? 'Not configured' }}</code>
+  </mat-card-footer>
+</mat-card>

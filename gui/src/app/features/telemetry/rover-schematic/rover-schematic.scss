@@ -1,0 +1,53 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.rover-schematic {
+  width: min(100%, 16rem);
+  color: var(--dcr-color-text);
+}
+
+svg {
+  display: block;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.direction-line,
+.front-chevron {
+  fill: none;
+  stroke: var(--dcr-color-info);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.camera {
+  fill: var(--dcr-color-info);
+}
+
+.wheel {
+  fill: var(--dcr-color-offline);
+  stroke: var(--dcr-color-neutral);
+  stroke-width: 1;
+}
+
+.chassis {
+  fill: #28313b;
+  stroke: var(--dcr-color-neutral);
+  stroke-width: 2;
+}
+
+.chassis-detail {
+  fill: none;
+  stroke: #43505f;
+  stroke-width: 1.5;
+}
+
+.centre-line {
+  fill: none;
+  stroke: #43505f;
+  stroke-dasharray: 5 5;
+  stroke-width: 1.5;
+}

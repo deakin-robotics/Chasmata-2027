@@ -1,0 +1,7 @@
+<main class="pilot-camera-layout" aria-label="Pilot camera layout">
+  <app-camera-stream class="front-camera" label="Front camera" [url]="frontCameraUrl()" (urlChange)="frontCameraUrl.set($event)" />
+  <app-camera-stream class="left-camera" label="Left side camera" [url]="leftCameraUrl()" (urlChange)="leftCameraUrl.set($event)" />
+  <app-rover-schematic class="rover-schematic" />
+  <app-camera-stream class="right-camera" label="Right side camera" [url]="rightCameraUrl()" (urlChange)="rightCameraUrl.set($event)" />
+  <app-camera-stream class="rear-camera" label="Rear camera" [url]="rearCameraUrl()" (urlChange)="rearCameraUrl.set($event)" />
+</main>

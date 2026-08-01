@@ -1,0 +1,53 @@
+// Include theming for Angular Material with `mat.theme()`.
+// This Sass mixin will define CSS variables that are used for styling Angular Material
+// components according to the Material 3 design spec.
+// Learn more about theming and how to use it for your application's
+// custom components at https://material.angular.dev/guide/theming
+@use '@angular/material' as mat;
+
+:root {
+  // Airbus ECAM-inspired operational colour semantics. See docs/design-system.md.
+  --dcr-color-normal: #55b987;
+  --dcr-color-caution: #e0ad4f;
+  --dcr-color-critical: #e05b65;
+  --dcr-color-info: #62a8e5;
+  --dcr-color-neutral: #8f9baa;
+  --dcr-color-offline: #697482;
+
+  --dcr-color-text: #d8dee9;
+  --dcr-color-surface: #181d23;
+  --dcr-color-surface-raised: #20262e;
+  --dcr-color-background: #111418;
+  --dcr-color-border: #303844;
+}
+
+html {
+  height: 100%;
+  @include mat.theme(
+    (
+      color: (
+        primary: mat.$azure-palette,
+        tertiary: mat.$blue-palette,
+      ),
+      typography: Roboto,
+      density: 0,
+    )
+  );
+}
+
+body {
+  color-scheme: dark;
+
+  // Set a default background, font and text colors for the application using
+  // Angular Material's system-level CSS variables. Learn more about these
+  // variables at https://material.angular.dev/guide/system-variables
+  background-color: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-medium);
+
+  // Reset the user agent margin.
+  margin: 0;
+  min-width: 20rem;
+  height: 100%;
+}
+/* You can add global styles to this file, and also import other style files */

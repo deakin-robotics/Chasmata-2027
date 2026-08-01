@@ -1,0 +1,32 @@
+<section class="rover-schematic" aria-label="Rover schematic">
+  <svg
+    viewBox="0 0 320 430"
+    role="img"
+    aria-labelledby="rover-title rover-description"
+  >
+    <title id="rover-title">Top-down rover schematic</title>
+    <desc id="rover-description">
+      A static symbolic rover with six wheels, four camera markers, and a front direction line.
+    </desc>
+
+    <path class="direction-line" d="M160 68V37M150 47l10-10 10 10" />
+
+    <rect class="camera camera-front" data-camera="front" x="149" y="70" width="22" height="10" rx="2" />
+    <rect class="camera camera-left" data-camera="left" x="93" y="177" width="12" height="22" rx="2" />
+    <rect class="camera camera-right" data-camera="right" x="215" y="177" width="12" height="22" rx="2" />
+    <rect class="camera camera-rear" data-camera="rear" x="149" y="350" width="22" height="10" rx="2" />
+
+    <rect class="wheel" data-wheel="front-left" x="67" y="108" width="32" height="58" rx="5" />
+    <rect class="wheel" data-wheel="middle-left" x="67" y="186" width="32" height="58" rx="5" />
+    <rect class="wheel" data-wheel="rear-left" x="67" y="264" width="32" height="58" rx="5" />
+
+    <rect class="wheel" data-wheel="front-right" x="221" y="108" width="32" height="58" rx="5" />
+    <rect class="wheel" data-wheel="middle-right" x="221" y="186" width="32" height="58" rx="5" />
+    <rect class="wheel" data-wheel="rear-right" x="221" y="264" width="32" height="58" rx="5" />
+
+    <rect class="chassis" x="105" y="88" width="110" height="252" rx="10" />
+    <rect class="chassis-detail" x="119" y="104" width="82" height="220" rx="6" />
+    <path class="centre-line" d="M160 113V315" />
+    <path class="front-chevron" d="M143 120l17-13 17 13" />
+  </svg>
+</section>

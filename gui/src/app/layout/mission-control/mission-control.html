@@ -1,0 +1,56 @@
+<div class="mission-control-shell">
+  <header class="top-bar">
+    <div class="brand" aria-label="Deakin Rover Mission Control">
+      <div class="brand-mark" aria-hidden="true">DCR</div>
+      <div>
+        <p>Deakin Rover</p>
+        <h1>Mission Control</h1>
+      </div>
+    </div>
+
+    <nav class="operator-navigation" aria-label="Operator views">
+      <a matButton routerLink="/pilot" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+        <mat-icon aria-hidden="true">sports_esports</mat-icon>
+        Pilot
+      </a>
+      <a matButton routerLink="/ecam" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+        <mat-icon aria-hidden="true">warning_amber</mat-icon>
+        ECAM
+      </a>
+      <a matButton routerLink="/arm" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+        <mat-icon aria-hidden="true">precision_manufacturing</mat-icon>
+        Arm
+      </a>
+    </nav>
+
+    <div class="global-actions">
+      <div
+        class="connection-status"
+        [attr.data-status]="rosConnection.status()"
+        role="status"
+        aria-live="polite"
+      >
+        <mat-icon
+          aria-hidden="true"
+          [class.spinning]="rosConnection.isConnecting()"
+        >{{ connectionIcon() }}</mat-icon>
+        <span>{{ connectionLabel() }}</span>
+      </div>
+
+      <button
+        matButton="outlined"
+        type="button"
+        class="estop-placeholder"
+        disabled
+        matTooltip="Emergency stop is not implemented yet"
+      >
+        <mat-icon aria-hidden="true">emergency</mat-icon>
+        E-stop
+      </button>
+    </div>
+  </header>
+
+  <main id="main-content" class="workspace">
+    <router-outlet />
+  </main>
+</div>

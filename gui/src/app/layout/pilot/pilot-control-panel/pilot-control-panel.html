@@ -1,0 +1,49 @@
+<section class="pilot-control-panel" aria-label="Pilot control panel">
+  <nav class="control-page-tabs" aria-label="Pilot control pages">
+    <span class="active-tab" aria-current="page">Drive</span>
+  </nav>
+
+  <app-status-indicator
+    label="Gamepad"
+    [status]="gamepadStatusLabel()"
+    [tone]="gamepadStatusTone()"
+  />
+
+  <app-action-button
+    label="ROS Link"
+    [actionLabel]="rosActionLabel()"
+    [tone]="rosActionTone()"
+    [busy]="rosActionBusy()"
+    (pressed)="openRosConnectionSettings()"
+  />
+
+  <app-control-flow-connector
+    class="gamepad-stem"
+    variant="vertical"
+    [tone]="gamepadFlowTone()"
+  />
+
+  <app-control-flow-connector
+    class="gamepad-flow"
+    variant="top-right"
+    [tone]="gamepadFlowTone()"
+  />
+
+  <app-control-flow-connector
+    class="ros-flow"
+    variant="vertical"
+    [tone]="rosFlowTone()"
+  />
+
+  <app-control-switch
+    label="Master Drive"
+    [checked]="masterDriveEnabled()"
+    [tone]="masterDriveTone"
+    [disabled]="!masterDriveEnabled() && (!gamepadConnected() || !rosConnected())"
+    (checkedChange)="toggleMasterDriveControl($event)"
+  />
+
+  @if (readinessError(); as error) {
+    <p class="control-readiness" role="status">{{ error }}</p>
+  }
+</section>

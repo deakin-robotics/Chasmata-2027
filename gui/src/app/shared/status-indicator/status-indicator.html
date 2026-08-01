@@ -1,0 +1,6 @@
+<div class="status-indicator" role="status" aria-live="polite">
+  <span class="status-label">{{ label() }}</span>
+  <span class="status-value" [class]="'tone-' + tone()">
+    <span class="status-dot"></span>{{ status() }}
+  </span>
+</div>
