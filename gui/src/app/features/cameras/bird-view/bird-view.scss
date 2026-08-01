@@ -1,0 +1,51 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.bird-view {
+  display: grid;
+  min-height: 0;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid var(--dcr-color-border);
+  border-radius: 0.65rem;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--dcr-color-info) 8%, transparent),
+      transparent 55%
+    ),
+    var(--dcr-color-surface);
+  color: var(--dcr-color-text);
+  text-align: center;
+}
+
+.placeholder-content {
+  padding: 1.5rem;
+
+  h2,
+  p {
+    margin: 0;
+  }
+
+  h2 {
+    margin-top: 0.25rem;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  p {
+    margin-top: 0.5rem;
+    color: var(--dcr-color-neutral);
+    font-size: 0.8rem;
+  }
+}
+
+.eyebrow {
+  color: var(--dcr-color-info);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}

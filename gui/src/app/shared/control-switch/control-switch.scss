@@ -1,0 +1,81 @@
+:host {
+  display: block;
+}
+
+.control-switch {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.control-switch-label {
+  color: var(--dcr-color-neutral);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+button {
+  --switch-color: var(--dcr-color-info);
+
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  width: 5rem;
+  min-height: 1.75rem;
+  padding: 0.15rem;
+  border: 1px solid var(--dcr-color-offline);
+  border-radius: 0.25rem;
+  background: color-mix(in srgb, var(--dcr-color-offline) 18%, transparent);
+  color: var(--dcr-color-offline);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.6rem;
+  font-weight: 800;
+}
+
+button::before {
+  position: absolute;
+  top: 0.15rem;
+  bottom: 0.15rem;
+  left: 0.15rem;
+  width: calc(50% - 0.15rem);
+  border-radius: 0.15rem;
+  background: var(--dcr-color-neutral);
+  content: '';
+  transition: transform 150ms ease, background-color 150ms ease;
+}
+
+button.active {
+  border-color: color-mix(in srgb, var(--switch-color) 75%, transparent);
+  background: color-mix(in srgb, var(--switch-color) 16%, transparent);
+}
+
+button.active::before {
+  background: var(--switch-color);
+  transform: translateX(100%);
+}
+
+.tone-info { --switch-color: var(--dcr-color-info); }
+.tone-normal { --switch-color: var(--dcr-color-normal); }
+.tone-caution { --switch-color: var(--dcr-color-caution); }
+.tone-critical { --switch-color: var(--dcr-color-critical); }
+.tone-neutral { --switch-color: var(--dcr-color-neutral); }
+
+button span {
+  position: relative;
+  z-index: 1;
+  color: var(--dcr-color-offline);
+  text-align: center;
+}
+
+button:not(.active) .state-off,
+button.active .state-on {
+  color: var(--dcr-color-background);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}

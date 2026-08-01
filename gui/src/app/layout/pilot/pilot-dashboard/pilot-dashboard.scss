@@ -1,0 +1,51 @@
+:host {
+  display: block;
+  height: 100%;
+  min-height: 0;
+}
+
+.pilot-dashboard {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-columns: minmax(0, 2fr) minmax(18rem, 1fr);
+  gap: clamp(0.75rem, 1.5vw, 2rem);
+  overflow: hidden;
+  position: relative;
+}
+
+app-pilot-camera-layout {
+  min-width: 0;
+  min-height: 0;
+}
+
+.bird-view-sidebar {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: 1rem;
+  margin-block: 0.5rem;
+  margin-right: clamp(0.75rem, 1.5vw, 2rem);
+}
+
+app-gamepad-control-panel {
+  position: absolute;
+  bottom: clamp(0.75rem, 1.5vw, 2rem);
+  left: clamp(0.75rem, 1.5vw, 2rem);
+  z-index: 1;
+  width: clamp(10rem, 16vw, 16rem);
+  height: auto;
+  aspect-ratio: 420 / 230;
+  pointer-events: auto;
+}
+
+app-pilot-control-panel {
+  height: 100%;
+  min-width: 0;
+}
+
+app-bird-view {
+  width: 100%;
+}

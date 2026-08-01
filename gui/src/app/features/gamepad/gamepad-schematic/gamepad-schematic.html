@@ -1,0 +1,46 @@
+<svg
+  class="command-link"
+  [class.active]="isCommandPublishing()"
+  viewBox="0 0 24 24"
+  role="img"
+  aria-label="Drive command transmission status"
+>
+  <path d="M4.5 9.5a10.5 10.5 0 0 1 15 0" />
+  <path d="M7.5 12.5a6.25 6.25 0 0 1 9 0" />
+  <path d="M10.5 15.5a2.1 2.1 0 0 1 3 0" />
+  <circle cx="12" cy="18.5" r="1" />
+</svg>
+
+<svg class="controller" viewBox="0 0 420 230" role="img" aria-label="Xbox-style controller input monitor">
+    <path class="controller-body" d="M210 50C185 50 168 35 149 35C132 35 116 43 95 54C72 66 61 84 55 106V180C47 203 60 221 76 219C84 218 92 212 101 203L140 167C149 159 160 155 173 155H247C260 155 271 159 280 167L319 203C328 212 336 218 344 219C360 221 373 203 365 180V106C359 84 348 66 325 54C304 43 288 35 271 35C252 35 235 50 210 50Z" />
+
+    <g class="d-pad" transform="translate(14 0)" aria-hidden="true">
+      <rect x="142" y="124" width="17" height="17" rx="3" [class.active]="isButtonPressed(12)" />
+      <rect x="142" y="155" width="17" height="17" rx="3" [class.active]="isButtonPressed(13)" />
+      <rect x="126" y="140" width="17" height="17" rx="3" [class.active]="isButtonPressed(14)" />
+      <rect x="159" y="140" width="17" height="17" rx="3" [class.active]="isButtonPressed(15)" />
+    </g>
+
+    <g class="stick-base" aria-hidden="true">
+      <circle cx="115" cy="90" r="28" />
+      <circle cx="250" cy="145" r="28" />
+    </g>
+    <g class="stick" [class.active]="isStickMoved(0, 1)" [attr.transform]="'translate(' + stickOffset(0) + ' ' + stickOffset(1) + ')'" aria-hidden="true">
+      <circle cx="115" cy="90" r="18" />
+    </g>
+    <g class="stick" [class.active]="isStickMoved(2, 3)" [attr.transform]="'translate(' + stickOffset(2) + ' ' + stickOffset(3) + ')'" aria-hidden="true">
+      <circle cx="250" cy="145" r="18" />
+    </g>
+
+    <g class="face-buttons" transform="translate(-14 -12)" aria-hidden="true">
+      <circle class="button-y" cx="318" cy="78" r="13" [class.active]="isButtonPressed(3)" />
+      <circle class="button-b" cx="339" cy="99" r="13" [class.active]="isButtonPressed(1)" />
+      <circle class="button-x" cx="297" cy="99" r="13" [class.active]="isButtonPressed(2)" />
+      <circle class="button-a" cx="318" cy="120" r="13" [class.active]="isButtonPressed(0)" />
+      <text x="318" y="83">Y</text>
+      <text x="339" y="104">B</text>
+      <text x="297" y="104">X</text>
+      <text x="318" y="125">A</text>
+    </g>
+
+  </svg>

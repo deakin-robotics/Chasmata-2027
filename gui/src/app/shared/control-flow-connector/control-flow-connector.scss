@@ -1,0 +1,21 @@
+:host { display: inline-block; line-height: 0; }
+
+.connector {
+  --connector-color: var(--dcr-color-neutral);
+
+  display: block;
+  fill: none;
+  stroke: var(--connector-color);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.vertical { width: 1rem; height: 1rem; stroke-width: 3; }
+.horizontal { width: 1rem; height: 1rem; stroke-width: 3; }
+.corner { width: 4rem; height: 4rem; stroke-width: 1.5; }
+
+.tone-neutral { --connector-color: var(--dcr-color-neutral); }
+.tone-info { --connector-color: var(--dcr-color-info); }
+.tone-normal { --connector-color: var(--dcr-color-normal); }
+.tone-caution { --connector-color: var(--dcr-color-caution); }
+.tone-critical { --connector-color: var(--dcr-color-critical); }

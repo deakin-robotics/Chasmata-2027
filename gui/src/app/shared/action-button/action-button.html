@@ -1,0 +1,16 @@
+<div class="action-button">
+  <span class="action-button-label">{{ label() }}</span>
+  <button
+    type="button"
+    [class]="'tone-' + tone()"
+    [disabled]="disabled()"
+    [attr.aria-busy]="busy()"
+    [attr.aria-label]="label()"
+    (click)="requestAction()"
+  >
+    @if (busy()) {
+      <span class="busy-indicator" aria-hidden="true"></span>
+    }
+    <span>{{ actionLabel() }}</span>
+  </button>
+</div>

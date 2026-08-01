@@ -1,0 +1,61 @@
+<section class="camera-stream" [attr.data-status]="status()">
+  <header class="stream-header">
+    <h2>{{ label }}</h2>
+    <span class="status" [attr.data-status]="status()" aria-live="polite">
+      <mat-icon aria-hidden="true" [class.spinning]="isConnecting()">{{ statusIcon() }}</mat-icon>
+      {{ statusLabel() }}
+    </span>
+  </header>
+
+  <div #streamFrame class="stream-frame" [class.fullscreen]="isFullscreen()">
+    @if (streamUrl(); as activeUrl) {
+      <img
+        class="stream-image"
+        [src]="activeUrl"
+        [style.transform]="'rotate(' + rotation() + 'deg)'"
+        (load)="onImageLoad()"
+        (error)="onImageError()"
+      />
+    } @else {
+      <div class="empty-state">
+        <mat-icon aria-hidden="true">videocam_off</mat-icon>
+        <p>{{ status() === 'error' ? 'Camera stream unavailable' : 'No stream URL configured' }}</p>
+      </div>
+    }
+
+    @if (isConnecting()) {
+      <div class="stream-overlay" aria-live="polite">
+        <mat-icon class="spinning" aria-hidden="true">sync</mat-icon>
+        <span>
+          @if (status() === 'reconnecting') {
+            Reconnecting — attempt {{ retryAttempt() }}
+          } @else {
+            Connecting to stream…
+          }
+        </span>
+      </div>
+    }
+
+    <div class="stream-controls">
+      <button matIconButton type="button" aria-label="Rotate camera left" (click)="rotateCounterClockwise()">
+        <mat-icon>rotate_left</mat-icon>
+      </button>
+      <button matIconButton type="button" aria-label="Rotate camera right" (click)="rotateClockwise()">
+        <mat-icon>rotate_right</mat-icon>
+      </button>
+      <button matIconButton type="button" aria-label="Camera stream settings" (click)="openSettings()">
+        <mat-icon>settings</mat-icon>
+      </button>
+      <button matIconButton type="button" [attr.aria-label]="isFullscreen() ? 'Exit fullscreen' : 'View camera fullscreen'" (click)="toggleFullscreen()">
+        <mat-icon>{{ isFullscreen() ? 'fullscreen_exit' : 'fullscreen' }}</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  @if (status() === 'error') {
+    <footer class="stream-error">
+      <span>Automatic recovery stopped after {{ retryAttempt() }} retries.</span>
+      <button matButton="outlined" type="button" (click)="retry()">Retry</button>
+    </footer>
+  }
+</section>

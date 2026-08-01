@@ -1,0 +1,42 @@
+:host {
+  display: block;
+}
+
+.status-indicator {
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: 0.3rem;
+}
+
+.status-label {
+  color: var(--dcr-color-neutral);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.status-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--dcr-color-neutral);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.status-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.tone-info { color: var(--dcr-color-info); }
+.tone-normal { color: var(--dcr-color-normal); }
+.tone-caution { color: var(--dcr-color-caution); }
+.tone-critical { color: var(--dcr-color-critical); }
+.tone-neutral { color: var(--dcr-color-neutral); }

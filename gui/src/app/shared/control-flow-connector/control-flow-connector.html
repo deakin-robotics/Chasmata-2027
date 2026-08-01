@@ -1,0 +1,20 @@
+@switch (variant()) {
+  @case ('vertical') {
+    <svg [class]="'connector vertical tone-' + tone()" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 0V24" /></svg>
+  }
+  @case ('horizontal') {
+    <svg [class]="'connector horizontal tone-' + tone()" viewBox="0 0 24 24" aria-hidden="true"><path d="M0 12H24" /></svg>
+  }
+  @case ('top-right') {
+    <svg [class]="'connector corner tone-' + tone()" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 0V16Q24 24 32 24H48" /></svg>
+  }
+  @case ('top-left') {
+    <svg [class]="'connector corner tone-' + tone()" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 0V16Q24 24 16 24H0" /></svg>
+  }
+  @case ('bottom-right') {
+    <svg [class]="'connector corner tone-' + tone()" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 48V32Q24 24 32 24H48" /></svg>
+  }
+  @case ('bottom-left') {
+    <svg [class]="'connector corner tone-' + tone()" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 48V32Q24 24 16 24H0" /></svg>
+  }
+}
