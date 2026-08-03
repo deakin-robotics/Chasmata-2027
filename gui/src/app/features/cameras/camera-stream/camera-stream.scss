@@ -1,11 +1,16 @@
 :host {
   display: block;
   min-width: 0;
+  min-height: 0;
 }
 
 .camera-stream {
   --status-color: #7d8998;
 
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
   border: 1px solid #303844;
   border-color: color-mix(in srgb, var(--status-color) 38%, #303844);
@@ -66,11 +71,11 @@
 .stream-frame {
   position: relative;
   display: grid;
+  height: 100%;
   min-height: 0;
   overflow: hidden;
   place-items: center;
   background: #090c10;
-  aspect-ratio: 16 / 9;
 
   &:fullscreen {
     width: 100%;

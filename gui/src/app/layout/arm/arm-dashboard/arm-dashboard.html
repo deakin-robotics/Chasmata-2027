@@ -1,7 +1,25 @@
 <main class="arm-dashboard" aria-label="Arm operator dashboard">
-  <section>
-    <p>Arm operator</p>
-    <h2>Arm workspace</h2>
-    <span>Controls and telemetry will appear here.</span>
+  <section class="rover-camera-column" aria-label="Arm rover camera workspace">
+    <app-arm-rover-camera-layout class="rover-camera-layout" />
+  </section>
+
+  <section class="arm-operator-column" aria-label="Arm operator workspace">
+    <app-camera-stream
+      class="arm-camera"
+      label="Arm camera"
+      [url]="armCameraUrl()"
+      (urlChange)="armCameraUrl.set($event)"
+    />
+
+    <app-arm-schematic class="arm-schematic" />
+  </section>
+
+  <section class="arm-schematic-column" aria-label="Arm schematic workspace">
+    <app-arm-control-panel />
+
+    <div class="clamp-schematic-placeholder" aria-label="Clamp schematic">
+      <p>Clamp schematic</p>
+      <span>End effector placeholder</span>
+    </div>
   </section>
 </main>

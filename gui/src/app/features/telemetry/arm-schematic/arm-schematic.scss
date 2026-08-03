@@ -1,0 +1,35 @@
+:host {
+  display: block;
+  height: 100%;
+  min-height: 0;
+}
+
+.arm-schematic {
+  display: grid;
+  height: 100%;
+  min-height: 8rem;
+  place-content: center;
+  gap: 0.45rem;
+  box-sizing: border-box;
+  border: 1px solid var(--dcr-color-border);
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--dcr-color-surface-raised) 90%, transparent);
+  text-align: center;
+}
+
+p,
+span {
+  margin: 0;
+}
+
+p {
+  color: var(--dcr-color-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+span {
+  color: var(--dcr-color-neutral);
+  font-size: 0.75rem;
+}

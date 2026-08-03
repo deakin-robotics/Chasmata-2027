@@ -1,0 +1,17 @@
+<section class="arm-rover-camera-layout" aria-label="Arm rover camera layout">
+  <app-camera-stream
+    class="front-camera"
+    label="Front camera"
+    [url]="frontCameraUrl()"
+    (urlChange)="frontCameraUrl.set($event)"
+  />
+
+  <app-rover-schematic class="rover-schematic" />
+
+  <app-camera-stream
+    class="rear-camera"
+    label="Rear camera"
+    [url]="rearCameraUrl()"
+    (urlChange)="rearCameraUrl.set($event)"
+  />
+</section>

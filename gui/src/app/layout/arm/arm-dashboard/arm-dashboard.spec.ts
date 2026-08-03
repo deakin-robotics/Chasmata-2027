@@ -20,7 +20,14 @@ describe('ArmDashboard', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should render the Arm workspace placeholder', () => {
-    expect(fixture.nativeElement.textContent).toContain('Arm workspace');
+  it('should render the Arm dashboard placeholders', () => {
+    const text = fixture.nativeElement.textContent;
+
+    expect(text).toContain('Arm camera');
+    expect(text).toContain('Front camera');
+    expect(text).toContain('Rear camera');
+    expect(text).toContain('Arm schematic');
+    expect(text).toContain('Clamp schematic');
+    expect(text).toContain('Master Drive');
   });
 });

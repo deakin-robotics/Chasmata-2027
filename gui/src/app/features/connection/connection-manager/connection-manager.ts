@@ -28,7 +28,7 @@ export class ConnectionManager {
   readonly rosConnection = inject(RosConnection);
   private readonly dialogRef = inject(MatDialogRef<ConnectionManager>, { optional: true });
 
-  readonly endpoint = new FormControl('localhost:9090', {
+  readonly endpoint = new FormControl('rover.local:9090', {
     nonNullable: true,
     validators: [Validators.required],
   });

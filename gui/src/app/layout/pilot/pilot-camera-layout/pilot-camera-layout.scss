@@ -51,6 +51,18 @@
 .right-camera,
 .rear-camera {
   min-width: 0;
+  height: auto;
+  aspect-ratio: 16 / 9;
+}
+
+.front-camera {
+  width: min(100%, 60dvh);
+}
+
+.left-camera,
+.right-camera,
+.rear-camera {
+  width: min(100%, 34dvh);
 }
 
 .rover-schematic {

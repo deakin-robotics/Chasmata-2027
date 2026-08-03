@@ -7,33 +7,33 @@ The `MissionControl` shell renders the selected operator dashboard; it does not 
 ## Pilot view
 
 ```text
-┌──────────────────────────────────────────────────────────────┐
-│                       FRONT CAMERA                           │
-│                       largest feed                           │
-├───────────────────┬─────────────────────┬────────────────────┤
-│ Left / side camera│                     │ Right / side camera│
-│                   │   ROVER SCHEMATIC   │                    │
-│                   │ heading, health,    │                    │
-│                   │ wheel state, alerts │                    │
-├───────────────────┴─────────────────────┴────────────────────┤
-│                      REAR CAMERA                             │
-└──────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────┬──────────────┐
+│ Front camera                                  │ Bird view    │
+│                                               │ placeholder  │
+├───────────────┬───────────────┬───────────────┼──────────────┤
+│ Left camera   │ Rover         │ Right camera  │ Pilot        │
+│               │ schematic     │               │ control      │
+├───────────────┴───────────────┴───────────────┤ panel        │
+│ Rear camera                                   │              │
+└───────────────────────────────────────────────┴──────────────┘
 ```
 
-The front camera has the highest visual priority. The schematic provides system awareness and must not imply that commanded movement is confirmed movement.
+The front camera has the highest visual priority. Left, right, and rear camera panels retain the rover-relative cockpit arrangement around the shared rover schematic. The gamepad schematic floats over the camera area rather than occupying the sidebar.
+
+The right sidebar places Bird View above the Pilot control panel. The control panel uses the compact Pilot-style Drive tab and owns the ROS link, gamepad status, and Master Drive switch.
 
 ## Arm operator view
 
 ```text
-┌──────────────────┬───────────────────────────────────────────┐
-│ Front / context  │                 ARM CAMERA                │
-│ camera           │                 largest feed              │
-├──────────────────┤                                           │
-│ Rover schematic  │                                           │
-│ arm pose/status  │                                           │
-├──────────────────┼───────────────────────────────────────────┤
-│ Rear / side      │ Motor telemetry, end effector, limits     │
-└──────────────────┴───────────────────────────────────────────┘
+┌──────────────────┬───────────────────────┬──────────────────┐
+│ Front rover cam  │ Arm camera            │ Arm control panel │
+├──────────────────┤                       │                  │
+│ Rover schematic  ├───────────────────────┼──────────────────┤
+├──────────────────┤ Arm schematic         │ Clamp schematic   │
+│ Rear rover cam   │                       │ placeholder      │
+└──────────────────┴───────────────────────┴──────────────────┘
 ```
 
-The arm camera has the highest visual priority. The same rover schematic presents arm state and joint-limit information.
+The arm camera and rover-awareness column are both first-class visual inputs. The rover-awareness column provides front and rear rover context around the shared rover schematic. The Arm control panel groups gamepad status, ROS link state, and the Master Drive control in the right column.
+
+The Arm schematic is currently a placeholder for future joint, end-effector, limit, and MoveIt-derived state. The clamp schematic is also a placeholder until the end-effector telemetry and command contract exists.
