@@ -28,7 +28,7 @@ describe('ConnectionManager', () => {
     const endpointInput = element.querySelector('input') as HTMLInputElement;
 
     expect(element.textContent).toContain('Disconnected');
-    expect(endpointInput.value).toBe('localhost:9090');
+    expect(endpointInput.value).toBe('rover.local:9090');
   });
 
   it('should pass the entered endpoint to the connection service', () => {

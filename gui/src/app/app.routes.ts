@@ -4,6 +4,7 @@ import { EcamPanel } from './layout/ecam-panel/ecam-panel';
 import { MissionControl } from './layout/mission-control/mission-control';
 import { PilotDashboard } from './layout/pilot/pilot-dashboard/pilot-dashboard';
 import {
+  armControlExitGuard,
   armControlGuard,
   pilotControlExitGuard,
   pilotControlGuard,
@@ -24,6 +25,7 @@ export const routes: Routes = [
         path: 'arm',
         component: ArmDashboard,
         canActivate: [armControlGuard],
+        canDeactivate: [armControlExitGuard],
       },
       {
         path: 'ecam',

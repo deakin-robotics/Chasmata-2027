@@ -39,6 +39,8 @@ The GUI communicates directly with the rover on its private operator network:
 
 - Controls and telemetry use ROSLIB through ROSbridge.
 - Camera video uses separate HTTP MJPEG streams.
+- Pilot drive publishes `sensor_msgs/Joy` on `/joy`.
+- Arm control publishes remapped `sensor_msgs/Joy` on `/arm/joy`.
 - The physical rover, radio link, controller, and safety behaviour must be tested before the Angular GUI replaces the existing interface.
 
 ## Prerequisites
@@ -77,10 +79,18 @@ ros2 launch rosbridge_server rosbridge_websocket_launch.xml
 Use this endpoint from the Angular GUI:
 
 ```text
-ws://localhost:9090
+ws://rover.local:9090
 ```
 
 Only ROSbridge is required for initial connection testing. The full rover bring-up starts hardware-dependent nodes and is not required for ordinary GUI development.
+
+Current camera defaults:
+
+```text
+Front camera: http://dcr-rover.local:8080/?action=stream
+Rear camera:  http://dcr-rover.local:8090/?action=stream
+Arm camera:   http://dcr-rover.local:8091/?action=stream
+```
 
 ## Architecture
 
@@ -89,23 +99,20 @@ The application uses a lightweight feature-based structure:
 ```text
 src/app/
 ├── core/
-│   ├── control/                 # Global control mode and safety state
+│   ├── control/                 # Global control mode plus Pilot and Arm publishers
 │   ├── gamepad/                 # Browser gamepad polling and mapping
 │   └── ros/                     # ROS connection, topics, and shared models
 │
 ├── features/
-│   ├── arm/                     # Arm control and motor telemetry
 │   ├── cameras/
 │   │   └── camera-stream/       # Individual resilient stream viewer
 │   ├── connection/              # Rover connection controls and status
-│   ├── drive/                   # Drivetrain controls and status
-│   ├── lidar/                   # Planned LiDAR visualization
 │   └── telemetry/               # Rover and subsystem health
 │
 ├── layout/
 │   ├── mission-control/         # Shared shell, navigation, and router outlet
-│   ├── pilot-dashboard/         # Pilot panel arrangement
-│   └── arm-dashboard/           # Arm operator panel arrangement
+│   ├── pilot/                   # Pilot panel arrangement
+│   └── arm/                     # Arm operator panel arrangement
 │
 └── shared/
     ├── confirmation-dialog/     # Reusable confirmation UI
@@ -119,6 +126,7 @@ src/app/
 - `features` owns complete operator capabilities and their feature-specific UI.
 - `shared` contains small reusable presentation components.
 - `layout` arranges feature components but does not communicate with ROS directly.
+- Operator dashboards own their own viewport layout; `MissionControl` remains a shell.
 - Components should not create independent ROS connections.
 - ROS and gamepad logic should remain outside presentation-only components.
 

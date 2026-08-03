@@ -1,39 +1,91 @@
 :host {
   display: block;
-  min-height: 100%;
+  height: calc(100dvh - var(--mission-control-top-bar-height));
+  min-height: 0;
+  overflow: hidden;
 }
 
 .arm-dashboard {
   display: grid;
-  min-height: 100%;
-  place-items: center;
-  padding: 2rem;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  grid-template-columns: minmax(14rem, 0.9fr) minmax(20rem, 1.2fr) minmax(15rem, 0.85fr);
+  gap: clamp(0.75rem, 1.5vw, 2rem);
+  overflow: hidden;
+  padding: clamp(0.75rem, 1.5vw, 2rem);
+  padding-bottom: clamp(0.5rem, 1vw, 1.25rem);
+}
+
+.rover-camera-column,
+.arm-operator-column,
+.arm-schematic-column {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
+  gap: clamp(0.75rem, 1.5vw, 1.25rem);
+}
+
+.rover-camera-column {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.arm-operator-column,
+.arm-schematic-column {
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1.05fr);
+}
+
+app-camera-stream,
+app-arm-rover-camera-layout,
+app-arm-schematic {
+  min-width: 0;
+  min-height: 0;
+}
+
+app-arm-control-panel {
+  height: 100%;
+  min-width: 0;
+}
+
+.clamp-schematic-placeholder {
+  display: grid;
+  min-height: 8rem;
+  place-content: center;
+  gap: 0.45rem;
+  box-sizing: border-box;
+  border: 1px solid var(--dcr-color-border);
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--dcr-color-surface-raised) 88%, transparent);
   text-align: center;
+}
 
-  p,
-  h2,
-  span {
-    display: block;
-    margin: 0;
+p,
+span {
+  margin: 0;
+}
+
+p {
+  color: var(--dcr-color-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+span {
+  color: var(--dcr-color-neutral);
+  font-size: 0.75rem;
+}
+
+@media (max-width: 56rem) {
+  .arm-dashboard {
+    grid-template-columns: minmax(0, 1fr);
+    overflow: auto;
   }
 
-  p {
-    color: var(--dcr-color-info);
-    font-size: 0.7rem;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-
-  h2 {
-    margin-top: 0.35rem;
-    color: var(--dcr-color-text);
-    font-size: 1.5rem;
-    font-weight: 600;
-  }
-
-  span {
-    margin-top: 0.6rem;
-    color: var(--dcr-color-neutral);
+  .rover-camera-column,
+  .arm-operator-column,
+  .arm-schematic-column {
+    min-height: 24rem;
   }
 }
