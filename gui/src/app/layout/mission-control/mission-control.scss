@@ -8,12 +8,12 @@
 .mission-control-shell {
   min-width: 20rem;
   min-height: 100dvh;
-  background:
-    radial-gradient(
-      circle at 50% -12rem,
-      color-mix(in srgb, var(--dcr-color-info) 10%, transparent),
-      transparent 38rem
-    ),
-    var(--dcr-color-background);
+  // background:
+  //   radial-gradient(
+  //     circle at 50% -12rem,
+  //     color-mix(in srgb, var(--dcr-color-info) 10%, transparent),
+  //     transparent 38rem
+  //   ),
+  background: var(--dcr-color-background);
   color: var(--dcr-color-text);
 }

@@ -5,9 +5,11 @@
       <span class="mode mode-active" [class.mode-managed]="column.active === 'MANAGED'">
         {{ column.active }}
       </span>
-      <span class="mode mode-armed" [class.mode-managed]="column.armed === 'MANAGED'">
-        {{ column.armed }}
-      </span>
+      @if (column.armed) {
+        <span class="mode mode-armed" [class.mode-managed]="column.armed === 'MANAGED'">
+          {{ column.armed }}
+        </span>
+      }
     </div>
   }
 </section>
