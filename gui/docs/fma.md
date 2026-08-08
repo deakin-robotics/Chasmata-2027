@@ -129,7 +129,7 @@ This column answers:
 
 > **Is the underlying rover system okay?**
 
-### `READY`
+### `GOOD`
 
 Required ROS/control nodes, communications, and controllers are healthy.
 
@@ -174,5 +174,5 @@ If link status is not available or has not yet been established, **display nothi
 | **DRIVE** | Current drivetrain control method | `MANUAL`, `VELOCITY`, `MANAGED •` |
 | **ARM** | Current arm control/configuration | `MANUAL`, `POSITION`, `MANAGED •`, `STOWED` |
 | **LAW** | Arm protection level | `NORMAL`, `ALTERNATE`, `DIRECT` |
-| **SYSTEM** | Overall rover/control-stack health | `READY`, `DEGRADED`, `FAULT`, `E-STOP` |
+| **SYSTEM** | Overall rover/control-stack health | `GOOD`, `DEGRADED`, `FAULT`, `E-STOP` |
 | **LINK** | Rover/base-station communication health | `GOOD`, `DEGRADED`, `LOST` |
