@@ -7,45 +7,10 @@
 
 .ecam-panel {
   display: grid;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
   height: 100%;
   min-height: 0;
   box-sizing: border-box;
-  place-items: center;
-  padding: 2rem;
-}
-
-.message-display {
-  width: min(100%, 48rem);
-  padding: 2rem;
-  border: 1px solid var(--dcr-color-border);
-  border-radius: 0.65rem;
-  background: var(--dcr-color-surface);
-  text-align: center;
-
-  p,
-  h2,
-  span {
-    display: block;
-    margin: 0;
-  }
-
-  p {
-    color: var(--dcr-color-info);
-    font-size: 0.7rem;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-
-  h2 {
-    margin-top: 0.35rem;
-    color: var(--dcr-color-text);
-    font-size: 1.5rem;
-    font-weight: 600;
-  }
-
-  span {
-    margin-top: 0.6rem;
-    color: var(--dcr-color-neutral);
-  }
+  padding: 0.6rem;
 }

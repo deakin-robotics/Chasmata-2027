@@ -1,0 +1,44 @@
+<section class="system-display" aria-label="ECAM system pages">
+  <header class="system-header">
+    <h2>
+      {{ selectedPageDefinition().name }}
+    </h2>
+
+    <nav aria-label="ECAM system display pages">
+      @for (page of pages; track page) {
+        <button
+          type="button"
+          [class.selected]="selectedPage() === page.name"
+          [attr.aria-current]="selectedPage() === page.name ? 'page' : null"
+          [attr.aria-label]="'System page: ' + page.name"
+          (click)="selectPage(page)"
+        >
+          {{ page.name }}
+        </button>
+      }
+    </nav>
+  </header>
+
+  <div class="page-content" aria-live="polite">
+    @switch (selectedPage()) {
+      @case ('DRIVE') {
+        <app-drive-page />
+      }
+      @case ('ARM') {
+        <app-arm-page />
+      }
+      @case ('POWER') {
+        <app-power-page />
+      }
+      @case ('LINK') {
+        <app-link-page />
+      }
+      @case ('CAMERA') {
+        <app-camera-page />
+      }
+      @case ('SYSTEM') {
+        <app-system-page />
+      }
+    }
+  </div>
+</section>

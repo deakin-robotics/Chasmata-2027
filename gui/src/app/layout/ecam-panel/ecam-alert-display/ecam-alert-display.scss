@@ -1,0 +1,146 @@
+:host {
+  display: block;
+  height: 100%;
+  min-height: 0;
+}
+
+.alert-display {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--dcr-color-border);
+  border-radius: 0.4rem;
+  background: var(--dcr-color-surface);
+}
+
+.alert-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  border-bottom: 1px solid var(--dcr-color-border);
+  padding: 0.7rem 0.9rem;
+}
+
+h1,
+.empty-state,
+.alert-list {
+  display: block;
+  margin: 0;
+}
+
+h1 {
+  color: var(--dcr-color-info);
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+button {
+  border: 1px solid var(--dcr-color-border);
+  border-radius: 0.25rem;
+  background: transparent;
+  color: var(--dcr-color-neutral);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.35rem 0.45rem;
+}
+
+button:hover,
+button:focus-visible {
+  border-color: var(--dcr-color-normal);
+  color: var(--dcr-color-normal);
+}
+
+.empty-state {
+  align-self: center;
+  color: var(--dcr-color-neutral);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.alert-list {
+  min-height: 0;
+  overflow: auto;
+  padding: 0.35rem 0.9rem;
+  list-style: none;
+}
+
+.alert {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.55rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--dcr-color-text) 35%, transparent);
+  padding: 0.55rem 0;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.025em;
+}
+
+.alert:last-child {
+  border-bottom: 0;
+}
+
+.severity-fault {
+  color: var(--dcr-color-critical);
+}
+
+.severity-warning {
+  color: var(--dcr-color-caution);
+}
+
+.severity-attention {
+  color: var(--dcr-color-info);
+}
+
+.alert-text {
+  min-width: 0;
+}
+
+.alert-detail {
+  color: var(--dcr-color-neutral);
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-align: right;
+}
+
+.procedure {
+  grid-column: 1 / -1;
+  color: var(--dcr-color-text);
+  font-size: 0.9rem;
+  font-weight: 500;
+  letter-spacing: normal;
+}
+
+.procedure ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1.35rem;
+  list-style: none;
+}
+
+.procedure li::before {
+  content: '-';
+  display: inline-block;
+  width: 0.9rem;
+  margin-left: -0.9rem;
+}
+
+.procedure li {
+  padding: 0.12rem 0;
+}
+
+@media (max-width: 42rem) {
+  .alert {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .alert-detail {
+    text-align: left;
+  }
+}
