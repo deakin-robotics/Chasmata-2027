@@ -1,10 +1,20 @@
-# Rover FMA Mode Definitions
+# Rover Functional Mode Annunciator Definitions
 
-This document defines the five Flight Mode Annunciator (FMA) columns used in the rover GUI:
+This document defines the five Functional Mode Annunciator (FMA) columns used in the rover GUI:
 
 **DRIVE | ARM | LAW | SYSTEM | LINK**
 
 The FMA should display the rover's **confirmed active state**, not merely a requested state.
+
+## Visual references
+
+### Current Angular implementation
+
+![Current rover FMA](../assets/fma.png)
+
+### Airbus A320 reference
+
+![A320 FMA column layout](../assets/references/fma1.jpg)
 
 ---
 
@@ -96,6 +106,10 @@ It stays folded close to the rover when not in use, helping maintain a good **ce
 ## 🛡️ LAW
 
 This refers specifically to **arm protection**.
+
+LAW design reference: Airbus A320 control laws, adapted for Arm control of the rover.
+
+[Airbus A320 Flight Laws – Interactive PFD Reference](https://airbus-a320-explainer.vercel.app/)
 
 ### `NORMAL`
 

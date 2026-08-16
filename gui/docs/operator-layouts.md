@@ -1,8 +1,14 @@
 # Operator Layouts
 
-The operator interface is **inspired by Airbus ECAM system displays**. A symbolic rover remains central while live camera feeds and telemetry are arranged according to the active operator's task.
+The operator interface is **inspired by the Airbus glass cockpit philosophy**. A symbolic rover remains central while live camera feeds and telemetry are arranged according to the active operator's task.
 
 The `MissionControl` shell renders the selected operator dashboard; it does not itself own the camera feeds or rover schematic.
+
+## Current Angular implementation
+
+![Pilot dashboard](../assets/pilot.png)
+
+![Arm operator dashboard](../assets/arm_ops.png)
 
 ## Pilot view
 

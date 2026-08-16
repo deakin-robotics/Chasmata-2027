@@ -2,7 +2,7 @@
 
 ## Design intent
 
-The DCR Mission Control interface is **inspired by the Airbus ECAM system-display philosophy**: show a calm symbolic system overview during normal operation, use colour consistently to communicate operational meaning, and make abnormal conditions immediately recognisable.
+The DCR Mission Control interface is **inspired by the Airbus glass cockpit philosophy**: show a calm symbolic system overview during normal operation, use colour consistently to communicate operational meaning, and make abnormal conditions immediately recognisable.
 
 ## Operational colour semantics
 
