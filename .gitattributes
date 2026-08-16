@@ -1,0 +1,9 @@
+# Use one line-ending convention across Windows Git Bash, WSL, and CI.
+* text=auto eol=lf
+
+# Image assets are binary and must not be line-ending normalised.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary

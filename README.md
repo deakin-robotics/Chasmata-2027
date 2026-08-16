@@ -21,12 +21,16 @@ The GUI is the browser-based Mission Control interface for rover operators. It p
 
 For GUI installation, development commands, architecture, and ROS integration details, see the [GUI README](gui/README.md).
 
-## 📚 Documentation
+## 🎛️ Control
 
-- [GUI operator layouts](gui/docs/operator-layouts.md)
-- [GUI colour palette](gui/docs/color-palette.md)
-- [Rover FMA mode definitions](gui/docs/fma.md)
+## 🤖 Autonomy
+
+## 📚 Project documentation
+
+- [GUI documentation](gui/README.md)
+- [Control documentation](rover/control/README.md)
+- [Autonomy documentation](rover/autonomous/README.md)
 
 ## 🚧 Status
 
-The Angular GUI is being developed as a structured replacement for the previous operator interface. Rover integration and physical validation remain required before it is used for rover operations.
+The project is under active development. GUI, Control, and Autonomy interfaces are being developed in parallel, with rover integration and physical validation still required.
