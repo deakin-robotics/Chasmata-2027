@@ -1,9 +1,8 @@
-# Replace these placeholders when the team leads' GitHub handles are known.
-# All code outside the team folders may be approved by any team lead.
-# * @namanhtran99 @control-team-lead @autonomy-team-lead
+# Default project ownership: any code owner may approve.
+* @namanhtran99 @forrestnguyen27 @T-Hari
 
-# GUI changes require review from the GUI team lead.
+# Subsystem ownership.
 /gui/ @namanhtran99
-
-# /control/ @control-team-lead
-# /autonomy/ @autonomy-team-lead
+/rover/control/ @forrestnguyen27
+/rover/autonomous/ @T-Hari
+/rover/shared/ @forrestnguyen27 @T-Hari
