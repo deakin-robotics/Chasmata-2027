@@ -1,8 +1,8 @@
 # Default project ownership: any code owner may approve.
-* @namanhtran99 @forrestnguyen27 @T-Hari
+* @deakin_robotics @namanhtran99 @forrestnguyen27 @T-Hari
 
 # Subsystem ownership.
-/gui/ @namanhtran99
-/rover/control/ @forrestnguyen27
-/rover/autonomous/ @T-Hari
-/rover/shared/ @forrestnguyen27 @T-Hari
+/gui/ @deakin_robotics @namanhtran99
+/rover/control/ @deakin_robotics @forrestnguyen27
+/rover/autonomous/ @deakin_robotics @T-Hari
+/rover/shared/ @deakin_robotics @forrestnguyen27 @T-Hari
