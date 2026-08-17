@@ -76,6 +76,34 @@ The current core consists of:
 
 The service is currently GUI-local. It is not yet connected to rover telemetry or a shared ROS alert topic.
 
+## T/O CONFIG
+
+`T/O CONFIG` is a pre-departure configuration check. It asks whether the rover is in an acceptable starting configuration and reports the individual conditions that need attention.
+
+Pressing the `T/O CONFIG` button starts the evaluation; it is not only a refresh or display action:
+
+```text
+GUI button press
+  → configuration check request
+  → rover-side Control evaluation
+  → configuration result returned to the GUI
+  → ECAM displays the result and any active conditions
+```
+
+The rover-side Control system is authoritative for this evaluation. The GUI displays the returned result and does not independently decide whether the rover is ready. A successful result may be shown as `T/O CONFIG NORMAL`; otherwise, each failed or unknown condition is presented as an ECAM message with its defined severity and any available procedure.
+
+`T/O CONFIG` is advisory and does not itself inhibit driving. If the operator chooses to drive while a condition remains unresolved, the corresponding active ECAM message remains visible until the underlying condition is cleared. `T/O CONFIG NORMAL` only confirms that the rover passed the checks at the moment the button was pressed. It does not mean the rover will remain healthy afterward.
+
+If the rover-side result is unavailable or stale, the GUI must show the check as unknown or unavailable rather than displaying it as normal.
+
+The current GUI implementation is a local demonstration using representative conditions:
+
+- E-stop status unavailable — fault
+- LAW DIRECT — warning with an operator procedure
+- Antenna not deployed — attention
+
+It does not issue a rover-side configuration command, change the E-stop state, or validate the actual rover configuration.
+
 ## Multiple operator PCs
 
 The Angular singleton is local to one browser instance. It cannot directly share state between the Pilot, Arm, and ECAM PCs.
@@ -101,10 +129,7 @@ Rover Control owns rover faults and health. Pilot and Arm GUIs only report stati
 
 If a station loses ROS completely, it cannot report its own failure. The relay must detect the missing station heartbeat and create a station-link alert itself.
 
-The alert stream should:
-
-- Publish immediately when an alert is raised, updated, or cleared.
-- Publish a complete active-alert snapshot at approximately 1 Hz for recovery from dropped packets or reconnects.
+The shared alert state should update when an alert is raised, changed, or cleared, and remain recoverable when a client reconnects or misses an update.
 
 A local browser failure should identify its station. For example, a Pilot browser failing to load a camera should report `PILOT FRONT CAMERA VIEW UNAVAILABLE`, not necessarily claim that the rover camera itself is broken.
 
