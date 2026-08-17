@@ -66,6 +66,9 @@ The GUI communicates directly with the rover on its private operator network:
 - Camera video uses separate HTTP MJPEG streams.
 - Pilot drive publishes `sensor_msgs/Joy` on `/joy`.
 - Arm control publishes remapped `sensor_msgs/Joy` on `/arm/joy`.
+- Pilot and Arm Operator GUIs may both view and control the shared Gimbal camera.
+  Gimbal ownership is requested through the controller's **GIMBAL PRIORITY**
+  button and confirmed authoritatively by the rover.
 - The physical rover, radio link, controller, and safety behaviour must be tested before the Angular GUI replaces the existing interface.
 
 ## Prerequisites
@@ -109,7 +112,7 @@ ws://rover.local:9090
 
 Only ROSbridge is required for initial connection testing. The full rover bring-up starts hardware-dependent nodes and is not required for ordinary GUI development.
 
-Current legacy rover camera defaults:
+Current legacy rover camera defaults (reference only):
 
 ```text
 Front camera: http://dcr-rover.local:8080/?action=stream
@@ -117,7 +120,10 @@ Rear camera:  http://dcr-rover.local:8090/?action=stream
 Arm camera:   http://dcr-rover.local:8091/?action=stream
 ```
 
-These endpoints support the existing rover code. The new rover camera inventory and stream interfaces remain under development and will be updated once finalised.
+These endpoints support the existing rover code. The current proposed new camera
+inventory is Front, Arm, and a controllable downward-facing Gimbal camera that
+provides a top-like/bird's-eye view. The final hardware and stream interfaces
+remain under development and will be updated once finalised.
 
 ## Architecture
 
@@ -133,7 +139,7 @@ src/app/
 │
 ├── features/
 │   ├── cameras/
-│   │   ├── bird-view/           # Rover-context camera view
+│   │   ├── bird-view/           # Shared controllable Gimbal/bird's-eye view
 │   │   └── camera-stream/       # Individual resilient stream viewer
 │   ├── connection/              # Rover connection controls and status
 │   ├── gamepad/                 # Gamepad controls and feedback
@@ -190,6 +196,12 @@ Camera feeds must recover from temporary radio or stream interruptions without r
 - Cleanup of retry activity when a component is destroyed
 
 The team is also evaluating uStreamer as a maintained alternative to the existing `mjpg-streamer` setup for UVC cameras.
+
+The Gimbal camera is shared between the Pilot and Arm Operator stations. Each
+station can request priority with its mapped **GIMBAL PRIORITY** controller
+button. The rover owns the confirmed owner, validates every Gimbal movement
+command, and broadcasts the current owner to all GUI instances. The GUI must
+show `GIMBAL PRIORITY UNKNOWN` when owner telemetry is stale or unavailable.
 
 ## Migration plan
 
