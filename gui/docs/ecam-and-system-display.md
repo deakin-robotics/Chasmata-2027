@@ -163,6 +163,24 @@ The current System Display page set is:
 
 `THERMAL` and `AUTONOMY` can be added when their telemetry is available and substantial enough to justify dedicated pages.
 
+### Current System Display implementation
+
+The current GUI implementation provides the following six SD pages. The values
+shown in these screenshots are mock telemetry pending the live rover telemetry
+contract.
+
+![Current DRIVE System Display page](../assets/system_display/drive.png)
+
+![Current ARM System Display page](../assets/system_display/arm.png)
+
+![Current POWER System Display page](../assets/system_display/power.png)
+
+![Current LINK System Display page](../assets/system_display/link.png)
+
+![Current CAMERA System Display page](../assets/system_display/camera.png)
+
+![Current SYSTEM System Display page](../assets/system_display/system.png)
+
 The SD page header shows the selected system name. Each page currently provides
 a simple symbolic schematic. Live telemetry will populate the values while
 remaining layered onto meaningful system components.
