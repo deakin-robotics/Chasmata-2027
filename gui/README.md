@@ -20,10 +20,35 @@ This project is an Angular replacement for the previous Next.js GUI. The migrati
 
 ## Design language
 
-The mission-control interface is inspired by the Airbus ECAM system-display philosophy: a calm symbolic overview during normal operation and consistent colour semantics for operational state.
+The mission-control interface is inspired by the Airbus glass cockpit philosophy: a calm symbolic overview during normal operation and consistent colour semantics for operational state.
 
-- [Design system and colour semantics](docs/color-palette.md)
-- [Pilot and Arm operator layouts](docs/operator-layouts.md)
+*Some design decisions have a longer history than this rover :)*
+<!-- From Tom to future you: If you found the easter eggs, you probably know where the Airbus obsession came from. :))) -->
+
+## Documentation
+
+- [Colour palette](docs/color-palette.md) — the UI colour system and operational status semantics.
+- [Operator layouts](docs/operator-layouts.md) — the Pilot and Arm dashboard layouts and responsibilities.
+- [Functional Mode Annunciator](docs/fma.md) — confirmed DRIVE, ARM, LAW, SYSTEM, and LINK states.
+- [ECAM and System Display](docs/ecam-and-system-display.md) — alert behaviour, operator procedures, shared alert architecture, and subsystem display pages.
+
+## Current Angular implementation
+
+### Functional Mode Annunciator
+
+![Current rover FMA](assets/fma.png)
+
+### Pilot dashboard
+
+![Pilot dashboard](assets/pilot.png)
+
+### Arm operator dashboard
+
+![Arm operator dashboard](assets/arm_ops.png)
+
+### ECAM and System Display
+
+![Current rover ECAM and System Display](assets/ecam.png)
 
 ## System overview
 
@@ -84,13 +109,15 @@ ws://rover.local:9090
 
 Only ROSbridge is required for initial connection testing. The full rover bring-up starts hardware-dependent nodes and is not required for ordinary GUI development.
 
-Current camera defaults:
+Current legacy rover camera defaults:
 
 ```text
 Front camera: http://dcr-rover.local:8080/?action=stream
 Rear camera:  http://dcr-rover.local:8090/?action=stream
 Arm camera:   http://dcr-rover.local:8091/?action=stream
 ```
+
+These endpoints support the existing rover code. The new rover camera inventory and stream interfaces remain under development and will be updated once finalised.
 
 ## Architecture
 
@@ -100,24 +127,29 @@ The application uses a lightweight feature-based structure:
 src/app/
 ├── core/
 │   ├── control/                 # Global control mode plus Pilot and Arm publishers
+│   ├── fma/                     # Functional Mode Annunciator state
 │   ├── gamepad/                 # Browser gamepad polling and mapping
 │   └── ros/                     # ROS connection, topics, and shared models
 │
 ├── features/
 │   ├── cameras/
+│   │   ├── bird-view/           # Rover-context camera view
 │   │   └── camera-stream/       # Individual resilient stream viewer
 │   ├── connection/              # Rover connection controls and status
-│   └── telemetry/               # Rover and subsystem health
+│   ├── gamepad/                 # Gamepad controls and feedback
+│   └── telemetry/               # Rover and subsystem schematics
 │
 ├── layout/
-│   ├── mission-control/         # Shared shell, navigation, and router outlet
-│   ├── pilot/                   # Pilot panel arrangement
-│   └── arm/                     # Arm operator panel arrangement
+│   ├── mission-control/         # Shared shell, navigation, header, and FMA
+│   ├── pilot/                   # Pilot dashboard and panel arrangement
+│   └── arm/                     # Arm dashboard and panel arrangement
 │
 └── shared/
+    ├── action-button/           # Reusable action button
     ├── confirmation-dialog/     # Reusable confirmation UI
-    ├── metric-tile/             # Reusable telemetry value display
-    └── status-badge/            # Reusable state indicator
+    ├── control-flow-connector/  # Control-flow visual connector
+    ├── control-switch/          # Reusable control-mode switch
+    └── status-indicator/        # Reusable state indicator
 ```
 
 ### Responsibility rules

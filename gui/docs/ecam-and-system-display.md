@@ -1,6 +1,6 @@
 # ECAM and System Display
 
-This document defines the intended behaviour of the rover's ECAM and lower System Display (SD). The design is inspired by Airbus system-display philosophy, but the content is specific to the Deakin rover and its competition workflow.
+This document defines the intended behaviour of the rover's ECAM and lower System Display (SD). The design is inspired by the Airbus glass cockpit philosophy, but the content is specific to the Deakin rover and its competition workflow.
 
 ## Display responsibilities
 
@@ -25,6 +25,20 @@ The lower `SD` answers:
 > What is happening inside the selected subsystem?
 
 The FMA in the shared Mission Control header remains the high-level operational summary. The SD should show useful subsystem detail rather than duplicate the FMA.
+
+## Visual references
+
+### Current Angular implementation
+
+![Current rover ECAM and System Display](../assets/ecam.png)
+
+### Airbus A320 references
+
+![A320 ECAM upper and lower display locations](../assets/references/ecam1.jpg)
+
+![A320 ECAM upper and lower displays](../assets/references/ecam2.jpg)
+
+![A320 ECAM page-selection panel](../assets/references/ecam_pages.jpg)
 
 ## ECAM alert colours
 
