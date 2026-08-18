@@ -98,9 +98,24 @@ The service is currently GUI-local. It is not yet connected to rover telemetry o
 
 ## T/O CONFIG behaviour
 
-`T/O CONFIG` is an operator-requested check made before departure. The GUI
-sends the request first; rover-side Control evaluates the current configuration
-and returns the authoritative result.
+`T/O CONFIG` is an operator-requested pre-departure configuration check. The
+GUI sends the request first; rover-side Control evaluates the current
+configuration and returns the authoritative result.
+
+```text
+GUI button press
+  → configuration check request
+  → rover-side Control evaluation
+  → configuration result returned to the GUI
+  → ECAM displays the result and individual conditions
+```
+
+The response result is `NORMAL`, `FAILED`, or `UNKNOWN`. Rover-side Control is
+authoritative for the evaluation; the GUI displays the returned result and does
+not independently decide whether the rover is ready. When the result is
+`FAILED` or `UNKNOWN`, the response includes the individual ECAM codes for the
+conditions found by the rover. The GUI resolves those codes through the ECAM
+message catalogue.
 
 The button represents the returned state:
 
@@ -109,11 +124,16 @@ The button represents the returned state:
 - Blue hover/focus indicates that the GUI is requesting a check, not that the
   check has passed.
 
-When the result is `FAILED`, the rover response includes the individual ECAM
-codes for the failed conditions. The GUI displays those codes through the ECAM
-message catalogue.
-If the GUI receives no response within its request window, it owns the local
-timeout/unavailable indication and shows an appropriate ECAM message.
+`T/O CONFIG` is advisory and does not itself inhibit driving. `T/O CONFIG
+NORMAL` confirms that the rover passed the checks at the moment the button was
+pressed; it does not guarantee that the rover will remain healthy afterward.
+If a condition remains unresolved, its active ECAM message remains visible until
+the underlying condition is cleared.
+
+If the rover-side result is unavailable or stale, the GUI must show the check as
+unknown or unavailable rather than displaying it as normal. If the GUI receives
+no response within its request window, it owns the local timeout/unavailable
+indication and shows an appropriate ECAM message.
 
 See [GUI telemetry requirements](telemetry-requirements.md#to-config-contract)
 for the response package, recovery-snapshot, and timeout contract.
@@ -143,10 +163,7 @@ Rover Control owns rover faults and health. Pilot and Arm GUIs only report stati
 
 If a station loses ROS completely, it cannot report its own failure. The relay must detect the missing station heartbeat and create a station-link alert itself.
 
-The alert stream should:
-
-- Publish immediately when an alert is raised, updated, or cleared.
-- Publish a complete active-alert snapshot at approximately 1 Hz for recovery from dropped packets or reconnects.
+The shared alert state should update when an alert is raised, changed, or cleared, and remain recoverable when a client reconnects or misses an update.
 
 A local browser failure should identify its station. For example, a Pilot browser failing to load a camera should report `PILOT FRONT CAMERA VIEW UNAVAILABLE`, not necessarily claim that the rover camera itself is broken.
 

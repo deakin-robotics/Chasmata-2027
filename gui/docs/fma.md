@@ -137,6 +137,89 @@ This annunciation makes it clear that the arm is operating without its normal pr
 
 ---
 
+## 🎥 GIMBAL PRIORITY
+
+The Gimbal Priority indicator is displayed directly beneath the `LAW` state in
+the FMA. It is a separate secondary indicator and is **not** an additional LAW
+state or a sixth FMA column.
+
+The indicator shows which operator station currently owns authority to command
+the shared physical Gimbal camera:
+
+```text
+← PILOT       ARM OPS →
+```
+
+`← PILOT` means that the Pilot owns Gimbal priority. `ARM OPS →` means that
+the Arm Operator owns Gimbal priority.
+
+The arrow direction is an ownership indication, not the direction of Gimbal
+movement. The left arrow always represents `PILOT`; the right arrow always
+represents `ARM_OPS`.
+
+#### Shared Gimbal ownership
+
+Both the Pilot GUI and Arm Operator GUI may view and control the same physical
+Gimbal camera. Each physical controller has a dedicated **GIMBAL PRIORITY**
+button.
+
+Pressing the button sends a Gimbal takeover request containing the identity of
+the requesting station:
+
+```text
+Pilot controller     → takeover request: PILOT
+Arm controller       → takeover request: ARM_OPS
+```
+
+The rover owns the authoritative Gimbal owner and priority state. When a valid
+takeover request is received, the rover updates the owner and broadcasts the
+confirmed owner state to every GUI instance.
+
+There is no additional Pilot-over-Arm hierarchy. If both operators press their
+priority buttons at approximately the same time, the latest valid request
+received by the rover wins.
+
+#### Gimbal movement commands
+
+Every Gimbal movement command, including D-pad commands, must include the
+identity of the sending station. The rover validates every command against its
+authoritative owner state:
+
+```text
+Command station == current owner  → accept command
+Command station != current owner  → ignore command
+```
+
+The local GUI must not block a movement command or takeover request solely
+because its cached owner state says that the station is not the current owner.
+The cached state may be stale. The rover remains responsible for final command
+validation and enforcement.
+
+There is no dual-input summing. Only commands from the rover-confirmed current
+owner are accepted.
+
+#### Owner indication and stale state
+
+The rover should publish the owner immediately after an ownership change and
+periodically thereafter so that GUI instances can recover from missed updates or
+reconnects.
+
+If owner telemetry becomes stale or unavailable, the GUI must not continue to
+show the last known owner as valid. The FMA must instead display:
+
+```text
+GIMBAL PRIORITY UNKNOWN
+```
+
+The GUI must receive a fresh authoritative owner state before showing either
+`← PILOT` or `ARM OPS →` again.
+
+Verbal callouts such as “I have gimbal” and “You have gimbal” may be used as
+human operating procedure, but they have no software effect. The mapped
+**GIMBAL PRIORITY** button is the only action that changes software ownership.
+
+---
+
 ## 🖥️ SYSTEM
 
 This column answers:
@@ -190,3 +273,7 @@ If link status is not available or has not yet been established, **display nothi
 | **LAW** | Arm protection level | `NORMAL`, `ALTERNATE`, `DIRECT` |
 | **SYSTEM** | Overall rover/control-stack health | `GOOD`, `DEGRADED`, `FAULT`, `E-STOP` |
 | **LINK** | Rover/base-station communication health | `GOOD`, `DEGRADED`, `LOST` |
+
+The Gimbal Priority indicator is displayed beneath the `LAW` column but is not
+part of the LAW value. It reports shared Gimbal ownership independently from the
+Arm protection state.
