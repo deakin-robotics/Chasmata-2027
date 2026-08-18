@@ -74,6 +74,9 @@ set of stable active ECAM codes immediately whenever that set changes and in the
 by the GUI. The GUI message catalogue maps each code to its text, severity,
 source, and optional procedure.
 
+See the [ECAM Code Dictionary](ecam-code-dictionary.md) for the available code
+identifiers, meanings, severities, and display text.
+
 If ECAM alert telemetry is stale or unavailable, the GUI must show that alert
 state is unavailable rather than assuming that all alerts are cleared.
 

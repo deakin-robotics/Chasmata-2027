@@ -38,6 +38,7 @@ describe('EcamAlertService', () => {
         { id: 'retry-controller', instruction: 'RETRY DRIVE-CONTROLLER CONNECTION' },
         { id: 'confirm-heartbeat', instruction: 'CONFIRM DRIVE-CONTROLLER HEARTBEAT' },
         { id: 'stop-driving', instruction: 'DO NOT DRIVE IF UNRESOLVED' },
+        { id: 'mockup-placeholder', instruction: 'MOCK-UP — FINAL STEPS PENDING LEAD REVIEW' },
       ],
     });
   });
