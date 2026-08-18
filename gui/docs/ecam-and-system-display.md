@@ -62,6 +62,26 @@ DRIVE_CONTROLLER_OFFLINE
 
 The message catalogue owns the user-facing text, source subsystem, severity, and optional troubleshooting procedure.
 
+## System Display colour convention
+
+The SD uses colour to communicate state without colouring every element of a
+page. Structure and supporting information remain neutral so the primary
+system state is easy to find.
+
+| Role | Colour | Use |
+|---|---|---|
+| Normal / valid state | Green | Confirmed healthy states and valid telemetry values, such as `NORMAL`, `OK`, `READY`, and `VALID`. |
+| Neutral information | Grey | Outlines, labels, separators, units, and descriptive telemetry labels such as `STREAM`, `RECON`, and `LAT`. |
+| Informational / interaction | Blue | Informational indications and operator-requested actions where a state has not yet been confirmed. |
+| Warning / unknown | Amber | Degraded, stale, unavailable, or otherwise uncertain state. |
+| Fault / critical | Red | Confirmed fault or condition requiring immediate operator attention. |
+
+Normal SD boxes use neutral outlines by default. A healthy state is shown by
+the relevant status text or value rather than by turning the entire box green.
+Amber or red outlines may be used when the box itself must clearly indicate a
+warning or fault. Unknown or stale telemetry must never continue to appear as
+green normal data.
+
 ## ECAM core
 
 The GUI contains one application-wide `EcamAlertService` under `core/ecam/`.
