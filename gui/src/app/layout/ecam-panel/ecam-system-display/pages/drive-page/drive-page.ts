@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 
 @Component({
   selector: 'app-drive-page',
-  template: '',
+  templateUrl: './drive-page.html',
+  styleUrl: './drive-page.scss',
 })
 export class DrivePage {}

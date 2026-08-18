@@ -77,16 +77,48 @@ source, and optional procedure.
 If ECAM alert telemetry is stale or unavailable, the GUI must show that alert
 state is unavailable rather than assuming that all alerts are cleared.
 
+## T/O CONFIG contract
+
+`T/O CONFIG` is an operator-requested check. The GUI sends the request first;
+the rover then evaluates the current configuration and returns the authoritative
+result.
+
+The rover response contains:
+
+```text
+result: NORMAL | FAILED | UNKNOWN
+ecam_codes: [ ... ]
+```
+
+The `result` is the overall result of the check. The `ecam_codes` array contains
+the stable ECAM codes for the individual failed conditions that the rover found.
+The GUI resolves those codes through its message catalogue and displays their
+text, severity, and any associated procedure.
+
+`NORMAL` means that the rover confirmed all applicable checks at the time of the
+request. `FAILED` means that one or more checks failed and the returned codes
+identify the causes. `UNKNOWN` means that the rover could not determine a valid
+result; the GUI must not present this as normal.
+
+The rover publishes the response immediately and includes the latest result and
+code array in the complete 1 Hz recovery snapshot. A code absent from a newer
+complete array is cleared from the GUI's active T/O CONFIG conditions.
+
+The GUI owns request timeout handling. If no response arrives within the GUI's
+request window, the GUI marks the result as unavailable or timed out locally and
+shows an amber T/O CONFIG state with an appropriate local ECAM message. This is
+not a rover result and is not included in the rover's `result` enumeration.
+
 ## System Display requirements
 
 | SD page | Required telemetry |
 |---|---|
 | `DRIVE` | Commanded/actual wheel velocity, odometry, motor current/temperature, motor-driver state, faults, and RS485 health. |
-| `ARM` | Joint position/velocity, current/torque where available, temperature, faults, CAN health, control mode, joint limits, sensor validity, planner state, and LAW/protection state. |
+| `ARM` | Joint position/velocity, current/torque where available, temperature, faults, CAN health, sensor validity, and planner state. Control mode, joint limits, and LAW/protection annunciation remain in the FMA. |
 | `POWER` | Battery voltage/current, total power, and power-rail/subsystem health where available. |
 | `LINK` | Network latency, packet loss/link quality where available, ROS node/service health, controller connection, and watchdog state. |
-| `CAMERA` | Front, Arm, and Gimbal camera availability; stream health; latency where available; Gimbal position/control state; and authoritative Gimbal owner. |
-| `SYSTEM` | ROS node/service health, CPU/memory/storage/system temperature where available, LED state, E-stop state, and overall diagnostics. |
+| `CAMERA` | Front, Arm, and Gimbal camera availability; stream health; reconnect state; latency where available; and Gimbal position/control state. Authoritative Gimbal ownership remains in the FMA. |
+| `SYSTEM` | ROS node/service health, CPU/memory/storage/system temperature where available, LED state, and overall diagnostics. E-stop state remains in FMA/ECAM. |
 
 ## Gimbal telemetry
 

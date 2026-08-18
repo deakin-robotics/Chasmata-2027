@@ -57,6 +57,30 @@ button:focus-visible {
   color: var(--dcr-color-normal);
 }
 
+.takeoff-config-button:hover,
+.takeoff-config-button:focus-visible {
+  border-color: var(--dcr-color-info);
+  color: var(--dcr-color-info);
+}
+
+.takeoff-config-button.config-normal {
+  border-color: var(--dcr-color-normal);
+  color: var(--dcr-color-normal);
+}
+
+.takeoff-config-button.config-warning {
+  border-color: var(--dcr-color-caution);
+  color: var(--dcr-color-caution);
+}
+
+.takeoff-config-button.config-normal:hover,
+.takeoff-config-button.config-normal:focus-visible,
+.takeoff-config-button.config-warning:hover,
+.takeoff-config-button.config-warning:focus-visible {
+  border-color: var(--dcr-color-info);
+  color: var(--dcr-color-info);
+}
+
 .empty-state {
   align-self: center;
   color: var(--dcr-color-neutral);

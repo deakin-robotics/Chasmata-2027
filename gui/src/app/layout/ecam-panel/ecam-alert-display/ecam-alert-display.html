@@ -2,10 +2,18 @@
   <header class="alert-header">
     <h1>ECAM</h1>
 
-    <button type="button" (click)="runMockTakeoffConfiguration()">T/O CONFIG</button>
+    <button
+      class="takeoff-config-button"
+      type="button"
+      [class.config-normal]="takeoffConfigResult() === 'NORMAL'"
+      [class.config-warning]="takeoffConfigResult() === 'FAILED' || takeoffConfigResult() === 'UNKNOWN'"
+      (click)="runMockTakeoffConfiguration()"
+    >
+      T/O CONFIG
+    </button>
   </header>
 
-  @if (hasActiveAlerts()) {
+  @if (activeAlerts().length > 0) {
     <ol class="alert-list" aria-live="polite">
       @for (alert of activeAlerts(); track alert.code) {
         <li [class]="'alert severity-' + alert.severity">

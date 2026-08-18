@@ -76,6 +76,28 @@ The current core consists of:
 
 The service is currently GUI-local. It is not yet connected to rover telemetry or a shared ROS alert topic.
 
+## T/O CONFIG behaviour
+
+`T/O CONFIG` is an operator-requested check made before departure. The GUI
+sends the request first; rover-side Control evaluates the current configuration
+and returns the authoritative result.
+
+The button represents the returned state:
+
+- `NORMAL` is shown in green.
+- `FAILED` or `UNKNOWN` is shown in amber.
+- Blue hover/focus indicates that the GUI is requesting a check, not that the
+  check has passed.
+
+When the result is `FAILED`, the rover response includes the individual ECAM
+codes for the failed conditions. The GUI displays those codes through the ECAM
+message catalogue.
+If the GUI receives no response within its request window, it owns the local
+timeout/unavailable indication and shows an appropriate ECAM message.
+
+See [GUI telemetry requirements](telemetry-requirements.md#to-config-contract)
+for the response package, recovery-snapshot, and timeout contract.
+
 ## Multiple operator PCs
 
 The Angular singleton is local to one browser instance. It cannot directly share state between the Pilot, Arm, and ECAM PCs.
@@ -110,7 +132,7 @@ A local browser failure should identify its station. For example, a Pilot browse
 
 ## System Display pages
 
-The current placeholder page set is:
+The current System Display page set is:
 
 - `DRIVE` — wheel and motor status, commanded versus actual motion, controller health, and drive faults.
 - `ARM` — joint positions, soft limits, position-sensor validity, protection state, and planner status.
@@ -121,7 +143,9 @@ The current placeholder page set is:
 
 `THERMAL` and `AUTONOMY` can be added when their telemetry is available and substantial enough to justify dedicated pages.
 
-The SD page header shows the selected system name. The current page bodies are placeholders; each page will eventually use a simple structural SVG schematic with telemetry layered onto meaningful components.
+The SD page header shows the selected system name. Each page currently provides
+a simple symbolic schematic. Live telemetry will populate the values while
+remaining layered onto meaningful system components.
 
 See [GUI telemetry requirements](telemetry-requirements.md) for the required
 telemetry, update rates, recovery snapshots, and per-page SD data contract.

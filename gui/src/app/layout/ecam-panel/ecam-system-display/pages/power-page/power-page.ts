@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 
 @Component({
   selector: 'app-power-page',
-  template: '',
+  templateUrl: './power-page.html',
+  styleUrl: './power-page.scss',
 })
 export class PowerPage {}

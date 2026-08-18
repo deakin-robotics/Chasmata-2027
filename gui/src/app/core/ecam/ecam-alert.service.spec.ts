@@ -34,10 +34,10 @@ describe('EcamAlertService', () => {
 
     expect(service.activeAlerts()[0].procedure).toEqual({
       steps: [
-        { id: 'check-link', instruction: 'Confirm LINK status is GOOD.' },
-        { id: 'retry-controller', instruction: 'Retry the drive-controller connection.' },
-        { id: 'confirm-heartbeat', instruction: 'Confirm the drive-controller heartbeat.' },
-        { id: 'stop-driving', instruction: 'If unresolved, do not drive.' },
+        { id: 'check-link', instruction: 'CONFIRM LINK GOOD' },
+        { id: 'retry-controller', instruction: 'RETRY DRIVE-CONTROLLER CONNECTION' },
+        { id: 'confirm-heartbeat', instruction: 'CONFIRM DRIVE-CONTROLLER HEARTBEAT' },
+        { id: 'stop-driving', instruction: 'DO NOT DRIVE IF UNRESOLVED' },
       ],
     });
   });

@@ -1,0 +1,120 @@
+:host {
+  display: block;
+  height: 100%;
+  min-height: 0;
+}
+
+.sd-page {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  height: 100%;
+  min-height: 0;
+}
+
+.schematic {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.schematic :is(.line, .component, .outline) {
+  fill: none;
+  stroke: var(--dcr-color-neutral);
+  stroke-width: 2;
+}
+
+.schematic .normal {
+  fill: none;
+  stroke: var(--dcr-color-normal);
+  stroke-width: 2.5;
+}
+
+.schematic .caution {
+  fill: none;
+  stroke: var(--dcr-color-caution);
+  stroke-width: 2.5;
+}
+
+.schematic .critical {
+  fill: none;
+  stroke: var(--dcr-color-critical);
+  stroke-width: 2.5;
+}
+
+.schematic .info {
+  fill: none;
+  stroke: var(--dcr-color-info);
+  stroke-width: 2.5;
+}
+
+.schematic .fill-normal {
+  fill: color-mix(in srgb, var(--dcr-color-normal) 18%, transparent);
+  stroke: var(--dcr-color-normal);
+  stroke-width: 2;
+}
+
+.schematic .fill-caution {
+  fill: color-mix(in srgb, var(--dcr-color-caution) 18%, transparent);
+  stroke: var(--dcr-color-caution);
+  stroke-width: 2;
+}
+
+.schematic .fill-info {
+  fill: color-mix(in srgb, var(--dcr-color-info) 15%, transparent);
+  stroke: var(--dcr-color-info);
+  stroke-width: 2;
+}
+
+.schematic text {
+  fill: var(--dcr-color-text);
+  font-family: Roboto, Arial, sans-serif;
+  font-size: 14px;
+  text-anchor: middle;
+}
+
+.schematic .label {
+  fill: var(--dcr-color-neutral);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+.schematic .value {
+  fill: var(--dcr-color-normal);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.schematic .value-caution {
+  fill: var(--dcr-color-caution);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.schematic .value-info {
+  fill: var(--dcr-color-info);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.schematic .small-value {
+  fill: var(--dcr-color-normal);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.schematic .small-value-muted {
+  fill: var(--dcr-color-neutral);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.telemetry-note {
+  margin: 0;
+  border-top: 1px solid var(--dcr-color-border);
+  padding: 0.4rem 0.65rem;
+  color: var(--dcr-color-neutral);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}

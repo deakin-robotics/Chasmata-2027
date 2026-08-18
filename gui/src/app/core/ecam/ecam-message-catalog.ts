@@ -33,11 +33,11 @@ export const ECAM_MESSAGE_CATALOG: Readonly<Record<EcamAlertCode, EcamAlertDefin
     code: 'CONFIG_LAW_DIRECT',
     procedure: {
       steps: [
-        { id: 'confirm-authority', instruction: 'Confirm DIRECT mode is intentional and authorised.' },
-        { id: 'confirm-clearance', instruction: 'Confirm the rover is stationary and the arm area is clear.' },
-        { id: 'operate-visually', instruction: 'Operate the arm only under direct visual supervision.' },
-        { id: 'restore-normal', instruction: 'Restore LAW NORMAL before continuing the mission.' },
-        { id: 'do-not-depart', instruction: 'If LAW NORMAL cannot be restored, do not depart.' },
+        { id: 'confirm-authority', instruction: 'CONFIRM DIRECT AUTHORISED' },
+        { id: 'confirm-clearance', instruction: 'CONFIRM ROVER STATIONARY AND ARM AREA CLEAR' },
+        { id: 'operate-visually', instruction: 'OPERATE UNDER DIRECT VISUAL SUPERVISION' },
+        { id: 'restore-normal', instruction: 'RESTORE LAW NORMAL' },
+        { id: 'do-not-depart', instruction: 'DO NOT DEPART IF UNABLE' },
       ],
     },
     source: 'CONFIG',
@@ -48,10 +48,10 @@ export const ECAM_MESSAGE_CATALOG: Readonly<Record<EcamAlertCode, EcamAlertDefin
     code: 'DRIVE_CONTROLLER_OFFLINE',
     procedure: {
       steps: [
-        { id: 'check-link', instruction: 'Confirm LINK status is GOOD.' },
-        { id: 'retry-controller', instruction: 'Retry the drive-controller connection.' },
-        { id: 'confirm-heartbeat', instruction: 'Confirm the drive-controller heartbeat.' },
-        { id: 'stop-driving', instruction: 'If unresolved, do not drive.' },
+        { id: 'check-link', instruction: 'CONFIRM LINK GOOD' },
+        { id: 'retry-controller', instruction: 'RETRY DRIVE-CONTROLLER CONNECTION' },
+        { id: 'confirm-heartbeat', instruction: 'CONFIRM DRIVE-CONTROLLER HEARTBEAT' },
+        { id: 'stop-driving', instruction: 'DO NOT DRIVE IF UNRESOLVED' },
       ],
     },
     source: 'DRIVE',

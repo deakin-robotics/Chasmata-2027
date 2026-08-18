@@ -13,7 +13,7 @@ interface EcamPage {
   name: EcamPageName;
 }
 
-/** Lower ECAM display with placeholder system pages. */
+/** Lower ECAM display with symbolic, telemetry-ready system pages. */
 @Component({
   selector: 'app-ecam-system-display',
   imports: [DrivePage, ArmPage, PowerPage, LinkPage, CameraPage, SystemPage],

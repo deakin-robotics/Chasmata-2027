@@ -51,10 +51,20 @@ describe('EcamAlertDisplay', () => {
     fixture.nativeElement.querySelector('button').click();
     fixture.detectChanges();
 
+    expect(component.takeoffConfigResult()).toBe('FAILED');
+    expect(fixture.nativeElement.querySelector('button').classList).toContain('config-warning');
     expect(ecamAlerts.activeAlerts().map((alert) => alert.code)).toEqual([
       'CONFIG_ESTOP_STATUS_UNAVAILABLE',
       'CONFIG_LAW_DIRECT',
       'CONFIG_ANTENNA_NOT_DEPLOYED',
     ]);
+  });
+
+  it('maps a confirmed normal result to the green button state', () => {
+    component.takeoffConfigResult.set('NORMAL');
+    fixture.detectChanges();
+
+    const button = fixture.nativeElement.querySelector('button') as HTMLButtonElement;
+    expect(button.classList).toContain('config-normal');
   });
 });
