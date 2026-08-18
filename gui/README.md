@@ -31,6 +31,7 @@ The mission-control interface is inspired by the Airbus glass cockpit philosophy
 - [Operator layouts](docs/operator-layouts.md) — the Pilot and Arm dashboard layouts and responsibilities.
 - [Functional Mode Annunciator](docs/fma.md) — confirmed DRIVE, ARM, LAW, SYSTEM, and LINK states.
 - [ECAM and System Display](docs/ecam-and-system-display.md) — alert behaviour, operator procedures, shared alert architecture, and subsystem display pages.
+- [Telemetry requirements](docs/telemetry-requirements.md) — FMA, ECAM, and System Display telemetry, update rates, and recovery behaviour.
 
 ## Current Angular implementation
 

@@ -1,0 +1,105 @@
+# GUI Telemetry Requirements
+
+This document defines the telemetry required by the GUI/base station for the
+Functional Mode Annunciator (FMA), ECAM, and System Display (SD) pages. It
+defines what the GUI needs to receive; Control owns the rover-side production,
+validation, and safety enforcement of that telemetry.
+
+## Delivery rules
+
+Telemetry is divided into immediate state-change updates, 10 Hz dynamic
+telemetry, 1 Hz operational telemetry, and a complete 1 Hz recovery snapshot.
+
+Every telemetry value must include validity or staleness information. The GUI
+must show unavailable or unknown state when data is stale rather than continue
+to present old data as current.
+
+### Immediate state-change updates
+
+The rover must publish the following immediately whenever they change:
+
+- E-stop and watchdog state.
+- DRIVE, ARM, LAW, SYSTEM, and LINK state.
+- Motor, drivetrain, and arm fault state.
+- Safety-inhibit, arm-protection, and joint-limit state.
+- Controller connection state.
+- ROS/network connection, degradation, and loss state.
+- T/O CONFIG result and individual failed or unknown conditions.
+- Gimbal owner/priority state, including unknown or stale state.
+- Camera availability changes.
+- ECAM active alert state.
+
+### 10 Hz dynamic telemetry
+
+The rover must publish the following at 10 Hz:
+
+- Commanded and actual wheel velocity.
+- Wheel position and odometry.
+- Arm joint position and velocity.
+- Arm current/torque where available.
+- Gimbal position and movement/control state.
+- Network latency and link-quality measurements where available.
+
+### 1 Hz operational and diagnostic telemetry
+
+The rover must publish the following at 1 Hz:
+
+- Battery voltage, current, and total power.
+- Power-rail or subsystem health where available.
+- Motor and arm temperature.
+- Motor-driver state.
+- CAN and RS485 communication health.
+- Camera and stream health.
+- ROS node and service health.
+- CPU, memory, storage, and system temperature where available.
+- LED state.
+
+### Complete 1 Hz recovery snapshot
+
+The rover must also publish a complete current-state snapshot at least once per
+second. It includes the latest values from every telemetry category, active
+faults and alerts, FMA states, safety states, link state, T/O CONFIG status,
+and Gimbal ownership. This allows a GUI instance to recover after reconnecting
+or missing an update.
+
+## FMA and ECAM requirements
+
+The FMA requires confirmed DRIVE, ARM, LAW, SYSTEM, and LINK state. Requested
+GUI actions are not displayed as confirmed until the rover reports its updated
+authoritative state.
+
+ECAM uses complete active alert-code snapshots. The rover sends the full current
+set of stable active ECAM codes immediately whenever that set changes and in the
+1 Hz recovery snapshot. A code absent from a newer complete snapshot is cleared
+by the GUI. The GUI message catalogue maps each code to its text, severity,
+source, and optional procedure.
+
+If ECAM alert telemetry is stale or unavailable, the GUI must show that alert
+state is unavailable rather than assuming that all alerts are cleared.
+
+## System Display requirements
+
+| SD page | Required telemetry |
+|---|---|
+| `DRIVE` | Commanded/actual wheel velocity, odometry, motor current/temperature, motor-driver state, faults, and RS485 health. |
+| `ARM` | Joint position/velocity, current/torque where available, temperature, faults, CAN health, control mode, joint limits, sensor validity, planner state, and LAW/protection state. |
+| `POWER` | Battery voltage/current, total power, and power-rail/subsystem health where available. |
+| `LINK` | Network latency, packet loss/link quality where available, ROS node/service health, controller connection, and watchdog state. |
+| `CAMERA` | Front, Arm, and Gimbal camera availability; stream health; latency where available; Gimbal position/control state; and authoritative Gimbal owner. |
+| `SYSTEM` | ROS node/service health, CPU/memory/storage/system temperature where available, LED state, E-stop state, and overall diagnostics. |
+
+## Gimbal telemetry
+
+Both Pilot and Arm Operator stations can view and request control of the shared
+Gimbal camera. The rover owns the authoritative owner state and validates
+station-identified movement commands.
+
+Gimbal priority must publish immediately when it changes and be included in the
+1 Hz recovery snapshot. If owner telemetry is stale or unavailable, the FMA
+must display `GIMBAL PRIORITY UNKNOWN` rather than the last known owner.
+
+## Interface ownership
+
+Control and GUI jointly define the semantic GUI-to-ROS contract, including the
+telemetry models, units, validity/staleness rules, and update behaviour. Control
+owns hardware-specific CAN, RS485, camera-server, and safety implementation.

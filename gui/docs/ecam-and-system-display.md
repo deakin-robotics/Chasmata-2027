@@ -123,6 +123,9 @@ The current placeholder page set is:
 
 The SD page header shows the selected system name. The current page bodies are placeholders; each page will eventually use a simple structural SVG schematic with telemetry layered onto meaningful components.
 
+See [GUI telemetry requirements](telemetry-requirements.md) for the required
+telemetry, update rates, recovery snapshots, and per-page SD data contract.
+
 ```text
 SVG = system topology
 Telemetry = live state
