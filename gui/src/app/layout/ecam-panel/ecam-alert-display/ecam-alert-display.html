@@ -1,0 +1,39 @@
+<section class="alert-display" aria-label="ECAM alerts">
+  <header class="alert-header">
+    <h1>ECAM</h1>
+
+    <button
+      class="takeoff-config-button"
+      type="button"
+      [class.config-normal]="takeoffConfigResult() === 'NORMAL'"
+      [class.config-warning]="takeoffConfigResult() === 'FAILED' || takeoffConfigResult() === 'UNKNOWN'"
+      (click)="runMockTakeoffConfiguration()"
+    >
+      T/O CONFIG
+    </button>
+  </header>
+
+  @if (activeAlerts().length > 0) {
+    <ol class="alert-list" aria-live="polite">
+      @for (alert of activeAlerts(); track alert.code) {
+        <li [class]="'alert severity-' + alert.severity">
+          <span class="alert-text">{{ alert.text }}</span>
+          @if (alert.detail) {
+            <span class="alert-detail">{{ alert.detail }}</span>
+          }
+          @if (alert.procedure; as procedure) {
+            <div class="procedure">
+              <ul>
+                @for (step of procedure.steps; track step.id) {
+                  <li>{{ step.instruction }}</li>
+                }
+              </ul>
+            </div>
+          }
+        </li>
+      }
+    </ol>
+  } @else {
+    <p class="empty-state">No active messages</p>
+  }
+</section>

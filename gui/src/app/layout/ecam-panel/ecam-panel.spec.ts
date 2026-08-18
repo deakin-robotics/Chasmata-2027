@@ -20,7 +20,9 @@ describe('EcamPanel', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should identify the system message display', () => {
-    expect(fixture.nativeElement.textContent).toContain('System messages');
+  it('should render the alert and system displays', () => {
+    expect(fixture.nativeElement.textContent).toContain('ECAM');
+    expect(fixture.nativeElement.textContent).toContain('T/O CONFIG');
+    expect(fixture.nativeElement.textContent).toContain('DRIVE');
   });
 });

@@ -62,6 +62,26 @@ DRIVE_CONTROLLER_OFFLINE
 
 The message catalogue owns the user-facing text, source subsystem, severity, and optional troubleshooting procedure.
 
+## System Display colour convention
+
+The SD uses colour to communicate state without colouring every element of a
+page. Structure and supporting information remain neutral so the primary
+system state is easy to find.
+
+| Role | Colour | Use |
+|---|---|---|
+| Normal / valid state | Green | Confirmed healthy states and valid telemetry values, such as `NORMAL`, `OK`, `READY`, and `VALID`. |
+| Neutral information | Grey | Outlines, labels, separators, units, and descriptive telemetry labels such as `STREAM`, `RECON`, and `LAT`. |
+| Informational / interaction | Blue | Informational indications and operator-requested actions where a state has not yet been confirmed. |
+| Warning / unknown | Amber | Degraded, stale, unavailable, or otherwise uncertain state. |
+| Fault / critical | Red | Confirmed fault or condition requiring immediate operator attention. |
+
+Normal SD boxes use neutral outlines by default. A healthy state is shown by
+the relevant status text or value rather than by turning the entire box green.
+Amber or red outlines may be used when the box itself must clearly indicate a
+warning or fault. Unknown or stale telemetry must never continue to appear as
+green normal data.
+
 ## ECAM core
 
 The GUI contains one application-wide `EcamAlertService` under `core/ecam/`.
@@ -76,33 +96,47 @@ The current core consists of:
 
 The service is currently GUI-local. It is not yet connected to rover telemetry or a shared ROS alert topic.
 
-## T/O CONFIG
+## T/O CONFIG behaviour
 
-`T/O CONFIG` is a pre-departure configuration check. It asks whether the rover is in an acceptable starting configuration and reports the individual conditions that need attention.
-
-Pressing the `T/O CONFIG` button starts the evaluation; it is not only a refresh or display action:
+`T/O CONFIG` is an operator-requested pre-departure configuration check. The
+GUI sends the request first; rover-side Control evaluates the current
+configuration and returns the authoritative result.
 
 ```text
 GUI button press
   → configuration check request
   → rover-side Control evaluation
   → configuration result returned to the GUI
-  → ECAM displays the result and any active conditions
+  → ECAM displays the result and individual conditions
 ```
 
-The rover-side Control system is authoritative for this evaluation. The GUI displays the returned result and does not independently decide whether the rover is ready. A successful result may be shown as `T/O CONFIG NORMAL`; otherwise, each failed or unknown condition is presented as an ECAM message with its defined severity and any available procedure.
+The response result is `NORMAL`, `FAILED`, or `UNKNOWN`. Rover-side Control is
+authoritative for the evaluation; the GUI displays the returned result and does
+not independently decide whether the rover is ready. When the result is
+`FAILED` or `UNKNOWN`, the response includes the individual ECAM codes for the
+conditions found by the rover. The GUI resolves those codes through the ECAM
+message catalogue.
 
-`T/O CONFIG` is advisory and does not itself inhibit driving. If the operator chooses to drive while a condition remains unresolved, the corresponding active ECAM message remains visible until the underlying condition is cleared. `T/O CONFIG NORMAL` only confirms that the rover passed the checks at the moment the button was pressed. It does not mean the rover will remain healthy afterward.
+The button represents the returned state:
 
-If the rover-side result is unavailable or stale, the GUI must show the check as unknown or unavailable rather than displaying it as normal.
+- `NORMAL` is shown in green.
+- `FAILED` or `UNKNOWN` is shown in amber.
+- Blue hover/focus indicates that the GUI is requesting a check, not that the
+  check has passed.
 
-The current GUI implementation is a local demonstration using representative conditions:
+`T/O CONFIG` is advisory and does not itself inhibit driving. `T/O CONFIG
+NORMAL` confirms that the rover passed the checks at the moment the button was
+pressed; it does not guarantee that the rover will remain healthy afterward.
+If a condition remains unresolved, its active ECAM message remains visible until
+the underlying condition is cleared.
 
-- E-stop status unavailable — fault
-- LAW DIRECT — warning with an operator procedure
-- Antenna not deployed — attention
+If the rover-side result is unavailable or stale, the GUI must show the check as
+unknown or unavailable rather than displaying it as normal. If the GUI receives
+no response within its request window, it owns the local timeout/unavailable
+indication and shows an appropriate ECAM message.
 
-It does not issue a rover-side configuration command, change the E-stop state, or validate the actual rover configuration.
+See [GUI telemetry requirements](telemetry-requirements.md#to-config-contract)
+for the response package, recovery-snapshot, and timeout contract.
 
 ## Multiple operator PCs
 
@@ -135,7 +169,7 @@ A local browser failure should identify its station. For example, a Pilot browse
 
 ## System Display pages
 
-The current placeholder page set is:
+The current System Display page set is:
 
 - `DRIVE` — wheel and motor status, commanded versus actual motion, controller health, and drive faults.
 - `ARM` — joint positions, soft limits, position-sensor validity, protection state, and planner status.
@@ -146,7 +180,30 @@ The current placeholder page set is:
 
 `THERMAL` and `AUTONOMY` can be added when their telemetry is available and substantial enough to justify dedicated pages.
 
-The SD page header shows the selected system name. The current page bodies are placeholders; each page will eventually use a simple structural SVG schematic with telemetry layered onto meaningful components.
+### Current System Display implementation
+
+The current GUI implementation provides the following six SD pages. The values
+shown in these screenshots are mock telemetry pending the live rover telemetry
+contract.
+
+![Current DRIVE System Display page](../assets/system_display/drive.png)
+
+![Current ARM System Display page](../assets/system_display/arm.png)
+
+![Current POWER System Display page](../assets/system_display/power.png)
+
+![Current LINK System Display page](../assets/system_display/link.png)
+
+![Current CAMERA System Display page](../assets/system_display/camera.png)
+
+![Current SYSTEM System Display page](../assets/system_display/system.png)
+
+The SD page header shows the selected system name. Each page currently provides
+a simple symbolic schematic. Live telemetry will populate the values while
+remaining layered onto meaningful system components.
+
+See [GUI telemetry requirements](telemetry-requirements.md) for the required
+telemetry, update rates, recovery snapshots, and per-page SD data contract.
 
 ```text
 SVG = system topology
