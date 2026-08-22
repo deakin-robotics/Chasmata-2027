@@ -1,4 +1,4 @@
-# ECAM Code Dictionary
+# Electronic Centralized Advisory Monitor (ECAM) Code Dictionary
 
 This document defines the stable ECAM alert codes available to the rover and
 GUI. Control should return a code from this dictionary when the corresponding
