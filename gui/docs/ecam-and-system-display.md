@@ -1,4 +1,4 @@
-# ECAM and System Display
+# Electronic Centralized Advisory Monitor (ECAM) and System Display (SD)
 
 This document defines the intended behaviour of the rover's ECAM and lower System Display (SD). The design is inspired by the Airbus glass cockpit philosophy, but the content is specific to the Deakin rover and its competition workflow.
 

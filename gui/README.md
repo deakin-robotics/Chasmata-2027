@@ -30,9 +30,9 @@ The mission-control interface is inspired by the Airbus glass cockpit philosophy
 - [Colour palette](docs/color-palette.md) — the UI colour system and operational status semantics.
 - [Operator layouts](docs/operator-layouts.md) — the Pilot and Arm dashboard layouts and responsibilities.
 - [Functional Mode Annunciator](docs/fma.md) — confirmed DRIVE, ARM, LAW, SYSTEM, and LINK states.
-- [ECAM and System Display](docs/ecam-and-system-display.md) — alert behaviour, operator procedures, shared alert architecture, and subsystem display pages.
+- [Electronic Centralized Advisory Monitor (ECAM) and System Display (SD)](docs/ecam-and-system-display.md) — alert behaviour, operator procedures, shared alert architecture, and subsystem display pages.
 - [ECAM Code Dictionary](docs/ecam-code-dictionary.md) — stable alert codes, severities, display text, and meanings.
-- [Telemetry requirements](docs/telemetry-requirements.md) — FMA, ECAM, and System Display telemetry, update rates, and recovery behaviour.
+- [Telemetry requirements](docs/telemetry-requirements.md) — FMA, ECAM, and System Display (SD) telemetry, update rates, and recovery behaviour.
 
 ## Current Angular implementation
 
@@ -48,9 +48,9 @@ The mission-control interface is inspired by the Airbus glass cockpit philosophy
 
 ![Arm operator dashboard](assets/arm_ops.png)
 
-### ECAM and System Display
+### ECAM and System Display (SD)
 
-![Current rover ECAM and System Display](assets/ecam.png)
+![Current rover ECAM and System Display (SD)](assets/ecam.png)
 
 ## System overview
 

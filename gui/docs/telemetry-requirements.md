@@ -1,7 +1,8 @@
 # GUI Telemetry Requirements
 
 This document defines the telemetry required by the GUI/base station for the
-Functional Mode Annunciator (FMA), ECAM, and System Display (SD) pages. It
+Functional Mode Annunciator (FMA), Electronic Centralized Advisory Monitor
+(ECAM), and System Display (SD) pages. It
 defines what the GUI needs to receive; Control owns the rover-side production,
 validation, and safety enforcement of that telemetry.
 
