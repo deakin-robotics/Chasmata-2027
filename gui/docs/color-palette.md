@@ -17,7 +17,7 @@ Use the global CSS variables in `src/styles.scss`. Do not introduce arbitrary st
 | Neutral | `--dcr-color-neutral` | Muted grey | Static geometry, labels, titles, and normal non-operational context. |
 | Offline / unavailable | `--dcr-color-offline` | Dark grey | Missing telemetry, inactive system, or unavailable camera. |
 
-`--dcr-color-text`, `--dcr-color-surface`, `--dcr-color-background`, and `--dcr-color-border` provide the supporting dark mission-control palette.
+`--dcr-color-text`, `--dcr-color-surface`, `--dcr-color-surface-raised`, `--dcr-color-background`, and `--dcr-color-border` provide the supporting dark mission-control palette.
 
 ## Status text and messages
 

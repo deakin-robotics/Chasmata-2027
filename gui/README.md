@@ -1,4 +1,4 @@
-# Deakin Rover GUI
+# 🖥️ Deakin Rover GUI
 
 The browser-based mission-control interface for the Deakin Competitive Robotics Club rover.
 
@@ -6,7 +6,7 @@ This project is an Angular replacement for the previous Next.js GUI. The migrati
 
 > This project is currently in its migration stage. The existing Next.js GUI remains the working reference until this application reaches feature parity and passes rover testing.
 
-## Technology stack
+## 🧰 Technology stack
 
 - Angular 22 with standalone components
 - TypeScript
@@ -18,14 +18,14 @@ This project is an Angular replacement for the previous Next.js GUI. The migrati
 - HTTP MJPEG camera streams
 - Vitest for unit testing
 
-## Design language
+## 🎨 Design language
 
 The mission-control interface is inspired by the Airbus glass cockpit philosophy: a calm symbolic overview during normal operation and consistent colour semantics for operational state.
 
 *Some design decisions have a longer history than this rover :)*
 <!-- From Tom to future you: If you found the easter eggs, you probably know where the Airbus obsession came from. :))) -->
 
-## Documentation
+## 📚 Documentation
 
 - [Colour palette](docs/color-palette.md) — the UI colour system and operational status semantics.
 - [Operator layouts](docs/operator-layouts.md) — the Pilot and Arm dashboard layouts and responsibilities.
@@ -34,7 +34,7 @@ The mission-control interface is inspired by the Airbus glass cockpit philosophy
 - [ECAM Code Dictionary](docs/ecam-code-dictionary.md) — stable alert codes, severities, display text, and meanings.
 - [Telemetry requirements](docs/telemetry-requirements.md) — FMA, ECAM, and System Display (SD) telemetry, update rates, and recovery behaviour.
 
-## Current Angular implementation
+## 🖥️ Current Angular implementation
 
 ### Functional Mode Annunciator
 
@@ -52,7 +52,7 @@ The mission-control interface is inspired by the Airbus glass cockpit philosophy
 
 ![Current rover ECAM and System Display (SD)](assets/ecam.png)
 
-## System overview
+## 🧭 System overview
 
 ```text
 Gamepad API ───────────────┐
@@ -73,7 +73,7 @@ The GUI communicates directly with the rover on its private operator network:
   button and confirmed authoritatively by the rover.
 - The physical rover, radio link, controller, and safety behaviour must be tested before the Angular GUI replaces the existing interface.
 
-## Prerequisites
+## 📋 Prerequisites
 
 - Node.js compatible with the Angular version in `package.json`
 - npm
@@ -81,7 +81,7 @@ The GUI communicates directly with the rover on its private operator network:
 
 The Angular CLI does not need to be installed globally. Commands can be run through the npm scripts or with `npx ng`.
 
-## Install and run
+## ▶️ Install and run
 
 Install dependencies:
 
@@ -97,7 +97,7 @@ npm start
 
 Open <http://localhost:4200>.
 
-## Local ROS testing
+## 🔌 Local ROS testing
 
 Start ROSbridge from the `deakin_rover` base-station Dev Container:
 
@@ -127,7 +127,7 @@ inventory is Front, Arm, and a controllable downward-facing Gimbal camera that
 provides a top-like/bird's-eye view. The final hardware and stream interfaces
 remain under development and will be updated once finalised.
 
-## Architecture
+## 🏗️ Architecture
 
 The application uses a lightweight feature-based structure:
 
@@ -135,6 +135,7 @@ The application uses a lightweight feature-based structure:
 src/app/
 ├── core/
 │   ├── control/                 # Global control mode plus Pilot and Arm publishers
+│   ├── ecam/                    # Application-wide ECAM alert state and messages
 │   ├── fma/                     # Functional Mode Annunciator state
 │   ├── gamepad/                 # Browser gamepad polling and mapping
 │   └── ros/                     # ROS connection, topics, and shared models
@@ -148,6 +149,7 @@ src/app/
 │   └── telemetry/               # Rover and subsystem schematics
 │
 ├── layout/
+│   ├── ecam-panel/              # ECAM alert and System Display panels
 │   ├── mission-control/         # Shared shell, navigation, header, and FMA
 │   ├── pilot/                   # Pilot dashboard and panel arrangement
 │   └── arm/                     # Arm dashboard and panel arrangement
@@ -170,7 +172,7 @@ src/app/
 - Components should not create independent ROS connections.
 - ROS and gamepad logic should remain outside presentation-only components.
 
-## Control safety principles
+## 🛡️ Control safety principles
 
 The combined dashboard must have explicit control modes:
 
@@ -187,7 +189,7 @@ SAFE / IDLE
 - Gamepad, ROS, or radio disconnection must result in a safe stop.
 - Movement-command behaviour must be validated on the physical rover.
 
-## Camera reliability requirement
+## 📷 Camera reliability requirement
 
 Camera feeds must recover from temporary radio or stream interruptions without requiring a page refresh. The camera feature should provide:
 
@@ -205,7 +207,7 @@ button. The rover owns the confirmed owner, validates every Gimbal movement
 command, and broadcasts the current owner to all GUI instances. The GUI must
 show `GIMBAL PRIORITY UNKNOWN` when owner telemetry is stale or unavailable.
 
-## Migration plan
+## 🔄 Migration plan
 
 1. Connect to ROSbridge and display connection state.
 2. Display one resilient MJPEG camera stream.
@@ -218,7 +220,7 @@ show `GIMBAL PRIORITY UNKNOWN` when owner telemetry is stale or unavailable.
 9. Validate the replacement with the real controller, radio, cameras, and rover.
 10. Add new capabilities only after the port is stable.
 
-## Development commands
+## 🛠️ Development commands
 
 ```bash
 # Start the development server
@@ -235,7 +237,7 @@ npx ng generate component features/example/example-panel
 npx ng generate service core/example/example
 ```
 
-## Existing GUI reference
+## 🕰️ Existing GUI reference
 
 During migration, use the existing implementation in the sibling rover repository as a behavioural reference:
 
