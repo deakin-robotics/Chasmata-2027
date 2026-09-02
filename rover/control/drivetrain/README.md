@@ -30,4 +30,4 @@ Test instructions will be added as the test suite is built out.
 
 ## 📚 Related documentation
 
-See the [top-level README](../../README.md) for overall repository structure, and the [autonomy](../autonomous/README.md) and [shared](../shared/README.md) packages for related rover-side components.
+See the [top-level README](../../../README.md) for overall repository structure, and the [autonomy](../../autonomous/README.md) and [shared](../../shared/README.md) packages for related rover-side components.
