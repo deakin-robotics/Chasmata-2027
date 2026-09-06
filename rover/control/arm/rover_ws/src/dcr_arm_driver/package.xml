@@ -4,7 +4,7 @@
   <name>dcr_arm_driver</name>
   <version>0.1.0</version>
   <description>ARM driver with controller for CAN motor control in ROS2 Jazzy</description>
-  <maintainer email="your.email@deakin.edu.au">Your Name</maintainer>
+  <maintainer email="forrest.nguyen27@gmail.com">Forrest Nguyen</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
