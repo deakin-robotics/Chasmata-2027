@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>dcr_arm_driver</name>
+  <version>0.1.0</version>
+  <description>ARM driver with controller for CAN motor control in ROS2 Jazzy</description>
+  <maintainer email="your.email@deakin.edu.au">Your Name</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>can_msgs</depend>
+  <depend>arm_interfaces</depend>
+  <depend>sensor_msgs</depend>
+  <depend>rcl_interfaces</depend>
+  <depend>std_msgs</depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+</package>
