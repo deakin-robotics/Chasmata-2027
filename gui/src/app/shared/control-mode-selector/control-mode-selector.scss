@@ -1,0 +1,71 @@
+:host {
+  display: block;
+  width: min(100%, 10rem);
+}
+
+.control-mode-selector {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.control-mode-selector-label {
+  color: var(--dcr-color-neutral);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.control-mode-options {
+  --selector-color: var(--dcr-color-normal);
+
+  position: relative;
+  display: grid;
+  box-sizing: border-box;
+  grid-template-columns: repeat(var(--option-count), minmax(0, 1fr));
+  min-height: 1.75rem;
+  border: 1px solid var(--dcr-color-offline);
+  border-radius: 0.25rem;
+  background: color-mix(in srgb, var(--dcr-color-offline) 18%, transparent);
+}
+
+.control-mode-options::before {
+  position: absolute;
+  top: 0.15rem;
+  bottom: 0.15rem;
+  left: 0.15rem;
+  width: calc((100% - 0.3rem) / var(--option-count));
+  border-radius: 0.15rem;
+  background: var(--selector-color);
+  content: '';
+  pointer-events: none;
+  transform: translateX(calc(var(--active-index) * 100%));
+  transition: transform 150ms ease;
+}
+
+button {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  border: 0;
+  padding: 0.15rem 0.45rem;
+  background: transparent;
+  color: var(--dcr-color-offline);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: color 150ms ease;
+}
+
+button.active {
+  color: var(--dcr-color-background);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--dcr-color-info);
+  outline-offset: 2px;
+}

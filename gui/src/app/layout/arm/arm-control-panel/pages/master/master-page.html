@@ -1,8 +1,4 @@
-<section class="pilot-control-panel" aria-label="Pilot control panel">
-  <nav class="control-page-tabs" aria-label="Pilot control pages">
-    <span class="active-tab" aria-current="page">Master</span>
-  </nav>
-
+<section class="master-page" aria-label="Arm master controls">
   <app-status-indicator
     label="Gamepad"
     [status]="gamepadStatusLabel()"
@@ -30,6 +26,8 @@
     [disabled]="!masterDriveEnabled() && (!gamepadConnected() || !rosConnected())"
     (checkedChange)="toggleMasterDriveControl($event)"
   />
+
+  <app-two-step-action-button class="law-override" label="Law Override" actionLabel="Override" />
 
   @if (readinessError(); as error) {
     <p class="control-readiness" role="status">{{ error }}</p>

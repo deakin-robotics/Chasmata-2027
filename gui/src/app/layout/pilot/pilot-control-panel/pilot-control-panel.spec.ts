@@ -31,4 +31,8 @@ describe('PilotControlPanel', () => {
   it('should render the read-only Gamepad status', () => {
     expect(fixture.nativeElement.querySelector('app-status-indicator')).toBeTruthy();
   });
+
+  it('should label the active tab Master', () => {
+    expect(fixture.nativeElement.querySelector('.active-tab')?.textContent.trim()).toBe('Master');
+  });
 });
