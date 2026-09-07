@@ -1,6 +1,9 @@
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
+
+import { CameraStream } from '../../../features/cameras/camera-stream/camera-stream';
 import { GamepadControlPanel } from '../../../features/gamepad/gamepad-control-panel/gamepad-control-panel';
-import { PilotCameraLayout } from '../pilot-camera-layout/pilot-camera-layout';
+import { RoverSchematic } from '../../../features/telemetry/rover-schematic/rover-schematic';
+import { ControlScheme } from '../../../shared/control-scheme/control-scheme';
 import { PilotControlPanel } from '../pilot-control-panel/pilot-control-panel';
 
 /**
@@ -10,8 +13,12 @@ import { PilotControlPanel } from '../pilot-control-panel/pilot-control-panel';
  */
 @Component({
   selector: 'app-pilot-dashboard',
-  imports: [GamepadControlPanel, PilotCameraLayout, PilotControlPanel],
+  imports: [CameraStream, ControlScheme, GamepadControlPanel, PilotControlPanel, RoverSchematic],
   templateUrl: './pilot-dashboard.html',
   styleUrl: './pilot-dashboard.scss',
 })
-export class PilotDashboard {}
+export class PilotDashboard {
+  readonly armCameraUrl = signal('http://dcr-rover.local:8091/?action=stream');
+  readonly frontCameraUrl = signal('http://dcr-rover.local:8080/?action=stream');
+  readonly gimbalCameraUrl = signal('');
+}

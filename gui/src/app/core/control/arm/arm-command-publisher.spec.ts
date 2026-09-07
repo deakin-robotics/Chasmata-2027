@@ -18,6 +18,10 @@ describe('ArmCommandPublisher', () => {
     expect(service.publish({ axes: [0, 0, 0, 0], buttons: [] })).toBe(false);
   });
 
+  it('should not publish clear faults while ROS is disconnected', () => {
+    expect(service.publishClearFaults()).toBe(false);
+  });
+
   it('should release Arm authority when stopping control', () => {
     controlMode.activate('arm');
 

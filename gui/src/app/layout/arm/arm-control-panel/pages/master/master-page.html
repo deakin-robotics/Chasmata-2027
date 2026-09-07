@@ -27,7 +27,21 @@
     (checkedChange)="toggleMasterDriveControl($event)"
   />
 
-  <app-two-step-action-button class="law-override" label="Law Override" actionLabel="Override" />
+  <app-two-step-action-button
+    class="law-override"
+    label="Law Override"
+    actionLabel="Override"
+    [disabled]="!rosConnected()"
+  />
+
+  <app-two-step-action-button
+    #clearFaultsButton
+    class="clear-faults"
+    label="Clear Faults"
+    actionLabel="Clear"
+    [disabled]="!rosConnected()"
+    (activated)="clearArmFaults(clearFaultsButton)"
+  />
 
   @if (readinessError(); as error) {
     <p class="control-readiness" role="status">{{ error }}</p>

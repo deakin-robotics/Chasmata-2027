@@ -24,10 +24,16 @@ describe('ArmDashboard', () => {
     const text = fixture.nativeElement.textContent;
 
     expect(text).toContain('Arm camera');
+    expect(text).toContain('Gimbal camera');
     expect(text).toContain('Front camera');
     expect(text).not.toContain('Rear camera');
     expect(text).toContain('Arm schematic');
-    expect(text).toContain('Clamp schematic');
+    expect(text).not.toContain('Clamp schematic');
     expect(text).toContain('Master Drive');
+    const roverColumn = fixture.nativeElement.querySelector('.rover-camera-column');
+    expect(roverColumn?.querySelector('app-control-scheme')).toBeTruthy();
+    expect(roverColumn?.querySelector('app-gamepad-control-panel')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.arm-schematic-column app-arm-schematic')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.arm-operator-column app-arm-schematic')).toBeFalsy();
   });
 });

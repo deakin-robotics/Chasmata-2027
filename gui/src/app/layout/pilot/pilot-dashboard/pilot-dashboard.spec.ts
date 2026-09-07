@@ -20,21 +20,22 @@ describe('PilotDashboard', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should render the rover schematic', () => {
-    expect(fixture.nativeElement.querySelector('app-rover-schematic')).toBeTruthy();
-  });
-
-  it('should render the front camera position', () => {
+  it('should render the front, arm, and gimbal camera positions', () => {
     const cameras = fixture.nativeElement.querySelectorAll('app-camera-stream');
 
-    expect(cameras).toHaveLength(1);
+    expect(cameras).toHaveLength(3);
     expect(fixture.nativeElement.textContent).toContain('Front camera');
-    expect(fixture.nativeElement.textContent).not.toContain('Left side camera');
-    expect(fixture.nativeElement.textContent).not.toContain('Right side camera');
-    expect(fixture.nativeElement.textContent).not.toContain('Rear camera');
+    expect(fixture.nativeElement.textContent).toContain('Arm camera');
+    expect(fixture.nativeElement.textContent).toContain('Gimbal camera');
   });
 
-  it('should render the controller input overlay', () => {
+  it('should render the rover schematic and Pilot control panel', () => {
+    expect(fixture.nativeElement.querySelector('app-rover-schematic')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('app-control-scheme')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('app-pilot-control-panel')).toBeTruthy();
+  });
+
+  it('should render the small gamepad overlay', () => {
     expect(fixture.nativeElement.querySelector('app-gamepad-control-panel')).toBeTruthy();
   });
 });

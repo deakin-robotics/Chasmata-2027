@@ -1,6 +1,10 @@
 <main class="arm-dashboard" aria-label="Arm operator dashboard">
   <section class="rover-camera-column" aria-label="Arm rover camera workspace">
     <app-arm-rover-camera-layout class="rover-camera-layout" />
+
+    <app-control-scheme class="control-scheme" context="arm">
+      <app-gamepad-control-panel scheme-gamepad />
+    </app-control-scheme>
   </section>
 
   <section class="arm-operator-column" aria-label="Arm operator workspace">
@@ -11,15 +15,16 @@
       (urlChange)="armCameraUrl.set($event)"
     />
 
-    <app-arm-schematic class="arm-schematic" />
+    <app-camera-stream
+      class="gimbal-camera"
+      label="Gimbal camera"
+      [url]="gimbalCameraUrl()"
+      (urlChange)="gimbalCameraUrl.set($event)"
+    />
   </section>
 
   <section class="arm-schematic-column" aria-label="Arm schematic workspace">
     <app-arm-control-panel />
-
-    <div class="clamp-schematic-placeholder" aria-label="Clamp schematic">
-      <p>Clamp schematic</p>
-      <span>End effector placeholder</span>
-    </div>
+    <app-arm-schematic class="arm-schematic" />
   </section>
 </main>

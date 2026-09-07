@@ -24,5 +24,8 @@ describe('ArmMasterPage', () => {
     expect(fixture.nativeElement.textContent).toContain('Master Drive');
     expect(fixture.nativeElement.textContent).toContain('ROS Link');
     expect(fixture.nativeElement.textContent).toContain('Law Override');
+    expect(fixture.nativeElement.textContent).toContain('Clear Faults');
+    expect(fixture.nativeElement.querySelector('.law-override button').disabled).toBe(true);
+    expect(fixture.nativeElement.querySelector('.clear-faults button').disabled).toBe(true);
   });
 });

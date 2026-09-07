@@ -2,6 +2,7 @@ import { Component, computed, inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 
 import { ArmControl } from '../../../../../core/control/arm/arm-control';
+import { ArmCommandPublisher } from '../../../../../core/control/arm/arm-command-publisher';
 import { GamepadInput } from '../../../../../core/gamepad/gamepad-input';
 import { RosConnection } from '../../../../../core/ros/ros-connection';
 import { ConnectionManager } from '../../../../../features/connection/connection-manager/connection-manager';
@@ -38,6 +39,7 @@ import { TwoStepActionButton } from '../../../../../shared/two-step-action-butto
 })
 export class ArmMasterPage {
   private readonly armControl = inject(ArmControl);
+  private readonly armCommandPublisher = inject(ArmCommandPublisher);
   private readonly gamepad = inject(GamepadInput);
   private readonly rosConnection = inject(RosConnection);
   private readonly dialog = inject(MatDialog);
@@ -128,5 +130,10 @@ export class ArmMasterPage {
       .subscribe((confirmed) => {
         if (confirmed === true) this.armControl.enable();
       });
+  }
+
+  /** Sends the explicit two-step motor-driver fault reset command. */
+  clearArmFaults(button: TwoStepActionButton): void {
+    if (this.armCommandPublisher.publishClearFaults()) button.reset();
   }
 }

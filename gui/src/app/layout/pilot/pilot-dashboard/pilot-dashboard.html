@@ -1,7 +1,30 @@
 <main class="pilot-dashboard" aria-label="Pilot dashboard">
-  <app-pilot-camera-layout />
-  <app-gamepad-control-panel />
-  <aside class="control-panel-sidebar" aria-label="Pilot control panels">
+  <section class="arm-camera-column" aria-label="Pilot arm camera workspace">
+    <app-camera-stream
+      label="Arm camera"
+      [url]="armCameraUrl()"
+      (urlChange)="armCameraUrl.set($event)"
+    />
+    <app-rover-schematic />
+    <app-control-scheme context="pilot">
+      <app-gamepad-control-panel scheme-gamepad />
+    </app-control-scheme>
+  </section>
+
+  <section class="rover-camera-column" aria-label="Pilot rover camera workspace">
+    <app-camera-stream
+      label="Front camera"
+      [url]="frontCameraUrl()"
+      (urlChange)="frontCameraUrl.set($event)"
+    />
+    <app-camera-stream
+      label="Gimbal camera"
+      [url]="gimbalCameraUrl()"
+      (urlChange)="gimbalCameraUrl.set($event)"
+    />
+  </section>
+
+  <aside class="pilot-control-column" aria-label="Pilot control panels">
     <app-pilot-control-panel />
   </aside>
 </main>

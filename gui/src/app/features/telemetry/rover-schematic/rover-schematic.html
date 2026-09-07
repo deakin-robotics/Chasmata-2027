@@ -1,17 +1,22 @@
 <section class="rover-schematic" aria-label="Rover schematic">
-  <svg viewBox="0 0 320 360" role="img" aria-labelledby="rover-title rover-description">
+  <svg viewBox="-20 -20 360 400" role="img" aria-labelledby="rover-title rover-description">
     <title id="rover-title">Top-down rover schematic</title>
     <desc id="rover-description">
-      A static symbolic rover with four wheels, a front camera marker, and a front direction line.
+      A static symbolic rover with four wheels, a front camera marker, commanded and actual
+      20-degree gimbal arcs, and commanded and actual arms with clamps.
     </desc>
 
-    <path class="direction-line" d="M160 68V37M150 47l10-10 10 10" />
+    <path class="direction-line" d="M160 48V5M150 15l10-10 10 10" />
+    @if (commandedGimbalYawDeg() !== actualGimbalYawDeg()) {
+      <path class="gimbal-direction gimbal-commanded" [attr.d]="commandedGimbalArcPath()" />
+    }
+    <path class="gimbal-direction gimbal-actual" [attr.d]="actualGimbalArcPath()" />
 
     <rect
       class="camera camera-front"
       data-camera="front"
       x="149"
-      y="70"
+      y="78"
       width="22"
       height="10"
       rx="2"
@@ -26,5 +31,21 @@
     <rect class="chassis-detail" x="119" y="104" width="82" height="188" rx="6" />
     <path class="centre-line" d="M160 113V283" />
     <path class="front-chevron" d="M143 120l17-13 17 13" />
+
+    <circle class="arm-pivot" cx="160" cy="165" r="5" />
+
+    @if (commandedArmYawDeg() !== actualArmYawDeg()) {
+      <g
+        class="arm arm-commanded"
+        [attr.transform]="'rotate(' + commandedArmYawDeg() + ' 160 165)'"
+      >
+        <line class="arm-direction" x1="160" y1="165" x2="160" y2="80" />
+        <path class="arm-clamp" d="M151 67L160 80L169 67" />
+      </g>
+    }
+    <g class="arm arm-actual" [attr.transform]="'rotate(' + actualArmYawDeg() + ' 160 165)'">
+      <line class="arm-direction" x1="160" y1="165" x2="160" y2="80" />
+      <path class="arm-clamp" d="M151 67L160 80L169 67" />
+    </g>
   </svg>
 </section>
