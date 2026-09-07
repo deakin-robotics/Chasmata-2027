@@ -4,7 +4,7 @@ import {
   ArmControlMode,
   ArmControlModeService,
 } from '../../../../../core/control/arm/arm-control-mode';
-import { ArmMode } from '../../../../../core/fma/fma-state.service';
+import { ArmMode, FmaStateService } from '../../../../../core/fma/fma-state.service';
 import {
   ControlModeOption,
   ControlModeSelector,
@@ -18,6 +18,7 @@ import {
 })
 export class ArmModePage {
   private readonly armControlMode = inject(ArmControlModeService);
+  private readonly fmaState = inject(FmaStateService);
 
   readonly armMode = this.armControlMode.mode;
   readonly armModeOptions: readonly ControlModeOption[] = [
@@ -27,7 +28,9 @@ export class ArmModePage {
 
   selectArmMode(mode: string): void {
     if (mode === ArmMode.Manual || mode === ArmMode.Position) {
-      this.armControlMode.setMode(mode as ArmControlMode);
+      const selectedMode = mode as ArmControlMode;
+      this.armControlMode.setMode(selectedMode);
+      this.fmaState.requestArmMode(selectedMode);
     }
   }
 }

@@ -33,22 +33,74 @@ export enum LinkMode {
 }
 
 export type FmaColumn =
-  | { label: 'DRIVE'; confirmed: DriveMode; commanded: DriveMode }
-  | { label: 'ARM'; confirmed: ArmMode; commanded: ArmMode }
+  | { label: 'DRIVE'; confirmed: DriveMode; commanded: DriveMode | null }
+  | { label: 'ARM'; confirmed: ArmMode; commanded: ArmMode | null }
   | { label: 'LAW'; confirmed: LawMode; commanded: null }
   | { label: 'SYSTEM'; confirmed: SystemMode; commanded: SystemMode | null }
   | { label: 'LINK'; confirmed: LinkMode; commanded: LinkMode | null };
 
-/** Holds the FMA state; the values are mock state until rover telemetry is available. */
+/** Holds confirmed and commanded FMA state for the operator displays. */
 @Service()
 export class FmaStateService {
   private readonly columnsState = signal<FmaColumn[]>([
-    { label: 'DRIVE', confirmed: DriveMode.Manual, commanded: DriveMode.Managed },
-    { label: 'ARM', confirmed: ArmMode.Manual, commanded: ArmMode.Managed },
+    { label: 'DRIVE', confirmed: DriveMode.Manual, commanded: null },
+    { label: 'ARM', confirmed: ArmMode.Manual, commanded: null },
     { label: 'LAW', confirmed: LawMode.Normal, commanded: null },
     { label: 'SYSTEM', confirmed: SystemMode.Good, commanded: null },
     { label: 'LINK', confirmed: LinkMode.Good, commanded: null },
   ]);
 
   readonly columns = this.columnsState.asReadonly();
+
+  /** Records a requested DRIVE mode without changing the confirmed state. */
+  requestDriveMode(mode: DriveMode): void {
+    this.updateDrive((column) => ({
+      ...column,
+      commanded: mode === column.confirmed ? null : mode,
+    }));
+  }
+
+  /** Applies rover-confirmed DRIVE feedback and clears its pending request. */
+  confirmDriveMode(mode: DriveMode): void {
+    this.updateDrive((column) => ({ ...column, confirmed: mode, commanded: null }));
+  }
+
+  /** Clears a rejected or timed-out DRIVE request. */
+  rejectDriveMode(): void {
+    this.updateDrive((column) => ({ ...column, commanded: null }));
+  }
+
+  /** Records a requested ARM mode without changing the confirmed state. */
+  requestArmMode(mode: ArmMode): void {
+    this.updateArm((column) => ({
+      ...column,
+      commanded: mode === column.confirmed ? null : mode,
+    }));
+  }
+
+  /** Applies rover-confirmed ARM feedback and clears its pending request. */
+  confirmArmMode(mode: ArmMode): void {
+    this.updateArm((column) => ({ ...column, confirmed: mode, commanded: null }));
+  }
+
+  /** Clears a rejected or timed-out ARM request. */
+  rejectArmMode(): void {
+    this.updateArm((column) => ({ ...column, commanded: null }));
+  }
+
+  private updateDrive(
+    update: (column: Extract<FmaColumn, { label: 'DRIVE' }>) => Extract<FmaColumn, { label: 'DRIVE' }>,
+  ): void {
+    this.columnsState.update((columns) =>
+      columns.map((column) => (column.label === 'DRIVE' ? update(column) : column)),
+    );
+  }
+
+  private updateArm(
+    update: (column: Extract<FmaColumn, { label: 'ARM' }>) => Extract<FmaColumn, { label: 'ARM' }>,
+  ): void {
+    this.columnsState.update((columns) =>
+      columns.map((column) => (column.label === 'ARM' ? update(column) : column)),
+    );
+  }
 }

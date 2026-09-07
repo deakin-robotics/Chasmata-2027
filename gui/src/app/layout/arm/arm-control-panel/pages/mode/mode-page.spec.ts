@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { ArmControlModeService } from '../../../../../core/control/arm/arm-control-mode';
+import { ArmMode, FmaStateService } from '../../../../../core/fma/fma-state.service';
 import { ArmModePage } from './mode-page';
 
 describe('ArmModePage', () => {
@@ -32,5 +33,10 @@ describe('ArmModePage', () => {
     fixture.detectChanges();
 
     expect(TestBed.inject(ArmControlModeService).mode()).toBe('MANUAL');
+    expect(
+      TestBed.inject(FmaStateService)
+        .columns()
+        .find((column) => column.label === 'ARM')?.commanded,
+    ).toBeNull();
   });
 });

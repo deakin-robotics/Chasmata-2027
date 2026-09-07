@@ -5,11 +5,14 @@
       <span class="mode mode-active" [class.mode-managed]="column.confirmed === 'MANAGED'">
         {{ column.confirmed }}
       </span>
-      @if (column.commanded) {
-        <span class="mode mode-commanded" [class.mode-managed]="column.commanded === 'MANAGED'">
-          {{ column.commanded }}
-        </span>
-      }
+      <span
+        class="mode mode-commanded"
+        [class.mode-managed]="column.commanded === 'MANAGED'"
+        [class.mode-placeholder]="!column.commanded"
+        [attr.aria-hidden]="!column.commanded"
+      >
+        {{ column.commanded ?? '' }}
+      </span>
     </div>
   }
 </section>

@@ -1,14 +1,12 @@
 import { Component, computed, inject, input } from '@angular/core';
 
-import { ArmControlModeService } from '../../core/control/arm/arm-control-mode';
 import { GamepadInput } from '../../core/gamepad/gamepad-input';
-import { DriveMode, FmaColumn, FmaStateService } from '../../core/fma/fma-state.service';
+import { ArmMode, DriveMode, FmaColumn, FmaStateService } from '../../core/fma/fma-state.service';
 import {
   CONTROL_SCHEME_CATALOGUE,
   ControlSchemeControl,
   ControlSchemeMapping,
   GamepadInput as CatalogueGamepadInput,
-  PilotDriveControlMode,
 } from '../../core/control/control-scheme-catalogue';
 
 export type ControlSchemeContext = 'pilot' | 'arm';
@@ -35,29 +33,29 @@ const LEFT_SIDE_INPUTS = new Set<CatalogueGamepadInput>([
 export class ControlScheme {
   readonly context = input<ControlSchemeContext>('pilot');
 
-  private readonly armControlMode = inject(ArmControlModeService);
-  private readonly fmaState = inject(FmaStateService);
   private readonly gamepad = inject(GamepadInput);
+  private readonly fmaState = inject(FmaStateService);
 
   readonly activeMapping = computed(() => {
     if (this.context() === 'arm') {
-      const modeMapping = CONTROL_SCHEME_CATALOGUE.arm[this.armControlMode.mode()];
-      if (!modeMapping) return EMPTY_MAPPING;
+      const armMode = this.confirmedArmMode();
+      if (armMode !== ArmMode.Manual && armMode !== ArmMode.Position) {
+        return EMPTY_MAPPING;
+      }
+
+      const modeMapping = CONTROL_SCHEME_CATALOGUE.arm[armMode];
 
       return this.isLeftBumperPressed()
         ? (modeMapping.modifiers?.['left-bumper'] ?? modeMapping.default)
         : modeMapping.default;
     }
 
-    const driveMode = this.fmaState.columns().find(
-      (column): column is Extract<FmaColumn, { label: 'DRIVE' }> => column.label === 'DRIVE',
-    )?.confirmed;
-
+    const driveMode = this.confirmedDriveMode();
     if (driveMode !== DriveMode.Manual && driveMode !== DriveMode.Velocity) {
       return EMPTY_MAPPING;
     }
 
-    return CONTROL_SCHEME_CATALOGUE.pilot[driveMode as PilotDriveControlMode];
+    return CONTROL_SCHEME_CATALOGUE.pilot[driveMode];
   });
 
   readonly leftControls = computed(() => this.controlsForSide(true));
@@ -71,6 +69,22 @@ export class ControlScheme {
 
   private isLeftBumperPressed(): boolean {
     return (this.gamepad.snapshot()?.buttons[4] ?? 0) > 0;
+  }
+
+  private confirmedDriveMode(): DriveMode | undefined {
+    const driveColumn = this.fmaState.columns().find(
+      (column): column is Extract<FmaColumn, { label: 'DRIVE' }> => column.label === 'DRIVE',
+    );
+
+    return driveColumn?.confirmed;
+  }
+
+  private confirmedArmMode(): ArmMode | undefined {
+    const armColumn = this.fmaState.columns().find(
+      (column): column is Extract<FmaColumn, { label: 'ARM' }> => column.label === 'ARM',
+    );
+
+    return armColumn?.confirmed;
   }
 
   private isLeftSideInput(input: CatalogueGamepadInput): boolean {

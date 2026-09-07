@@ -1,0 +1,8 @@
+<section class="mode-page" aria-label="Pilot drive mode controls">
+  <app-control-mode-selector
+    label="Drive control mode"
+    [options]="driveModeOptions"
+    [value]="driveMode()"
+    (valueChange)="selectDriveMode($event)"
+  />
+</section>

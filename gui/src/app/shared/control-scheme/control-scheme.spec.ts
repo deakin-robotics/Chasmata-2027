@@ -41,7 +41,7 @@ describe('ControlScheme', () => {
 
     const text = fixture.nativeElement.textContent;
 
-    expect(text).toContain('IK horizontal position');
+    expect(text).toContain('Joint 1');
     expect(text).toContain('Open end-effector');
   });
 });

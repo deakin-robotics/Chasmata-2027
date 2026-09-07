@@ -35,4 +35,13 @@ describe('PilotControlPanel', () => {
   it('should label the active tab Master', () => {
     expect(fixture.nativeElement.querySelector('.active-tab')?.textContent.trim()).toBe('Master');
   });
+
+  it('should render the Mode page when its tab is selected', () => {
+    const modeTab = fixture.nativeElement.querySelectorAll('.tab-button')[1] as HTMLButtonElement;
+    modeTab.click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-pilot-mode-page')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('app-control-mode-selector')).toBeTruthy();
+  });
 });
