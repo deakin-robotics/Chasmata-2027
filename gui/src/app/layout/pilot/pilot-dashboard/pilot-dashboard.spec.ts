@@ -24,18 +24,14 @@ describe('PilotDashboard', () => {
     expect(fixture.nativeElement.querySelector('app-rover-schematic')).toBeTruthy();
   });
 
-  it('should render the front, side, and rear camera positions', () => {
+  it('should render the front camera position', () => {
     const cameras = fixture.nativeElement.querySelectorAll('app-camera-stream');
 
-    expect(cameras).toHaveLength(4);
+    expect(cameras).toHaveLength(1);
     expect(fixture.nativeElement.textContent).toContain('Front camera');
-    expect(fixture.nativeElement.textContent).toContain('Left side camera');
-    expect(fixture.nativeElement.textContent).toContain('Right side camera');
-    expect(fixture.nativeElement.textContent).toContain('Rear camera');
-  });
-
-  it('should render the bird\'s-eye view panel', () => {
-    expect(fixture.nativeElement.querySelector('app-bird-view')).toBeTruthy();
+    expect(fixture.nativeElement.textContent).not.toContain('Left side camera');
+    expect(fixture.nativeElement.textContent).not.toContain('Right side camera');
+    expect(fixture.nativeElement.textContent).not.toContain('Rear camera');
   });
 
   it('should render the controller input overlay', () => {

@@ -20,11 +20,11 @@ describe('RoverSchematic', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should render a top-down rover with six wheels and four camera markers', () => {
+  it('should render a top-down rover with four wheels and a front camera marker', () => {
     const element = fixture.nativeElement as HTMLElement;
 
     expect(element.querySelector('svg')).toBeTruthy();
-    expect(element.querySelectorAll('[data-wheel]')).toHaveLength(6);
-    expect(element.querySelectorAll('[data-camera]')).toHaveLength(4);
+    expect(element.querySelectorAll('[data-wheel]')).toHaveLength(4);
+    expect(element.querySelectorAll('[data-camera]')).toHaveLength(1);
   });
 });

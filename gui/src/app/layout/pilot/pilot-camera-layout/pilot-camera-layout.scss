@@ -10,11 +10,10 @@
   min-height: 0;
   box-sizing: border-box;
   grid-template-areas:
-    'front front front'
-    'left rover right'
-    'rear rear rear';
-  grid-template-columns: minmax(0, 1fr) minmax(10rem, 0.55fr) minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr);
+    'front'
+    'rover';
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1.5fr) minmax(0, 1fr);
   align-items: center;
   column-gap: clamp(0.5rem, 1vw, 1rem);
   row-gap: clamp(1.5rem, 2vw, 2rem);
@@ -28,28 +27,7 @@
   width: min(100%, 60dvh);
 }
 
-.left-camera {
-  grid-area: left;
-  justify-self: end;
-  width: min(100%, 34dvh);
-}
-
-.right-camera {
-  grid-area: right;
-  justify-self: start;
-  width: min(100%, 34dvh);
-}
-
-.rear-camera {
-  grid-area: rear;
-  justify-self: center;
-  width: min(100%, 34dvh);
-}
-
-.front-camera,
-.left-camera,
-.right-camera,
-.rear-camera {
+.front-camera {
   min-width: 0;
   height: auto;
   aspect-ratio: 16 / 9;
@@ -57,12 +35,6 @@
 
 .front-camera {
   width: min(100%, 60dvh);
-}
-
-.left-camera,
-.right-camera,
-.rear-camera {
-  width: min(100%, 34dvh);
 }
 
 .rover-schematic {

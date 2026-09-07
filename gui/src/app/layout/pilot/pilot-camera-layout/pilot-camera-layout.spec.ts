@@ -20,8 +20,11 @@ describe('PilotCameraLayout', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should render the front, side, and rear camera positions', () => {
-    expect(fixture.nativeElement.querySelectorAll('app-camera-stream')).toHaveLength(4);
+  it('should render the front camera position', () => {
+    expect(fixture.nativeElement.querySelectorAll('app-camera-stream')).toHaveLength(1);
+    expect(fixture.nativeElement.textContent).not.toContain('Left side camera');
+    expect(fixture.nativeElement.textContent).not.toContain('Right side camera');
+    expect(fixture.nativeElement.textContent).not.toContain('Rear camera');
     expect(fixture.nativeElement.querySelector('app-rover-schematic')).toBeTruthy();
   });
 });

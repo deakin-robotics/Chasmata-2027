@@ -20,9 +20,9 @@ describe('ArmRoverCameraLayout', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should render the front and rear camera layout', () => {
+  it('should render the front camera and rover schematic', () => {
     expect(fixture.nativeElement.textContent).toContain('Front camera');
-    expect(fixture.nativeElement.textContent).toContain('Rear camera');
+    expect(fixture.nativeElement.textContent).not.toContain('Rear camera');
     expect(fixture.nativeElement.querySelector('app-rover-schematic')).toBeTruthy();
   });
 });

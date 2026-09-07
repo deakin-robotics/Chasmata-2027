@@ -25,7 +25,7 @@ describe('ArmDashboard', () => {
 
     expect(text).toContain('Arm camera');
     expect(text).toContain('Front camera');
-    expect(text).toContain('Rear camera');
+    expect(text).not.toContain('Rear camera');
     expect(text).toContain('Arm schematic');
     expect(text).toContain('Clamp schematic');
     expect(text).toContain('Master Drive');

@@ -20,7 +20,7 @@ app-pilot-camera-layout {
   min-height: 0;
 }
 
-.bird-view-sidebar {
+.control-panel-sidebar {
   display: grid;
   min-width: 0;
   min-height: 0;
@@ -45,8 +45,4 @@ app-gamepad-control-panel {
 app-pilot-control-panel {
   height: 100%;
   min-width: 0;
-}
-
-app-bird-view {
-  width: 100%;
 }

@@ -5,8 +5,7 @@ import { RoverSchematic } from '../../../features/telemetry/rover-schematic/rove
 /**
  * Arranges the Pilot camera feeds around the reusable rover schematic.
  *
- * This component owns only the Pilot camera layout. A future bird's-eye view
- * will be composed beside it by the parent Pilot dashboard.
+ * This component owns only the Pilot camera layout.
  */
 @Component({
   selector: 'app-pilot-camera-layout',
@@ -16,7 +15,4 @@ import { RoverSchematic } from '../../../features/telemetry/rover-schematic/rove
 })
 export class PilotCameraLayout {
   readonly frontCameraUrl = signal('http://dcr-rover.local:8080/?action=stream');
-  readonly leftCameraUrl = signal('');
-  readonly rightCameraUrl = signal('');
-  readonly rearCameraUrl = signal('http://dcr-rover.local:8090/?action=stream');
 }

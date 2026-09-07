@@ -3,7 +3,7 @@ import { Component, signal } from '@angular/core';
 import { CameraStream } from '../../../features/cameras/camera-stream/camera-stream';
 import { RoverSchematic } from '../../../features/telemetry/rover-schematic/rover-schematic';
 
-/** Front/rear rover camera awareness for the Arm operator. */
+/** Front rover camera awareness for the Arm operator. */
 @Component({
   selector: 'app-arm-rover-camera-layout',
   imports: [CameraStream, RoverSchematic],
@@ -12,5 +12,4 @@ import { RoverSchematic } from '../../../features/telemetry/rover-schematic/rove
 })
 export class ArmRoverCameraLayout {
   readonly frontCameraUrl = signal('http://dcr-rover.local:8080/?action=stream');
-  readonly rearCameraUrl = signal('http://dcr-rover.local:8090/?action=stream');
 }

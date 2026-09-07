@@ -9,7 +9,7 @@
   height: 100%;
   min-height: 0;
   box-sizing: border-box;
-  grid-template-rows: 0.85fr 0.55fr 0.85fr;
+  grid-template-rows: 0.85fr 0.55fr;
   gap: 0.5rem;
   overflow: hidden;
 }
@@ -25,8 +25,7 @@ app-camera-stream {
   height: 100%;
 }
 
-.front-camera,
-.rear-camera {
+.front-camera {
   box-sizing: border-box;
   padding-bottom: 0.2rem;
 }
