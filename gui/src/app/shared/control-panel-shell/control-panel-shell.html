@@ -1,0 +1,26 @@
+<section class="control-panel-shell" [attr.aria-label]="label()">
+  <nav
+    class="control-page-tabs"
+    role="tablist"
+    [attr.aria-label]="label() + ' pages'"
+    [style.--tab-count]="tabs().length || 1"
+    [style.--active-index]="activeIndex()"
+  >
+    @for (tab of tabs(); track tab.id) {
+      <button
+        type="button"
+        role="tab"
+        class="tab-button"
+        [class.active-tab]="activeTab() === tab.id"
+        [attr.aria-selected]="activeTab() === tab.id"
+        (click)="selectTab(tab.id)"
+      >
+        {{ tab.label }}
+      </button>
+    }
+  </nav>
+
+  <div class="control-panel-content">
+    <ng-content />
+  </div>
+</section>

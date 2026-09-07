@@ -44,11 +44,7 @@ describe('ArmControlPanel', () => {
 
     expect(component.activeTab()).toBe('mode');
     expect(tabs[1].getAttribute('aria-selected')).toBe('true');
-    expect(
-      fixture.nativeElement
-        .querySelector('.control-page-tabs')
-        ?.classList.contains('mode-tab-active'),
-    ).toBe(true);
+    expect(fixture.nativeElement.querySelector('.active-tab')?.textContent.trim()).toBe('Mode');
     expect(fixture.nativeElement.textContent).not.toContain('Master Drive');
     expect(fixture.nativeElement.textContent).toContain('Arm control mode');
     expect(fixture.nativeElement.querySelector('app-arm-mode-page')).toBeTruthy();

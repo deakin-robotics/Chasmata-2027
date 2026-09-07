@@ -1,37 +1,9 @@
-<section class="arm-control-panel" aria-label="Arm control panel">
-  <nav
-    class="control-page-tabs"
-    [class.mode-tab-active]="activeTab() === 'mode'"
-    role="tablist"
-    aria-label="Arm control pages"
-  >
-    <button
-      type="button"
-      role="tab"
-      class="tab-button"
-      [class.active-tab]="activeTab() === 'control'"
-      [attr.aria-selected]="activeTab() === 'control'"
-      (click)="selectTab('control')"
-    >
-      Master
-    </button>
-    <button
-      type="button"
-      role="tab"
-      class="tab-button"
-      [class.active-tab]="activeTab() === 'mode'"
-      [attr.aria-selected]="activeTab() === 'mode'"
-      (click)="selectTab('mode')"
-    >
-      Mode
-    </button>
-  </nav>
-
-  @if (activeTab() === 'control') {
-    <app-arm-master-page class="tab-content" />
+<app-control-panel-shell label="Arm control panel" [tabs]="tabs" [(activeTab)]="activeTab">
+  @if (activeTab() === 'master') {
+    <app-arm-master-page />
   }
 
   @if (activeTab() === 'mode') {
-    <app-arm-mode-page class="tab-content" />
+    <app-arm-mode-page />
   }
-</section>
+</app-control-panel-shell>
