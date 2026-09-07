@@ -33,6 +33,7 @@ The mission-control interface is inspired by the Airbus glass cockpit philosophy
 - [Electronic Centralized Advisory Monitor (ECAM) and System Display (SD)](docs/ecam-and-system-display.md) — alert behaviour, operator procedures, shared alert architecture, and subsystem display pages.
 - [ECAM Code Dictionary](docs/ecam-code-dictionary.md) — stable alert codes, severities, display text, and meanings.
 - [Telemetry requirements](docs/telemetry-requirements.md) — FMA, ECAM, and System Display (SD) telemetry, update rates, and recovery behaviour.
+- [Arm inverse kinematics](docs/arm-ik.md) — URDF model, browser-side IK solver, and the future joint-angle command handoff.
 
 ## 🖥️ Current Angular implementation
 

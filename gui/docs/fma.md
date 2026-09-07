@@ -87,7 +87,9 @@ Arm Ops uses the gamepad to command **individual joints directly**. Used when IK
 
 Solver-assisted control.
 
-Arm Ops specifies a desired **end-effector position/pose**, and MoveIt 2 handles the joint solution and motion planning.
+Arm Ops specifies a desired **end-effector position/pose**. The GUI solves the
+joint angles from the arm URDF; the rover validates and executes the resulting
+joint-angle command. Motion planning remains future work.
 
 ### `MANAGED •`
 
