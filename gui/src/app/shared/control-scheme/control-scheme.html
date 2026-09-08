@@ -1,0 +1,37 @@
+<section class="control-scheme" aria-label="Control scheme">
+  <aside class="mapping mapping-left">
+    <div class="mapping-list">
+      @for (control of leftControls(); track control.input) {
+        <div class="mapping-entry">
+          <span class="mapping-input">{{ control.label }}</span>
+          @if (control.action) {
+            <span class="mapping-action">{{ control.action }}</span>
+          }
+        </div>
+      }
+    </div>
+    @if (!rosConnected()) {
+      <app-unavailable-overlay label="Left control mapping unavailable" />
+    }
+  </aside>
+
+  <div class="scheme-gamepad">
+    <ng-content select="[scheme-gamepad]" />
+  </div>
+
+  <aside class="mapping mapping-right">
+    <div class="mapping-list">
+      @for (control of rightControls(); track control.input) {
+        <div class="mapping-entry">
+          <span class="mapping-input">{{ control.label }}</span>
+          @if (control.action) {
+            <span class="mapping-action">{{ control.action }}</span>
+          }
+        </div>
+      }
+    </div>
+    @if (!rosConnected()) {
+      <app-unavailable-overlay label="Right control mapping unavailable" />
+    }
+  </aside>
+</section>

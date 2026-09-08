@@ -1,0 +1,49 @@
+<section class="master-page" aria-label="Arm master controls">
+  <app-status-indicator
+    label="Gamepad"
+    [status]="gamepadStatusLabel()"
+    [tone]="gamepadStatusTone()"
+  />
+
+  <app-action-button
+    label="ROS Link"
+    [actionLabel]="rosActionLabel()"
+    [tone]="rosActionTone()"
+    [busy]="rosActionBusy()"
+    (pressed)="openRosConnectionSettings()"
+  />
+
+  <app-control-flow-connector class="gamepad-stem" variant="vertical" [tone]="gamepadFlowTone()" />
+
+  <app-control-flow-connector class="gamepad-flow" variant="top-right" [tone]="gamepadFlowTone()" />
+
+  <app-control-flow-connector class="ros-flow" variant="vertical" [tone]="rosFlowTone()" />
+
+  <app-control-switch
+    label="Master Drive"
+    [checked]="masterDriveEnabled()"
+    [tone]="masterDriveTone"
+    [disabled]="!masterDriveEnabled() && (!gamepadConnected() || !rosConnected())"
+    (checkedChange)="toggleMasterDriveControl($event)"
+  />
+
+  <app-two-step-action-button
+    class="law-override"
+    label="Law Override"
+    actionLabel="Override"
+    [disabled]="!rosConnected()"
+  />
+
+  <app-two-step-action-button
+    #clearFaultsButton
+    class="clear-faults"
+    label="Clear Faults"
+    actionLabel="Clear"
+    [disabled]="!rosConnected()"
+    (activated)="clearArmFaults(clearFaultsButton)"
+  />
+
+  @if (readinessError(); as error) {
+    <p class="control-readiness" role="status">{{ error }}</p>
+  }
+</section>

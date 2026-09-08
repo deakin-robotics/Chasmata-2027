@@ -1,0 +1,9 @@
+<section class="mode-page" aria-label="Driver drive mode controls">
+  <app-control-mode-selector
+    label="Drive control mode"
+    [options]="driveModeOptions"
+    [value]="driveMode()"
+    [disabled]="!rosConnected()"
+    (valueChange)="selectDriveMode($event)"
+  />
+</section>

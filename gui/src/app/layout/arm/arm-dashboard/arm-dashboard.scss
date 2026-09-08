@@ -10,14 +10,15 @@
   height: 100%;
   min-height: 0;
   box-sizing: border-box;
-  grid-template-columns: minmax(14rem, 0.9fr) minmax(20rem, 1.2fr) minmax(15rem, 0.85fr);
+  grid-template-columns: minmax(15rem, 0.9fr) minmax(20rem, 1.2fr) minmax(15rem, 0.9fr);
   gap: clamp(0.75rem, 1.5vw, 2rem);
   overflow: hidden;
+  position: relative;
   padding: clamp(0.75rem, 1.5vw, 2rem);
   padding-bottom: clamp(0.5rem, 1vw, 1.25rem);
 }
 
-.rover-camera-column,
+.arm-camera-column,
 .arm-operator-column,
 .arm-schematic-column {
   display: grid;
@@ -27,18 +28,23 @@
   gap: clamp(0.75rem, 1.5vw, 1.25rem);
 }
 
-.rover-camera-column {
-  grid-template-rows: minmax(0, 1fr);
+.arm-camera-column {
+  row-gap: 0.25rem;
+  grid-column: 1;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 0.65fr) minmax(8rem, 0.45fr);
 }
 
-.arm-operator-column,
+.arm-operator-column {
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1.05fr);
+}
+
 .arm-schematic-column {
   grid-template-rows: minmax(0, 1fr) minmax(0, 1.05fr);
 }
 
 app-camera-stream,
-app-arm-rover-camera-layout,
-app-arm-schematic {
+app-rover-schematic,
+app-arm-model-viewer {
   min-width: 0;
   min-height: 0;
 }
@@ -48,33 +54,15 @@ app-arm-control-panel {
   min-width: 0;
 }
 
-.clamp-schematic-placeholder {
-  display: grid;
-  min-height: 8rem;
-  place-content: center;
-  gap: 0.45rem;
-  box-sizing: border-box;
-  border: 1px solid var(--dcr-color-border);
-  border-radius: 0.5rem;
-  background: color-mix(in srgb, var(--dcr-color-surface-raised) 88%, transparent);
-  text-align: center;
+app-rover-schematic {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
-p,
-span {
-  margin: 0;
-}
-
-p {
-  color: var(--dcr-color-text);
-  font-size: 0.85rem;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-span {
-  color: var(--dcr-color-neutral);
-  font-size: 0.75rem;
+app-control-scheme {
+  min-width: 0;
+  min-height: 0;
 }
 
 @media (max-width: 56rem) {
@@ -83,7 +71,7 @@ span {
     overflow: auto;
   }
 
-  .rover-camera-column,
+  .arm-camera-column,
   .arm-operator-column,
   .arm-schematic-column {
     min-height: 24rem;

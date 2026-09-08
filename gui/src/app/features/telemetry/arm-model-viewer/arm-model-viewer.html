@@ -1,0 +1,39 @@
+<section class="arm-model-viewer" aria-label="Arm 3D model viewer">
+  <header class="viewer-header">
+    <h2>Arm model viewer</h2>
+    <div class="viewer-statuses">
+      <span
+        class="viewer-status"
+        [class.viewer-status-error]="status() === 'error' || !rosConnected()"
+      >
+        3D: {{ viewerStatusLabel() }}
+      </span>
+      <span class="status-separator" aria-hidden="true">|</span>
+      <span
+        class="ik-status"
+        [class.ik-status-solving]="ikStatus() === 'solving'"
+        [class.ik-status-valid]="ikStatus() === 'valid'"
+        [class.ik-status-unreachable]="ikStatus() === 'unreachable'"
+        [class.ik-status-invalid]="ikStatus() === 'invalid'"
+        aria-live="polite"
+      >
+        @if (rosConnected() && ikStatus() === 'solving') {
+          <mat-icon class="spinning" aria-hidden="true">sync</mat-icon>
+        }
+        IK: {{ rosConnected() ? ikStatusLabel() : '—' }}
+      </span>
+    </div>
+  </header>
+
+  <div class="viewer-frame">
+    <div #sceneHost class="scene-host"></div>
+
+    @if (!rosConnected()) {
+      <app-unavailable-overlay label="Arm model unavailable" />
+    }
+
+    @if (status() === 'error') {
+      <p class="viewer-message" role="status">{{ statusMessage() }}</p>
+    }
+  </div>
+</section>

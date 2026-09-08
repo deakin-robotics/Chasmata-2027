@@ -28,11 +28,12 @@ The mission-control interface is inspired by the Airbus glass cockpit philosophy
 ## 📚 Documentation
 
 - [Colour palette](docs/color-palette.md) — the UI colour system and operational status semantics.
-- [Operator layouts](docs/operator-layouts.md) — the Pilot and Arm dashboard layouts and responsibilities.
+- [Operator layouts](docs/operator-layouts.md) — the Driver and Arm dashboard layouts and responsibilities.
 - [Functional Mode Annunciator](docs/fma.md) — confirmed DRIVE, ARM, LAW, SYSTEM, and LINK states.
 - [Electronic Centralized Advisory Monitor (ECAM) and System Display (SD)](docs/ecam-and-system-display.md) — alert behaviour, operator procedures, shared alert architecture, and subsystem display pages.
 - [ECAM Code Dictionary](docs/ecam-code-dictionary.md) — stable alert codes, severities, display text, and meanings.
 - [Telemetry requirements](docs/telemetry-requirements.md) — FMA, ECAM, and System Display (SD) telemetry, update rates, and recovery behaviour.
+- [Arm inverse kinematics](docs/arm-ik.md) — URDF model, browser-side IK solver, and the future joint-angle command handoff.
 
 ## 🖥️ Current Angular implementation
 
@@ -40,9 +41,9 @@ The mission-control interface is inspired by the Airbus glass cockpit philosophy
 
 ![Current rover FMA](assets/fma.png)
 
-### Pilot dashboard
+### Driver dashboard
 
-![Pilot dashboard](assets/pilot.png)
+![Driver dashboard](assets/driver.png)
 
 ### Arm operator dashboard
 
@@ -66,9 +67,9 @@ The GUI communicates directly with the rover on its private operator network:
 
 - Controls and telemetry use ROSLIB through ROSbridge.
 - Camera video uses separate HTTP MJPEG streams.
-- Pilot drive publishes `sensor_msgs/Joy` on `/joy`.
+- Driver control publishes `sensor_msgs/Joy` on `/joy`.
 - Arm control publishes remapped `sensor_msgs/Joy` on `/arm/joy`.
-- Pilot and Arm Operator GUIs may both view and control the shared Gimbal camera.
+- Driver and Arm Operator GUIs may both view and control the shared Gimbal camera.
   Gimbal ownership is requested through the controller's **GIMBAL PRIORITY**
   button and confirmed authoritatively by the rover.
 - The physical rover, radio link, controller, and safety behaviour must be tested before the Angular GUI replaces the existing interface.
@@ -134,7 +135,7 @@ The application uses a lightweight feature-based structure:
 ```text
 src/app/
 ├── core/
-│   ├── control/                 # Global control mode plus Pilot and Arm publishers
+│   ├── control/                 # Global control mode plus Driver and Arm publishers
 │   ├── ecam/                    # Application-wide ECAM alert state and messages
 │   ├── fma/                     # Functional Mode Annunciator state
 │   ├── gamepad/                 # Browser gamepad polling and mapping
@@ -151,7 +152,7 @@ src/app/
 ├── layout/
 │   ├── ecam-panel/              # ECAM alert and System Display panels
 │   ├── mission-control/         # Shared shell, navigation, header, and FMA
-│   ├── pilot/                   # Pilot dashboard and panel arrangement
+│   ├── driver/                  # Driver dashboard and panel arrangement
 │   └── arm/                     # Arm dashboard and panel arrangement
 │
 └── shared/
@@ -201,7 +202,7 @@ Camera feeds must recover from temporary radio or stream interruptions without r
 
 The team is also evaluating uStreamer as a maintained alternative to the existing `mjpg-streamer` setup for UVC cameras.
 
-The Gimbal camera is shared between the Pilot and Arm Operator stations. Each
+The Gimbal camera is shared between the Driver and Arm Operator stations. Each
 station can request priority with its mapped **GIMBAL PRIORITY** controller
 button. The rover owns the confirmed owner, validates every Gimbal movement
 command, and broadcasts the current owner to all GUI instances. The GUI must

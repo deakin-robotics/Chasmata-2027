@@ -1,0 +1,73 @@
+:host {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  border-left: 1px solid var(--dcr-color-critical);
+  border-right: 1px solid var(--dcr-color-critical);
+  padding: 0 0.35rem;
+  transition: border-color 150ms ease;
+}
+
+:host.armed,
+:host.active {
+  border-left-color: var(--dcr-color-normal);
+  border-right-color: var(--dcr-color-normal);
+}
+
+.two-step-action-button {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+}
+
+.two-step-action-button-label {
+  color: var(--dcr-color-neutral);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 5rem;
+  min-height: 1.75rem;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--dcr-color-critical);
+  border-radius: 0.25rem;
+  background: color-mix(in srgb, var(--dcr-color-critical) 14%, transparent);
+  color: var(--dcr-color-critical);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+:host.active button {
+  border-color: var(--dcr-color-normal);
+  background: color-mix(in srgb, var(--dcr-color-normal) 14%, transparent);
+  color: var(--dcr-color-normal);
+}
+
+button:hover:not(:disabled) {
+  background: color-mix(in srgb, currentColor 22%, transparent);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--dcr-color-info);
+  outline-offset: 2px;
+}

@@ -18,12 +18,26 @@ svg {
 }
 
 .direction-line,
-.front-chevron {
+.front-chevron,
+.gimbal-direction {
   fill: none;
   stroke: var(--dcr-color-info);
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 3;
+}
+
+.gimbal-direction {
+  stroke-width: 2;
+  opacity: 0.9;
+}
+
+.gimbal-commanded {
+  stroke: var(--dcr-color-info);
+}
+
+.gimbal-actual {
+  stroke: var(--dcr-color-normal);
 }
 
 .camera {
@@ -53,4 +67,43 @@ svg {
   stroke: #43505f;
   stroke-dasharray: 5 5;
   stroke-width: 1.5;
+}
+
+.arm-link {
+  fill: var(--dcr-color-offline);
+  stroke: var(--dcr-color-neutral);
+  stroke-width: 2;
+}
+
+.arm-clamp {
+  fill: none;
+  stroke: var(--dcr-color-neutral);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.arm-direction {
+  fill: none;
+  stroke: var(--dcr-color-neutral);
+  stroke-linecap: round;
+  stroke-width: 3;
+}
+
+.arm-commanded {
+  .arm-direction,
+  .arm-clamp {
+    stroke: var(--dcr-color-info);
+  }
+}
+
+.arm-actual {
+  .arm-direction,
+  .arm-clamp {
+    stroke: var(--dcr-color-normal);
+  }
+}
+
+.arm-pivot {
+  fill: var(--dcr-color-neutral);
 }

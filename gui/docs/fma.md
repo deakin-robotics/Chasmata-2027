@@ -25,6 +25,16 @@ The FMA displays the **confirmed rover state**, not simply what the operator req
 ### Command pending
 When an operator selects a mode from the GUI, the requested mode is shown in **blue** while the command is waiting for acknowledgement from the rover.
 
+At GUI startup, Driver defaults to `VELOCITY` and Arm defaults to `POSITION`.
+While the rover connection is unavailable, these remain local selections and
+are not shown as FMA requests. Once the connection is established, they are
+recorded as pending requests in blue until rover telemetry confirms them.
+
+When ROS is disconnected, the FMA hides all status values, including Gimbal
+Priority, and shows the unavailable red X overlay. The X represents the
+overall cold-and-dark state; individual `UNKNOWN` values are used only after
+ROS is connected.
+
 ### Command confirmed
 Once the rover receives the command, changes state, and returns an acknowledgement handshake, the mode changes to **green**.
 
@@ -51,23 +61,25 @@ This column answers:
 
 Raw skid-steer control.
 
-The Pilot directly controls the **left and right wheel groups independently** using the gamepad. Used as a fallback when the higher-level drive controller has problems.
+The Driver directly controls the **left and right wheel groups independently** using the gamepad. Used as a fallback when the higher-level drive controller has problems.
 
 ### `VELOCITY`
 
 Normal assisted driving mode.
 
-The Pilot uses a **single joystick** for forward/backward movement and left/right rotation. These become linear and angular velocity commands through `cmd_vel`, and the drivetrain controller calculates the required left/right wheel speeds.
+The Driver uses a **single joystick** for forward/backward movement and left/right rotation. These become linear and angular velocity commands through `cmd_vel`, and the drivetrain controller calculates the required left/right wheel speeds.
 
 ### `MANAGED •`
 
 Autonomous control owns the drivetrain.
 
-Nav2 or another autonomy component generates the movement commands instead of the Pilot.
+Nav2 or another autonomy component generates the movement commands instead of the Driver.
 
 ### No displayed mode
 
-If there is no valid connection or confirmed drive mode, **display nothing**.
+If there is no valid connection or confirmed drive mode, do not display a green
+confirmed mode or a pending request. A local startup or operator selection is
+not placed in the FMA until a valid rover connection exists.
 
 ---
 
@@ -87,7 +99,9 @@ Arm Ops uses the gamepad to command **individual joints directly**. Used when IK
 
 Solver-assisted control.
 
-Arm Ops specifies a desired **end-effector position/pose**, and MoveIt 2 handles the joint solution and motion planning.
+Arm Ops specifies a desired **end-effector position/pose**. The GUI solves the
+joint angles from the arm URDF; the rover validates and executes the resulting
+joint-angle command. Motion planning remains future work.
 
 ### `MANAGED •`
 
@@ -147,19 +161,19 @@ The indicator shows which operator station currently owns authority to command
 the shared physical Gimbal camera:
 
 ```text
-← PILOT       ARM OPS →
+← DRIVER       ARM OPS →
 ```
 
-`← PILOT` means that the Pilot owns Gimbal priority. `ARM OPS →` means that
+`← DRIVER` means that the Driver owns Gimbal priority. `ARM OPS →` means that
 the Arm Operator owns Gimbal priority.
 
 The arrow direction is an ownership indication, not the direction of Gimbal
-movement. The left arrow always represents `PILOT`; the right arrow always
+movement. The left arrow always represents `DRIVER`; the right arrow always
 represents `ARM_OPS`.
 
 #### Shared Gimbal ownership
 
-Both the Pilot GUI and Arm Operator GUI may view and control the same physical
+Both the Driver GUI and Arm Operator GUI may view and control the same physical
 Gimbal camera. Each physical controller has a dedicated **GIMBAL PRIORITY**
 button.
 
@@ -167,7 +181,7 @@ Pressing the button sends a Gimbal takeover request containing the identity of
 the requesting station:
 
 ```text
-Pilot controller     → takeover request: PILOT
+Driver controller     → takeover request: DRIVER
 Arm controller       → takeover request: ARM_OPS
 ```
 
@@ -175,7 +189,7 @@ The rover owns the authoritative Gimbal owner and priority state. When a valid
 takeover request is received, the rover updates the owner and broadcasts the
 confirmed owner state to every GUI instance.
 
-There is no additional Pilot-over-Arm hierarchy. If both operators press their
+There is no additional Driver-over-Arm hierarchy. If both operators press their
 priority buttons at approximately the same time, the latest valid request
 received by the rover wins.
 
@@ -204,15 +218,16 @@ The rover should publish the owner immediately after an ownership change and
 periodically thereafter so that GUI instances can recover from missed updates or
 reconnects.
 
-If owner telemetry becomes stale or unavailable, the GUI must not continue to
-show the last known owner as valid. The FMA must instead display:
+If ROS is connected but owner telemetry is null, explicitly unknown, or stale,
+the GUI must not continue to show the last known owner as valid. The FMA must
+instead display:
 
 ```text
 GIMBAL PRIORITY UNKNOWN
 ```
 
 The GUI must receive a fresh authoritative owner state before showing either
-`← PILOT` or `ARM OPS →` again.
+`← DRIVER` or `ARM OPS →` again.
 
 Verbal callouts such as “I have gimbal” and “You have gimbal” may be used as
 human operating procedure, but they have no software effect. The mapped

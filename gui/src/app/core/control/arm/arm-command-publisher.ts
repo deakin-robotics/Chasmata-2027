@@ -14,9 +14,16 @@ const ARM_JOY_TOPIC = '/arm/joy';
 const JOY_MESSAGE_TYPE = 'sensor_msgs/Joy';
 const ARM_AXES_COUNT = 8;
 const ARM_BUTTON_COUNT = 12;
+const CLEAR_FAULTS_BUTTON_INDEX = 10;
 const STOP_COMMAND: ArmJoyCommand = {
   axes: new Array(ARM_AXES_COUNT).fill(0),
   buttons: new Array(ARM_BUTTON_COUNT).fill(0),
+};
+const CLEAR_FAULTS_COMMAND: ArmJoyCommand = {
+  axes: [...STOP_COMMAND.axes],
+  buttons: STOP_COMMAND.buttons.map((_, index) =>
+    index === CLEAR_FAULTS_BUTTON_INDEX ? 1 : 0,
+  ),
 };
 
 /** Publishes Arm Joy commands using the old base-station mapping. */
@@ -42,6 +49,11 @@ export class ArmCommandPublisher {
   /** Sends a zeroed Arm Joy command. */
   publishStop(): boolean {
     return this.publishCommand(STOP_COMMAND);
+  }
+
+  /** Publishes the old Home/PS button-10 clear-fault command once. */
+  publishClearFaults(): boolean {
+    return this.publishCommand(CLEAR_FAULTS_COMMAND);
   }
 
   /** Stops Arm output before releasing Arm control authority. */

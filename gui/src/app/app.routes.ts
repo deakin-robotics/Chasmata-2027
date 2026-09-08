@@ -1,13 +1,10 @@
 import { Routes } from '@angular/router';
-import { ArmDashboard } from './layout/arm/arm-dashboard/arm-dashboard';
-import { EcamPanel } from './layout/ecam-panel/ecam-panel';
 import { MissionControl } from './layout/mission-control/mission-control';
-import { PilotDashboard } from './layout/pilot/pilot-dashboard/pilot-dashboard';
 import {
   armControlExitGuard,
   armControlGuard,
-  pilotControlExitGuard,
-  pilotControlGuard,
+  driverControlExitGuard,
+  driverControlGuard,
 } from './core/control/control-guards';
 
 export const routes: Routes = [
@@ -16,20 +13,29 @@ export const routes: Routes = [
     component: MissionControl,
     children: [
       {
-        path: 'pilot',
-        component: PilotDashboard,
-        canActivate: [pilotControlGuard],
-        canDeactivate: [pilotControlExitGuard],
+        path: 'driver',
+        loadComponent: () =>
+          import('./layout/driver/driver-dashboard/driver-dashboard').then(
+            ({ DriverDashboard }) => DriverDashboard,
+          ),
+        canActivate: [driverControlGuard],
+        canDeactivate: [driverControlExitGuard],
       },
       {
         path: 'arm',
-        component: ArmDashboard,
+        loadComponent: () =>
+          import('./layout/arm/arm-dashboard/arm-dashboard').then(
+            ({ ArmDashboard }) => ArmDashboard,
+          ),
         canActivate: [armControlGuard],
         canDeactivate: [armControlExitGuard],
       },
       {
         path: 'ecam',
-        component: EcamPanel,
+        loadComponent: () =>
+          import('./layout/ecam-panel/ecam-panel').then(
+            ({ EcamPanel }) => EcamPanel,
+          ),
       },
       {
         path: '',

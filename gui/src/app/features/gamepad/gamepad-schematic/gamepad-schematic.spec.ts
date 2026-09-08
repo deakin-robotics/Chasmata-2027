@@ -23,4 +23,10 @@ describe('GamepadSchematic', () => {
   it('should render the controller SVG', () => {
     expect(fixture.nativeElement.querySelector('svg.controller')).toBeTruthy();
   });
+
+  it('should render shoulder and trigger indicators', () => {
+    expect(fixture.nativeElement.querySelectorAll('.shoulder-buttons .shoulder')).toHaveLength(2);
+    expect(fixture.nativeElement.querySelectorAll('.triggers .trigger-track')).toHaveLength(2);
+    expect(fixture.nativeElement.querySelectorAll('.triggers .trigger-fill')).toHaveLength(2);
+  });
 });

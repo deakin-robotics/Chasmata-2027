@@ -1,0 +1,145 @@
+:host {
+  display: block;
+  height: 100%;
+  min-height: 0;
+}
+
+.arm-model-viewer {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+  min-height: 8rem;
+  overflow: hidden;
+  box-sizing: border-box;
+  border: 1px solid var(--dcr-color-border);
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--dcr-color-surface-raised) 90%, transparent);
+}
+
+.viewer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--dcr-color-border);
+}
+
+.viewer-statuses {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+h2,
+p {
+  margin: 0;
+}
+
+h2 {
+  color: var(--dcr-color-text);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.viewer-status {
+  overflow: hidden;
+  color: var(--dcr-color-normal);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viewer-status-error {
+  color: var(--dcr-color-critical);
+}
+
+.status-separator {
+  color: var(--dcr-color-neutral);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.ik-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  color: var(--dcr-color-info);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.ik-status mat-icon {
+  width: 0.9rem;
+  height: 0.9rem;
+  font-size: 0.9rem;
+}
+
+.ik-status-solving {
+  color: var(--dcr-color-info);
+}
+
+.ik-status-valid {
+  color: var(--dcr-color-normal);
+}
+
+.ik-status-unreachable {
+  color: var(--dcr-color-caution);
+}
+
+.ik-status-invalid {
+  color: var(--dcr-color-critical);
+}
+
+.spinning {
+  animation: spin 1.1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinning {
+    animation: none;
+  }
+}
+
+.viewer-frame {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.scene-host {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  height: 100%;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.viewer-message {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max-content;
+  max-width: calc(100% - 2rem);
+  transform: translate(-50%, -50%);
+  color: var(--dcr-color-neutral);
+  font-size: 0.78rem;
+  text-align: center;
+}
