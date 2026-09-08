@@ -43,8 +43,8 @@ priority indication, while the rover remains authoritative for Gimbal ownership.
 │ context          │ primary               │ Gimbal priority   │
 ├──────────────────┤                       │ and status        │
 │ Rover schematic  ├───────────────────────┼──────────────────┤
-│                  │ Gimbal overhead view  │ Clamp schematic   │
-│                  │ and direction/control │ placeholder       │
+│                  │ Gimbal overhead view  │ Arm model viewer  │
+│                  │ and direction/control │ URDF visual model │
 └──────────────────┴───────────────────────┴──────────────────┘
 ```
 
@@ -58,4 +58,6 @@ ROS link state, Arm controls, and the authoritative Gimbal owner indication. A
 local cached owner must not be used to block takeover requests or movement
 commands; the rover validates station identity and ownership.
 
-The Arm schematic is currently a placeholder for future joint, end-effector, limit, and MoveIt-derived state. The clamp schematic is also a placeholder until the end-effector telemetry and command contract exists.
+The Arm model viewer loads the current six-joint URDF and renders its visual
+geometry in a Three.js scene. Joint telemetry, IK targets, and commanded-versus
+actual pose overlays will be connected as those shared states are implemented.

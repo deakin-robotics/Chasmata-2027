@@ -2,7 +2,7 @@ import { Component, signal } from '@angular/core';
 
 import { CameraStream } from '../../../features/cameras/camera-stream/camera-stream';
 import { GamepadControlPanel } from '../../../features/gamepad/gamepad-control-panel/gamepad-control-panel';
-import { ArmSchematic } from '../../../features/telemetry/arm-schematic/arm-schematic';
+import { ArmModelViewer } from '../../../features/telemetry/arm-model-viewer/arm-model-viewer';
 import { RoverSchematic } from '../../../features/telemetry/rover-schematic/rover-schematic';
 import { ControlScheme } from '../../../shared/control-scheme/control-scheme';
 import { ArmControlPanel } from '../arm-control-panel/arm-control-panel';
@@ -10,14 +10,14 @@ import { ArmControlPanel } from '../arm-control-panel/arm-control-panel';
 /**
  * Arm operator workspace.
  *
- * This placeholder establishes the dedicated Arm route without activating
- * camera streams, telemetry subscriptions, or control publishers.
+ * The dashboard keeps camera, telemetry, and control concerns in their own
+ * components. The Arm model viewer renders the current URDF visual model.
  */
 @Component({
   selector: 'app-arm-dashboard',
   imports: [
     ArmControlPanel,
-    ArmSchematic,
+    ArmModelViewer,
     CameraStream,
     ControlScheme,
     GamepadControlPanel,

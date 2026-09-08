@@ -20,14 +20,14 @@ describe('ArmDashboard', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should render the Arm dashboard placeholders', () => {
+  it('should render the Arm dashboard', () => {
     const text = fixture.nativeElement.textContent;
 
     expect(text).toContain('Arm camera');
     expect(text).toContain('Gimbal camera');
     expect(text).toContain('Front camera');
     expect(text).not.toContain('Rear camera');
-    expect(text).toContain('Arm schematic');
+    expect(text).toContain('Arm model viewer');
     expect(text).not.toContain('Clamp schematic');
     expect(text).toContain('Master Drive');
     const cameraColumn = fixture.nativeElement.querySelector('.arm-camera-column');
@@ -36,10 +36,10 @@ describe('ArmDashboard', () => {
     expect(cameraColumn?.querySelector('app-control-scheme')).toBeTruthy();
     expect(cameraColumn?.querySelector('app-gamepad-control-panel')).toBeTruthy();
     expect(
-      fixture.nativeElement.querySelector('.arm-schematic-column app-arm-schematic'),
+      fixture.nativeElement.querySelector('.arm-schematic-column app-arm-model-viewer'),
     ).toBeTruthy();
     expect(
-      fixture.nativeElement.querySelector('.arm-operator-column app-arm-schematic'),
+      fixture.nativeElement.querySelector('.arm-operator-column app-arm-model-viewer'),
     ).toBeFalsy();
   });
 });
