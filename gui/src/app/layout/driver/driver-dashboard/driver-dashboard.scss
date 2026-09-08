@@ -40,6 +40,7 @@
 
 .driver-control-column {
   grid-column: 3;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1.05fr);
 }
 
 app-camera-stream {
@@ -62,6 +63,24 @@ app-control-scheme {
 app-driver-control-panel {
   height: 100%;
   min-width: 0;
+}
+
+.reserved-space {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  place-items: center;
+  box-sizing: border-box;
+  border: 1px solid var(--dcr-color-border);
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--dcr-color-surface-raised) 90%, transparent);
+}
+
+.reserved-space span {
+  color: var(--dcr-color-neutral);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 @media (max-width: 56rem) {

@@ -35,6 +35,12 @@ describe('DriverDashboard', () => {
     expect(fixture.nativeElement.querySelector('app-driver-control-panel')).toBeTruthy();
   });
 
+  it('should render the reserved lower control-column space', () => {
+    const reserved = fixture.nativeElement.querySelector('.reserved-space');
+
+    expect(reserved?.textContent.trim()).toBe('Reserved');
+  });
+
   it('should render the small gamepad overlay', () => {
     expect(fixture.nativeElement.querySelector('app-gamepad-control-panel')).toBeTruthy();
   });
