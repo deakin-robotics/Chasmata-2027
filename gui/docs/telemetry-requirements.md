@@ -11,9 +11,11 @@ validation, and safety enforcement of that telemetry.
 Telemetry is divided into immediate state-change updates, 10 Hz dynamic
 telemetry, 1 Hz operational telemetry, and a complete 1 Hz recovery snapshot.
 
-Every telemetry value must include validity or staleness information. The GUI
-must show unavailable or unknown state when data is stale rather than continue
-to present old data as current.
+Every telemetry value must include validity or staleness information. When ROS
+is connected, the GUI must show unavailable or unknown state when data is stale
+or missing rather than continue to present old data as current. When ROS is
+disconnected entirely, the FMA and dependent displays use their overall
+unavailable state instead of rendering individual telemetry values.
 
 ### Immediate state-change updates
 
@@ -131,8 +133,10 @@ Gimbal camera. The rover owns the authoritative owner state and validates
 station-identified movement commands.
 
 Gimbal priority must publish immediately when it changes and be included in the
-1 Hz recovery snapshot. If owner telemetry is stale or unavailable, the FMA
-must display `GIMBAL PRIORITY UNKNOWN` rather than the last known owner.
+1 Hz recovery snapshot. If ROS is connected but owner telemetry is null,
+explicitly unknown, or stale, the FMA must display `GIMBAL PRIORITY UNKNOWN`
+rather than the last known owner. If ROS is disconnected entirely, the FMA
+hides the priority value and shows its overall unavailable indicator instead.
 
 ## Interface ownership
 

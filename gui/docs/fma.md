@@ -30,6 +30,11 @@ While the rover connection is unavailable, these remain local selections and
 are not shown as FMA requests. Once the connection is established, they are
 recorded as pending requests in blue until rover telemetry confirms them.
 
+When ROS is disconnected, the FMA hides all status values, including Gimbal
+Priority, and shows the unavailable red X overlay. The X represents the
+overall cold-and-dark state; individual `UNKNOWN` values are used only after
+ROS is connected.
+
 ### Command confirmed
 Once the rover receives the command, changes state, and returns an acknowledgement handshake, the mode changes to **green**.
 
@@ -213,8 +218,9 @@ The rover should publish the owner immediately after an ownership change and
 periodically thereafter so that GUI instances can recover from missed updates or
 reconnects.
 
-If owner telemetry becomes stale or unavailable, the GUI must not continue to
-show the last known owner as valid. The FMA must instead display:
+If ROS is connected but owner telemetry is null, explicitly unknown, or stale,
+the GUI must not continue to show the last known owner as valid. The FMA must
+instead display:
 
 ```text
 GIMBAL PRIORITY UNKNOWN

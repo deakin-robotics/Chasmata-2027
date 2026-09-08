@@ -89,18 +89,6 @@ Rejected requests are cleared through `FmaStateService` without becoming
 confirmed state. See [`fma.md`](./fma.md) for the complete annunciator
 definition.
 
-## Gimbal priority is separate
-
-Gimbal priority is not another control mode and is not a sixth FMA column. It
-is a secondary indicator managed by `GimbalPriorityService` and rendered below
-the LAW state:
-
-```text
-GIM PRI UNK       no confirmed owner
-<- DRIVER         Driver owns Gimbal priority
-ARM OPS ->        Arm Operator owns Gimbal priority
-```
-
 ## Naming reminder
 
 When reading or changing code, first ask which question the code is answering:
