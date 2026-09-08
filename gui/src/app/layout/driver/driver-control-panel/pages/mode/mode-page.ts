@@ -4,7 +4,8 @@ import {
   DriverControlMode,
   DriverControlModeService,
 } from '../../../../../core/control/drive/drive-control-mode';
-import { DriveMode, FmaStateService } from '../../../../../core/fma/fma-state.service';
+import { ControlModeCoordinator } from '../../../../../core/control/control-mode-coordinator';
+import { DriveMode } from '../../../../../core/fma/fma-state.service';
 import {
   ControlModeOption,
   ControlModeSelector,
@@ -19,7 +20,7 @@ import { RosConnection } from '../../../../../core/ros/ros-connection';
 })
 export class DriverModePage {
   private readonly driverControlMode = inject(DriverControlModeService);
-  private readonly fmaState = inject(FmaStateService);
+  private readonly controlModeCoordinator = inject(ControlModeCoordinator);
   private readonly rosConnection = inject(RosConnection);
 
   readonly driveMode = this.driverControlMode.mode;
@@ -31,11 +32,7 @@ export class DriverModePage {
 
   selectDriveMode(mode: string): void {
     if (mode === DriveMode.Manual || mode === DriveMode.Velocity) {
-      const selectedMode = mode as DriverControlMode;
-      this.driverControlMode.setMode(selectedMode);
-      if (this.rosConnection.isConnected()) {
-        this.fmaState.requestDriveMode(selectedMode);
-      }
+      this.controlModeCoordinator.selectDriveMode(mode as DriverControlMode);
     }
   }
 }

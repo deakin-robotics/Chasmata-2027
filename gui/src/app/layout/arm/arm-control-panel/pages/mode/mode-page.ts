@@ -4,7 +4,8 @@ import {
   ArmControlMode,
   ArmControlModeService,
 } from '../../../../../core/control/arm/arm-control-mode';
-import { ArmMode, FmaStateService } from '../../../../../core/fma/fma-state.service';
+import { ControlModeCoordinator } from '../../../../../core/control/control-mode-coordinator';
+import { ArmMode } from '../../../../../core/fma/fma-state.service';
 import {
   ControlModeOption,
   ControlModeSelector,
@@ -19,7 +20,7 @@ import { RosConnection } from '../../../../../core/ros/ros-connection';
 })
 export class ArmModePage {
   private readonly armControlMode = inject(ArmControlModeService);
-  private readonly fmaState = inject(FmaStateService);
+  private readonly controlModeCoordinator = inject(ControlModeCoordinator);
   private readonly rosConnection = inject(RosConnection);
 
   readonly armMode = this.armControlMode.mode;
@@ -31,11 +32,7 @@ export class ArmModePage {
 
   selectArmMode(mode: string): void {
     if (mode === ArmMode.Manual || mode === ArmMode.Position) {
-      const selectedMode = mode as ArmControlMode;
-      this.armControlMode.setMode(selectedMode);
-      if (this.rosConnection.isConnected()) {
-        this.fmaState.requestArmMode(selectedMode);
-      }
+      this.controlModeCoordinator.selectArmMode(mode as ArmControlMode);
     }
   }
 }

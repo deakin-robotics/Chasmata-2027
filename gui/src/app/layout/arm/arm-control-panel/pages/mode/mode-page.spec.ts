@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { ArmControlModeService } from '../../../../../core/control/arm/arm-control-mode';
-import { FmaStateService } from '../../../../../core/fma/fma-state.service';
+import { ArmMode, FmaStateService } from '../../../../../core/fma/fma-state.service';
 import { ArmModePage } from './mode-page';
 
 describe('ArmModePage', () => {
@@ -33,14 +33,10 @@ describe('ArmModePage', () => {
     expect([...buttons].every((button) => button.disabled)).toBe(true);
   });
 
-  it('should ignore mode changes without ROS connection', () => {
-    const manualButton = fixture.nativeElement.querySelector(
-      'app-control-mode-selector button',
-    ) as HTMLButtonElement;
-    manualButton.click();
-    fixture.detectChanges();
+  it('should change only the local mode without ROS connection', () => {
+    component.selectArmMode(ArmMode.Manual);
 
-    expect(TestBed.inject(ArmControlModeService).mode()).toBe('POSITION');
+    expect(TestBed.inject(ArmControlModeService).mode()).toBe(ArmMode.Manual);
     expect(
       TestBed.inject(FmaStateService)
         .columns()

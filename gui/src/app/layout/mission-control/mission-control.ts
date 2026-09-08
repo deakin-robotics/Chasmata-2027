@@ -1,5 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { ControlModeCoordinator } from '../../core/control/control-mode-coordinator';
 import { MissionControlHeader } from './mission-control-header/mission-control-header';
 
 @Component({
@@ -8,4 +9,6 @@ import { MissionControlHeader } from './mission-control-header/mission-control-h
   templateUrl: './mission-control.html',
   styleUrl: './mission-control.scss',
 })
-export class MissionControl {}
+export class MissionControl {
+  private readonly controlModeCoordinator = inject(ControlModeCoordinator);
+}

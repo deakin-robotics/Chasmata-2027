@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { DriverControlModeService } from '../../../../../core/control/drive/drive-control-mode';
-import { FmaStateService } from '../../../../../core/fma/fma-state.service';
+import { DriveMode, FmaStateService } from '../../../../../core/fma/fma-state.service';
 import { DriverModePage } from './mode-page';
 
 describe('DriverModePage', () => {
@@ -33,14 +33,10 @@ describe('DriverModePage', () => {
     expect([...buttons].every((button) => button.disabled)).toBe(true);
   });
 
-  it('should ignore mode changes without ROS connection', () => {
-    const manualButton = fixture.nativeElement.querySelectorAll(
-      'app-control-mode-selector button',
-    )[0] as HTMLButtonElement;
-    manualButton.click();
-    fixture.detectChanges();
+  it('should change only the local mode without ROS connection', () => {
+    component.selectDriveMode(DriveMode.Manual);
 
-    expect(TestBed.inject(DriverControlModeService).mode()).toBe('VELOCITY');
+    expect(TestBed.inject(DriverControlModeService).mode()).toBe(DriveMode.Manual);
     expect(
       TestBed.inject(FmaStateService)
         .columns()

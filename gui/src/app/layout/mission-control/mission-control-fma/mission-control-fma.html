@@ -20,7 +20,13 @@
           {{ column.commanded ?? '' }}
         </span>
       } @else if (column.label === 'LAW') {
-        <span class="mode gimbal-priority" aria-label="Gimbal priority unknown">GIM PRI UNK</span>
+        <span
+          class="mode gimbal-priority"
+          [class.gimbal-priority-known]="gimbalPriority.owner()"
+          [attr.aria-label]="gimbalPriority.ariaLabel()"
+        >
+          {{ gimbalPriority.display() }}
+        </span>
       }
     </div>
   }
