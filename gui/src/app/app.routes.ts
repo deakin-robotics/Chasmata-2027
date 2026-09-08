@@ -1,8 +1,5 @@
 import { Routes } from '@angular/router';
-import { ArmDashboard } from './layout/arm/arm-dashboard/arm-dashboard';
-import { EcamPanel } from './layout/ecam-panel/ecam-panel';
 import { MissionControl } from './layout/mission-control/mission-control';
-import { DriverDashboard } from './layout/driver/driver-dashboard/driver-dashboard';
 import {
   armControlExitGuard,
   armControlGuard,
@@ -17,19 +14,28 @@ export const routes: Routes = [
     children: [
       {
         path: 'driver',
-        component: DriverDashboard,
+        loadComponent: () =>
+          import('./layout/driver/driver-dashboard/driver-dashboard').then(
+            ({ DriverDashboard }) => DriverDashboard,
+          ),
         canActivate: [driverControlGuard],
         canDeactivate: [driverControlExitGuard],
       },
       {
         path: 'arm',
-        component: ArmDashboard,
+        loadComponent: () =>
+          import('./layout/arm/arm-dashboard/arm-dashboard').then(
+            ({ ArmDashboard }) => ArmDashboard,
+          ),
         canActivate: [armControlGuard],
         canDeactivate: [armControlExitGuard],
       },
       {
         path: 'ecam',
-        component: EcamPanel,
+        loadComponent: () =>
+          import('./layout/ecam-panel/ecam-panel').then(
+            ({ EcamPanel }) => EcamPanel,
+          ),
       },
       {
         path: '',
