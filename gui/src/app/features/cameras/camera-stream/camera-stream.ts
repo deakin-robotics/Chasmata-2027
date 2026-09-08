@@ -11,19 +11,18 @@ import {
   SimpleChanges,
   ViewChild,
   computed,
+  effect,
   signal,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
+import { RosConnection } from '../../../core/ros/ros-connection';
+import { UnavailableOverlay } from '../../../shared/unavailable-overlay/unavailable-overlay';
 import { CameraStreamSettingsDialog } from './camera-stream-settings-dialog/camera-stream-settings-dialog';
 
 export type CameraStreamStatus =
-  | 'not-configured'
-  | 'loading'
-  | 'streaming'
-  | 'reconnecting'
-  | 'error';
+  'not-configured' | 'loading' | 'streaming' | 'reconnecting' | 'error' | 'unavailable';
 
 const RETRY_DELAY_MS = 5_000;
 const MAX_RETRY_ATTEMPTS = 10; // Max attempts before giving up
@@ -38,7 +37,7 @@ const LOAD_TIMEOUT_MS = 10_000; // Max wait for stream to load before giving up
  */
 @Component({
   selector: 'app-camera-stream',
-  imports: [MatButtonModule, MatIconModule],
+  imports: [MatButtonModule, MatIconModule, UnavailableOverlay],
   templateUrl: './camera-stream.html',
   styleUrl: './camera-stream.scss',
 })
@@ -53,6 +52,7 @@ export class CameraStream implements OnChanges, OnDestroy {
   private loadTimer: ReturnType<typeof setTimeout> | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly dialog = inject(MatDialog);
+  private readonly rosConnection = inject(RosConnection);
 
   readonly status = signal<CameraStreamStatus>('not-configured');
   readonly retryAttempt = signal(0);
@@ -60,6 +60,20 @@ export class CameraStream implements OnChanges, OnDestroy {
   readonly streamUrl = signal<string | null>(null);
   readonly isFullscreen = signal(false);
   private readonly configuredUrl = signal('');
+  readonly rosConnected = this.rosConnection.isConnected;
+
+  private readonly connectionEffect = effect(() => {
+    const connected = this.rosConnected();
+    const url = this.configuredUrl();
+
+    if (connected && url.trim()) {
+      this.beginLoading();
+    } else if (connected) {
+      this.setNotConfigured();
+    } else {
+      this.setUnavailable();
+    }
+  });
 
   readonly statusLabel = computed(() => {
     switch (this.status()) {
@@ -71,6 +85,8 @@ export class CameraStream implements OnChanges, OnDestroy {
         return 'Reconnecting';
       case 'error':
         return 'Offline';
+      case 'unavailable':
+        return 'Unavailable';
       default:
         return 'Not configured';
     }
@@ -83,6 +99,7 @@ export class CameraStream implements OnChanges, OnDestroy {
         return 'sync';
       case 'streaming':
         return 'videocam';
+      case 'unavailable':
       case 'error':
         return 'videocam_off';
       default:
@@ -103,7 +120,6 @@ export class CameraStream implements OnChanges, OnDestroy {
     if (changes['url']) {
       this.configuredUrl.set(this.url);
       this.retryAttempt.set(0);
-      this.beginLoading();
     }
   }
 
@@ -112,17 +128,23 @@ export class CameraStream implements OnChanges, OnDestroy {
   }
 
   onImageLoad(): void {
+    if (!this.rosConnected()) return;
+
     this.clearLoadTimer();
     this.retryAttempt.set(0);
     this.status.set('streaming');
   }
 
   onImageError(): void {
+    if (!this.rosConnected()) return;
+
     this.clearLoadTimer();
     this.scheduleRetry();
   }
 
   retry(): void {
+    if (!this.rosConnected()) return;
+
     this.clearTimers();
     this.retryAttempt.set(0);
     this.beginLoading();
@@ -148,7 +170,6 @@ export class CameraStream implements OnChanges, OnDestroy {
         this.configuredUrl.set(url);
         this.urlChange.emit(url);
         this.retryAttempt.set(0);
-        this.beginLoading();
       });
   }
 
@@ -176,9 +197,13 @@ export class CameraStream implements OnChanges, OnDestroy {
     const url = this.configuredUrl().trim();
     this.clearTimers();
 
+    if (!this.rosConnected()) {
+      this.setUnavailable();
+      return;
+    }
+
     if (!url) {
-      this.streamUrl.set(null);
-      this.status.set('not-configured');
+      this.setNotConfigured();
       return;
     }
 
@@ -195,8 +220,13 @@ export class CameraStream implements OnChanges, OnDestroy {
 
   /** Schedules the next stream load attempt after a fixed delay. */
   private scheduleRetry(): void {
+    if (!this.rosConnected()) {
+      this.setUnavailable();
+      return;
+    }
+
     if (!this.configuredUrl().trim()) {
-      this.status.set('not-configured');
+      this.setNotConfigured();
       return;
     }
 
@@ -229,6 +259,18 @@ export class CameraStream implements OnChanges, OnDestroy {
       clearTimeout(this.loadTimer);
       this.loadTimer = null;
     }
+  }
+
+  private setNotConfigured(): void {
+    this.clearTimers();
+    this.streamUrl.set(null);
+    this.status.set('not-configured');
+  }
+
+  private setUnavailable(): void {
+    this.clearTimers();
+    this.streamUrl.set(null);
+    this.status.set('unavailable');
   }
 
   /** Adds a changing query value so browsers request a fresh stream URL. */

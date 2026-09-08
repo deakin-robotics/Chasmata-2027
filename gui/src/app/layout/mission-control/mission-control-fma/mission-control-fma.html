@@ -24,4 +24,8 @@
       }
     </div>
   }
+
+  @if (!rosConnected()) {
+    <app-unavailable-overlay label="Flight mode annunciator unavailable" />
+  }
 </section>

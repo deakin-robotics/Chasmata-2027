@@ -8,6 +8,8 @@ import {
   ControlSchemeMapping,
   GamepadInput as CatalogueGamepadInput,
 } from '../../core/control/control-scheme-catalogue';
+import { RosConnection } from '../../core/ros/ros-connection';
+import { UnavailableOverlay } from '../unavailable-overlay/unavailable-overlay';
 
 export type ControlSchemeContext = 'driver' | 'arm';
 
@@ -27,6 +29,7 @@ const LEFT_SIDE_INPUTS = new Set<CatalogueGamepadInput>([
 /** Reusable three-part control reference with mappings around its gamepad. */
 @Component({
   selector: 'app-control-scheme',
+  imports: [UnavailableOverlay],
   templateUrl: './control-scheme.html',
   styleUrl: './control-scheme.scss',
 })
@@ -35,6 +38,7 @@ export class ControlScheme {
 
   private readonly gamepad = inject(GamepadInput);
   private readonly fmaState = inject(FmaStateService);
+  private readonly rosConnection = inject(RosConnection);
 
   readonly activeMapping = computed(() => {
     if (this.context() === 'arm') {
@@ -60,6 +64,7 @@ export class ControlScheme {
 
   readonly leftControls = computed(() => this.controlsForSide(true));
   readonly rightControls = computed(() => this.controlsForSide(false));
+  readonly rosConnected = this.rosConnection.isConnected;
 
   private controlsForSide(leftSide: boolean): readonly ControlSchemeControl[] {
     return this.activeMapping().controls.filter(

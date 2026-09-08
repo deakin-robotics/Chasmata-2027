@@ -30,6 +30,10 @@ describe('ControlScheme', () => {
     expect(element.querySelector('.mapping-right')).toBeTruthy();
   });
 
+  it('should mark both mapping columns unavailable without ROS connection', () => {
+    expect(fixture.nativeElement.querySelectorAll('app-unavailable-overlay')).toHaveLength(2);
+  });
+
   it('should render the active driver catalogue mapping', () => {
     const text = fixture.nativeElement.textContent;
 

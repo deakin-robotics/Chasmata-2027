@@ -17,7 +17,9 @@
 }
 
 .mapping {
+  position: relative;
   display: grid;
+  height: 100%;
   min-width: 0;
   align-items: center;
   color: var(--dcr-color-neutral);
