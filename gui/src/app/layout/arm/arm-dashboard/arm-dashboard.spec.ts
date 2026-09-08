@@ -30,10 +30,16 @@ describe('ArmDashboard', () => {
     expect(text).toContain('Arm schematic');
     expect(text).not.toContain('Clamp schematic');
     expect(text).toContain('Master Drive');
-    const roverColumn = fixture.nativeElement.querySelector('.rover-camera-column');
-    expect(roverColumn?.querySelector('app-control-scheme')).toBeTruthy();
-    expect(roverColumn?.querySelector('app-gamepad-control-panel')).toBeTruthy();
-    expect(fixture.nativeElement.querySelector('.arm-schematic-column app-arm-schematic')).toBeTruthy();
-    expect(fixture.nativeElement.querySelector('.arm-operator-column app-arm-schematic')).toBeFalsy();
+    const cameraColumn = fixture.nativeElement.querySelector('.arm-camera-column');
+    expect(cameraColumn?.querySelector('app-camera-stream')).toBeTruthy();
+    expect(cameraColumn?.querySelector('app-rover-schematic')).toBeTruthy();
+    expect(cameraColumn?.querySelector('app-control-scheme')).toBeTruthy();
+    expect(cameraColumn?.querySelector('app-gamepad-control-panel')).toBeTruthy();
+    expect(
+      fixture.nativeElement.querySelector('.arm-schematic-column app-arm-schematic'),
+    ).toBeTruthy();
+    expect(
+      fixture.nativeElement.querySelector('.arm-operator-column app-arm-schematic'),
+    ).toBeFalsy();
   });
 });

@@ -1,6 +1,12 @@
 <main class="arm-dashboard" aria-label="Arm operator dashboard">
-  <section class="rover-camera-column" aria-label="Arm rover camera workspace">
-    <app-arm-rover-camera-layout class="rover-camera-layout" />
+  <section class="arm-camera-column" aria-label="Arm rover camera workspace">
+    <app-camera-stream
+      label="Front camera"
+      [url]="frontCameraUrl()"
+      (urlChange)="frontCameraUrl.set($event)"
+    />
+
+    <app-rover-schematic />
 
     <app-control-scheme class="control-scheme" context="arm">
       <app-gamepad-control-panel scheme-gamepad />

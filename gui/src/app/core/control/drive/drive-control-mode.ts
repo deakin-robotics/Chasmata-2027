@@ -7,7 +7,7 @@ export type DriverControlMode = DriveMode.Manual | DriveMode.Velocity;
 /** Owns the Driver's selected Manual or Velocity drive-control mode. */
 @Service()
 export class DriverControlModeService {
-  private readonly modeState = signal<DriverControlMode>(DriveMode.Manual);
+  private readonly modeState = signal<DriverControlMode>(DriveMode.Velocity);
 
   readonly mode = this.modeState.asReadonly();
   readonly isManual = computed(() => this.modeState() === DriveMode.Manual);

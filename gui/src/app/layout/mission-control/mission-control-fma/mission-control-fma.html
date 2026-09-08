@@ -2,17 +2,26 @@
   @for (column of columns(); track column.label) {
     <div class="fma-column">
       <h2>{{ column.label }}</h2>
-      <span class="mode mode-active" [class.mode-managed]="column.confirmed === 'MANAGED'">
+      <span
+        class="mode mode-active"
+        [class.mode-managed]="column.confirmed === 'MANAGED'"
+        [class.mode-placeholder]="!column.confirmed"
+        [attr.aria-hidden]="!column.confirmed"
+      >
         {{ column.confirmed }}
       </span>
-      <span
-        class="mode mode-commanded"
-        [class.mode-managed]="column.commanded === 'MANAGED'"
-        [class.mode-placeholder]="!column.commanded"
-        [attr.aria-hidden]="!column.commanded"
-      >
-        {{ column.commanded ?? '' }}
-      </span>
+      @if (column.label !== 'LAW' && column.label !== 'SYSTEM') {
+        <span
+          class="mode mode-commanded"
+          [class.mode-managed]="column.commanded === 'MANAGED'"
+          [class.mode-placeholder]="!column.commanded"
+          [attr.aria-hidden]="!column.commanded"
+        >
+          {{ column.commanded ?? '' }}
+        </span>
+      } @else if (column.label === 'LAW') {
+        <span class="mode gimbal-priority" aria-label="Gimbal priority unknown">GIM PRI UNK</span>
+      }
     </div>
   }
 </section>

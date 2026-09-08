@@ -8,7 +8,7 @@
 .fma-column {
   display: grid;
   min-width: 5.5rem;
-  grid-template-rows: 0.8rem 1.35rem 1.35rem;
+  grid-template-rows: 1rem 1.35rem 1.35rem;
   justify-items: center;
   gap: 0.2rem;
   box-sizing: border-box;
@@ -56,6 +56,15 @@ h2 {
 
 .mode-placeholder {
   visibility: hidden;
+}
+
+.gimbal-priority {
+  width: calc(200% + 0.3rem);
+  justify-self: start;
+  position: relative;
+  z-index: 2;
+  background: var(--dcr-color-background);
+  color: var(--dcr-color-caution);
 }
 
 .mode-managed::after {

@@ -15,6 +15,7 @@ export class ControlModeSelector {
   readonly label = input.required<string>();
   readonly options = input.required<readonly ControlModeOption[]>();
   readonly value = input.required<string>();
+  readonly disabled = input(false);
   readonly valueChange = output<string>();
   readonly activeIndex = computed(() => {
     const index = this.options().findIndex((option) => option.value === this.value());
@@ -22,6 +23,8 @@ export class ControlModeSelector {
   });
 
   select(value: string): void {
+    if (this.disabled()) return;
+
     if (this.options().some((option) => option.value === value)) {
       this.valueChange.emit(value);
     }

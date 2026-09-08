@@ -3,6 +3,7 @@
     label="Arm control mode"
     [options]="armModeOptions"
     [value]="armMode()"
+    [disabled]="!rosConnected()"
     (valueChange)="selectArmMode($event)"
   />
 </section>

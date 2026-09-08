@@ -9,6 +9,7 @@ import {
   ControlModeOption,
   ControlModeSelector,
 } from '../../../../../shared/control-mode-selector/control-mode-selector';
+import { RosConnection } from '../../../../../core/ros/ros-connection';
 
 @Component({
   selector: 'app-arm-mode-page',
@@ -19,8 +20,10 @@ import {
 export class ArmModePage {
   private readonly armControlMode = inject(ArmControlModeService);
   private readonly fmaState = inject(FmaStateService);
+  private readonly rosConnection = inject(RosConnection);
 
   readonly armMode = this.armControlMode.mode;
+  readonly rosConnected = this.rosConnection.isConnected;
   readonly armModeOptions: readonly ControlModeOption[] = [
     { label: ArmMode.Manual, value: ArmMode.Manual },
     { label: ArmMode.Position, value: ArmMode.Position },
@@ -30,7 +33,9 @@ export class ArmModePage {
     if (mode === ArmMode.Manual || mode === ArmMode.Position) {
       const selectedMode = mode as ArmControlMode;
       this.armControlMode.setMode(selectedMode);
-      this.fmaState.requestArmMode(selectedMode);
+      if (this.rosConnection.isConnected()) {
+        this.fmaState.requestArmMode(selectedMode);
+      }
     }
   }
 }

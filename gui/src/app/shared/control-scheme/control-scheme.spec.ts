@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
+import { ArmMode, DriveMode, FmaStateService } from '../../core/fma/fma-state.service';
 import { ControlScheme } from './control-scheme';
 
 describe('ControlScheme', () => {
@@ -13,6 +14,7 @@ describe('ControlScheme', () => {
 
     fixture = TestBed.createComponent(ControlScheme);
     component = fixture.componentInstance;
+    TestBed.inject(FmaStateService).confirmDriveMode(DriveMode.Manual);
     fixture.detectChanges();
   });
 
@@ -37,6 +39,7 @@ describe('ControlScheme', () => {
 
   it('should render the active arm catalogue mapping', () => {
     fixture.componentRef.setInput('context', 'arm');
+    TestBed.inject(FmaStateService).confirmArmMode(ArmMode.Manual);
     fixture.detectChanges();
 
     const text = fixture.nativeElement.textContent;

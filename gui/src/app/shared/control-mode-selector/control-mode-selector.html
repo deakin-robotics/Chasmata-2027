@@ -1,10 +1,15 @@
-<section class="control-mode-selector" [attr.aria-label]="label()">
+<section
+  class="control-mode-selector"
+  [attr.aria-label]="label()"
+  [attr.aria-disabled]="disabled()"
+>
   <span class="control-mode-selector-label">{{ label() }}</span>
 
   <div
     class="control-mode-options"
     role="radiogroup"
     [attr.aria-label]="label()"
+    [class.disabled]="disabled()"
     [style.--option-count]="options().length || 1"
     [style.--active-index]="activeIndex()"
   >
@@ -14,6 +19,7 @@
         role="radio"
         [class.active]="value() === option.value"
         [attr.aria-checked]="value() === option.value"
+        [disabled]="disabled()"
         (click)="select(option.value)"
       >
         {{ option.label }}

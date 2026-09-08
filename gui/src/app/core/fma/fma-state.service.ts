@@ -33,8 +33,8 @@ export enum LinkMode {
 }
 
 export type FmaColumn =
-  | { label: 'DRIVE'; confirmed: DriveMode; commanded: DriveMode | null }
-  | { label: 'ARM'; confirmed: ArmMode; commanded: ArmMode | null }
+  | { label: 'DRIVE'; confirmed: DriveMode | null; commanded: DriveMode | null }
+  | { label: 'ARM'; confirmed: ArmMode | null; commanded: ArmMode | null }
   | { label: 'LAW'; confirmed: LawMode; commanded: null }
   | { label: 'SYSTEM'; confirmed: SystemMode; commanded: SystemMode | null }
   | { label: 'LINK'; confirmed: LinkMode; commanded: LinkMode | null };
@@ -43,8 +43,8 @@ export type FmaColumn =
 @Service()
 export class FmaStateService {
   private readonly columnsState = signal<FmaColumn[]>([
-    { label: 'DRIVE', confirmed: DriveMode.Manual, commanded: null },
-    { label: 'ARM', confirmed: ArmMode.Manual, commanded: null },
+    { label: 'DRIVE', confirmed: null, commanded: null },
+    { label: 'ARM', confirmed: null, commanded: null },
     { label: 'LAW', confirmed: LawMode.Normal, commanded: null },
     { label: 'SYSTEM', confirmed: SystemMode.Good, commanded: null },
     { label: 'LINK', confirmed: LinkMode.Good, commanded: null },
@@ -88,8 +88,23 @@ export class FmaStateService {
     this.updateArm((column) => ({ ...column, commanded: null }));
   }
 
+  /** Clears DRIVE and ARM state when the rover connection is unavailable. */
+  resetControlModes(): void {
+    this.columnsState.update((columns) =>
+      columns.map((column) => {
+        if (column.label === 'DRIVE' || column.label === 'ARM') {
+          return { ...column, confirmed: null, commanded: null };
+        }
+
+        return column;
+      }),
+    );
+  }
+
   private updateDrive(
-    update: (column: Extract<FmaColumn, { label: 'DRIVE' }>) => Extract<FmaColumn, { label: 'DRIVE' }>,
+    update: (
+      column: Extract<FmaColumn, { label: 'DRIVE' }>,
+    ) => Extract<FmaColumn, { label: 'DRIVE' }>,
   ): void {
     this.columnsState.update((columns) =>
       columns.map((column) => (column.label === 'DRIVE' ? update(column) : column)),

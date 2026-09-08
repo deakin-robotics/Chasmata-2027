@@ -3,6 +3,7 @@
     label="Drive control mode"
     [options]="driveModeOptions"
     [value]="driveMode()"
+    [disabled]="!rosConnected()"
     (valueChange)="selectDriveMode($event)"
   />
 </section>

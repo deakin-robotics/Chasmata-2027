@@ -72,19 +72,19 @@ export class ControlScheme {
   }
 
   private confirmedDriveMode(): DriveMode | undefined {
-    const driveColumn = this.fmaState.columns().find(
-      (column): column is Extract<FmaColumn, { label: 'DRIVE' }> => column.label === 'DRIVE',
-    );
+    const driveColumn = this.fmaState
+      .columns()
+      .find((column): column is Extract<FmaColumn, { label: 'DRIVE' }> => column.label === 'DRIVE');
 
-    return driveColumn?.confirmed;
+    return driveColumn?.confirmed ?? undefined;
   }
 
   private confirmedArmMode(): ArmMode | undefined {
-    const armColumn = this.fmaState.columns().find(
-      (column): column is Extract<FmaColumn, { label: 'ARM' }> => column.label === 'ARM',
-    );
+    const armColumn = this.fmaState
+      .columns()
+      .find((column): column is Extract<FmaColumn, { label: 'ARM' }> => column.label === 'ARM');
 
-    return armColumn?.confirmed;
+    return armColumn?.confirmed ?? undefined;
   }
 
   private isLeftSideInput(input: CatalogueGamepadInput): boolean {

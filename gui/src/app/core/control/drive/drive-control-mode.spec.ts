@@ -11,9 +11,9 @@ describe('DriverControlModeService', () => {
     service = TestBed.inject(DriverControlModeService);
   });
 
-  it('should default to Manual mode', () => {
-    expect(service.mode()).toBe(DriveMode.Manual);
-    expect(service.isManual()).toBe(true);
+  it('should default to Velocity mode', () => {
+    expect(service.mode()).toBe(DriveMode.Velocity);
+    expect(service.isVelocity()).toBe(true);
   });
 
   it('should update the selected drive mode', () => {

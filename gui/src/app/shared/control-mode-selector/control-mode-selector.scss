@@ -30,6 +30,10 @@
   background: color-mix(in srgb, var(--dcr-color-offline) 18%, transparent);
 }
 
+.control-mode-options.disabled {
+  opacity: 0.55;
+}
+
 .control-mode-options::before {
   position: absolute;
   top: 0.15rem;
@@ -63,6 +67,10 @@ button {
 
 button.active {
   color: var(--dcr-color-background);
+}
+
+button:disabled {
+  cursor: not-allowed;
 }
 
 button:focus-visible {

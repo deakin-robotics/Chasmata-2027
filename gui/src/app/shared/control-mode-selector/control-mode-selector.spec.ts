@@ -49,4 +49,20 @@ describe('ControlModeSelector', () => {
 
     expect(selected).toEqual([]);
   });
+
+  it('should disable selection when disabled', () => {
+    const selected: string[] = [];
+    component.valueChange.subscribe((value) => selected.push(value));
+
+    fixture.componentRef.setInput('disabled', true);
+    fixture.detectChanges();
+
+    const buttons = fixture.nativeElement.querySelectorAll(
+      'button',
+    ) as NodeListOf<HTMLButtonElement>;
+    buttons[0].click();
+
+    expect([...buttons].every((button) => button.disabled)).toBe(true);
+    expect(selected).toEqual([]);
+  });
 });

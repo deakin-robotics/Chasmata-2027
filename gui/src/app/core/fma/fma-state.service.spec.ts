@@ -10,11 +10,11 @@ describe('FmaStateService', () => {
     service = TestBed.inject(FmaStateService);
   });
 
-  it('starts DRIVE and ARM with confirmed modes and no pending request', () => {
+  it('starts DRIVE and ARM without confirmed or pending modes', () => {
     expect(service.columns()).toEqual(
       expect.arrayContaining([
-        { label: 'DRIVE', confirmed: DriveMode.Manual, commanded: null },
-        { label: 'ARM', confirmed: ArmMode.Manual, commanded: null },
+        { label: 'DRIVE', confirmed: null, commanded: null },
+        { label: 'ARM', confirmed: null, commanded: null },
       ]),
     );
   });
@@ -23,9 +23,7 @@ describe('FmaStateService', () => {
     service.requestDriveMode(DriveMode.Velocity);
 
     expect(service.columns()).toEqual(
-      expect.arrayContaining([
-        { label: 'DRIVE', confirmed: DriveMode.Manual, commanded: DriveMode.Velocity },
-      ]),
+      expect.arrayContaining([{ label: 'DRIVE', confirmed: null, commanded: DriveMode.Velocity }]),
     );
   });
 
@@ -34,9 +32,7 @@ describe('FmaStateService', () => {
     service.confirmDriveMode(DriveMode.Velocity);
 
     expect(service.columns()).toEqual(
-      expect.arrayContaining([
-        { label: 'DRIVE', confirmed: DriveMode.Velocity, commanded: null },
-      ]),
+      expect.arrayContaining([{ label: 'DRIVE', confirmed: DriveMode.Velocity, commanded: null }]),
     );
   });
 
@@ -45,9 +41,7 @@ describe('FmaStateService', () => {
     service.rejectArmMode();
 
     expect(service.columns()).toEqual(
-      expect.arrayContaining([
-        { label: 'ARM', confirmed: ArmMode.Manual, commanded: null },
-      ]),
+      expect.arrayContaining([{ label: 'ARM', confirmed: null, commanded: null }]),
     );
   });
 });

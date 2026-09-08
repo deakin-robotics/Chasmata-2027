@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { DriverControlModeService } from '../../../../../core/control/drive/drive-control-mode';
-import { DriveMode, FmaStateService } from '../../../../../core/fma/fma-state.service';
+import { FmaStateService } from '../../../../../core/fma/fma-state.service';
 import { DriverModePage } from './mode-page';
 
 describe('DriverModePage', () => {
@@ -18,18 +18,26 @@ describe('DriverModePage', () => {
     fixture.detectChanges();
   });
 
-  it('should default to Manual mode', () => {
-    expect(component.driveMode()).toBe('MANUAL');
+  it('should default to Velocity mode', () => {
+    expect(component.driveMode()).toBe('VELOCITY');
     expect(fixture.nativeElement.querySelector('button.active')?.textContent.trim()).toBe(
-      'MANUAL',
+      'VELOCITY',
     );
   });
 
-  it('should update the shared Driver drive mode service', () => {
-    const velocityButton = fixture.nativeElement.querySelectorAll(
+  it('should disable mode selection without ROS connection', () => {
+    const buttons = fixture.nativeElement.querySelectorAll(
       'app-control-mode-selector button',
-    )[1] as HTMLButtonElement;
-    velocityButton.click();
+    ) as NodeListOf<HTMLButtonElement>;
+
+    expect([...buttons].every((button) => button.disabled)).toBe(true);
+  });
+
+  it('should ignore mode changes without ROS connection', () => {
+    const manualButton = fixture.nativeElement.querySelectorAll(
+      'app-control-mode-selector button',
+    )[0] as HTMLButtonElement;
+    manualButton.click();
     fixture.detectChanges();
 
     expect(TestBed.inject(DriverControlModeService).mode()).toBe('VELOCITY');
@@ -37,6 +45,6 @@ describe('DriverModePage', () => {
       TestBed.inject(FmaStateService)
         .columns()
         .find((column) => column.label === 'DRIVE')?.commanded,
-    ).toBe(DriveMode.Velocity);
+    ).toBeNull();
   });
 });

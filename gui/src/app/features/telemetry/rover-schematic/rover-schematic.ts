@@ -28,7 +28,7 @@ export class RoverSchematic {
   private buildGimbalArcPath(yawDeg: number): string {
     const centreX = 160;
     const centreY = 198;
-    const radius = 135;
+    const radius = 140;
     const halfSpanDeg = 10;
     const startAngle = this.toRadians(yawDeg - halfSpanDeg);
     const endAngle = this.toRadians(yawDeg + halfSpanDeg);

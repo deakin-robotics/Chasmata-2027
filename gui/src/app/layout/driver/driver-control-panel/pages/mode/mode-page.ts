@@ -9,6 +9,7 @@ import {
   ControlModeOption,
   ControlModeSelector,
 } from '../../../../../shared/control-mode-selector/control-mode-selector';
+import { RosConnection } from '../../../../../core/ros/ros-connection';
 
 @Component({
   selector: 'app-driver-mode-page',
@@ -19,8 +20,10 @@ import {
 export class DriverModePage {
   private readonly driverControlMode = inject(DriverControlModeService);
   private readonly fmaState = inject(FmaStateService);
+  private readonly rosConnection = inject(RosConnection);
 
   readonly driveMode = this.driverControlMode.mode;
+  readonly rosConnected = this.rosConnection.isConnected;
   readonly driveModeOptions: readonly ControlModeOption[] = [
     { label: DriveMode.Manual, value: DriveMode.Manual },
     { label: DriveMode.Velocity, value: DriveMode.Velocity },
@@ -30,7 +33,9 @@ export class DriverModePage {
     if (mode === DriveMode.Manual || mode === DriveMode.Velocity) {
       const selectedMode = mode as DriverControlMode;
       this.driverControlMode.setMode(selectedMode);
-      this.fmaState.requestDriveMode(selectedMode);
+      if (this.rosConnection.isConnected()) {
+        this.fmaState.requestDriveMode(selectedMode);
+      }
     }
   }
 }

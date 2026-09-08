@@ -25,6 +25,11 @@ The FMA displays the **confirmed rover state**, not simply what the operator req
 ### Command pending
 When an operator selects a mode from the GUI, the requested mode is shown in **blue** while the command is waiting for acknowledgement from the rover.
 
+At GUI startup, Driver defaults to `VELOCITY` and Arm defaults to `POSITION`.
+While the rover connection is unavailable, these remain local selections and
+are not shown as FMA requests. Once the connection is established, they are
+recorded as pending requests in blue until rover telemetry confirms them.
+
 ### Command confirmed
 Once the rover receives the command, changes state, and returns an acknowledgement handshake, the mode changes to **green**.
 
@@ -67,7 +72,9 @@ Nav2 or another autonomy component generates the movement commands instead of th
 
 ### No displayed mode
 
-If there is no valid connection or confirmed drive mode, **display nothing**.
+If there is no valid connection or confirmed drive mode, do not display a green
+confirmed mode or a pending request. A local startup or operator selection is
+not placed in the FMA until a valid rover connection exists.
 
 ---
 
