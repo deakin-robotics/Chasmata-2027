@@ -24,4 +24,12 @@ describe('MissionControlFma', () => {
 
     expect(fmaState.columns()).toEqual(stateBeforeMount);
   });
+
+  it('hides all FMA status values while ROS is disconnected', () => {
+    fixture = TestBed.createComponent(MissionControlFma);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.mode')).toHaveLength(0);
+    expect(fixture.nativeElement.querySelector('app-unavailable-overlay')).toBeTruthy();
+  });
 });

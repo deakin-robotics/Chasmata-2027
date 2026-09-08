@@ -19,6 +19,16 @@ describe('FmaStateService', () => {
     );
   });
 
+  it('starts telemetry-backed LAW, SYSTEM, and LINK states as unknown', () => {
+    expect(service.columns()).toEqual(
+      expect.arrayContaining([
+        { label: 'LAW', confirmed: null, commanded: null },
+        { label: 'SYSTEM', confirmed: null, commanded: null },
+        { label: 'LINK', confirmed: null, commanded: null },
+      ]),
+    );
+  });
+
   it('keeps DRIVE confirmed state unchanged while a request is pending', () => {
     service.requestDriveMode(DriveMode.Velocity);
 
@@ -43,5 +53,16 @@ describe('FmaStateService', () => {
     expect(service.columns()).toEqual(
       expect.arrayContaining([{ label: 'ARM', confirmed: null, commanded: null }]),
     );
+  });
+
+  it('starts gimbal priority unknown and formats authoritative owners', () => {
+    expect(service.gimbalPriorityOwner()).toBeNull();
+    expect(service.gimbalPriorityDisplay()).toBe('GIMBAL PRIORITY UNKNOWN');
+
+    service.setGimbalPriorityOwner('DRIVER');
+    expect(service.gimbalPriorityDisplay()).toBe('← DRIVER');
+
+    service.setGimbalPriorityOwner('ARM OPS');
+    expect(service.gimbalPriorityDisplay()).toBe('ARM OPS →');
   });
 });

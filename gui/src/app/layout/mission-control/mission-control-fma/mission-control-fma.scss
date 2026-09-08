@@ -1,7 +1,9 @@
 .fma {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(5, minmax(5.5rem, 1fr));
+  width: 40rem;
+  min-width: 0;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   align-items: stretch;
   gap: 0.3rem;
 }
@@ -14,7 +16,7 @@ app-unavailable-overlay {
 
 .fma-column {
   display: grid;
-  min-width: 5.5rem;
+  min-width: 0;
   grid-template-rows: 1rem 1.35rem 1.35rem;
   justify-items: center;
   gap: 0.2rem;
