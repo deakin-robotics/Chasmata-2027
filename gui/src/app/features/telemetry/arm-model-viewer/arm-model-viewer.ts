@@ -4,16 +4,18 @@ import {
   ElementRef,
   OnDestroy,
   ViewChild,
+  computed,
   effect,
   inject,
   signal,
 } from '@angular/core';
+import { MatIconModule } from '@angular/material/icon';
 import type * as Three from 'three';
 import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type URDFLoader from 'urdf-loader';
 import type { URDFRobot } from 'urdf-loader/src/URDFClasses';
 
-import { ArmPositionTargetService } from '../../../core/arm/arm-position-target';
+import { ArmIkCoordinator } from '../../../core/arm/arm-ik-coordinator';
 import { RosConnection } from '../../../core/ros/ros-connection';
 import { UnavailableOverlay } from '../../../shared/unavailable-overlay/unavailable-overlay';
 
@@ -27,12 +29,12 @@ type ThreeModule = typeof import('three');
 /** Renders the arm URDF in a Three.js scene. */
 @Component({
   selector: 'app-arm-model-viewer',
-  imports: [UnavailableOverlay],
+  imports: [MatIconModule, UnavailableOverlay],
   templateUrl: './arm-model-viewer.html',
   styleUrl: './arm-model-viewer.scss',
 })
 export class ArmModelViewer implements AfterViewInit, OnDestroy {
-  private readonly armPositionTarget = inject(ArmPositionTargetService);
+  private readonly armIkCoordinator = inject(ArmIkCoordinator);
   private readonly rosConnection = inject(RosConnection);
 
   @ViewChild('sceneHost', { static: true })
@@ -40,6 +42,20 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
 
   readonly status = signal<ViewerStatus>('unavailable');
   readonly statusMessage = signal('Unavailable');
+  readonly viewerStatusLabel = computed(() => {
+    switch (this.status()) {
+      case 'loading':
+        return 'LOADING';
+      case 'ready':
+        return 'READY';
+      case 'error':
+        return 'ERROR';
+      default:
+        return 'UNAVAILABLE';
+    }
+  });
+  readonly ikStatus = this.armIkCoordinator.status;
+  readonly ikStatusLabel = this.armIkCoordinator.statusLabel;
   readonly rosConnected = this.rosConnection.isConnected;
 
   private three: ThreeModule | null = null;
@@ -71,8 +87,11 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
   });
 
   private readonly targetPositionEffect = effect(() => {
-    const position = this.armPositionTarget.position();
+    const position = this.armIkCoordinator.position();
+    const jointAngles = this.armIkCoordinator.jointAngles();
+    const ikStatus = this.armIkCoordinator.status();
     this.targetMarker?.position.set(...position);
+    if (ikStatus === 'valid') this.applyJointAngles(jointAngles);
   });
 
   ngAfterViewInit(): void {
@@ -178,6 +197,10 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
       this.orbitControlsConstructor = controlsModule.OrbitControls;
       this.loader = new urdfModule.default();
 
+      await this.armIkCoordinator.load(ARM_URDF_URL);
+
+      if (this.destroyed || !this.rosConnected()) return;
+
       if (!this.initializeScene()) return;
 
       this.observeResize();
@@ -237,6 +260,9 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
         this.addGroundGrid(robot);
         this.frameRobot(robot);
         this.addTargetMarker(robot);
+        if (this.ikStatus() === 'valid') {
+          this.applyJointAngles(this.armIkCoordinator.jointAngles());
+        }
         this.status.set('ready');
         this.statusMessage.set('Ready');
       },
@@ -261,9 +287,19 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
       }),
     );
     marker.name = 'arm-position-target';
-    marker.position.set(...this.armPositionTarget.position());
+    marker.position.set(...this.armIkCoordinator.position());
     robot.add(marker);
     this.targetMarker = marker;
+  }
+
+  private applyJointAngles(jointAngles: Readonly<Record<string, number>> | null): void {
+    if (!jointAngles || !this.robot) return;
+
+    for (const [name, angle] of Object.entries(jointAngles)) {
+      if (Number.isFinite(angle)) this.robot.setJointValue(name, angle);
+    }
+
+    this.robot.updateMatrixWorld(true);
   }
 
   private styleRobot(robot: URDFRobot): void {
@@ -358,6 +394,8 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
   }
 
   private disposeViewer(): void {
+    this.armIkCoordinator.reset();
+
     if (this.animationFrame !== null && typeof window !== 'undefined') {
       window.cancelAnimationFrame(this.animationFrame);
     }

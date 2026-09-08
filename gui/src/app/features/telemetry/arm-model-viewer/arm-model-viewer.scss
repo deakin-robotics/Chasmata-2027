@@ -26,6 +26,14 @@
   border-bottom: 1px solid var(--dcr-color-border);
 }
 
+.viewer-statuses {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
 h2,
 p {
   margin: 0;
@@ -48,7 +56,60 @@ h2 {
 }
 
 .viewer-status-error {
-  color: var(--dcr-color-warning);
+  color: var(--dcr-color-critical);
+}
+
+.status-separator {
+  color: var(--dcr-color-neutral);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.ik-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  color: var(--dcr-color-info);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.ik-status mat-icon {
+  width: 0.9rem;
+  height: 0.9rem;
+  font-size: 0.9rem;
+}
+
+.ik-status-solving {
+  color: var(--dcr-color-info);
+}
+
+.ik-status-valid {
+  color: var(--dcr-color-normal);
+}
+
+.ik-status-unreachable {
+  color: var(--dcr-color-caution);
+}
+
+.ik-status-invalid {
+  color: var(--dcr-color-critical);
+}
+
+.spinning {
+  animation: spin 1.1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinning {
+    animation: none;
+  }
 }
 
 .viewer-frame {

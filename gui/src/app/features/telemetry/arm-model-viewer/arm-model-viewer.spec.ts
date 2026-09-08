@@ -25,7 +25,13 @@ describe('ArmModelViewer', () => {
 
   it('should show the unavailable overlay without rendering while ROS is disconnected', () => {
     expect(fixture.componentInstance.rosConnected()).toBe(false);
+    expect(fixture.componentInstance.ikStatus()).toBe('idle');
     expect(fixture.nativeElement.querySelector('app-unavailable-overlay')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.viewer-status')?.textContent).toContain(
+      '3D: UNAVAILABLE',
+    );
+    expect(fixture.nativeElement.querySelector('.ik-status')?.textContent).toContain('IK: —');
+    expect(fixture.nativeElement.querySelector('.viewer-status-error')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('canvas')).toBeFalsy();
   });
 });
