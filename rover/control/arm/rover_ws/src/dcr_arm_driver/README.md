@@ -41,7 +41,6 @@ cd
 colcon build --packages-select dcr_arm_driver
 source install/setup.bash
 ```
-
 ### Testing
 
 Start the driver:
