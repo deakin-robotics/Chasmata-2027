@@ -1,8 +1,9 @@
 # Arm inverse kinematics (IK)
 
-This document describes the browser-side arm IK foundation in the Angular GUI.
-It converts an Arm Operator target pose into named joint angles. It does **not**
-drive motors or replace rover-side safety checks.
+This document describes the browser-side arm IK workflow in the Angular GUI.
+It converts an Arm Operator position target, with the current fixed orientation,
+into named joint angles. It does **not** drive motors or replace rover-side
+safety checks.
 
 ## Responsibility boundary
 
@@ -24,6 +25,10 @@ Rover: validate limits, execute/reject, publish telemetry
 
 The GUI owns the kinematic calculation. The rover remains the authoritative
 source of whether a command is accepted and what the arm actually did.
+
+The IK math can run without ROS, which is useful for unit tests. The dashboard
+runtime waits for a ROS connection before starting the Arm IK workflow because
+an operational solve needs live arm context and a future command path.
 
 ## Model source of truth
 
@@ -56,12 +61,19 @@ update as well.
 ## GUI implementation
 
 [`src/app/core/arm/arm-ik-solver.ts`](../src/app/core/arm/arm-ik-solver.ts)
-is an Angular singleton service built on:
+is the calculation engine built on:
 
 - `urdf-loader` to parse the URDF.
 - `closed-chain-ik` to solve the kinematic chain.
 
-Its public flow is:
+[`src/app/core/arm/arm-ik-coordinator.ts`](../src/app/core/arm/arm-ik-coordinator.ts)
+is the Angular singleton that owns the dashboard workflow. It stores and
+validates the target position, loads the solver, runs a solve when the target
+changes, and exposes the status and latest valid joint angles. The
+`ArmModelViewer` consumes those outputs and only renders the URDF, target
+marker, and valid joint angles.
+
+The low-level solver flow is:
 
 ```ts
 await armIk.load();
@@ -85,7 +97,10 @@ const result = armIk.solve({
 // result.jointAngles: { base_joint: ..., shoulder_joint: ..., ... }
 ```
 
-`position` and `orientation` must use the same coordinate frame as
+For the current coordinator workflow, the position comes from its shared target
+and the orientation is captured from the solver's current forward-kinematics
+pose when the model loads. `position` and `orientation` must use the same
+coordinate frame as
 `armIk.endEffectorPose()`. Do not mix a camera frame, map frame, or another
 visualisation frame into the solver without a defined transform.
 
@@ -101,12 +116,16 @@ Implemented now:
 - Reading movable joint names and URDF limits.
 - Solving a full end-effector pose.
 - Returning named joint angles and a solver status.
+- Storing and validating the Arm Position-mode target position.
+- Coordinating target changes through `ArmIkCoordinator`.
+- Showing `SOLVING`, `VALID`, `UNREACHABLE`, and `INVALID` states.
+- Rendering the target marker and applying valid solutions to the Three.js arm.
 
 Not implemented yet:
 
 - A Position-mode UI for choosing the target pose.
+- Live joint telemetry as the normal IK seed and actual-pose rendering.
 - The ROS message/topic/service contract for joint-angle commands.
-- Arm telemetry subscription and use as the normal IK seed.
 - Rover acknowledgement/rejection display.
 - Collision checking and motion-path planning.
 

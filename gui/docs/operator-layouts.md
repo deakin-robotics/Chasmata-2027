@@ -59,5 +59,7 @@ local cached owner must not be used to block takeover requests or movement
 commands; the rover validates station identity and ownership.
 
 The Arm model viewer loads the current six-joint URDF and renders its visual
-geometry in a Three.js scene. Joint telemetry, IK targets, and commanded-versus
-actual pose overlays will be connected as those shared states are implemented.
+geometry in a Three.js scene. It currently displays the local IK target marker
+and valid solved pose. Joint telemetry, actual-pose rendering, and
+commanded-versus-actual overlays will be connected when those shared states and
+the ROS contract are implemented.
