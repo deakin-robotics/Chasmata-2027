@@ -1,17 +1,17 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { PilotDashboard } from './pilot-dashboard';
+import { DriverDashboard } from './driver-dashboard';
 
-describe('PilotDashboard', () => {
-  let component: PilotDashboard;
-  let fixture: ComponentFixture<PilotDashboard>;
+describe('DriverDashboard', () => {
+  let component: DriverDashboard;
+  let fixture: ComponentFixture<DriverDashboard>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [PilotDashboard],
+      imports: [DriverDashboard],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(PilotDashboard);
+    fixture = TestBed.createComponent(DriverDashboard);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
@@ -29,10 +29,10 @@ describe('PilotDashboard', () => {
     expect(fixture.nativeElement.textContent).toContain('Gimbal camera');
   });
 
-  it('should render the rover schematic and Pilot control panel', () => {
+  it('should render the rover schematic and Driver control panel', () => {
     expect(fixture.nativeElement.querySelector('app-rover-schematic')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('app-control-scheme')).toBeTruthy();
-    expect(fixture.nativeElement.querySelector('app-pilot-control-panel')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('app-driver-control-panel')).toBeTruthy();
   });
 
   it('should render the small gamepad overlay', () => {

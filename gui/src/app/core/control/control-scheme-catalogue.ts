@@ -1,7 +1,7 @@
 import { ArmControlMode } from './arm/arm-control-mode';
 import { ArmMode, DriveMode } from '../fma/fma-state.service';
 
-export type PilotDriveControlMode = DriveMode.Manual | DriveMode.Velocity;
+export type DriverControlMode = DriveMode.Manual | DriveMode.Velocity;
 
 /** Physical input that can be shown in a gamepad control reference. */
 export type GamepadInput =
@@ -64,10 +64,10 @@ const ARM_MANUAL_SHARED_CONTROLS: readonly ControlSchemeControl[] = [
  * ownership and therefore have no operator gamepad mapping.
  */
 export const CONTROL_SCHEME_CATALOGUE: {
-  readonly pilot: Readonly<Record<PilotDriveControlMode, ControlSchemeMapping>>;
+  readonly driver: Readonly<Record<DriverControlMode, ControlSchemeMapping>>;
   readonly arm: Readonly<Record<ArmControlMode, ControlSchemeMode>>;
 } = {
-  pilot: {
+  driver: {
     [DriveMode.Manual]: {
       controls: [
         { input: 'left-trigger', label: 'LT', action: 'Left track' },

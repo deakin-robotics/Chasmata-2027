@@ -36,8 +36,8 @@ export class ArmControl {
       return 'Connect to ROSbridge before enabling Arm control.';
     }
 
-    if (this.controlMode.isPilotActive()) {
-      return 'Release Pilot control before enabling Arm control.';
+    if (this.controlMode.isDriverActive()) {
+      return 'Release Driver control before enabling Arm control.';
     }
 
     const snapshot = this.gamepad.snapshot();

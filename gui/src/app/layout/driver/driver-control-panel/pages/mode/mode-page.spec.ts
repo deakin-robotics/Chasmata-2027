@@ -1,19 +1,19 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { PilotDriveModeService } from '../../../../../core/control/pilot/pilot-drive-mode';
+import { DriverControlModeService } from '../../../../../core/control/drive/drive-control-mode';
 import { DriveMode, FmaStateService } from '../../../../../core/fma/fma-state.service';
-import { PilotModePage } from './mode-page';
+import { DriverModePage } from './mode-page';
 
-describe('PilotModePage', () => {
-  let component: PilotModePage;
-  let fixture: ComponentFixture<PilotModePage>;
+describe('DriverModePage', () => {
+  let component: DriverModePage;
+  let fixture: ComponentFixture<DriverModePage>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [PilotModePage],
+      imports: [DriverModePage],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(PilotModePage);
+    fixture = TestBed.createComponent(DriverModePage);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
@@ -25,14 +25,14 @@ describe('PilotModePage', () => {
     );
   });
 
-  it('should update the shared Pilot drive mode service', () => {
+  it('should update the shared Driver drive mode service', () => {
     const velocityButton = fixture.nativeElement.querySelectorAll(
       'app-control-mode-selector button',
     )[1] as HTMLButtonElement;
     velocityButton.click();
     fixture.detectChanges();
 
-    expect(TestBed.inject(PilotDriveModeService).mode()).toBe('VELOCITY');
+    expect(TestBed.inject(DriverControlModeService).mode()).toBe('VELOCITY');
     expect(
       TestBed.inject(FmaStateService)
         .columns()

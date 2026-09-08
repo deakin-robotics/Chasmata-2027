@@ -1,17 +1,17 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { PilotMasterPage } from './master-page';
+import { DriverMasterPage } from './master-page';
 
-describe('PilotMasterPage', () => {
-  let component: PilotMasterPage;
-  let fixture: ComponentFixture<PilotMasterPage>;
+describe('DriverMasterPage', () => {
+  let component: DriverMasterPage;
+  let fixture: ComponentFixture<DriverMasterPage>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [PilotMasterPage],
+      imports: [DriverMasterPage],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(PilotMasterPage);
+    fixture = TestBed.createComponent(DriverMasterPage);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
@@ -20,7 +20,7 @@ describe('PilotMasterPage', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should render the Pilot master controls', () => {
+  it('should render the Driver master controls', () => {
     expect(fixture.nativeElement.textContent).toContain('Master Drive');
     expect(fixture.nativeElement.textContent).toContain('ROS Link');
   });

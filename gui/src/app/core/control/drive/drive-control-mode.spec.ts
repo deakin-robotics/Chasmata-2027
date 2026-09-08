@@ -1,14 +1,14 @@
 import { TestBed } from '@angular/core/testing';
 
 import { DriveMode } from '../../fma/fma-state.service';
-import { PilotDriveModeService } from './pilot-drive-mode';
+import { DriverControlModeService } from './drive-control-mode';
 
-describe('PilotDriveModeService', () => {
-  let service: PilotDriveModeService;
+describe('DriverControlModeService', () => {
+  let service: DriverControlModeService;
 
   beforeEach(() => {
     TestBed.configureTestingModule({});
-    service = TestBed.inject(PilotDriveModeService);
+    service = TestBed.inject(DriverControlModeService);
   });
 
   it('should default to Manual mode', () => {

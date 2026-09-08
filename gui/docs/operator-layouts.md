@@ -6,32 +6,32 @@ The `MissionControl` shell renders the selected operator dashboard; it does not 
 
 ## Current Angular implementation
 
-![Pilot dashboard](../assets/pilot.png)
+![Driver dashboard](../assets/driver.png)
 
 ![Arm operator dashboard](../assets/arm_ops.png)
 
-## Pilot view
+## Driver view
 
 ```text
 ┌───────────────────────────────────────────────┬──────────────┐
 │ Front camera                                  │ Gimbal view  │
 │ primary driving view                          │ shared/control│
 ├───────────────────────────────┬───────────────┼──────────────┤
-│ Rover schematic                │ Arm camera    │ Pilot        │
+│ Rover schematic                │ Arm camera    │ Driver       │
 │                               │ context       │ control      │
 ├───────────────────────────────┴───────────────┤ panel        │
 │ Gimbal overhead view and priority status      │              │
 └───────────────────────────────────────────────┴──────────────┘
 ```
 
-The Front camera is the current proposed primary Pilot view, but the final Pilot
-camera priority must be confirmed with the Pilot. The controllable Gimbal camera
+The Front camera is the current proposed primary Driver view, but the final Driver
+camera priority must be confirmed with the Driver. The controllable Gimbal camera
 provides a shared overhead/bird's-eye view. The Arm camera remains available for
 context where screen space allows. The previous Left/Right/Rear arrangement is
 not the current proposed hardware layout.
 
 The right sidebar places the shared Gimbal view and priority status above the
-Pilot control panel. The Pilot controller includes the **GIMBAL PRIORITY** button.
+Driver control panel. The Driver controller includes the **GIMBAL PRIORITY** button.
 The control panel owns the ROS link, gamepad status, Drive controls, and Gimbal
 priority indication, while the rover remains authoritative for Gimbal ownership.
 
@@ -50,7 +50,7 @@ priority indication, while the rover remains authoritative for Gimbal ownership.
 
 The Arm camera is the current proposed primary Arm Operator view. The Front
 camera provides rover context, while the shared Gimbal provides overhead
-positioning and situational awareness. Both Pilot and Arm Operator GUIs may view
+positioning and situational awareness. Both Driver and Arm Operator GUIs may view
 and control the same physical Gimbal.
 
 The Arm control panel includes the **GIMBAL PRIORITY** button, gamepad status,

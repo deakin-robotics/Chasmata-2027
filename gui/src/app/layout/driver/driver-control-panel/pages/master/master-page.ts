@@ -2,7 +2,7 @@ import { Component, computed, inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 
 import { GamepadInput } from '../../../../../core/gamepad/gamepad-input';
-import { PilotDriveControl } from '../../../../../core/control/pilot/pilot-drive-control';
+import { DriverControl } from '../../../../../core/control/drive/driver-control';
 import { RosConnection } from '../../../../../core/ros/ros-connection';
 import { ConnectionManager } from '../../../../../features/connection/connection-manager/connection-manager';
 import { ActionButton, ActionButtonTone } from '../../../../../shared/action-button/action-button';
@@ -24,20 +24,20 @@ import {
 } from '../../../../../shared/status-indicator/status-indicator';
 
 @Component({
-  selector: 'app-pilot-master-page',
+  selector: 'app-driver-master-page',
   imports: [ActionButton, ControlFlowConnector, ControlSwitch, StatusIndicator],
   templateUrl: './master-page.html',
   styleUrl: './master-page.scss',
 })
-export class PilotMasterPage {
-  private readonly pilotDriveControl = inject(PilotDriveControl);
+export class DriverMasterPage {
+  private readonly driverControl = inject(DriverControl);
   private readonly gamepad = inject(GamepadInput);
   private readonly rosConnection = inject(RosConnection);
   private readonly dialog = inject(MatDialog);
 
-  readonly masterDriveEnabled = this.pilotDriveControl.enabled;
+  readonly masterDriveEnabled = this.driverControl.enabled;
   readonly masterDriveTone: ControlSwitchTone = 'normal';
-  readonly readinessError = this.pilotDriveControl.readinessError;
+  readonly readinessError = this.driverControl.readinessError;
   readonly rosConnected = this.rosConnection.isConnected;
   readonly gamepadConnected = this.gamepad.connected;
   readonly gamepadStatusLabel = computed(() =>
@@ -102,7 +102,7 @@ export class PilotMasterPage {
   /** Requests enabled drivetrain publishing or immediately stops active publishing. */
   toggleMasterDriveControl(nextState: boolean): void {
     if (!nextState) {
-      this.pilotDriveControl.disable();
+      this.driverControl.disable();
       return;
     }
 
@@ -119,7 +119,7 @@ export class PilotMasterPage {
       })
       .afterClosed()
       .subscribe((confirmed) => {
-        if (confirmed === true) this.pilotDriveControl.enable();
+        if (confirmed === true) this.driverControl.enable();
       });
   }
 }

@@ -1,9 +1,0 @@
-<app-control-panel-shell label="Pilot control panel" [tabs]="tabs" [(activeTab)]="activeTab">
-  @if (activeTab() === 'master') {
-    <app-pilot-master-page />
-  }
-
-  @if (activeTab() === 'mode') {
-    <app-pilot-mode-page />
-  }
-</app-control-panel-shell>

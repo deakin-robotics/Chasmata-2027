@@ -9,7 +9,7 @@ import {
   GamepadInput as CatalogueGamepadInput,
 } from '../../core/control/control-scheme-catalogue';
 
-export type ControlSchemeContext = 'pilot' | 'arm';
+export type ControlSchemeContext = 'driver' | 'arm';
 
 const EMPTY_MAPPING: ControlSchemeMapping = { controls: [] };
 
@@ -31,7 +31,7 @@ const LEFT_SIDE_INPUTS = new Set<CatalogueGamepadInput>([
   styleUrl: './control-scheme.scss',
 })
 export class ControlScheme {
-  readonly context = input<ControlSchemeContext>('pilot');
+  readonly context = input<ControlSchemeContext>('driver');
 
   private readonly gamepad = inject(GamepadInput);
   private readonly fmaState = inject(FmaStateService);
@@ -55,7 +55,7 @@ export class ControlScheme {
       return EMPTY_MAPPING;
     }
 
-    return CONTROL_SCHEME_CATALOGUE.pilot[driveMode];
+    return CONTROL_SCHEME_CATALOGUE.driver[driveMode];
   });
 
   readonly leftControls = computed(() => this.controlsForSide(true));

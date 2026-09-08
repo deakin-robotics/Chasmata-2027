@@ -86,7 +86,7 @@ green normal data.
 
 The GUI contains one application-wide `EcamAlertService` under `core/ecam/`.
 
-Features raise and clear stable alert codes through the service. They do not choose colours, message wording, or ordering. The service deduplicates repeated codes and exposes one active-alert list to the ECAM, Pilot, Arm, and FMA interfaces.
+Features raise and clear stable alert codes through the service. They do not choose colours, message wording, or ordering. The service deduplicates repeated codes and exposes one active-alert list to the ECAM, Driver, Arm, and FMA interfaces.
 
 The current core consists of:
 
@@ -140,7 +140,7 @@ for the response package, recovery-snapshot, and timeout contract.
 
 ## Multiple operator PCs
 
-The Angular singleton is local to one browser instance. It cannot directly share state between the Pilot, Arm, and ECAM PCs.
+The Angular singleton is local to one browser instance. It cannot directly share state between the Driver, Arm, and ECAM PCs.
 
 The intended competition architecture is:
 
@@ -148,24 +148,24 @@ The intended competition architecture is:
 Rover Control / health nodes
   → rover health topics
                          ┐
-Pilot GUI ── station status ─┤
+Driver GUI ── station status ─┤
 Arm GUI ─── station status ──┤→ ECAM relay/aggregator
                               └→ /ecam/alerts
 
-Pilot GUI  ←────────────── /ecam/alerts
+Driver GUI  ←────────────── /ecam/alerts
 Arm GUI    ←────────────── /ecam/alerts
 ECAM GUI   ←────────────── /ecam/alerts
 ```
 
 The relay/aggregator is a separate shared service or ROS node, not part of the ECAM GUI. It will become the shared source of truth. The GUIs will each maintain a local copy of the canonical alert state.
 
-Rover Control owns rover faults and health. Pilot and Arm GUIs only report station-local conditions, such as a browser being unable to display a camera. They do not become the source of truth for global rover alerts.
+Rover Control owns rover faults and health. Driver and Arm GUIs only report station-local conditions, such as a browser being unable to display a camera. They do not become the source of truth for global rover alerts.
 
 If a station loses ROS completely, it cannot report its own failure. The relay must detect the missing station heartbeat and create a station-link alert itself.
 
 The shared alert state should update when an alert is raised, changed, or cleared, and remain recoverable when a client reconnects or misses an update.
 
-A local browser failure should identify its station. For example, a Pilot browser failing to load a camera should report `PILOT FRONT CAMERA VIEW UNAVAILABLE`, not necessarily claim that the rover camera itself is broken.
+A local browser failure should identify its station. For example, a Driver browser failing to load a camera should report `DRIVER FRONT CAMERA VIEW UNAVAILABLE`, not necessarily claim that the rover camera itself is broken.
 
 ## System Display pages
 

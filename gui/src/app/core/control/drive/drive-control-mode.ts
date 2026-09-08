@@ -2,19 +2,19 @@ import { Service, computed, signal } from '@angular/core';
 
 import { DriveMode } from '../../fma/fma-state.service';
 
-export type PilotDriveControlMode = DriveMode.Manual | DriveMode.Velocity;
+export type DriverControlMode = DriveMode.Manual | DriveMode.Velocity;
 
-/** Owns the Pilot's selected Manual or Velocity drive-control mode. */
+/** Owns the Driver's selected Manual or Velocity drive-control mode. */
 @Service()
-export class PilotDriveModeService {
-  private readonly modeState = signal<PilotDriveControlMode>(DriveMode.Manual);
+export class DriverControlModeService {
+  private readonly modeState = signal<DriverControlMode>(DriveMode.Manual);
 
   readonly mode = this.modeState.asReadonly();
   readonly isManual = computed(() => this.modeState() === DriveMode.Manual);
   readonly isVelocity = computed(() => this.modeState() === DriveMode.Velocity);
 
-  /** Selects how Pilot gamepad input will be interpreted. */
-  setMode(mode: PilotDriveControlMode): void {
+  /** Selects how Driver gamepad input will be interpreted. */
+  setMode(mode: DriverControlMode): void {
     this.modeState.set(mode);
   }
 }

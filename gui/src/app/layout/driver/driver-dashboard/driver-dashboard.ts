@@ -4,20 +4,20 @@ import { CameraStream } from '../../../features/cameras/camera-stream/camera-str
 import { GamepadControlPanel } from '../../../features/gamepad/gamepad-control-panel/gamepad-control-panel';
 import { RoverSchematic } from '../../../features/telemetry/rover-schematic/rover-schematic';
 import { ControlScheme } from '../../../shared/control-scheme/control-scheme';
-import { PilotControlPanel } from '../pilot-control-panel/pilot-control-panel';
+import { DriverControlPanel } from '../driver-control-panel/driver-control-panel';
 
 /**
- * Pilot operator workspace.
+ * Driver operator workspace.
  *
- * It composes the visual layouts and controls used by the rover pilot.
+ * It composes the visual layouts and controls used by the rover driver.
  */
 @Component({
-  selector: 'app-pilot-dashboard',
-  imports: [CameraStream, ControlScheme, GamepadControlPanel, PilotControlPanel, RoverSchematic],
-  templateUrl: './pilot-dashboard.html',
-  styleUrl: './pilot-dashboard.scss',
+  selector: 'app-driver-dashboard',
+  imports: [CameraStream, ControlScheme, DriverControlPanel, GamepadControlPanel, RoverSchematic],
+  templateUrl: './driver-dashboard.html',
+  styleUrl: './driver-dashboard.scss',
 })
-export class PilotDashboard {
+export class DriverDashboard {
   readonly armCameraUrl = signal('http://dcr-rover.local:8091/?action=stream');
   readonly frontCameraUrl = signal('http://dcr-rover.local:8080/?action=stream');
   readonly gimbalCameraUrl = signal('');

@@ -5,7 +5,7 @@ import { Component, computed, signal } from '@angular/core';
  *
  * It intentionally has no ROS subscriptions or control behaviour. Future
  * telemetry layers can colour or annotate these visual elements without
- * changing how the Pilot and Arm dashboards reuse the schematic.
+ * changing how the Driver and Arm dashboards reuse the schematic.
  */
 @Component({
   selector: 'app-rover-schematic',

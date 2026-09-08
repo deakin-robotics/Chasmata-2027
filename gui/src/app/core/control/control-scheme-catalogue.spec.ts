@@ -3,8 +3,8 @@ import { ArmMode, DriveMode } from '../fma/fma-state.service';
 import { CONTROL_SCHEME_CATALOGUE } from './control-scheme-catalogue';
 
 describe('CONTROL_SCHEME_CATALOGUE', () => {
-  it('contains the current pilot mapping', () => {
-    expect(CONTROL_SCHEME_CATALOGUE.pilot[DriveMode.Manual].controls).toEqual(
+  it('contains the current driver mapping', () => {
+    expect(CONTROL_SCHEME_CATALOGUE.driver[DriveMode.Manual].controls).toEqual(
       expect.arrayContaining([
         { input: 'left-trigger', label: 'LT', action: 'Left track' },
         { input: 'right-trigger', label: 'RT', action: 'Right track' },
@@ -13,14 +13,14 @@ describe('CONTROL_SCHEME_CATALOGUE', () => {
         { input: 'right-stick-click', label: 'Right joystick click', action: 'Gimbal Priority' },
       ]),
     );
-    expect(CONTROL_SCHEME_CATALOGUE.pilot[DriveMode.Velocity].controls).toEqual(
+    expect(CONTROL_SCHEME_CATALOGUE.driver[DriveMode.Velocity].controls).toEqual(
       expect.arrayContaining([
         { input: 'left-stick', label: 'Left joystick', action: 'Drive rover' },
         { input: 'right-stick', label: 'Right joystick', action: 'Gimbal' },
         { input: 'right-stick-click', label: 'Right joystick click', action: 'Gimbal Priority' },
       ]),
     );
-    expect(DriveMode.Managed in CONTROL_SCHEME_CATALOGUE.pilot).toBe(false);
+    expect(DriveMode.Managed in CONTROL_SCHEME_CATALOGUE.driver).toBe(false);
   });
 
   it('contains entries for both arm control modes', () => {

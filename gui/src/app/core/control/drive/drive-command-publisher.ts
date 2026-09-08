@@ -17,7 +17,7 @@ const STOP_COMMAND: JoyCommand = {
   buttons: [],
 };
 
-/** Publishes safe drivetrain Joy commands while Pilot control is authorised. */
+/** Publishes safe drivetrain Joy commands while Driver control is authorised. */
 @Service()
 export class DriveCommandPublisher {
   private readonly rosConnection = inject(RosConnection);
@@ -27,10 +27,10 @@ export class DriveCommandPublisher {
   private topicClient: Ros | null = null;
 
   readonly canPublish = computed(
-    () => this.rosConnection.isConnected() && this.controlMode.isPilotActive(),
+    () => this.rosConnection.isConnected() && this.controlMode.isDriverActive(),
   );
 
-  /** Publishes one Joy command when ROS is connected and Pilot control is active. */
+  /** Publishes one Joy command when ROS is connected and Driver control is active. */
   publish(command: JoyCommand): boolean {
     if (!this.canPublish() || !this.isValidCommand(command)) return false;
 
@@ -50,9 +50,9 @@ export class DriveCommandPublisher {
     return true;
   }
 
-  /** Stops the drivetrain before releasing Pilot control authority. */
-  releasePilotControl(): void {
-    if (!this.controlMode.isPilotActive()) return;
+  /** Stops the drivetrain before releasing Driver control authority. */
+  releaseDriverControl(): void {
+    if (!this.controlMode.isDriverActive()) return;
 
     this.publishStop();
     this.controlMode.release();

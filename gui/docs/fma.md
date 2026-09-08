@@ -51,19 +51,19 @@ This column answers:
 
 Raw skid-steer control.
 
-The Pilot directly controls the **left and right wheel groups independently** using the gamepad. Used as a fallback when the higher-level drive controller has problems.
+The Driver directly controls the **left and right wheel groups independently** using the gamepad. Used as a fallback when the higher-level drive controller has problems.
 
 ### `VELOCITY`
 
 Normal assisted driving mode.
 
-The Pilot uses a **single joystick** for forward/backward movement and left/right rotation. These become linear and angular velocity commands through `cmd_vel`, and the drivetrain controller calculates the required left/right wheel speeds.
+The Driver uses a **single joystick** for forward/backward movement and left/right rotation. These become linear and angular velocity commands through `cmd_vel`, and the drivetrain controller calculates the required left/right wheel speeds.
 
 ### `MANAGED •`
 
 Autonomous control owns the drivetrain.
 
-Nav2 or another autonomy component generates the movement commands instead of the Pilot.
+Nav2 or another autonomy component generates the movement commands instead of the Driver.
 
 ### No displayed mode
 
@@ -149,19 +149,19 @@ The indicator shows which operator station currently owns authority to command
 the shared physical Gimbal camera:
 
 ```text
-← PILOT       ARM OPS →
+← DRIVER       ARM OPS →
 ```
 
-`← PILOT` means that the Pilot owns Gimbal priority. `ARM OPS →` means that
+`← DRIVER` means that the Driver owns Gimbal priority. `ARM OPS →` means that
 the Arm Operator owns Gimbal priority.
 
 The arrow direction is an ownership indication, not the direction of Gimbal
-movement. The left arrow always represents `PILOT`; the right arrow always
+movement. The left arrow always represents `DRIVER`; the right arrow always
 represents `ARM_OPS`.
 
 #### Shared Gimbal ownership
 
-Both the Pilot GUI and Arm Operator GUI may view and control the same physical
+Both the Driver GUI and Arm Operator GUI may view and control the same physical
 Gimbal camera. Each physical controller has a dedicated **GIMBAL PRIORITY**
 button.
 
@@ -169,7 +169,7 @@ Pressing the button sends a Gimbal takeover request containing the identity of
 the requesting station:
 
 ```text
-Pilot controller     → takeover request: PILOT
+Driver controller     → takeover request: DRIVER
 Arm controller       → takeover request: ARM_OPS
 ```
 
@@ -177,7 +177,7 @@ The rover owns the authoritative Gimbal owner and priority state. When a valid
 takeover request is received, the rover updates the owner and broadcasts the
 confirmed owner state to every GUI instance.
 
-There is no additional Pilot-over-Arm hierarchy. If both operators press their
+There is no additional Driver-over-Arm hierarchy. If both operators press their
 priority buttons at approximately the same time, the latest valid request
 received by the rover wins.
 
@@ -214,7 +214,7 @@ GIMBAL PRIORITY UNKNOWN
 ```
 
 The GUI must receive a fresh authoritative owner state before showing either
-`← PILOT` or `ARM OPS →` again.
+`← DRIVER` or `ARM OPS →` again.
 
 Verbal callouts such as “I have gimbal” and “You have gimbal” may be used as
 human operating procedure, but they have no software effect. The mapped

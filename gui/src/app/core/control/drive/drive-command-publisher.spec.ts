@@ -13,15 +13,15 @@ describe('DriveCommandPublisher', () => {
     service = TestBed.inject(DriveCommandPublisher);
   });
 
-  it('should not publish while Pilot control is inactive', () => {
+  it('should not publish while Driver control is inactive', () => {
     expect(service.canPublish()).toBe(false);
     expect(service.publish({ axes: [0, 0, 0, 0], buttons: [] })).toBe(false);
   });
 
-  it('should release Pilot authority when stopping control', () => {
-    controlMode.activate('pilot');
+  it('should release Driver authority when stopping control', () => {
+    controlMode.activate('driver');
 
-    service.releasePilotControl();
+    service.releaseDriverControl();
 
     expect(controlMode.mode()).toBe('none');
   });

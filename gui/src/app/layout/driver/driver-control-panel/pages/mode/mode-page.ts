@@ -1,9 +1,9 @@
 import { Component, inject } from '@angular/core';
 
 import {
-  PilotDriveControlMode,
-  PilotDriveModeService,
-} from '../../../../../core/control/pilot/pilot-drive-mode';
+  DriverControlMode,
+  DriverControlModeService,
+} from '../../../../../core/control/drive/drive-control-mode';
 import { DriveMode, FmaStateService } from '../../../../../core/fma/fma-state.service';
 import {
   ControlModeOption,
@@ -11,16 +11,16 @@ import {
 } from '../../../../../shared/control-mode-selector/control-mode-selector';
 
 @Component({
-  selector: 'app-pilot-mode-page',
+  selector: 'app-driver-mode-page',
   imports: [ControlModeSelector],
   templateUrl: './mode-page.html',
   styleUrl: './mode-page.scss',
 })
-export class PilotModePage {
-  private readonly pilotDriveMode = inject(PilotDriveModeService);
+export class DriverModePage {
+  private readonly driverControlMode = inject(DriverControlModeService);
   private readonly fmaState = inject(FmaStateService);
 
-  readonly driveMode = this.pilotDriveMode.mode;
+  readonly driveMode = this.driverControlMode.mode;
   readonly driveModeOptions: readonly ControlModeOption[] = [
     { label: DriveMode.Manual, value: DriveMode.Manual },
     { label: DriveMode.Velocity, value: DriveMode.Velocity },
@@ -28,8 +28,8 @@ export class PilotModePage {
 
   selectDriveMode(mode: string): void {
     if (mode === DriveMode.Manual || mode === DriveMode.Velocity) {
-      const selectedMode = mode as PilotDriveControlMode;
-      this.pilotDriveMode.setMode(selectedMode);
+      const selectedMode = mode as DriverControlMode;
+      this.driverControlMode.setMode(selectedMode);
       this.fmaState.requestDriveMode(selectedMode);
     }
   }

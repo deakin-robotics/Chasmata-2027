@@ -15,11 +15,11 @@ describe('ControlModeService', () => {
     expect(service.hasActiveControl()).toBe(false);
   });
 
-  it('should activate Pilot control', () => {
-    service.activate('pilot');
+  it('should activate Driver control', () => {
+    service.activate('driver');
 
-    expect(service.mode()).toBe('pilot');
-    expect(service.isPilotActive()).toBe(true);
+    expect(service.mode()).toBe('driver');
+    expect(service.isDriverActive()).toBe(true);
     expect(service.isArmActive()).toBe(false);
   });
 

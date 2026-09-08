@@ -28,7 +28,7 @@ describe('ControlScheme', () => {
     expect(element.querySelector('.mapping-right')).toBeTruthy();
   });
 
-  it('should render the active pilot catalogue mapping', () => {
+  it('should render the active driver catalogue mapping', () => {
     const text = fixture.nativeElement.textContent;
 
     expect(text).toContain('Left track');

@@ -126,7 +126,7 @@ not a rover result and is not included in the rover's `result` enumeration.
 
 ## Gimbal telemetry
 
-Both Pilot and Arm Operator stations can view and request control of the shared
+Both Driver and Arm Operator stations can view and request control of the shared
 Gimbal camera. The rover owns the authoritative owner state and validates
 station-identified movement commands.
 

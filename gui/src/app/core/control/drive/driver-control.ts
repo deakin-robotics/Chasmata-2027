@@ -10,7 +10,7 @@ const MINIMUM_DRIVE_AXES = 4;
 
 /** Coordinates authorised gamepad input with gated drivetrain publishing. */
 @Service()
-export class PilotDriveControl {
+export class DriverControl {
   private readonly rosConnection = inject(RosConnection);
   private readonly controlMode = inject(ControlModeService);
   private readonly gamepad = inject(GamepadInput);
@@ -28,21 +28,21 @@ export class PilotDriveControl {
     () => this.enabledState() && this.publisher.canPublish(),
   );
 
-  /** Returns the reason Pilot control cannot be enabled, or null when ready. */
+  /** Returns the reason Driver control cannot be enabled, or null when ready. */
   readiness(): string | null {
     this.gamepad.start();
 
     if (!this.rosConnection.isConnected()) {
-      return 'Connect to ROSbridge before enabling Pilot control.';
+      return 'Connect to ROSbridge before enabling Driver control.';
     }
 
     if (this.controlMode.isArmActive()) {
-      return 'Release Arm control before enabling Pilot control.';
+      return 'Release Arm control before enabling Driver control.';
     }
 
     const snapshot = this.gamepad.snapshot();
     if (!this.gamepad.connected() || !snapshot) {
-      return 'Connect a gamepad before enabling Pilot control.';
+      return 'Connect a gamepad before enabling Driver control.';
     }
 
     if (snapshot.axes.length < MINIMUM_DRIVE_AXES) {
@@ -58,20 +58,20 @@ export class PilotDriveControl {
     this.readinessErrorState.set(readinessError);
     if (readinessError) return false;
 
-    this.controlMode.activate('pilot');
+    this.controlMode.activate('driver');
     this.enabledState.set(true);
     this.startPublishing();
     return true;
   }
 
-  /** Stops drivetrain output and releases Pilot control authority. */
+  /** Stops drivetrain output and releases Driver control authority. */
   disable(): void {
     if (this.publishTimer !== null) {
       clearInterval(this.publishTimer);
       this.publishTimer = null;
     }
 
-    this.publisher.releasePilotControl();
+    this.publisher.releaseDriverControl();
     this.enabledState.set(false);
     this.gamepad.stop();
   }

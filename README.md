@@ -17,7 +17,7 @@ docs/   Project-wide documentation and competition references
 
 ## 🖥️ Operator GUI
 
-The GUI is the browser-based Mission Control interface for rover operators. It provides a shared shell with dedicated Pilot, Arm, and ECAM views, and is being developed alongside the rover-side control and autonomy software.
+The GUI is the browser-based Mission Control interface for rover operators. It provides a shared shell with dedicated Driver, Arm, and ECAM views, and is being developed alongside the rover-side control and autonomy software.
 
 For GUI installation, development commands, architecture, and ROS integration details, see the [GUI README](gui/README.md).
 

@@ -1,6 +1,6 @@
 import { Component, inject } from '@angular/core';
 
-import { PilotDriveControl } from '../../../core/control/pilot/pilot-drive-control';
+import { DriverControl } from '../../../core/control/drive/driver-control';
 import { GamepadInput } from '../../../core/gamepad/gamepad-input';
 
 /** Visualises browser controller input. */
@@ -11,10 +11,10 @@ import { GamepadInput } from '../../../core/gamepad/gamepad-input';
 })
 export class GamepadSchematic {
   private readonly gamepad = inject(GamepadInput);
-  private readonly pilotDriveControl = inject(PilotDriveControl);
+  private readonly driverControl = inject(DriverControl);
 
-  /** Indicates that authorised Pilot commands are currently being published. */
-  readonly isCommandPublishing = this.pilotDriveControl.canDrive;
+  /** Indicates that authorised Driver commands are currently being published. */
+  readonly isCommandPublishing = this.driverControl.canDrive;
 
   constructor() {
     this.gamepad.start();

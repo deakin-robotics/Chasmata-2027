@@ -1,13 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 
-import { PilotDriveControl } from './pilot-drive-control';
+import { DriverControl } from './driver-control';
 
-describe('PilotDriveControl', () => {
-  let service: PilotDriveControl;
+describe('DriverControl', () => {
+  let service: DriverControl;
 
   beforeEach(() => {
     TestBed.configureTestingModule({});
-    service = TestBed.inject(PilotDriveControl);
+    service = TestBed.inject(DriverControl);
   });
 
   afterEach(() => {
@@ -16,7 +16,7 @@ describe('PilotDriveControl', () => {
 
   it('should reject enabling control when ROS is disconnected', () => {
     expect(service.enable()).toBe(false);
-    expect(service.readinessError()).toBe('Connect to ROSbridge before enabling Pilot control.');
+    expect(service.readinessError()).toBe('Connect to ROSbridge before enabling Driver control.');
   });
 
   it('should start disabled', () => {

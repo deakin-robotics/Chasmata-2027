@@ -1,17 +1,17 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { PilotControlPanel } from './pilot-control-panel';
+import { DriverControlPanel } from './driver-control-panel';
 
-describe('PilotControlPanel', () => {
-  let component: PilotControlPanel;
-  let fixture: ComponentFixture<PilotControlPanel>;
+describe('DriverControlPanel', () => {
+  let component: DriverControlPanel;
+  let fixture: ComponentFixture<DriverControlPanel>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [PilotControlPanel],
+      imports: [DriverControlPanel],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(PilotControlPanel);
+    fixture = TestBed.createComponent(DriverControlPanel);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
@@ -41,7 +41,7 @@ describe('PilotControlPanel', () => {
     modeTab.click();
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('app-pilot-mode-page')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('app-driver-mode-page')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('app-control-mode-selector')).toBeTruthy();
   });
 });

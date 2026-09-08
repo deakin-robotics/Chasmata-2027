@@ -2,12 +2,12 @@ import { Routes } from '@angular/router';
 import { ArmDashboard } from './layout/arm/arm-dashboard/arm-dashboard';
 import { EcamPanel } from './layout/ecam-panel/ecam-panel';
 import { MissionControl } from './layout/mission-control/mission-control';
-import { PilotDashboard } from './layout/pilot/pilot-dashboard/pilot-dashboard';
+import { DriverDashboard } from './layout/driver/driver-dashboard/driver-dashboard';
 import {
   armControlExitGuard,
   armControlGuard,
-  pilotControlExitGuard,
-  pilotControlGuard,
+  driverControlExitGuard,
+  driverControlGuard,
 } from './core/control/control-guards';
 
 export const routes: Routes = [
@@ -16,10 +16,10 @@ export const routes: Routes = [
     component: MissionControl,
     children: [
       {
-        path: 'pilot',
-        component: PilotDashboard,
-        canActivate: [pilotControlGuard],
-        canDeactivate: [pilotControlExitGuard],
+        path: 'driver',
+        component: DriverDashboard,
+        canActivate: [driverControlGuard],
+        canDeactivate: [driverControlExitGuard],
       },
       {
         path: 'arm',

@@ -1,6 +1,6 @@
 import { Service, computed, signal } from '@angular/core';
 
-export type ControlMode = 'none' | 'pilot' | 'arm';
+export type ControlMode = 'none' | 'driver' | 'arm';
 
 /** Owns the currently authorised rover control mode. */
 @Service()
@@ -9,7 +9,7 @@ export class ControlModeService {
 
   readonly mode = this.modeState.asReadonly();
   readonly hasActiveControl = computed(() => this.modeState() !== 'none');
-  readonly isPilotActive = computed(() => this.modeState() === 'pilot');
+  readonly isDriverActive = computed(() => this.modeState() === 'driver');
   readonly isArmActive = computed(() => this.modeState() === 'arm');
 
   /** Grants control authority to one operator mode. */
