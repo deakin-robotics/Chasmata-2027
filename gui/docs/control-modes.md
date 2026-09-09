@@ -47,15 +47,15 @@ The defaults are local GUI selections. They are not confirmed rover states.
 The mode pages call the coordinator. They do not write to the FMA state store
 directly.
 
-```text
-Driver mode selector ─┐
-                      ├─> ControlModeCoordinator ──> local mode service
-Arm mode selector ────┘                                  │
-                                                         ├─ ROS connected:
-                                                         │  pending FMA request
-                                                         │  future ROS command
-                                                         └─ ROS disconnected:
-                                                            local selection only
+```mermaid
+flowchart LR
+    driver[Driver mode selector] --> coordinator[ControlModeCoordinator]
+    arm[Arm mode selector] --> coordinator
+    coordinator --> local[Local mode service]
+    coordinator --> connection{ROS connected?}
+    connection -->|Yes| pending[Pending FMA request]
+    connection -->|Yes| future[Future ROS command]
+    connection -->|No| disconnected[Local selection only]
 ```
 
 When the coordinator observes a ROS connection:
@@ -73,11 +73,12 @@ again.
 
 `FmaStateService` remains the shared store for the main FMA columns:
 
-```text
-Rover telemetry ──> FmaStateService ──> FMA renderer and other consumers
-                         ^
-                         │
-ControlModeCoordinator ──┘  pending local mode requests
+```mermaid
+flowchart LR
+    telemetry[Rover telemetry] --> fma[FmaStateService]
+    coordinator[ControlModeCoordinator<br/>pending local mode requests] --> fma
+    fma --> renderer[FMA renderer]
+    fma --> consumers[Other consumers]
 ```
 
 The FMA component only renders the state. It does not select modes, create

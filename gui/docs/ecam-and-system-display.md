@@ -102,12 +102,15 @@ The service is currently GUI-local. It is not yet connected to rover telemetry o
 GUI sends the request first; rover-side Control evaluates the current
 configuration and returns the authoritative result.
 
-```text
-GUI button press
-  → configuration check request
-  → rover-side Control evaluation
-  → configuration result returned to the GUI
-  → ECAM displays the result and individual conditions
+```mermaid
+flowchart LR
+    press[GUI button press]
+    request[Configuration check request]
+    evaluate[Rover-side Control evaluation]
+    result[Configuration result returned to GUI]
+    display[ECAM displays result and individual conditions]
+
+    press --> request --> evaluate --> result --> display
 ```
 
 The response result is `NORMAL`, `FAILED`, or `UNKNOWN`. Rover-side Control is
@@ -144,17 +147,16 @@ The Angular singleton is local to one browser instance. It cannot directly share
 
 The intended competition architecture is:
 
-```text
-Rover Control / health nodes
-  → rover health topics
-                         ┐
-Driver GUI ── station status ─┤
-Arm GUI ─── station status ──┤→ ECAM relay/aggregator
-                              └→ /ecam/alerts
-
-Driver GUI  ←────────────── /ecam/alerts
-Arm GUI    ←────────────── /ecam/alerts
-ECAM GUI   ←────────────── /ecam/alerts
+```mermaid
+flowchart TB
+    health[Rover Control / health nodes] --> topics[Rover health topics]
+    topics --> relay[ECAM relay/aggregator]
+    driver[Driver GUI<br/>station status] --> relay
+    arm[Arm GUI<br/>station status] --> relay
+    relay --> alerts[/ecam/alerts/]
+    alerts --> driverDisplay[Driver GUI]
+    alerts --> armDisplay[Arm GUI]
+    alerts --> ecamDisplay[ECAM GUI]
 ```
 
 The relay/aggregator is a separate shared service or ROS node, not part of the ECAM GUI. It will become the shared source of truth. The GUIs will each maintain a local copy of the canonical alert state.
@@ -227,11 +229,12 @@ The ECAM display is informative and procedural. Rover-side Control remains autho
 
 An alert can later identify a relevant SD page through its source or an explicit page association:
 
-```text
-DRIVE_CONTROLLER_OFFLINE → DRIVE
-CONFIG_ARM_NOT_STOWED    → ARM
-POWER_BATTERY_LOW        → POWER
-LINK_DEGRADED             → LINK
+```mermaid
+flowchart LR
+    driveAlert[DRIVE_CONTROLLER_OFFLINE] --> drivePage[DRIVE]
+    armAlert[CONFIG_ARM_NOT_STOWED] --> armPage[ARM]
+    powerAlert[POWER_BATTERY_LOW] --> powerPage[POWER]
+    linkAlert[LINK_DEGRADED] --> linkPage[LINK]
 ```
 
 The SD should not constantly jump between pages when multiple alerts arrive. A new critical fault may request or temporarily select its relevant page, while the operator should retain control for ordinary alerts.

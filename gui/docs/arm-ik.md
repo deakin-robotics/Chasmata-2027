@@ -7,20 +7,15 @@ safety checks.
 
 ## Responsibility boundary
 
-```text
-Operator target pose
-        |
-        v
-GUI: URDF model + IK solve
-        |
-        v
-Named joint angles (radians)
-        |
-        v
-Future ROS command interface
-        |
-        v
-Rover: validate limits, execute/reject, publish telemetry
+```mermaid
+flowchart TD
+    target[Operator target pose]
+    solve[GUI: URDF model + IK solve]
+    angles[Named joint angles<br/>radians]
+    ros[Future ROS command interface]
+    rover[Rover: validate limits<br/>execute/reject<br/>publish telemetry]
+
+    target --> solve --> angles --> ros --> rover
 ```
 
 The GUI owns the kinematic calculation. The rover remains the authoritative

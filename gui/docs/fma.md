@@ -180,9 +180,10 @@ button.
 Pressing the button sends a Gimbal takeover request containing the identity of
 the requesting station:
 
-```text
-Driver controller     → takeover request: DRIVER
-Arm controller       → takeover request: ARM_OPS
+```mermaid
+flowchart LR
+    driver[Driver controller] --> driverRequest[Takeover request: DRIVER]
+    arm[Arm controller] --> armRequest[Takeover request: ARM_OPS]
 ```
 
 The rover owns the authoritative Gimbal owner and priority state. When a valid
@@ -199,9 +200,11 @@ Every Gimbal movement command, including D-pad commands, must include the
 identity of the sending station. The rover validates every command against its
 authoritative owner state:
 
-```text
-Command station == current owner  → accept command
-Command station != current owner  → ignore command
+```mermaid
+flowchart LR
+    station[Command station] --> owner{Matches current owner?}
+    owner -->|Yes| accept[Accept command]
+    owner -->|No| ignore[Ignore command]
 ```
 
 The local GUI must not block a movement command or takeover request solely

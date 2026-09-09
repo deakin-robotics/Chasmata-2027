@@ -55,12 +55,12 @@ The mission-control interface is inspired by the Airbus glass cockpit philosophy
 
 ## 🧭 System overview
 
-```text
-Gamepad API ───────────────┐
-                          │
-Angular mission control ──┼── JSON/WebSocket ── ROSbridge :9090 ── ROS 2 nodes
-                          │
-Camera <img> elements ────┴── HTTP/MJPEG ────── Camera stream servers
+```mermaid
+flowchart LR
+    gamepad[Gamepad API] --> gui[Angular mission control]
+    gui -->|JSON/WebSocket| rosbridge[ROSbridge :9090]
+    rosbridge --> ros[ROS 2 nodes]
+    camera[Camera img elements] -->|HTTP/MJPEG| streams[Camera stream servers]
 ```
 
 The GUI communicates directly with the rover on its private operator network:
@@ -177,12 +177,11 @@ src/app/
 
 The combined dashboard must have explicit control modes:
 
-```text
-DISCONNECTED
-     ↓
-SAFE / IDLE
-     ├── DRIVE → publish only drivetrain commands
-     └── ARM   → publish only arm commands
+```mermaid
+flowchart TD
+    disconnected[DISCONNECTED] --> safe[SAFE / IDLE]
+    safe --> drive[DRIVE<br/>publish only drivetrain commands]
+    safe --> arm[ARM<br/>publish only arm commands]
 ```
 
 - Drive and Arm commands must not be active simultaneously from the same controller.
