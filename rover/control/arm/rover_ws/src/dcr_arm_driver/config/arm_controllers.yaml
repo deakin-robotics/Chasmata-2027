@@ -1,0 +1,38 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 50  # Control loop frequency (50 Hz)
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+    arm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+# Joint state broadcaster: publishes /joint_states topic
+joint_state_broadcaster:
+  ros__parameters:
+    interfaces:
+      - position
+      - velocity
+      - effort
+
+# Joint trajectory controller: receives trajectory commands from MoveIt2
+arm_controller:
+  ros__parameters:
+    joints:
+      - base_joint
+      - shoulder_joint
+      - elbow_joint
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    allow_partial_joints_goal: false
+    action_monitor_rate: 10.0
+    allow_integration_in_goal_trajectories: true
+    constraints:
+      stopped_velocity_tolerance: 0.05
+    goal_time: 0.0
+    gains:
+      base_joint: { p: 100.0, i: 0.01, d: 5.0 }
+      shoulder_joint: { p: 100.0, i: 0.01, d: 5.0 }
+      elbow_joint: { p: 100.0, i: 0.01, d: 5.0 }

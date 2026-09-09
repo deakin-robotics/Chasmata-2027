@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<library format="2">
+  <class name="dcr_arm_driver/ArmHardwareInterface"
+         type="dcr_arm_driver::ArmHardwareInterface"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>
+      ARM hardware interface for ros2_control, using CAN communication
+      via nobleo_socketcan_bridge
+    </description>
+  </class>
+</library>

@@ -1,62 +1,92 @@
-# DCR ARM Driver
+# DCR Arm Driver
 
-A ROS2 Jazzy package for controlling a 6-DOF robotic arm via CAN bus. Provides motor control, status monitoring, and joint state publishing.
+ROS 2 Jazzy hardware interface for controlling a 3-DOF robotic arm via CAN bus communication using `nobleo_socketcan_bridge`.
 
 ## Overview
 
-The `dcr_arm_driver` package consists of two main components:
+This package provides:
+- **Low-level motor driver** (`Motor` class): Direct CAN frame creation and parsing
+- **ros2_control hardware interface**: Integration with ROS 2 control framework
+- **MoveIt 2 compatibility**: Motion planning and trajectory execution
+- **Real-time control**: 50 Hz control loop with joint state feedback
 
-- **Motor Driver**: Low-level CAN frame generation and parsing for motor commands and telemetry
-- **ARM Controller Node**: High-level ROS2 node for joint command reception, motor control, and status publishing
+## Robot Specification
 
-## Features
+### Arm Kinematics
+- **3 DOF revolute joints**: base, shoulder, elbow
+- **End-effector link**: Fixed attachment point for gripper/sensor
+- **Base link**: Fixed to rover platform
 
-- **Position Control**: Send desired joint angles via ROS2 topics
-- **Real-time Monitoring**: Receive motor statistics (temperature, current, speed, angle)
-- **Joint Limits**: Enforces configurable min/max joint angles
-- **E-stop Support**: Emergency stop functionality to halt all motors
-- **Visualization**: Publishes joint states for RViz integration
-- **CAN Bridge Integration**: Works with `socketcan_bridge` for hardware communication
+### Joint Configuration
+
+| Joint Name | CAN ID | Type | Range | Effort | Velocity |
+|-----------|--------|------|-------|--------|----------|
+| base_joint | 0x01 | Revolute (Yaw) | ±3.14 rad | 100 N·m | 1.0 rad/s |
+| shoulder_joint | 0x02 | Revolute (Pitch) | 0-3.14 rad | 100 N·m | 1.0 rad/s |
+| elbow_joint | 0x03 | Revolute (Roll) | 0-4.71 rad | 100 N·m | 1.0 rad/s |
+
+### CAN Protocol
+
+**Motor Commands:**
+- `0xC1`: Speed control (4-byte little-endian signed integer, scaled by 100)
+- `0xC2`: Position control (4-byte little-endian signed integer, angle in degrees × 16384/360)
+- `0xB1`: Set home position
+- `0xAF`: Clear faults
+
+**Motor Status:**
+- `0xA4`: Status 1 (temperature, current, speed, angle)
+- `0xAE`: Status 2 (bus voltage, bus current, mode, faults)
+
+---
 
 ## Installation
 
 ### Prerequisites
 
-- ROS2 Jazzy (installed and sourced)
-- `can_msgs` package
-- `arm_interfaces` package (custom message definitions)
-- `socketcan_bridge` (for CAN hardware interface)
+- **ROS 2 Jazzy** installed and sourced
+- **CAN interface** configured on your system (e.g., `can0`)
+- **nobleo_socketcan_bridge** package
+- **MoveIt 2** (optional, for motion planning)
 
-### Build
+### Install Dependencies
 
 ```bash
-# Navigate to your ROS2 workspace
-cd 
-
-# Clone or add this package
-git clone <repository-url>/dcr_arm_driver
-
-# Build the package
-cd 
-colcon build --packages-select dcr_arm_driver
-source install/setup.bash
+sudo apt-get update
+sudo apt-get install ros-jazzy-hardware-interface \
+                     ros-jazzy-controller-manager \
+                     ros-jazzy-joint-trajectory-controller \
+                     ros-jazzy-joint-state-broadcaster \
+                     ros-jazzy-pluginlib \
+                     ros-jazzy-socketcan-bridge
 ```
-### Testing
+### Setup CAN Interface
 
-Start the driver:
 ```bash
-ros2 run dcr_arm_driver arm_controller_node
+# List available CAN interfaces
+ip link show type can
+
+# Bring up CAN interface (500 kbps)
+sudo ip link set can0 type can bitrate 500000
+sudo ip link set can0 up
+
+# Verify CAN interface is up
+ip link show can0
+
+# Optional: Monitor CAN traffic
+candump can0
+```
+if missing dependencies:
+```bash
+rosdep install --from-paths src --ignore-src -y
 ```
 
-Send a command:
-'''bash
-ros2 topic pub /joint_commands sensor_msgs/JointState \
-  '{header: {frame_id: "base"}, 
-    name: ["j1", "j2", "j3", "j4", "j5", "j6"], 
-    position: [0.1, 0.1, 0.1, 0, 0, 0]}'
-'''
-
-Monitor respond:
+launch the node (for testing):
 ```bash
-ros2 topic echo /motor_stat_1
+ros2 launch dcr_arm_driver arm_control.launch.py
+```
+
+launch moveit (untested):
+```bash
+ros2 launch moveit_ros_move_group move_group.launch.py \
+  robot_description:="$(xacro <path to the .urdf.xacro file>)"
 ```

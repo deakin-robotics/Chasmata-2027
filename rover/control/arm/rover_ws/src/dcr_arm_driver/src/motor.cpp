@@ -5,6 +5,7 @@
 
 namespace dcr_arm_driver {
 
+// End effector speed control
 can_msgs::msg::Frame Motor::ee_set_spd(uint8_t spd) {
   can_msgs::msg::Frame msg;
   msg.id = 0x07;
@@ -14,6 +15,7 @@ can_msgs::msg::Frame Motor::ee_set_spd(uint8_t spd) {
   return msg;
 }
 
+// End effector position control
 can_msgs::msg::Frame Motor::ee_set_pos(uint8_t pos) {
   can_msgs::msg::Frame msg;
   msg.id = 0x07;
@@ -23,6 +25,7 @@ can_msgs::msg::Frame Motor::ee_set_pos(uint8_t pos) {
   return msg;
 }
 
+// End effector laser control
 can_msgs::msg::Frame Motor::ee_laser() {
   can_msgs::msg::Frame msg;
   msg.id = 0x07;
@@ -32,6 +35,7 @@ can_msgs::msg::Frame Motor::ee_laser() {
   return msg;
 }
 
+// Clear all faults
 can_msgs::msg::Frame Motor::clr_faults() {
   can_msgs::msg::Frame msg;
   msg.id = 0x00;
@@ -40,6 +44,7 @@ can_msgs::msg::Frame Motor::clr_faults() {
   return msg;
 }
 
+// Set motor home position
 can_msgs::msg::Frame Motor::set_home(uint32_t id) {
   can_msgs::msg::Frame msg;
   msg.id = id;
@@ -48,15 +53,16 @@ can_msgs::msg::Frame Motor::set_home(uint32_t id) {
   return msg;
 }
 
+// Position control: convert angle (degrees) to CAN frame
 can_msgs::msg::Frame Motor::position_control(uint32_t id, float angle) {
   int32_t count = static_cast<int32_t>(angle / 360.0f * 16384.0f);
   
   can_msgs::msg::Frame msg;
   msg.id = id;
   msg.dlc = 0x05;
-  msg.data[0] = 0xC2;
+  msg.data[0] = 0xC2;  // Position control command byte
   
-  // Convert to little-endian bytes
+  // Convert count to little-endian bytes
   msg.data[1] = static_cast<uint8_t>(count & 0xFF);
   msg.data[2] = static_cast<uint8_t>((count >> 8) & 0xFF);
   msg.data[3] = static_cast<uint8_t>((count >> 16) & 0xFF);
@@ -65,15 +71,16 @@ can_msgs::msg::Frame Motor::position_control(uint32_t id, float angle) {
   return msg;
 }
 
+// Speed control: convert speed to CAN frame
 can_msgs::msg::Frame Motor::speed_control(uint32_t id, float speed_cmd) {
   int32_t speed = static_cast<int32_t>(speed_cmd * 100.0f);
   
   can_msgs::msg::Frame msg;
   msg.id = id;
   msg.dlc = 0x05;
-  msg.data[0] = 0xC1;
+  msg.data[0] = 0xC1;  // Speed control command byte
   
-  // Convert to little-endian bytes
+  // Convert speed to little-endian bytes
   msg.data[1] = static_cast<uint8_t>(speed & 0xFF);
   msg.data[2] = static_cast<uint8_t>((speed >> 8) & 0xFF);
   msg.data[3] = static_cast<uint8_t>((speed >> 16) & 0xFF);
@@ -82,6 +89,7 @@ can_msgs::msg::Frame Motor::speed_control(uint32_t id, float speed_cmd) {
   return msg;
 }
 
+// Request status 1 (temperature, current, speed, angle)
 can_msgs::msg::Frame Motor::send_status_1() {
   can_msgs::msg::Frame msg;
   msg.id = 0xFF;
@@ -90,6 +98,7 @@ can_msgs::msg::Frame Motor::send_status_1() {
   return msg;
 }
 
+// Request status 2 (voltage, current, mode, faults)
 can_msgs::msg::Frame Motor::send_status_2() {
   can_msgs::msg::Frame msg;
   msg.id = 0xFF;
@@ -98,6 +107,7 @@ can_msgs::msg::Frame Motor::send_status_2() {
   return msg;
 }
 
+// Parse status 1 response
 arm_interfaces::msg::MotorStat1 Motor::read_status_1(
     const can_msgs::msg::Frame& can_stat) {
   arm_interfaces::msg::MotorStat1 stat;
@@ -126,6 +136,7 @@ arm_interfaces::msg::MotorStat1 Motor::read_status_1(
   return stat;
 }
 
+// Parse status 2 response
 arm_interfaces::msg::MotorStat2 Motor::read_status_2(
     const can_msgs::msg::Frame& can_stat) {
   arm_interfaces::msg::MotorStat2 stat;
@@ -144,7 +155,7 @@ arm_interfaces::msg::MotorStat2 Motor::read_status_2(
       (static_cast<uint16_t>(can_stat.data[4]) << 8);
   stat.busc = static_cast<float>(busc_raw) * 0.01f;
   
-  // Mode: byte 6
+  // Motor mode (byte 6)
   uint8_t mode = can_stat.data[6];
   switch (mode) {
     case 0:
@@ -166,7 +177,7 @@ arm_interfaces::msg::MotorStat2 Motor::read_status_2(
       stat.mode = "No Mode";
   }
   
-  // Fault: byte 7 (bitfield)
+  // Fault flags (byte 7)
   uint8_t fault = can_stat.data[7];
   std::stringstream fault_stream;
   fault_stream << "Faults: ";
