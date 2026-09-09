@@ -23,6 +23,7 @@ The rover must publish the following immediately whenever they change:
 
 - E-stop and watchdog state.
 - DRIVE, ARM, LAW, SYSTEM, and LINK state.
+- Pending, confirmed, and rejected DRIVE/ARM mode request state.
 - Motor, drivetrain, and arm fault state.
 - Safety-inhibit, arm-protection, and joint-limit state.
 - Controller connection state.
@@ -63,13 +64,17 @@ The rover must also publish a complete current-state snapshot at least once per
 second. It includes the latest values from every telemetry category, active
 faults and alerts, FMA states, safety states, link state, T/O CONFIG status,
 and Gimbal ownership. This allows a GUI instance to recover after reconnecting
-or missing an update.
+or missing an update. The snapshot includes both confirmed FMA values and any
+pending mode request state.
 
 ## FMA and ECAM requirements
 
-The FMA requires confirmed DRIVE, ARM, LAW, SYSTEM, and LINK state. Requested
-GUI actions are not displayed as confirmed until the rover reports its updated
-authoritative state.
+The FMA requires confirmed DRIVE, ARM, LAW, SYSTEM, and LINK state. For DRIVE
+and ARM mode changes, the rover must also publish the current pending request
+or rejection result. A pending requested value is displayed in blue by every
+GUI instance; it is not displayed as confirmed until the rover reports its
+updated authoritative state in green. A rejected request must clear the
+pending value without changing the confirmed state.
 
 ECAM uses complete active alert-code snapshots. The rover sends the full current
 set of stable active ECAM codes immediately whenever that set changes and in the

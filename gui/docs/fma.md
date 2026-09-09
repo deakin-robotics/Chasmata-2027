@@ -20,15 +20,20 @@ The FMA should display the rover's **confirmed active state**, not merely a requ
 
 ## FMA Interaction Behaviour
 
-The FMA displays the **confirmed rover state**, not simply what the operator requested.
+The FMA displays the **confirmed rover state** and any explicitly rover-reported
+pending request state. A local operator click is never treated as confirmed by
+itself.
 
 ### Command pending
-When an operator selects a mode from the GUI, the requested mode is shown in **blue** while the command is waiting for acknowledgement from the rover.
+When an operator selects a mode from the GUI, the request is sent to the rover.
+The rover broadcasts the pending requested mode, which is shown in **blue** by
+every GUI while the command is waiting for acknowledgement.
 
 At GUI startup, Driver defaults to `VELOCITY` and Arm defaults to `POSITION`.
 While the rover connection is unavailable, these remain local selections and
-are not shown as FMA requests. Once the connection is established, they are
-recorded as pending requests in blue until rover telemetry confirms them.
+are not shown as FMA requests. Once the connection is established, the
+coordinator requests them and the rover broadcasts the pending state in blue
+until telemetry confirms them.
 
 When ROS is disconnected, the FMA hides all status values, including Gimbal
 Priority, and shows the unavailable red X overlay. The X represents the
@@ -36,10 +41,14 @@ overall cold-and-dark state; individual `UNKNOWN` values are used only after
 ROS is connected.
 
 ### Command confirmed
-Once the rover receives the command, changes state, and returns an acknowledgement handshake, the mode changes to **green**.
+Once the rover receives the command, changes state, and broadcasts the
+acknowledgement/confirmed state, the mode changes to **green** on every GUI.
 
 ### Command rejected / no acknowledgement
-If the rover rejects the command or acknowledgement is not received, the requested mode must not be shown as active. The FMA should continue displaying the last confirmed state or indicate the failure through the appropriate system warning.
+If the rover rejects the command, it broadcasts the rejection. The pending
+requested mode must not become active; every FMA should continue displaying the
+last confirmed state or indicate the failure through the appropriate system
+warning. If no response is received, the GUI must not invent a confirmed state.
 
 Example:
 

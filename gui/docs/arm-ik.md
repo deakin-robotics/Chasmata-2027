@@ -9,17 +9,32 @@ safety checks.
 
 ```mermaid
 flowchart TD
-    target[Operator target pose]
-    solve[GUI: URDF model + IK solve]
-    angles[Named joint angles<br/>radians]
-    ros[Future ROS command interface]
-    rover[Rover: validate limits<br/>execute/reject<br/>publish telemetry]
+    target[1. Operator target pose]
+    coordinator[2. ArmIkCoordinator<br/>stable GUI boundary]
+    ros[4. ROS 2]
+    rover[5. Rover: validate limits<br/>execute/reject<br/>publish telemetry]
 
-    target --> solve --> angles --> ros --> rover
+    subgraph solverBox[3. IK source]
+        subgraph solverOptions[ ]
+            direction LR
+            current[3a. Now: closed-chain-ik<br/>returns target joint angles]
+            future[3b. Later: MoveIt 2<br/>returns trajectory or<br/>target joint angles]
+        end
+    end
+
+    target --> coordinator
+    coordinator <--> solverBox
+    coordinator --> ros
+    ros --> rover
+
+    style solverOptions fill:transparent,stroke:transparent,color:transparent
 ```
 
-The GUI owns the kinematic calculation. The rover remains the authoritative
-source of whether a command is accepted and what the arm actually did.
+`ArmIkCoordinator` is the stable boundary between the GUI and the selected IK
+source. The current path uses `closed-chain-ik`; a future path can replace it
+with MoveIt 2 without changing the operator controls, model viewer, or rover
+command boundary. The rover remains the authoritative source of whether a
+command is accepted and what the arm actually did.
 
 The IK math can run without ROS, which is useful for unit tests. The dashboard
 runtime waits for a ROS connection before starting the Arm IK workflow because
