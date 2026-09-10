@@ -85,16 +85,17 @@ h2 {
 }
 
 .gimbal-priority-unknown {
-  grid-row: 3;
-  width: calc(200% + 0.3rem);
-  justify-self: start;
-  position: relative;
-  z-index: 2;
-  background: var(--dcr-color-background);
+  grid-row: 2;
+  width: 100%;
 }
 
 .gimbal-priority-known {
   color: var(--dcr-color-normal);
+}
+
+.gimbal-priority-pending {
+  grid-row: 3;
+  color: var(--dcr-color-info);
 }
 
 .mode-managed::after {

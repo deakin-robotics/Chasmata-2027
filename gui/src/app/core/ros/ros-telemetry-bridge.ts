@@ -102,11 +102,10 @@ export class RosTelemetryBridge {
     this.applyModeTelemetry(telemetry.arm, 'arm');
 
     const system = this.enumValue(telemetry.system, Object.values(SystemMode));
-    const gimbalPriority = this.parseGimbalPriority(telemetry.gimbal_priority);
 
     this.applyLawTelemetry(telemetry.law);
     if (system !== undefined) this.fmaState.setSystemMode(system);
-    if (gimbalPriority !== undefined) this.fmaState.setGimbalPriorityOwner(gimbalPriority);
+    this.applyGimbalPriorityTelemetry(telemetry.gimbal_priority);
   }
 
   private applyModeTelemetry(state: FmaModeState | undefined, subsystem: 'drive' | 'arm'): void {
@@ -187,7 +186,29 @@ export class RosTelemetryBridge {
     return typeof value === 'string' && values.includes(value as T) ? (value as T) : undefined;
   }
 
-  private parseGimbalPriority(value: unknown): GimbalPriorityOwner | null | undefined {
+  private applyGimbalPriorityTelemetry(value: unknown): void {
+    if (value === null || typeof value === 'string') {
+      const confirmed = this.parseGimbalPriorityOwner(value);
+      if (confirmed !== undefined) this.fmaState.setGimbalPriorityOwner(confirmed);
+      return;
+    }
+
+    if (!value || typeof value !== 'object') return;
+
+    const state = value as FmaModeState;
+    const confirmed = this.parseGimbalPriorityOwner(state.confirmed);
+    const pending = this.parseGimbalPriorityOwner(state.pending);
+
+    if (confirmed !== undefined && pending !== undefined) {
+      this.fmaState.setGimbalPriorityTelemetry(confirmed, pending);
+    } else if (confirmed !== undefined) {
+      this.fmaState.setGimbalPriorityTelemetry(confirmed, null);
+    } else if (pending !== undefined) {
+      this.fmaState.setGimbalPriorityTelemetry(null, pending);
+    }
+  }
+
+  private parseGimbalPriorityOwner(value: unknown): GimbalPriorityOwner | null | undefined {
     if (value === null || value === 'UNKNOWN') return null;
     return value === 'DRIVER' || value === 'ARM OPS' ? value : undefined;
   }

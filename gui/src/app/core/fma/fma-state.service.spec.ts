@@ -57,13 +57,22 @@ describe('FmaStateService', () => {
 
   it('starts gimbal priority unknown and formats authoritative owners', () => {
     expect(service.gimbalPriorityOwner()).toBeNull();
-    expect(service.gimbalPriorityDisplay()).toBe('GIMBAL PRIORITY UNKNOWN');
+    expect(service.gimbalPriorityDisplay()).toBe('PRIORITY UNK');
 
     service.setGimbalPriorityOwner('DRIVER');
     expect(service.gimbalPriorityDisplay()).toBe('← DRIVER');
 
     service.setGimbalPriorityOwner('ARM OPS');
     expect(service.gimbalPriorityDisplay()).toBe('ARM OPS →');
+  });
+
+  it('keeps the confirmed Gimbal arrow while exposing a pending takeover', () => {
+    service.setGimbalPriorityTelemetry('DRIVER', 'ARM OPS');
+
+    expect(service.gimbalPriorityOwner()).toBe('DRIVER');
+    expect(service.gimbalPriorityDisplay()).toBe('← DRIVER');
+    expect(service.gimbalPriorityPending()).toBe('ARM OPS');
+    expect(service.gimbalPriorityPendingDisplay()).toBe('ARM OPS');
   });
 
   it('derives the override indicator from authoritative LAW telemetry', () => {

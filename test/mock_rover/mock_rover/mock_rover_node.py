@@ -77,6 +77,7 @@ class MockRoverNode(Node):
         self.law_before_override: Optional[str] = None
         self.pending_law: Optional[Tuple[str, float]] = None
         self.gimbal_priority: Optional[str] = None
+        self.pending_gimbal_priority: Optional[Tuple[str, float]] = None
         self.pending_modes: Dict[str, Optional[Tuple[str, float]]] = {
             'drive': None,
             'arm': None,
@@ -200,9 +201,12 @@ class MockRoverNode(Node):
             self.get_logger().warn(f'Rejected Gimbal priority request: {owner}')
             return
 
-        self.gimbal_priority = owner
+        self.pending_gimbal_priority = (
+            owner,
+            time.monotonic() + self.mode_ack_delay_seconds,
+        )
         self.publish_fma()
-        self.get_logger().info(f'Confirmed Gimbal priority: {owner}')
+        self.get_logger().info(f'Pending Gimbal priority request: {owner}')
 
     def law_mode_request_callback(self, message: String) -> None:
         request = message.data.strip().upper()
@@ -250,6 +254,7 @@ class MockRoverNode(Node):
 
         self.process_mode_requests(now)
         self.process_law_request(now)
+        self.process_gimbal_priority_request(now)
         self.clear_expired_rejections(now)
         self.joints.step(elapsed)
         self.publish_joint_state()
@@ -288,6 +293,15 @@ class MockRoverNode(Node):
         self.publish_fma()
         self.get_logger().info(f'Confirmed LAW state: {self.law_mode}')
 
+    def process_gimbal_priority_request(self, now: float) -> None:
+        if self.pending_gimbal_priority is None or self.pending_gimbal_priority[1] > now:
+            return
+
+        self.gimbal_priority = self.pending_gimbal_priority[0]
+        self.pending_gimbal_priority = None
+        self.publish_fma()
+        self.get_logger().info(f'Confirmed Gimbal priority: {self.gimbal_priority}')
+
     def clear_expired_rejections(self, now: float) -> None:
         changed = False
         for subsystem, clear_time in self.rejection_clear_times.items():
@@ -312,7 +326,15 @@ class MockRoverNode(Node):
                 'rejected': None,
             },
             'system': 'GOOD',
-            'gimbal_priority': self.gimbal_priority,
+            'gimbal_priority': {
+                'confirmed': self.gimbal_priority,
+                'pending': (
+                    self.pending_gimbal_priority[0]
+                    if self.pending_gimbal_priority is not None
+                    else None
+                ),
+                'rejected': None,
+            },
         }
         message = String()
         message.data = json.dumps(payload, separators=(',', ':'))

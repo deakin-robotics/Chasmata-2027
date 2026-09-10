@@ -10,8 +10,17 @@
             [class.gimbal-priority-unknown]="!gimbalPriorityOwner()"
             [attr.aria-label]="gimbalPriorityAriaLabel()"
           >
-            {{ gimbalPriorityDisplay() }}
+            {{ gimbalPriorityOwner() ? gimbalPriorityDisplay() : 'PRIORITY UNK' }}
           </span>
+
+          @if (gimbalPriorityPending()) {
+            <span
+              class="mode gimbal-priority-pending"
+              [attr.aria-label]="gimbalPriorityPendingAriaLabel()"
+            >
+              {{ gimbalPriorityPendingDisplay() }}
+            </span>
+          }
         } @else {
           <span
             class="mode mode-active"

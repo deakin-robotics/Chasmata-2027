@@ -36,9 +36,10 @@ Gimbal camera: http://localhost:8090/?action=stream
 - Accepts LAW requests on `/fma/law/request`, broadcasts them as pending, then
   confirms them after 150 ms. `DIRECT` enables the override; `RESTORE` returns
   to the LAW that was active before the override.
-- Accepts temporary Gimbal priority requests on `/fma/gimbal/request`. A valid
-  `DRIVER` or `ARM OPS` request becomes the confirmed owner and is rebroadcast
-  through `/fma/state`; the latest valid request wins.
+- Accepts temporary Gimbal priority requests on `/fma/gimbal/request`,
+  broadcasts them as pending, then confirms them after 150 ms. The confirmed
+  owner keeps the directional arrow; a pending owner is shown separately in
+  blue. The latest valid request wins.
 - Publishes a complete FMA state immediately and once per second for late
   subscribers/recovery.
 - Accepts arm joint targets, clamps them to the current six-joint limits, and
@@ -80,7 +81,7 @@ The provisional `/fma/state` JSON shape is:
   "arm": {"confirmed": "POSITION", "pending": null, "rejected": null},
   "law": {"confirmed": "NORMAL", "pending": null, "rejected": null},
   "system": "GOOD",
-  "gimbal_priority": null
+  "gimbal_priority": {"confirmed": null, "pending": null, "rejected": null}
 }
 ```
 

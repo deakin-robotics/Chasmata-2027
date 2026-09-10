@@ -30,7 +30,8 @@ The rover must publish the following immediately whenever they change:
 - Controller connection state.
 - ROS/network connection, degradation, and loss state.
 - T/O CONFIG result and individual failed or unknown conditions.
-- Gimbal owner/priority state, including unknown or stale state.
+- Gimbal owner/priority state, including confirmed owner, pending takeover,
+  unknown, or stale state.
 - Camera availability changes.
 - ECAM active alert state.
 
@@ -66,7 +67,7 @@ second. It includes the latest values from every telemetry category, active
 faults and alerts, FMA states, safety states, link state, T/O CONFIG status,
 and Gimbal ownership. This allows a GUI instance to recover after reconnecting
 or missing an update. The snapshot includes both confirmed FMA values and any
-pending DRIVE, ARM, or LAW mode request state.
+pending DRIVE, ARM, LAW, or Gimbal priority request state.
 
 ## FMA and ECAM requirements
 
@@ -146,11 +147,13 @@ Both Driver and Arm Operator stations can view and request control of the shared
 Gimbal camera. The rover owns the authoritative owner state and validates
 station-identified movement commands.
 
-Gimbal priority must publish immediately when it changes and be included in the
-1 Hz recovery snapshot. If ROS is connected but owner telemetry is null,
-explicitly unknown, or stale, the FMA must display `GIMBAL PRIORITY UNKNOWN`
-rather than the last known owner. If ROS is disconnected entirely, the FMA
-hides the priority value and shows its overall unavailable indicator instead.
+Gimbal priority must publish immediately when a request becomes pending, when
+the confirmed owner changes, and in the 1 Hz recovery snapshot. The telemetry
+must include both `confirmed` and `pending` owner values. If ROS is connected
+but owner telemetry is null, explicitly unknown, or stale, the FMA must display
+`PRIORITY UNK` rather than the last known owner. If ROS is
+disconnected entirely, the FMA hides the priority value and shows its overall
+unavailable indicator instead.
 
 ## Interface ownership
 

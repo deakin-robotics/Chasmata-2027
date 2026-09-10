@@ -179,8 +179,8 @@ This column answers:
 
 This column carries the existing **GIMBAL PRIORITY** owner indicator. It is not
 a selectable control mode and is independent from the Arm protection `LAW`
-state. The rover owns the authoritative owner and broadcasts the confirmed
-state to every GUI.
+state. The rover owns the authoritative owner and broadcasts both the confirmed
+owner and any pending takeover request to every GUI.
 
 ### Confirmed Driver owner
 
@@ -210,7 +210,7 @@ ROS is connected, but the authoritative Gimbal owner telemetry is null, invalid,
 or stale. The FMA displays:
 
 ```text
-GIMBAL PRIORITY UNKNOWN
+PRIORITY UNK
 ```
 
 When ROS is disconnected, the FMA hides the Gimbal value and shows the overall
@@ -245,8 +245,11 @@ flowchart LR
 ```
 
 The rover owns the authoritative Gimbal owner and priority state. When a valid
-takeover request is received, the rover updates the owner and broadcasts the
-confirmed owner state to every GUI instance.
+takeover request is received, the rover broadcasts the requested owner as blue
+pending text while the current confirmed owner and its arrow remain unchanged.
+Once the rover accepts the request, it broadcasts the new confirmed owner and
+the arrow moves to that owner on every GUI instance. A rejected request clears
+the pending text and leaves the confirmed owner unchanged.
 
 There is no additional Driver-over-Arm hierarchy. If both operators press their
 priority buttons at approximately the same time, the latest valid request
@@ -275,13 +278,14 @@ owner are accepted.
 
 #### Owner indication and stale state
 
-The rover should publish the owner immediately after an ownership change and
-periodically thereafter so that GUI instances can recover from missed updates or
-reconnects.
+The rover should publish the owner immediately after an ownership change, when
+a takeover request becomes pending, and periodically thereafter so that GUI
+instances can recover from missed updates or reconnects. A recovery snapshot
+must include both the confirmed owner and any pending request.
 
 If ROS is connected but owner telemetry is null, explicitly unknown, or stale,
 the GUI must not continue to show the last known owner as valid. It must show
-`GIMBAL PRIORITY UNKNOWN` until a fresh authoritative owner state is received.
+`PRIORITY UNK` until a fresh authoritative owner state is received.
 
 Verbal callouts such as “I have gimbal” and “You have gimbal” may be used as
 human operating procedure, but they have no software effect. The mapped
@@ -320,5 +324,5 @@ Emergency stop is active. Actuation is disabled and a deliberate reset/re-arm ac
 | **DRIVE** | Current drivetrain control method | `MANUAL`, `VELOCITY`, `MANAGED •` |
 | **ARM** | Current arm control/configuration | `MANUAL`, `POSITION`, `MANAGED •`, `STOWED` |
 | **LAW** | Arm protection level and override request | `NORMAL`, `ALTERNATE`, `DIRECT`; blue/red `OVERRIDE` |
-| **GIMBAL** | Existing Gimbal Priority owner indicator | `← DRIVER`, `ARM OPS →`, `GIMBAL PRIORITY UNKNOWN` |
+| **GIMBAL** | Existing Gimbal Priority owner indicator | `← DRIVER`, `ARM OPS →`, `PRIORITY UNK` |
 | **SYSTEM** | Overall rover/control-stack health | `GOOD`, `DEGRADED`, `FAULT`, `E-STOP` |

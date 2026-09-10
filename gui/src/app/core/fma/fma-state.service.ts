@@ -37,7 +37,11 @@ export type FmaColumn =
   | { label: 'DRIVE'; confirmed: DriveMode | null; commanded: DriveMode | null }
   | { label: 'ARM'; confirmed: ArmMode | null; commanded: ArmMode | null }
   | { label: 'LAW'; confirmed: LawMode | null; commanded: LawRequest | null }
-  | { label: 'GIMBAL'; confirmed: GimbalPriorityOwner | null; commanded: null }
+  | {
+      label: 'GIMBAL';
+      confirmed: GimbalPriorityOwner | null;
+      commanded: GimbalPriorityOwner | null;
+    }
   | { label: 'SYSTEM'; confirmed: SystemMode | null; commanded: SystemMode | null };
 
 /** Holds shared FMA state for the operator displays. */
@@ -70,6 +74,13 @@ export class FmaStateService {
     );
     return column?.confirmed ?? null;
   });
+  readonly gimbalPriorityPending = computed(() => {
+    const column = this.columnsState().find(
+      (candidate): candidate is Extract<FmaColumn, { label: 'GIMBAL' }> =>
+        candidate.label === 'GIMBAL',
+    );
+    return column?.commanded ?? null;
+  });
   readonly gimbalPriorityDisplay = computed(() => {
     switch (this.gimbalPriorityOwner()) {
       case 'DRIVER':
@@ -77,7 +88,7 @@ export class FmaStateService {
       case 'ARM OPS':
         return 'ARM OPS →';
       default:
-        return 'GIMBAL PRIORITY UNKNOWN';
+        return 'PRIORITY UNK';
     }
   });
   readonly gimbalPriorityAriaLabel = computed(() => {
@@ -89,6 +100,14 @@ export class FmaStateService {
       default:
         return 'Gimbal priority unknown';
     }
+  });
+  readonly gimbalPriorityPendingDisplay = computed(() => {
+    const pending = this.gimbalPriorityPending();
+    return pending ?? '';
+  });
+  readonly gimbalPriorityPendingAriaLabel = computed(() => {
+    const pending = this.gimbalPriorityPending();
+    return pending ? `Gimbal priority request pending: ${pending}` : '';
   });
 
   /** Records a requested DRIVE mode without changing the confirmed state. */
@@ -154,7 +173,15 @@ export class FmaStateService {
 
   /** Applies authoritative gimbal-priority telemetry, or clears it when unknown. */
   setGimbalPriorityOwner(owner: GimbalPriorityOwner | null): void {
-    this.updateColumn('GIMBAL', (column) => ({ ...column, confirmed: owner, commanded: null }));
+    this.setGimbalPriorityTelemetry(owner, null);
+  }
+
+  /** Applies authoritative Gimbal priority telemetry, including pending takeover. */
+  setGimbalPriorityTelemetry(
+    confirmed: GimbalPriorityOwner | null,
+    commanded: GimbalPriorityOwner | null,
+  ): void {
+    this.updateColumn('GIMBAL', (column) => ({ ...column, confirmed, commanded }));
   }
 
   /** Clears DRIVE and ARM state when the rover connection is unavailable. */
