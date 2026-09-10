@@ -29,16 +29,28 @@ describe('DriverDashboard', () => {
     expect(fixture.nativeElement.textContent).toContain('Gimbal camera');
   });
 
-  it('should render the rover schematic and Driver control panel', () => {
+  it('should place the rover schematic and control scheme with the Driver panel', () => {
     expect(fixture.nativeElement.querySelector('app-rover-schematic')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('app-control-scheme')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('app-driver-control-panel')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.arm-camera-column app-rover-schematic')).toBeFalsy();
+    expect(fixture.nativeElement.querySelector('.arm-camera-column app-control-scheme')).toBeFalsy();
+    expect(
+      fixture.nativeElement.querySelector('.driver-control-column app-rover-schematic'),
+    ).toBeTruthy();
+    expect(
+      fixture.nativeElement.querySelector('.driver-control-column app-control-scheme'),
+    ).toBeTruthy();
   });
 
-  it('should render the reserved lower control-column space', () => {
+  it('should render the reserved space in the left column', () => {
     const reserved = fixture.nativeElement.querySelector('.reserved-space');
 
     expect(reserved?.textContent.trim()).toBe('Reserved');
+    expect(fixture.nativeElement.querySelector('.arm-camera-column .reserved-space')).toBeTruthy();
+    expect(
+      fixture.nativeElement.querySelector('.driver-control-column .reserved-space'),
+    ).toBeFalsy();
   });
 
   it('should render the small gamepad overlay', () => {

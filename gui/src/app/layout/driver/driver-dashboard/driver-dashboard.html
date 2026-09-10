@@ -5,10 +5,10 @@
       [url]="armCameraUrl()"
       (urlChange)="armCameraUrl.set($event)"
     />
-    <app-rover-schematic />
-    <app-control-scheme context="driver">
-      <app-gamepad-control-panel scheme-gamepad />
-    </app-control-scheme>
+
+    <section class="reserved-space" aria-label="Reserved">
+      <span>Reserved</span>
+    </section>
   </section>
 
   <section class="rover-camera-column" aria-label="Driver rover camera workspace">
@@ -26,9 +26,9 @@
 
   <aside class="driver-control-column" aria-label="Driver control panels">
     <app-driver-control-panel />
-
-    <section class="reserved-space" aria-label="Reserved">
-      <span>Reserved</span>
-    </section>
+    <app-rover-schematic />
+    <app-control-scheme context="driver">
+      <app-gamepad-control-panel scheme-gamepad />
+    </app-control-scheme>
   </aside>
 </main>
