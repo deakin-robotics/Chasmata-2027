@@ -33,6 +33,8 @@ Gimbal camera: http://localhost:8090/?action=stream
 - Starts with LAW `NORMAL`, SYSTEM `GOOD`, and unknown Gimbal priority.
 - Accepts valid Driver and Arm mode requests, publishes them as pending, then
   confirms them after 150 ms.
+- Accepts LAW mode requests on `/fma/law/request` and immediately broadcasts
+  the confirmed LAW mode through `/fma/state`.
 - Accepts temporary Gimbal priority requests on `/fma/gimbal/request`. A valid
   `DRIVER` or `ARM OPS` request becomes the confirmed owner and is rebroadcast
   through `/fma/state`; the latest valid request wins.
@@ -59,6 +61,7 @@ base_joint, shoulder_joint, elbow_joint, yaw_joint, pitch_joint, roll_joint
 | Mock rover → GUI | `/joint_states` | `sensor_msgs/msg/JointState` | Simulated actual joint positions and velocities. |
 | GUI → mock rover | `/fma/drive/request` | `std_msgs/msg/String` | Driver mode value, such as `VELOCITY`. |
 | GUI → mock rover | `/fma/arm/request` | `std_msgs/msg/String` | Arm mode value, such as `POSITION`. |
+| GUI → mock rover | `/fma/law/request` | `std_msgs/msg/String` | LAW mode request: `NORMAL`, `ALTERNATE`, or `DIRECT`. |
 | GUI → mock rover | `/fma/gimbal/request` | `std_msgs/msg/String` | Temporary Gimbal priority request: `DRIVER` or `ARM OPS`. |
 | Mock rover → GUI | `/fma/state` | `std_msgs/msg/String` | JSON FMA telemetry broadcast. |
 

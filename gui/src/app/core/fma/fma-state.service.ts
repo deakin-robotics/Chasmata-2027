@@ -47,6 +47,12 @@ export class FmaStateService {
   ]);
 
   readonly columns = this.columnsState.asReadonly();
+  readonly lawOverrideActive = computed(() =>
+    this.columnsState().some(
+      (column) => column.label === 'LAW' && column.confirmed === LawMode.Direct,
+    ),
+  );
+
   readonly gimbalPriorityOwner = computed(() => {
     const column = this.columnsState().find(
       (candidate): candidate is Extract<FmaColumn, { label: 'GIMBAL' }> =>

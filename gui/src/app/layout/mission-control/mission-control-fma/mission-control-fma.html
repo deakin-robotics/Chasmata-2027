@@ -32,6 +32,16 @@
               {{ column.commanded ?? '' }}
             </span>
           }
+
+          @if (column.label === 'LAW') {
+            <span
+              class="mode law-override-indicator"
+              [class.mode-placeholder]="!lawOverrideActive()"
+              [attr.aria-hidden]="!lawOverrideActive()"
+            >
+              {{ lawOverrideActive() ? 'OVERRIDE' : '' }}
+            </span>
+          }
         }
       }
     </div>

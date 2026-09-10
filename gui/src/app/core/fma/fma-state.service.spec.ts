@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 
-import { ArmMode, DriveMode, FmaStateService } from './fma-state.service';
+import { ArmMode, DriveMode, FmaStateService, LawMode } from './fma-state.service';
 
 describe('FmaStateService', () => {
   let service: FmaStateService;
@@ -64,5 +64,15 @@ describe('FmaStateService', () => {
 
     service.setGimbalPriorityOwner('ARM OPS');
     expect(service.gimbalPriorityDisplay()).toBe('ARM OPS →');
+  });
+
+  it('derives the override indicator from authoritative LAW telemetry', () => {
+    expect(service.lawOverrideActive()).toBe(false);
+
+    service.setLawMode(LawMode.Direct);
+    expect(service.lawOverrideActive()).toBe(true);
+
+    service.setLawMode(LawMode.Normal);
+    expect(service.lawOverrideActive()).toBe(false);
   });
 });

@@ -32,6 +32,8 @@
     label="Law Override"
     actionLabel="Override"
     [disabled]="!rosConnected()"
+    (activated)="activateLawOverride()"
+    (deactivated)="deactivateLawOverride()"
   />
 
   <app-two-step-action-button

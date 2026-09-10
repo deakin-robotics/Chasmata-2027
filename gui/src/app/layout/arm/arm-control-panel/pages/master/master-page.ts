@@ -3,7 +3,9 @@ import { MatDialog } from '@angular/material/dialog';
 
 import { ArmControlModeService } from '../../../../../core/control/arm/arm-control-mode';
 import { ArmCommandPublisher } from '../../../../../core/control/arm/arm-command-publisher';
+import { ControlModeCommandPublisher } from '../../../../../core/control/control-mode-command-publisher';
 import { GamepadInput } from '../../../../../core/gamepad/gamepad-input';
+import { LawMode } from '../../../../../core/fma/fma-state.service';
 import { RosConnection } from '../../../../../core/ros/ros-connection';
 import { ConnectionManager } from '../../../../../features/connection/connection-manager/connection-manager';
 import { ActionButton, ActionButtonTone } from '../../../../../shared/action-button/action-button';
@@ -40,6 +42,7 @@ import { TwoStepActionButton } from '../../../../../shared/two-step-action-butto
 export class ArmMasterPage {
   private readonly armControlMode = inject(ArmControlModeService);
   private readonly armCommandPublisher = inject(ArmCommandPublisher);
+  private readonly controlModeCommandPublisher = inject(ControlModeCommandPublisher);
   private readonly gamepad = inject(GamepadInput);
   private readonly rosConnection = inject(RosConnection);
   private readonly dialog = inject(MatDialog);
@@ -137,5 +140,13 @@ export class ArmMasterPage {
   /** Sends the explicit two-step motor-driver fault reset command. */
   clearArmFaults(button: TwoStepActionButton): void {
     if (this.armCommandPublisher.publishClearFaults()) button.reset();
+  }
+
+  activateLawOverride(): void {
+    this.controlModeCommandPublisher.publishLawMode(LawMode.Direct);
+  }
+
+  deactivateLawOverride(): void {
+    this.controlModeCommandPublisher.publishLawMode(LawMode.Normal);
   }
 }

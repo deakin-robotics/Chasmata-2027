@@ -39,6 +39,7 @@ DRIVE_JOY_TOPIC = '/joy'
 ARM_JOY_TOPIC = '/arm/joy'
 DRIVE_MODE_REQUEST_TOPIC = '/fma/drive/request'
 ARM_MODE_REQUEST_TOPIC = '/fma/arm/request'
+LAW_MODE_REQUEST_TOPIC = '/fma/law/request'
 GIMBAL_PRIORITY_REQUEST_TOPIC = '/fma/gimbal/request'
 FMA_STATE_TOPIC = '/fma/state'
 
@@ -47,6 +48,7 @@ ARM_TRIGGER_AXES = (8, 9)
 
 DRIVE_MODES = {'MANUAL', 'VELOCITY', 'MANAGED'}
 ARM_MODES = {'MANUAL', 'POSITION', 'MANAGED', 'STOWED'}
+LAW_MODES = {'NORMAL', 'ALTERNATE', 'DIRECT'}
 GIMBAL_PRIORITY_OWNERS = {'DRIVER', 'ARM OPS'}
 
 
@@ -70,6 +72,7 @@ class MockRoverNode(Node):
         self.joints = JointSimulator(JOINT_NAMES, JOINT_LIMITS, joint_speed)
         self.drive_mode: Optional[str] = None
         self.arm_mode: Optional[str] = None
+        self.law_mode = 'NORMAL'
         self.gimbal_priority: Optional[str] = None
         self.pending_modes: Dict[str, Optional[Tuple[str, float]]] = {
             'drive': None,
@@ -122,6 +125,12 @@ class MockRoverNode(Node):
             String,
             ARM_MODE_REQUEST_TOPIC,
             lambda message: self.mode_request_callback('arm', message.data),
+            10,
+        )
+        self.create_subscription(
+            String,
+            LAW_MODE_REQUEST_TOPIC,
+            self.law_mode_request_callback,
             10,
         )
         self.create_subscription(
@@ -191,6 +200,16 @@ class MockRoverNode(Node):
         self.gimbal_priority = owner
         self.publish_fma()
         self.get_logger().info(f'Confirmed Gimbal priority: {owner}')
+
+    def law_mode_request_callback(self, message: String) -> None:
+        mode = message.data.strip().upper()
+        if mode not in LAW_MODES:
+            self.get_logger().warn(f'Rejected LAW mode request: {mode}')
+            return
+
+        self.law_mode = mode
+        self.publish_fma()
+        self.get_logger().info(f'Confirmed LAW mode: {mode}')
 
     def joy_callback(self, subsystem: str, message: Joy, trigger_axes: Tuple[int, int]) -> None:
         if len(message.axes) <= trigger_axes[1]:
@@ -264,7 +283,7 @@ class MockRoverNode(Node):
             'sequence': self.sequence,
             'drive': self.mode_state('drive', self.drive_mode),
             'arm': self.mode_state('arm', self.arm_mode),
-            'law': 'NORMAL',
+            'law': self.law_mode,
             'system': 'GOOD',
             'gimbal_priority': self.gimbal_priority,
         }
