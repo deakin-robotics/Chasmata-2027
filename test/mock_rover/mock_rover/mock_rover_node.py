@@ -59,18 +59,19 @@ class MockRoverNode(Node):
     def __init__(self) -> None:
         super().__init__('mock_rover')
 
-        self.declare_parameter('joint_speed_rad_s', 1.0)
         self.declare_parameter('publish_rate_hz', 20.0)
         self.declare_parameter('mode_ack_delay_ms', 150.0)
 
-        joint_speed = float(self.get_parameter('joint_speed_rad_s').value)
         publish_rate = max(float(self.get_parameter('publish_rate_hz').value), 1.0)
         self.mode_ack_delay_seconds = max(
             float(self.get_parameter('mode_ack_delay_ms').value) / 1000.0,
             0.0,
         )
 
-        self.joints = JointSimulator(JOINT_NAMES, JOINT_LIMITS, joint_speed)
+        # The mock is an immediate command/telemetry loop. The simulator keeps
+        # the rover-side limit checks and state shape, while accepted commands
+        # are reflected in /joint_states without modelling motor dynamics.
+        self.joints = JointSimulator(JOINT_NAMES, JOINT_LIMITS, max_speed_rad_s=1.0)
         self.drive_mode: Optional[str] = None
         self.arm_mode: Optional[str] = None
         self.law_mode = 'NORMAL'
@@ -91,7 +92,6 @@ class MockRoverNode(Node):
             'arm': None,
         }
         self.sequence = 0
-        self.last_tick = time.monotonic()
         self.last_fma_publish = 0.0
 
         fma_qos = QoSProfile(depth=1)
@@ -188,12 +188,13 @@ class MockRoverNode(Node):
             self.get_logger().warn('Ignored an unnamed command with the wrong joint count')
             return
 
-        accepted_values = self.joints.set_target(joint_values)
+        accepted_values = self.joints.set_target_immediately(joint_values)
         unknown_joints = set(joint_values) - set(JOINT_NAMES)
         if unknown_joints:
             self.get_logger().warn(f'Ignored unknown joints: {sorted(unknown_joints)}')
         if accepted_values:
             self.get_logger().debug(f'Accepted joint target: {accepted_values}')
+            self.publish_joint_state()
 
     def gimbal_priority_request_callback(self, message: String) -> None:
         owner = message.data.strip().upper()
@@ -249,14 +250,11 @@ class MockRoverNode(Node):
 
     def tick(self) -> None:
         now = time.monotonic()
-        elapsed = min(max(now - self.last_tick, 0.0), 0.25)
-        self.last_tick = now
 
         self.process_mode_requests(now)
         self.process_law_request(now)
         self.process_gimbal_priority_request(now)
         self.clear_expired_rejections(now)
-        self.joints.step(elapsed)
         self.publish_joint_state()
 
         if now - self.last_fma_publish >= 1.0:

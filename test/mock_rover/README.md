@@ -43,7 +43,9 @@ Gimbal camera: http://localhost:8090/?action=stream
 - Publishes a complete FMA state immediately and once per second for late
   subscribers/recovery.
 - Accepts arm joint targets, clamps them to the current six-joint limits, and
-  moves each simulated joint toward its target at a configurable speed.
+  immediately publishes the accepted positions as rover telemetry. This keeps
+  the GUI's rendered arm on the same `/joint_states` path as the real rover
+  without modelling motor dynamics.
 - Publishes actual arm state on `/joint_states` at 20 Hz.
 - Serves canned GIF feeds through the legacy HTTP camera endpoint shape.
 
@@ -95,7 +97,6 @@ mock's feedback responsibilities stay the same.
 
 ```bash
 ros2 run mock_rover mock_rover --ros-args \
-  -p joint_speed_rad_s:=1.0 \
   -p publish_rate_hz:=20.0 \
   -p mode_ack_delay_ms:=150.0
 ```

@@ -27,13 +27,11 @@ export const ARM_END_EFFECTOR_LINK = 'ee_link';
 const DOF_X = 0;
 const DOF_Y = 1;
 const DOF_Z = 2;
-const DOF_EX = 3;
-const DOF_EY = 4;
-const DOF_EZ = 5;
 const SOLVE_CONVERGED = 0;
 const SOLVE_STALLED = 1;
 const SOLVE_DIVERGED = 2;
 const SOLVE_TIMEOUT = 3;
+const SOLVER_DIVERGE_THRESHOLD = 0.1;
 
 type LoadedRobot = ReturnType<URDFLoader['parse']>;
 type LoadedJoint = LoadedRobot['joints'][string];
@@ -147,17 +145,32 @@ export class ArmIkSolver {
       throw new Error('The URDF did not produce an IK root.');
     }
 
+    // urdfRobotToIKRoot adds a free six-DOF world joint. The rover arm is
+    // mounted to a fixed base, and only the named arm joints are sent to it.
+    // Locking this synthetic root prevents the solver from reaching a target
+    // by translating or rotating the entire arm outside the command payload.
+    (ikRoot as unknown as { clearDoF(): void }).clearDoF();
+
     const endEffector = ikRoot.find((frame) => frame.name === ARM_END_EFFECTOR_LINK) as Link | null;
     if (!endEffector?.isLink) {
       throw new Error(`The URDF must contain an end-effector link named ${ARM_END_EFFECTOR_LINK}.`);
     }
 
     const goal = new Goal();
-    goal.setGoalDoF(DOF_X, DOF_Y, DOF_Z, DOF_EX, DOF_EY, DOF_EZ);
+    // Position mode moves the end effector to the blue target. Its orientation
+    // is intentionally free so the fixed-base solver can choose a reachable
+    // joint configuration instead of stalling on an unnecessary orientation
+    // constraint.
+    goal.setGoalDoF(DOF_X, DOF_Y, DOF_Z);
     goal.makeClosure(endEffector);
 
     const solver = new Solver(ikRoot);
     solver.maxIterations = 100;
+    // The library's default threshold is tuned for a free-floating root. With
+    // the rover base fixed, a normal first correction can temporarily increase
+    // the residual before converging, so do not reject that correction as a
+    // divergent solve.
+    solver.divergeThreshold = SOLVER_DIVERGE_THRESHOLD;
 
     const jointNames = Object.entries(robot.joints)
       .filter(([, joint]) => this.isMovableJoint(joint))

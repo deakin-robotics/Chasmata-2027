@@ -70,4 +70,30 @@ describe('ArmIkSolver', () => {
     expect(result.status).toBe('converged');
     expect(Object.keys(result.jointAngles)).toHaveLength(6);
   });
+
+  it('returns joint angles that reach a moved position with a fixed base', () => {
+    const solver = new ArmIkSolver();
+    solver.loadUrdf(SIX_JOINT_URDF);
+
+    const start = solver.endEffectorPose();
+    const target = {
+      position: [start.position[0] + 0.02, start.position[1], start.position[2]] as const,
+      orientation: start.orientation,
+    };
+
+    const result = solver.solve(target);
+    expect(result.status).toBe('converged');
+
+    // Replaying only the serialized six-joint command must reproduce the
+    // target. This catches a solver that reaches the target by moving a hidden
+    // floating root that the rover never receives.
+    const commandedModel = new ArmIkSolver();
+    commandedModel.loadUrdf(SIX_JOINT_URDF);
+    commandedModel.setJointAngles(result.jointAngles);
+    const actual = commandedModel.endEffectorPose().position;
+
+    expect(actual[0]).toBeCloseTo(target.position[0], 3);
+    expect(actual[1]).toBeCloseTo(target.position[1], 3);
+    expect(actual[2]).toBeCloseTo(target.position[2], 3);
+  });
 });

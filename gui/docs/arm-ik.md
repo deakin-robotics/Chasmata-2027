@@ -1,9 +1,9 @@
 # Arm inverse kinematics (IK)
 
 This document describes the browser-side arm IK workflow in the Angular GUI.
-It converts an Arm Operator position target, with the current fixed orientation,
-into named joint angles. It does **not** drive motors or replace rover-side
-safety checks.
+It converts an Arm Operator position target into named joint angles. The
+current Position mode solves the target XYZ position; end-effector orientation
+is free. It does **not** drive motors or replace rover-side safety checks.
 
 In Position mode, the gamepad updates the target through
 `ArmPositionControl`; in Manual mode, `ArmManualControl` continues to publish
@@ -123,10 +123,10 @@ const result = armIk.solve({
 // result.jointAngles: { base_joint: ..., shoulder_joint: ..., ... }
 ```
 
-For the current coordinator workflow, the position comes from its shared target
-and the orientation is captured from the solver's current forward-kinematics
-pose when the model loads. `position` and `orientation` must use the same
-coordinate frame as
+For the current coordinator workflow, the position comes from its shared
+target. The solver keeps the orientation field in its pose interface for
+compatibility, but Position mode does not constrain end-effector orientation.
+The target position must use the same coordinate frame as
 `armIk.endEffectorPose()`. Do not mix a camera frame, map frame, or another
 visualisation frame into the solver without a defined transform.
 
@@ -146,11 +146,12 @@ Implemented now:
 - Updating the target from the Position-mode gamepad controls.
 - Coordinating target changes through `ArmIkCoordinator`.
 - Showing `SOLVING`, `VALID`, `UNREACHABLE`, and `INVALID` states.
-- Rendering the target marker and applying valid solutions to the Three.js arm.
+- Rendering the target marker and applying rover-reported joint telemetry to
+  the Three.js arm.
 
 Not implemented yet:
 
-- Live joint telemetry as the normal IK seed and actual-pose rendering.
+- Live joint telemetry as the normal IK seed for the next IK solve.
 - The ROS message/topic/service contract for joint-angle commands.
 - Rover acknowledgement/rejection display.
 - Collision checking and motion-path planning.

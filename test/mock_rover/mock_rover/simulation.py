@@ -11,7 +11,7 @@ JointLimits = Mapping[str, Tuple[float, float]]
 
 
 class JointSimulator:
-    """Moves simulated joints toward a target with speed and limit checks."""
+    """Stores simulated joints with target and limit checks."""
 
     def __init__(
         self,
@@ -54,6 +54,16 @@ class JointSimulator:
             clamped[name] = bounded_value
 
         return clamped
+
+    def set_target_immediately(self, joint_values: Mapping[str, float]) -> Dict[str, float]:
+        """Accept targets and expose them as actual positions immediately."""
+        accepted = self.set_target(joint_values)
+
+        for name, value in accepted.items():
+            self._positions[name] = value
+            self._velocities[name] = 0.0
+
+        return accepted
 
     def step(self, elapsed_seconds: float) -> None:
         """Advance each joint by at most max speed times elapsed time."""
