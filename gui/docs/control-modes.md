@@ -3,21 +3,25 @@
 This document explains the different kinds of control mode in the GUI. The
 names are similar, but they answer different questions.
 
-## The four related services
+## The related services
 
-| File | Responsibility |
-|---|---|
-| `src/app/core/control/control-mode.ts` | Global control authority: who currently owns control — `none`, `driver`, or `arm`. Command publishers use this to decide whether commands are allowed. |
+| File                                               | Responsibility                                                                                                                                                  |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/app/core/control/control-mode.ts`             | Global control authority: who currently owns control — `none`, `driver`, or `arm`. Command publishers use this to decide whether commands are allowed.          |
 | `src/app/core/control/control-mode-coordinator.ts` | Coordinates mode selections, local mode services, and ROS connection state. It sends mode requests to ROS; rover telemetry remains authoritative for FMA state. |
-| `src/app/core/control/drive/drive-control-mode.ts` | Driver control interpretation: `MANUAL` or `VELOCITY`. |
-| `src/app/core/control/arm/arm-control-mode.ts` | Arm control interpretation: `MANUAL` or `POSITION`. |
+| `src/app/core/control/drive/drive-control-mode.ts` | Driver control interpretation: `MANUAL` or `VELOCITY`.                                                                                                          |
+| `src/app/core/control/arm/arm-control-mode.ts`     | Owns Arm interpretation mode, the shared Arm input session, and routing to the selected handler.                                                                |
+| `src/app/core/control/arm/arm-manual-control.ts`   | Handles the Manual Arm gamepad mapping and publishes the existing `/arm/joy` command.                                                                           |
+| `src/app/core/control/arm/arm-position-control.ts` | Handles the Position Arm gamepad mapping and updates the IK target through `ArmIkCoordinator`.                                                                  |
 
 In short:
 
 - `ControlModeService` answers: **Who is allowed to control?**
 - `DriverControlModeService` answers: **How should Driver input control the rover?**
-- `ArmControlModeService` answers: **How should Arm Operator input control the arm?**
+- `ArmControlModeService` answers: **Which Arm input interpretation is selected, and which handler receives input?**
 - `ControlModeCoordinator` answers: **How do selections and ROS connection become mode requests?**
+- `ArmManualControl` answers: **How is the legacy direct-joint Arm mapping executed?**
+- `ArmPositionControl` answers: **How does Position-mode input move the IK target?**
 
 ## Control authority versus control interpretation
 
@@ -35,12 +39,17 @@ The authority service does not choose between `MANUAL`, `VELOCITY`, or
 
 ## Current defaults
 
-| Subsystem | Local default | Meaning |
-|---|---|---|
-| Driver | `VELOCITY` | Driver input is interpreted as assisted velocity control. |
-| Arm Operator | `POSITION` | Arm Operator input is interpreted as an end-effector position target for IK. |
+| Subsystem    | Local default | Meaning                                                                      |
+| ------------ | ------------- | ---------------------------------------------------------------------------- |
+| Driver       | `VELOCITY`    | Driver input is interpreted as assisted velocity control.                    |
+| Arm Operator | `POSITION`    | Arm Operator input is interpreted as an end-effector position target for IK. |
 
 The defaults are local GUI selections. They are not confirmed rover states.
+
+The Arm master switch is the safety and authority gate used before a mission.
+Once Arm control is active, the Arm Operator can still change between Manual
+and Position. `ArmControlModeService` stops the current worker and starts the
+newly selected worker while preserving the gamepad session.
 
 ## Selection and connection flow
 
@@ -106,9 +115,9 @@ annunciator definition.
 
 When reading or changing code, first ask which question the code is answering:
 
-| Question | Use |
-|---|---|
-| Who owns control authority? | `ControlModeService` |
-| Which Driver mode is selected? | `DriverControlModeService` |
-| Which Arm mode is selected? | `ArmControlModeService` |
-| How are selections synchronized with ROS and FMA? | `ControlModeCoordinator` |
+| Question                                          | Use                        |
+| ------------------------------------------------- | -------------------------- |
+| Who owns control authority?                       | `ControlModeService`       |
+| Which Driver mode is selected?                    | `DriverControlModeService` |
+| Which Arm mode is selected?                       | `ArmControlModeService`    |
+| How are selections synchronized with ROS and FMA? | `ControlModeCoordinator`   |

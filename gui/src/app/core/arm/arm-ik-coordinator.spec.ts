@@ -51,6 +51,17 @@ describe('ArmIkCoordinator', () => {
     expect(position[2]).toBeCloseTo(0.45);
   });
 
+  it('defaults the target to the loaded end-effector pose', async () => {
+    solver.endEffectorPose.mockReturnValue({
+      position: [0.25, 0.1, 0.4],
+      orientation: [0, 0, 0, 1],
+    });
+
+    await coordinator.load();
+
+    expect(coordinator.position()).toEqual([0.25, 0.1, 0.4]);
+  });
+
   it('rejects non-finite target positions', () => {
     expect(() => coordinator.setPosition([0, Number.NaN, 0])).toThrow(
       'The arm position target must contain three finite coordinates.',

@@ -34,6 +34,7 @@ export class ArmIkCoordinator {
 
   private ikOrientation: ArmQuaternion | null = null;
   private ikReady = false;
+  private targetInitialized = false;
   private solveTimer: ReturnType<typeof setTimeout> | null = null;
   private solveRequest = 0;
   private loadRequest = 0;
@@ -75,7 +76,9 @@ export class ArmIkCoordinator {
 
       if (request !== this.loadRequest) return;
 
-      this.ikOrientation = this.armIkSolver.endEffectorPose().orientation;
+      const endEffectorPose = this.armIkSolver.endEffectorPose();
+      this.ikOrientation = endEffectorPose.orientation;
+      if (!this.targetInitialized) this.setPosition(endEffectorPose.position);
       this.ikReady = true;
       this.scheduleSolve(this.positionState());
     } catch (error) {

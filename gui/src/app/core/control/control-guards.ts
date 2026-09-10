@@ -7,7 +7,7 @@ import {
   ControlConfirmationDialog,
   ControlConfirmationDialogData,
 } from '../../shared/confirmation-dialog/control-confirmation-dialog';
-import { ArmControl } from './arm/arm-control';
+import { ArmControlModeService } from './arm/arm-control-mode';
 import { DriverControl } from './drive/driver-control';
 
 function openConfirmation(data: ControlConfirmationDialogData) {
@@ -44,6 +44,6 @@ export const armControlGuard: CanActivateFn = () => {
 
 /** Stops Arm output whenever the Arm control workspace is left. */
 export const armControlExitGuard: CanDeactivateFn<unknown> = () => {
-  inject(ArmControl).disable();
+  inject(ArmControlModeService).disable();
   return true;
 };

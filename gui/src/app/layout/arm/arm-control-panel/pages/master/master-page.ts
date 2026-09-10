@@ -1,7 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 
-import { ArmControl } from '../../../../../core/control/arm/arm-control';
+import { ArmControlModeService } from '../../../../../core/control/arm/arm-control-mode';
 import { ArmCommandPublisher } from '../../../../../core/control/arm/arm-command-publisher';
 import { GamepadInput } from '../../../../../core/gamepad/gamepad-input';
 import { RosConnection } from '../../../../../core/ros/ros-connection';
@@ -38,15 +38,15 @@ import { TwoStepActionButton } from '../../../../../shared/two-step-action-butto
   styleUrl: './master-page.scss',
 })
 export class ArmMasterPage {
-  private readonly armControl = inject(ArmControl);
+  private readonly armControlMode = inject(ArmControlModeService);
   private readonly armCommandPublisher = inject(ArmCommandPublisher);
   private readonly gamepad = inject(GamepadInput);
   private readonly rosConnection = inject(RosConnection);
   private readonly dialog = inject(MatDialog);
 
-  readonly masterDriveEnabled = this.armControl.enabled;
+  readonly masterDriveEnabled = this.armControlMode.enabled;
   readonly masterDriveTone: ControlSwitchTone = 'normal';
-  readonly readinessError = this.armControl.readinessError;
+  readonly readinessError = this.armControlMode.readinessError;
   readonly rosConnected = this.rosConnection.isConnected;
   readonly gamepadConnected = this.gamepad.connected;
   readonly gamepadStatusLabel = computed(() =>
@@ -108,10 +108,10 @@ export class ArmMasterPage {
     });
   }
 
-  /** Requests enabled Arm publishing or immediately stops active publishing. */
+  /** Enables the input worker selected by ArmControlModeService. */
   toggleMasterDriveControl(nextState: boolean): void {
     if (!nextState) {
-      this.armControl.disable();
+      this.armControlMode.disable();
       return;
     }
 
@@ -128,7 +128,9 @@ export class ArmMasterPage {
       })
       .afterClosed()
       .subscribe((confirmed) => {
-        if (confirmed === true) this.armControl.enable();
+        if (confirmed !== true) return;
+
+        this.armControlMode.enable();
       });
   }
 

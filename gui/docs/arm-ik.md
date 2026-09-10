@@ -5,6 +5,12 @@ It converts an Arm Operator position target, with the current fixed orientation,
 into named joint angles. It does **not** drive motors or replace rover-side
 safety checks.
 
+In Position mode, the gamepad updates the target through
+`ArmPositionControl`; in Manual mode, `ArmManualControl` continues to publish
+the existing `/arm/joy` command. `ArmControlModeService` selects which handler
+receives input. It owns the shared input loop, so Arm Ops can switch between
+handlers while the master control remains active.
+
 ## Responsibility boundary
 
 ```mermaid
@@ -83,6 +89,16 @@ changes, and exposes the status and latest valid joint angles. The
 `ArmModelViewer` consumes those outputs and only renders the URDF, target
 marker, and valid joint angles.
 
+On the first successful model load, the coordinator initializes the blue target
+marker from the URDF model's current end-effector pose. Later reloads preserve
+the operator's target.
+
+[`src/app/core/control/arm/arm-position-control.ts`](../src/app/core/control/arm/arm-position-control.ts)
+is the Position-mode gamepad adapter. It converts left-stick X/Y input into
+horizontal target movement and D-pad up/down input into height movement, then
+passes the resulting target delta to `ArmIkCoordinator`. It does not publish
+joint commands to ROS.
+
 The low-level solver flow is:
 
 ```ts
@@ -127,13 +143,13 @@ Implemented now:
 - Solving a full end-effector pose.
 - Returning named joint angles and a solver status.
 - Storing and validating the Arm Position-mode target position.
+- Updating the target from the Position-mode gamepad controls.
 - Coordinating target changes through `ArmIkCoordinator`.
 - Showing `SOLVING`, `VALID`, `UNREACHABLE`, and `INVALID` states.
 - Rendering the target marker and applying valid solutions to the Three.js arm.
 
 Not implemented yet:
 
-- A Position-mode UI for choosing the target pose.
 - Live joint telemetry as the normal IK seed and actual-pose rendering.
 - The ROS message/topic/service contract for joint-angle commands.
 - Rover acknowledgement/rejection display.
