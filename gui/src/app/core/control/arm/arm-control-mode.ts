@@ -103,7 +103,6 @@ export class ArmControlModeService {
     if (this.isManual()) this.armManualControl.release();
     if (this.controlMode.isArmActive()) this.controlMode.release();
     this.enabledState.set(false);
-    this.gamepad.stop();
   }
 
   /** Selects the Arm mode; an active session routes the next input to it. */

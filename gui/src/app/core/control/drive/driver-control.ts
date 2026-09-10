@@ -73,7 +73,6 @@ export class DriverControl {
 
     this.publisher.releaseDriverControl();
     this.enabledState.set(false);
-    this.gamepad.stop();
   }
 
   private startPublishing(): void {

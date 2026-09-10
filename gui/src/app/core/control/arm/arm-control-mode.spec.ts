@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 
+import { GamepadInput } from '../../gamepad/gamepad-input';
 import { ArmMode } from '../../fma/fma-state.service';
 import { ArmManualControl } from './arm-manual-control';
 import { ArmControlModeService } from './arm-control-mode';
@@ -53,5 +54,14 @@ describe('ArmControlModeService', () => {
     service.setMode(ArmMode.Manual);
     service.route(snapshot);
     expect(manual).toHaveBeenCalledWith(snapshot);
+  });
+
+  it('keeps the gamepad monitor active when Arm control is disabled', () => {
+    const gamepad = TestBed.inject(GamepadInput);
+    const stop = vi.spyOn(gamepad, 'stop');
+
+    service.disable();
+
+    expect(stop).not.toHaveBeenCalled();
   });
 });
