@@ -49,6 +49,7 @@ ARM_TRIGGER_AXES = (8, 9)
 DRIVE_MODES = {'MANUAL', 'VELOCITY', 'MANAGED'}
 ARM_MODES = {'MANUAL', 'POSITION', 'MANAGED', 'STOWED'}
 LAW_MODES = {'NORMAL', 'ALTERNATE', 'DIRECT'}
+LAW_REQUESTS = {'DIRECT', 'RESTORE'}
 GIMBAL_PRIORITY_OWNERS = {'DRIVER', 'ARM OPS'}
 
 
@@ -73,6 +74,8 @@ class MockRoverNode(Node):
         self.drive_mode: Optional[str] = None
         self.arm_mode: Optional[str] = None
         self.law_mode = 'NORMAL'
+        self.law_before_override: Optional[str] = None
+        self.pending_law: Optional[Tuple[str, float]] = None
         self.gimbal_priority: Optional[str] = None
         self.pending_modes: Dict[str, Optional[Tuple[str, float]]] = {
             'drive': None,
@@ -202,14 +205,17 @@ class MockRoverNode(Node):
         self.get_logger().info(f'Confirmed Gimbal priority: {owner}')
 
     def law_mode_request_callback(self, message: String) -> None:
-        mode = message.data.strip().upper()
-        if mode not in LAW_MODES:
-            self.get_logger().warn(f'Rejected LAW mode request: {mode}')
+        request = message.data.strip().upper()
+        if request not in LAW_REQUESTS:
+            self.get_logger().warn(f'Rejected LAW request: {request}')
             return
 
-        self.law_mode = mode
+        self.pending_law = (
+            request,
+            time.monotonic() + self.mode_ack_delay_seconds,
+        )
         self.publish_fma()
-        self.get_logger().info(f'Confirmed LAW mode: {mode}')
+        self.get_logger().info(f'Pending LAW request: {request}')
 
     def joy_callback(self, subsystem: str, message: Joy, trigger_axes: Tuple[int, int]) -> None:
         if len(message.axes) <= trigger_axes[1]:
@@ -243,6 +249,7 @@ class MockRoverNode(Node):
         self.last_tick = now
 
         self.process_mode_requests(now)
+        self.process_law_request(now)
         self.clear_expired_rejections(now)
         self.joints.step(elapsed)
         self.publish_joint_state()
@@ -265,6 +272,22 @@ class MockRoverNode(Node):
             self.publish_fma()
             self.get_logger().info(f'Confirmed {subsystem} mode: {mode}')
 
+    def process_law_request(self, now: float) -> None:
+        if self.pending_law is None or self.pending_law[1] > now:
+            return
+
+        request = self.pending_law[0]
+        if request == 'DIRECT' and self.law_mode != 'DIRECT':
+            self.law_before_override = self.law_mode
+            self.law_mode = 'DIRECT'
+        elif request == 'RESTORE' and self.law_mode == 'DIRECT':
+            self.law_mode = self.law_before_override or 'NORMAL'
+            self.law_before_override = None
+
+        self.pending_law = None
+        self.publish_fma()
+        self.get_logger().info(f'Confirmed LAW state: {self.law_mode}')
+
     def clear_expired_rejections(self, now: float) -> None:
         changed = False
         for subsystem, clear_time in self.rejection_clear_times.items():
@@ -283,7 +306,11 @@ class MockRoverNode(Node):
             'sequence': self.sequence,
             'drive': self.mode_state('drive', self.drive_mode),
             'arm': self.mode_state('arm', self.arm_mode),
-            'law': self.law_mode,
+            'law': {
+                'confirmed': self.law_mode,
+                'pending': self.pending_law[0] if self.pending_law is not None else None,
+                'rejected': None,
+            },
             'system': 'GOOD',
             'gimbal_priority': self.gimbal_priority,
         }

@@ -5,7 +5,7 @@ import { ArmControlModeService } from '../../../../../core/control/arm/arm-contr
 import { ArmCommandPublisher } from '../../../../../core/control/arm/arm-command-publisher';
 import { ControlModeCommandPublisher } from '../../../../../core/control/control-mode-command-publisher';
 import { GamepadInput } from '../../../../../core/gamepad/gamepad-input';
-import { LawMode } from '../../../../../core/fma/fma-state.service';
+import { LawRequest } from '../../../../../core/fma/fma-state.service';
 import { RosConnection } from '../../../../../core/ros/ros-connection';
 import { ConnectionManager } from '../../../../../features/connection/connection-manager/connection-manager';
 import { ActionButton, ActionButtonTone } from '../../../../../shared/action-button/action-button';
@@ -143,10 +143,10 @@ export class ArmMasterPage {
   }
 
   activateLawOverride(): void {
-    this.controlModeCommandPublisher.publishLawMode(LawMode.Direct);
+    this.controlModeCommandPublisher.publishLawRequest(LawRequest.EnableOverride);
   }
 
   deactivateLawOverride(): void {
-    this.controlModeCommandPublisher.publishLawMode(LawMode.Normal);
+    this.controlModeCommandPublisher.publishLawRequest(LawRequest.Restore);
   }
 }

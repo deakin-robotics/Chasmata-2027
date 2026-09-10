@@ -64,7 +64,15 @@ h2 {
 }
 
 .law-override-indicator {
+  color: var(--dcr-color-info);
+}
+
+.law-override-confirmed {
   color: var(--dcr-color-critical);
+}
+
+.law-override-pending {
+  color: var(--dcr-color-info);
 }
 
 .mode-placeholder {

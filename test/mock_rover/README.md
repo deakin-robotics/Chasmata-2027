@@ -33,8 +33,9 @@ Gimbal camera: http://localhost:8090/?action=stream
 - Starts with LAW `NORMAL`, SYSTEM `GOOD`, and unknown Gimbal priority.
 - Accepts valid Driver and Arm mode requests, publishes them as pending, then
   confirms them after 150 ms.
-- Accepts LAW mode requests on `/fma/law/request` and immediately broadcasts
-  the confirmed LAW mode through `/fma/state`.
+- Accepts LAW requests on `/fma/law/request`, broadcasts them as pending, then
+  confirms them after 150 ms. `DIRECT` enables the override; `RESTORE` returns
+  to the LAW that was active before the override.
 - Accepts temporary Gimbal priority requests on `/fma/gimbal/request`. A valid
   `DRIVER` or `ARM OPS` request becomes the confirmed owner and is rebroadcast
   through `/fma/state`; the latest valid request wins.
@@ -61,7 +62,7 @@ base_joint, shoulder_joint, elbow_joint, yaw_joint, pitch_joint, roll_joint
 | Mock rover → GUI | `/joint_states` | `sensor_msgs/msg/JointState` | Simulated actual joint positions and velocities. |
 | GUI → mock rover | `/fma/drive/request` | `std_msgs/msg/String` | Driver mode value, such as `VELOCITY`. |
 | GUI → mock rover | `/fma/arm/request` | `std_msgs/msg/String` | Arm mode value, such as `POSITION`. |
-| GUI → mock rover | `/fma/law/request` | `std_msgs/msg/String` | LAW mode request: `NORMAL`, `ALTERNATE`, or `DIRECT`. |
+| GUI → mock rover | `/fma/law/request` | `std_msgs/msg/String` | LAW request: `DIRECT` or `RESTORE`. |
 | GUI → mock rover | `/fma/gimbal/request` | `std_msgs/msg/String` | Temporary Gimbal priority request: `DRIVER` or `ARM OPS`. |
 | Mock rover → GUI | `/fma/state` | `std_msgs/msg/String` | JSON FMA telemetry broadcast. |
 
@@ -77,17 +78,17 @@ The provisional `/fma/state` JSON shape is:
   "sequence": 12,
   "drive": {"confirmed": "VELOCITY", "pending": null, "rejected": null},
   "arm": {"confirmed": "POSITION", "pending": null, "rejected": null},
-  "law": "NORMAL",
+  "law": {"confirmed": "NORMAL", "pending": null, "rejected": null},
   "system": "GOOD",
   "gimbal_priority": null
 }
 ```
 
-This JSON and `/fma/gimbal/request` topic are deliberately provisional. They
-keep the mock usable before the Control team finalises the production Gimbal
-priority message definition. The GUI should replace this adapter with the
-final message type when that contract is agreed; the mock's feedback
-responsibilities stay the same.
+This JSON and the `/fma/law/request` and `/fma/gimbal/request` topics are
+deliberately provisional. They keep the mock usable before the Control team
+finalises the production FMA message definitions. The GUI should replace this
+adapter with the final message types when those contracts are agreed; the
+mock's feedback responsibilities stay the same.
 
 ## Parameters
 

@@ -24,6 +24,7 @@ The rover must publish the following immediately whenever they change:
 - E-stop and watchdog state.
 - DRIVE, ARM, LAW, and SYSTEM FMA state; Gimbal owner/priority and LINK state.
 - Pending, confirmed, and rejected DRIVE/ARM mode request state.
+- Pending and confirmed LAW override state.
 - Motor, drivetrain, and arm fault state.
 - Safety-inhibit, arm-protection, and joint-limit state.
 - Controller connection state.
@@ -65,17 +66,24 @@ second. It includes the latest values from every telemetry category, active
 faults and alerts, FMA states, safety states, link state, T/O CONFIG status,
 and Gimbal ownership. This allows a GUI instance to recover after reconnecting
 or missing an update. The snapshot includes both confirmed FMA values and any
-pending mode request state.
+pending DRIVE, ARM, or LAW mode request state.
 
 ## FMA and ECAM requirements
 
 The FMA requires confirmed DRIVE, ARM, LAW, GIMBAL owner/priority, and SYSTEM
 state. Link health remains available as general telemetry and for the System
-Display. For DRIVE and ARM mode changes, the rover must also publish the
+Display. For DRIVE, ARM, and LAW mode changes, the rover must also publish the
 current pending request or rejection result. A pending requested value is
 displayed in blue by every GUI instance; it is not displayed as confirmed until
-the rover reports its updated authoritative state in green. A rejected request
-must clear the pending value without changing the confirmed state.
+the rover reports its updated authoritative state in green. For a LAW `DIRECT`
+request, this means the rover may broadcast the underlying confirmed LAW
+(`NORMAL` or `ALTERNATE`) together with a pending `DIRECT`; every GUI then shows
+blue `OVERRIDE` on the LAW third row. After confirmation, the GUI shows red
+`OVERRIDE` and confirmed LAW becomes `DIRECT`. To disable the override, the GUI
+sends `RESTORE`; the rover restores the LAW that was active before `DIRECT`.
+If the rover rejects or cannot complete a request, it must keep the confirmed
+LAW state authoritative and report the request outcome without making `DIRECT`
+appear confirmed.
 
 ECAM uses complete active alert-code snapshots. The rover sends the full current
 set of stable active ECAM codes immediately whenever that set changes and in the

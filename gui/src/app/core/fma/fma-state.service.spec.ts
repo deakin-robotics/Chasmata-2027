@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 
-import { ArmMode, DriveMode, FmaStateService, LawMode } from './fma-state.service';
+import { ArmMode, DriveMode, FmaStateService, LawMode, LawRequest } from './fma-state.service';
 
 describe('FmaStateService', () => {
   let service: FmaStateService;
@@ -68,11 +68,18 @@ describe('FmaStateService', () => {
 
   it('derives the override indicator from authoritative LAW telemetry', () => {
     expect(service.lawOverrideActive()).toBe(false);
+    expect(service.lawOverridePending()).toBe(false);
 
-    service.setLawMode(LawMode.Direct);
-    expect(service.lawOverrideActive()).toBe(true);
-
-    service.setLawMode(LawMode.Normal);
+    service.setLawTelemetry(LawMode.Alternate, LawRequest.EnableOverride);
     expect(service.lawOverrideActive()).toBe(false);
+    expect(service.lawOverridePending()).toBe(true);
+
+    service.setLawTelemetry(LawMode.Direct, LawRequest.Restore);
+    expect(service.lawOverrideActive()).toBe(true);
+    expect(service.lawOverridePending()).toBe(false);
+
+    service.setLawTelemetry(LawMode.Alternate, null);
+    expect(service.lawOverrideActive()).toBe(false);
+    expect(service.lawOverridePending()).toBe(false);
   });
 });

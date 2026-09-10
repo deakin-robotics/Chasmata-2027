@@ -19,6 +19,11 @@ export enum LawMode {
   Direct = 'DIRECT',
 }
 
+export enum LawRequest {
+  EnableOverride = 'DIRECT',
+  Restore = 'RESTORE',
+}
+
 export enum SystemMode {
   Good = 'GOOD',
   Degraded = 'DEGRADED',
@@ -31,7 +36,7 @@ export type GimbalPriorityOwner = 'DRIVER' | 'ARM OPS';
 export type FmaColumn =
   | { label: 'DRIVE'; confirmed: DriveMode | null; commanded: DriveMode | null }
   | { label: 'ARM'; confirmed: ArmMode | null; commanded: ArmMode | null }
-  | { label: 'LAW'; confirmed: LawMode | null; commanded: null }
+  | { label: 'LAW'; confirmed: LawMode | null; commanded: LawRequest | null }
   | { label: 'GIMBAL'; confirmed: GimbalPriorityOwner | null; commanded: null }
   | { label: 'SYSTEM'; confirmed: SystemMode | null; commanded: SystemMode | null };
 
@@ -50,6 +55,11 @@ export class FmaStateService {
   readonly lawOverrideActive = computed(() =>
     this.columnsState().some(
       (column) => column.label === 'LAW' && column.confirmed === LawMode.Direct,
+    ),
+  );
+  readonly lawOverridePending = computed(() =>
+    this.columnsState().some(
+      (column) => column.label === 'LAW' && column.commanded === LawRequest.EnableOverride,
     ),
   );
 
@@ -129,7 +139,12 @@ export class FmaStateService {
 
   /** Applies authoritative LAW telemetry, or clears it when unknown. */
   setLawMode(mode: LawMode | null): void {
-    this.updateColumn('LAW', (column) => ({ ...column, confirmed: mode, commanded: null }));
+    this.setLawTelemetry(mode, null);
+  }
+
+  /** Applies authoritative LAW telemetry, including a pending override request. */
+  setLawTelemetry(confirmed: LawMode | null, commanded: LawRequest | null): void {
+    this.updateColumn('LAW', (column) => ({ ...column, confirmed, commanded }));
   }
 
   /** Applies authoritative SYSTEM telemetry, or clears it when unknown. */

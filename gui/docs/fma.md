@@ -29,6 +29,13 @@ When an operator selects a mode from the GUI, the request is sent to the rover.
 The rover broadcasts the pending requested mode, which is shown in **blue** by
 every GUI while the command is waiting for acknowledgement.
 
+The same rule applies to the Arm protection override. A requested `DIRECT`
+override is shown as blue `OVERRIDE` on the LAW column's third row while the
+confirmed LAW remains its underlying `NORMAL` or `ALTERNATE` value. It changes to red `OVERRIDE` only after the
+rover broadcasts confirmed `DIRECT`. If the rover cannot enable the override
+yet, it keeps broadcasting the pending request so every GUI shows the same
+blue `OVERRIDE`.
+
 At GUI startup, Driver defaults to `VELOCITY` and Arm defaults to `POSITION`.
 While the rover connection is unavailable, these remain local selections and
 are not shown as FMA requests. Once the connection is established, the
@@ -156,7 +163,11 @@ If Arm Ops selects the override:
 
 `LAW: NORMAL → DIRECT`
 
-This annunciation makes it clear that the arm is operating without its normal protection layer.
+The LAW column's third row displays `OVERRIDE` in blue while `DIRECT` is
+pending, then red once the rover confirms `DIRECT`. The confirmed LAW value
+stays at the underlying `NORMAL` or `ALTERNATE` law during the pending period.
+When Arm Ops releases the override, the GUI sends `RESTORE`; the rover returns
+to the law that was active before `DIRECT`.
 
 ---
 
@@ -308,6 +319,6 @@ Emergency stop is active. Actuation is disabled and a deliberate reset/re-arm ac
 |---|---|---|
 | **DRIVE** | Current drivetrain control method | `MANUAL`, `VELOCITY`, `MANAGED •` |
 | **ARM** | Current arm control/configuration | `MANUAL`, `POSITION`, `MANAGED •`, `STOWED` |
-| **LAW** | Arm protection level | `NORMAL`, `ALTERNATE`, `DIRECT` |
+| **LAW** | Arm protection level and override request | `NORMAL`, `ALTERNATE`, `DIRECT`; blue/red `OVERRIDE` |
 | **GIMBAL** | Existing Gimbal Priority owner indicator | `← DRIVER`, `ARM OPS →`, `GIMBAL PRIORITY UNKNOWN` |
 | **SYSTEM** | Overall rover/control-stack health | `GOOD`, `DEGRADED`, `FAULT`, `E-STOP` |

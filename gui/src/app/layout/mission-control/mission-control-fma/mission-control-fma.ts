@@ -16,6 +16,7 @@ export class MissionControlFma {
 
   readonly columns = this.fmaState.columns;
   readonly lawOverrideActive = this.fmaState.lawOverrideActive;
+  readonly lawOverridePending = this.fmaState.lawOverridePending;
   readonly gimbalPriorityOwner = this.fmaState.gimbalPriorityOwner;
   readonly gimbalPriorityDisplay = this.fmaState.gimbalPriorityDisplay;
   readonly gimbalPriorityAriaLabel = this.fmaState.gimbalPriorityAriaLabel;

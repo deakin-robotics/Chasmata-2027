@@ -36,10 +36,12 @@
           @if (column.label === 'LAW') {
             <span
               class="mode law-override-indicator"
-              [class.mode-placeholder]="!lawOverrideActive()"
-              [attr.aria-hidden]="!lawOverrideActive()"
+              [class.law-override-pending]="lawOverridePending() && !lawOverrideActive()"
+              [class.law-override-confirmed]="lawOverrideActive()"
+              [class.mode-placeholder]="!lawOverridePending() && !lawOverrideActive()"
+              [attr.aria-hidden]="!lawOverridePending() && !lawOverrideActive()"
             >
-              {{ lawOverrideActive() ? 'OVERRIDE' : '' }}
+              {{ lawOverridePending() || lawOverrideActive() ? 'OVERRIDE' : '' }}
             </span>
           }
         }

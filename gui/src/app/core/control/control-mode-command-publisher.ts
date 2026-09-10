@@ -2,7 +2,7 @@ import { Service, inject } from '@angular/core';
 import { Ros, Topic } from 'roslib';
 
 import { RosConnection } from '../ros/ros-connection';
-import { LawMode } from '../fma/fma-state.service';
+import { LawRequest } from '../fma/fma-state.service';
 import { ArmControlMode } from './arm/arm-control-mode';
 import { DriverControlMode } from './drive/drive-control-mode';
 
@@ -37,11 +37,11 @@ export class ControlModeCommandPublisher {
     return true;
   }
 
-  publishLawMode(mode: LawMode): boolean {
+  publishLawRequest(request: LawRequest): boolean {
     const topic = this.getTopic('law');
     if (!topic) return false;
 
-    topic.publish({ data: mode });
+    topic.publish({ data: request });
     return true;
   }
 
