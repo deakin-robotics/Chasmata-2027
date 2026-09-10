@@ -5,7 +5,9 @@ import math
 import time
 from typing import Dict, Optional, Tuple
 
+from control_msgs.action import FollowJointTrajectory
 import rclpy
+from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import JointState, Joy
@@ -34,6 +36,7 @@ JOINT_LIMITS: Dict[str, Tuple[float, float]] = {
 }
 
 JOINT_COMMAND_TOPIC = '/joint_commands'
+ARM_TRAJECTORY_ACTION = '/arm_controller/follow_joint_trajectory'
 JOINT_STATE_TOPIC = '/joint_states'
 DRIVE_JOY_TOPIC = '/joy'
 ARM_JOY_TOPIC = '/arm/joy'
@@ -100,6 +103,14 @@ class MockRoverNode(Node):
 
         self.fma_publisher = self.create_publisher(String, FMA_STATE_TOPIC, fma_qos)
         self.joint_state_publisher = self.create_publisher(JointState, JOINT_STATE_TOPIC, 10)
+        self.trajectory_action_server = ActionServer(
+            self,
+            FollowJointTrajectory,
+            ARM_TRAJECTORY_ACTION,
+            execute_callback=self.execute_trajectory,
+            goal_callback=self.trajectory_goal_callback,
+            cancel_callback=self.trajectory_cancel_callback,
+        )
 
         self.create_subscription(
             JointState,
@@ -195,6 +206,57 @@ class MockRoverNode(Node):
         if accepted_values:
             self.get_logger().debug(f'Accepted joint target: {accepted_values}')
             self.publish_joint_state()
+
+    def trajectory_goal_callback(self, goal_request) -> GoalResponse:
+        if not goal_request.trajectory.joint_names or not goal_request.trajectory.points:
+            return GoalResponse.REJECT
+
+        return GoalResponse.ACCEPT
+
+    def trajectory_cancel_callback(self, _goal_handle) -> CancelResponse:
+        return CancelResponse.ACCEPT
+
+    async def execute_trajectory(self, goal_handle):
+        result = FollowJointTrajectory.Result()
+        trajectory = goal_handle.request.trajectory
+        joint_names = list(trajectory.joint_names)
+
+        if len(joint_names) != len(JOINT_NAMES) or set(joint_names) != set(JOINT_NAMES):
+            result.error_code = FollowJointTrajectory.Result.INVALID_JOINTS
+            result.error_string = 'The trajectory must contain the six arm joints.'
+            goal_handle.abort()
+            return result
+
+        final_point = trajectory.points[-1]
+        if len(final_point.positions) != len(joint_names) or not all(
+            math.isfinite(float(position)) for position in final_point.positions
+        ):
+            result.error_code = FollowJointTrajectory.Result.INVALID_GOAL
+            result.error_string = 'The trajectory final point has invalid positions.'
+            goal_handle.abort()
+            return result
+
+        if goal_handle.is_cancel_requested:
+            goal_handle.canceled()
+            result.error_code = FollowJointTrajectory.Result.INVALID_GOAL
+            result.error_string = 'The trajectory was cancelled before execution.'
+            return result
+
+        accepted_values = self.joints.set_target_immediately(
+            dict(zip(joint_names, final_point.positions))
+        )
+        if len(accepted_values) != len(JOINT_NAMES):
+            result.error_code = FollowJointTrajectory.Result.INVALID_GOAL
+            result.error_string = 'The trajectory contained an unknown arm joint.'
+            goal_handle.abort()
+            return result
+
+        self.publish_joint_state()
+        goal_handle.succeed()
+        result.error_code = FollowJointTrajectory.Result.SUCCESSFUL
+        result.error_string = ''
+        self.get_logger().info('Executed an arm trajectory through the mock rover')
+        return result
 
     def gimbal_priority_request_callback(self, message: String) -> None:
         owner = message.data.strip().upper()

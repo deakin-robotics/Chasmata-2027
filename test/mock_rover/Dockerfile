@@ -5,6 +5,7 @@ SHELL ["/bin/bash", "-c"]
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         python3-colcon-common-extensions \
+        ros-jazzy-control-msgs \
         ros-jazzy-rosbridge-server \
     && rm -rf /var/lib/apt/lists/*
 
