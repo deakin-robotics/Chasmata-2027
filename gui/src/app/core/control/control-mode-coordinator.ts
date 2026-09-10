@@ -30,6 +30,8 @@ export class ControlModeCoordinator {
 
   /** Selects the Driver mode and requests it from the rover when connected. */
   selectDriveMode(mode: DriverControlMode): void {
+    if (mode === this.driverControlMode.mode()) return;
+
     this.driverControlMode.setMode(mode);
 
     if (!this.rosConnection.isConnected()) return;
@@ -40,6 +42,8 @@ export class ControlModeCoordinator {
 
   /** Selects the Arm mode and requests it from the rover when connected. */
   selectArmMode(mode: ArmControlMode): void {
+    if (mode === this.armControlMode.mode()) return;
+
     this.armControlMode.setMode(mode);
 
     if (!this.rosConnection.isConnected()) return;

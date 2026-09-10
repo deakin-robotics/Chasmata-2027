@@ -24,11 +24,12 @@ const ARM_URDF_URL = '/assets/kinematics/arm.urdf';
 const ARM_MODEL_COLOR = '#697482';
 const ARM_TARGET_COLOR = '#62a8e5';
 const ARM_ACTUAL_COLOR = '#62c77a';
+const GRID_SIZE = 1.4;
 
 type ViewerStatus = 'unavailable' | 'loading' | 'ready' | 'error';
 type ThreeModule = typeof import('three');
 
-/** Renders the arm URDF in a Three.js scene. */
+/** Renders the arm URDF and rover feedback in a Three.js scene. */
 @Component({
   selector: 'app-arm-model-viewer',
   imports: [MatIconModule, UnavailableOverlay],
@@ -69,11 +70,12 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
   private renderer: Three.WebGLRenderer | null = null;
   private controls: OrbitControls | null = null;
   private robot: URDFRobot | null = null;
-  private resizeObserver: ResizeObserver | null = null;
-  private animationFrame: number | null = null;
+  private groundGrid: Three.GridHelper | null = null;
   private targetMarker: Three.Mesh | null = null;
   private actualMarker: Three.Mesh | null = null;
-  private groundGrid: Three.GridHelper | null = null;
+  private resizeObserver: ResizeObserver | null = null;
+  private animationFrame: number | null = null;
+  private initialPoseNeedsFraming = false;
   private initializing = false;
   private destroyed = false;
 
@@ -90,13 +92,19 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     this.statusMessage.set('Unavailable');
   });
 
-  private readonly targetPositionEffect = effect(() => {
-    const position = this.armIkCoordinator.position();
+  private readonly telemetryEffect = effect(() => {
+    const targetPosition = this.armIkCoordinator.position();
     const actualJointAngles = this.armTelemetry.actualJointAngles();
-    this.targetMarker?.position.set(...position);
 
-    if (actualJointAngles) {
-      this.applyActualJointAngles(actualJointAngles);
+    this.targetMarker?.position.set(...targetPosition);
+
+    if (!actualJointAngles || !this.robot) return;
+
+    this.applyActualJointAngles(actualJointAngles);
+
+    if (this.initialPoseNeedsFraming) {
+      this.frameInitialView(this.robot);
+      this.initialPoseNeedsFraming = false;
     }
   });
 
@@ -113,112 +121,16 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     const host = this.sceneHost?.nativeElement;
     const renderer = this.renderer;
     const camera = this.camera;
-
     if (!host || !renderer || !camera) return;
 
     const width = Math.max(host.clientWidth, 1);
     const height = Math.max(host.clientHeight, 1);
-
     renderer.setSize(width, height, false);
+    renderer.domElement.style.width = '100%';
+    renderer.domElement.style.height = '100%';
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
   };
-
-  private initializeScene(): boolean {
-    const host = this.sceneHost?.nativeElement;
-    const three = this.three;
-    const OrbitControlsConstructor = this.orbitControlsConstructor;
-    if (!host || !three || !OrbitControlsConstructor) return false;
-
-    if (typeof WebGLRenderingContext === 'undefined') {
-      this.status.set('error');
-      this.statusMessage.set('3D rendering unavailable');
-      return false;
-    }
-
-    try {
-      const scene = new three.Scene();
-      const camera = new three.PerspectiveCamera(35, 1, 0.01, 100);
-      const renderer = new three.WebGLRenderer({ antialias: true, alpha: true });
-      const controls = new OrbitControlsConstructor(camera, renderer.domElement);
-
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      renderer.setClearColor(0x000000, 0);
-      renderer.outputEncoding = three.sRGBEncoding;
-
-      camera.position.set(1.5, 1.2, 1.5);
-      camera.lookAt(0, 0.5, 0);
-
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.08;
-      controls.enablePan = false;
-      controls.minDistance = 0.35;
-      controls.maxDistance = 5;
-
-      scene.add(new three.AmbientLight(0xffffff, 1));
-
-      const keyLight = new three.DirectionalLight(0xffffff, 1.4);
-      keyLight.position.set(2, 3, 3);
-      scene.add(keyLight);
-
-      const fillLight = new three.DirectionalLight(0x9fc7ff, 0.6);
-      fillLight.position.set(-2, 1, -2);
-      scene.add(fillLight);
-
-      renderer.domElement.setAttribute('aria-hidden', 'true');
-      host.appendChild(renderer.domElement);
-
-      this.scene = scene;
-      this.camera = camera;
-      this.renderer = renderer;
-      this.controls = controls;
-      this.resizeScene();
-      return true;
-    } catch {
-      this.status.set('error');
-      this.statusMessage.set('3D rendering unavailable');
-      return false;
-    }
-  }
-
-  private async initializeViewer(): Promise<void> {
-    if (!this.rosConnected()) return;
-
-    if (typeof WebGLRenderingContext === 'undefined') {
-      this.status.set('error');
-      this.statusMessage.set('3D rendering unavailable');
-      return;
-    }
-
-    try {
-      const [three, controlsModule, urdfModule] = await Promise.all([
-        import('three'),
-        import('three/examples/jsm/controls/OrbitControls.js'),
-        import('urdf-loader'),
-      ]);
-
-      if (this.destroyed || !this.rosConnected()) return;
-
-      this.three = three;
-      this.orbitControlsConstructor = controlsModule.OrbitControls;
-      this.loader = new urdfModule.default();
-
-      await this.armIkCoordinator.load(ARM_URDF_URL);
-
-      if (this.destroyed || !this.rosConnected()) return;
-
-      if (!this.initializeScene()) return;
-
-      this.observeResize();
-      this.loadArmModel();
-      this.animate();
-    } catch {
-      if (this.destroyed || !this.rosConnected()) return;
-
-      this.status.set('error');
-      this.statusMessage.set('3D viewer failed to initialize');
-    }
-  }
 
   private startViewer(): void {
     if (
@@ -237,6 +149,93 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     });
   }
 
+  private async initializeViewer(): Promise<void> {
+    try {
+      if (typeof WebGLRenderingContext === 'undefined') {
+        throw new Error('3D rendering unavailable');
+      }
+
+      const [three, controlsModule, urdfModule] = await Promise.all([
+        import('three'),
+        import('three/examples/jsm/controls/OrbitControls.js'),
+        import('urdf-loader'),
+      ]);
+
+      if (this.destroyed || !this.rosConnected()) return;
+
+      this.three = three;
+      this.orbitControlsConstructor = controlsModule.OrbitControls;
+      this.loader = new urdfModule.default();
+      this.createScene();
+      this.observeResize();
+      this.animate();
+
+      await this.armIkCoordinator.load(ARM_URDF_URL);
+      if (this.destroyed || !this.rosConnected()) return;
+
+      this.loadArmModel();
+    } catch {
+      if (this.destroyed || !this.rosConnected()) return;
+
+      this.disposeViewer();
+      this.status.set('error');
+      this.statusMessage.set('3D viewer failed to initialize');
+    }
+  }
+
+  private createScene(): void {
+    const host = this.sceneHost?.nativeElement;
+    const three = this.three;
+    const OrbitControlsConstructor = this.orbitControlsConstructor;
+    if (!host || !three || !OrbitControlsConstructor) {
+      throw new Error('3D viewer dependencies are unavailable');
+    }
+
+    const scene = new three.Scene();
+    const camera = new three.PerspectiveCamera(35, 1, 0.01, 100);
+    const renderer = new three.WebGLRenderer({ antialias: true, alpha: true });
+    const controls = new OrbitControlsConstructor(camera, renderer.domElement);
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setClearColor(0x000000, 0);
+    renderer.outputEncoding = three.sRGBEncoding;
+
+    camera.position.set(1.5, 1.2, 1.5);
+    camera.lookAt(0, 0, 0);
+
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.enablePan = true;
+    controls.screenSpacePanning = true;
+    controls.minDistance = 0.35;
+    controls.maxDistance = 5;
+
+    scene.add(new three.AmbientLight(0xffffff, 1));
+
+    const keyLight = new three.DirectionalLight(0xffffff, 1.4);
+    keyLight.position.set(2, 3, 3);
+    scene.add(keyLight);
+
+    const fillLight = new three.DirectionalLight(0x9fc7ff, 0.6);
+    fillLight.position.set(-2, 1, -2);
+    scene.add(fillLight);
+
+    renderer.domElement.setAttribute('aria-hidden', 'true');
+    host.appendChild(renderer.domElement);
+
+    this.scene = scene;
+    this.camera = camera;
+    this.renderer = renderer;
+    this.controls = controls;
+    this.resizeScene();
+
+    // The host can receive its final grid size only after this view has been
+    // inserted into the dashboard. Resize again after that layout pass.
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(this.resizeScene);
+    }
+  }
+
   private observeResize(): void {
     const host = this.sceneHost?.nativeElement;
     if (!host) return;
@@ -244,36 +243,21 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     if (typeof ResizeObserver !== 'undefined') {
       this.resizeObserver = new ResizeObserver(this.resizeScene);
       this.resizeObserver.observe(host);
-    } else if (typeof window !== 'undefined') {
+      return;
+    }
+
+    if (typeof window !== 'undefined') {
       window.addEventListener('resize', this.resizeScene);
     }
   }
 
   private loadArmModel(): void {
-    const scene = this.scene;
     const loader = this.loader;
-    if (!scene || !loader) return;
+    if (!loader) return;
 
     loader.load(
       ARM_URDF_URL,
-      (robot) => {
-        if (this.destroyed || !this.rosConnected() || !this.scene) return;
-
-        this.robot = robot;
-        robot.rotation.x = -Math.PI / 2;
-        this.styleRobot(robot);
-        scene.add(robot);
-        this.addGroundGrid(robot);
-        this.frameRobot(robot);
-        this.addTargetMarker(robot);
-        this.addActualMarker(robot);
-        const actualJointAngles = this.armTelemetry.actualJointAngles();
-        if (actualJointAngles) {
-          this.applyActualJointAngles(actualJointAngles);
-        }
-        this.status.set('ready');
-        this.statusMessage.set('Ready');
-      },
+      (robot) => this.onArmModelLoaded(robot),
       undefined,
       () => {
         if (this.destroyed || !this.rosConnected()) return;
@@ -282,6 +266,93 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
         this.statusMessage.set('Unable to load arm model');
       },
     );
+  }
+
+  private onArmModelLoaded(robot: URDFRobot): void {
+    if (this.destroyed || !this.rosConnected() || !this.scene) return;
+
+    this.robot = robot;
+    robot.rotation.x = -Math.PI / 2;
+    this.styleRobot(robot);
+    this.scene.add(robot);
+
+    const actualJointAngles = this.armTelemetry.actualJointAngles();
+    if (actualJointAngles) this.applyActualJointAngles(actualJointAngles);
+
+    // The camera is framed only after the model has its first available pose.
+    this.frameInitialView(robot);
+    this.addGroundGrid(robot);
+    this.addTargetMarker(robot);
+    this.addActualMarker(robot);
+    this.initialPoseNeedsFraming = !actualJointAngles;
+
+    this.status.set('ready');
+    this.statusMessage.set('Ready');
+  }
+
+  private frameInitialView(robot: URDFRobot): void {
+    const camera = this.camera;
+    const controls = this.controls;
+    const three = this.three;
+    if (!camera || !controls || !three) return;
+
+    robot.updateMatrixWorld(true);
+    const bounds = this.getModelBounds(robot);
+    const size = bounds.getSize(new three.Vector3());
+    const distance = Math.max(size.x, size.y, size.z, 0.1) * 1.3;
+    const target = this.getBaseVisualPosition(robot);
+
+    camera.near = Math.max(distance / 100, 0.001);
+    camera.far = Math.max(distance * 20, 10);
+    camera.position.set(
+      target.x - distance * 0.95,
+      target.y + distance * 0.85,
+      target.z + distance * 1.15,
+    );
+    camera.lookAt(target);
+    controls.target.copy(target);
+    controls.update();
+    camera.updateProjectionMatrix();
+  }
+
+  private getBaseVisualPosition(robot: URDFRobot): Three.Vector3 {
+    const three = this.three;
+    const baseLink = robot.links['base_link'] ?? robot;
+    const baseVisual = baseLink.children.find((child) => child.type === 'URDFVisual');
+    const position = new three!.Vector3();
+    (baseVisual ?? baseLink).getWorldPosition(position);
+    return position;
+  }
+
+  private getModelBounds(robot: URDFRobot): Three.Box3 {
+    const three = this.three;
+    const bounds = new three!.Box3();
+
+    robot.traverse((object) => {
+      if (object === this.targetMarker || object === this.actualMarker) return;
+      if (!('geometry' in object) || !('material' in object)) return;
+
+      const mesh = object as Three.Mesh;
+      mesh.geometry.computeBoundingBox();
+      if (!mesh.geometry.boundingBox) return;
+
+      bounds.union(mesh.geometry.boundingBox.clone().applyMatrix4(mesh.matrixWorld));
+    });
+
+    return bounds.isEmpty() ? new three!.Box3().setFromObject(robot) : bounds;
+  }
+
+  private addGroundGrid(robot: URDFRobot): void {
+    const scene = this.scene;
+    const three = this.three;
+    if (!scene || !three) return;
+
+    const grid = new three.GridHelper(GRID_SIZE, 14, 0x405064, 0x263341);
+    const bounds = this.getModelBounds(robot);
+    const basePosition = this.getBaseVisualPosition(robot);
+    grid.position.set(basePosition.x, bounds.min.y, basePosition.z);
+    scene.add(grid);
+    this.groundGrid = grid;
   }
 
   private addTargetMarker(robot: URDFRobot): void {
@@ -316,8 +387,8 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     this.updateActualMarkerPosition(robot);
   }
 
-  private applyActualJointAngles(jointAngles: Readonly<Record<string, number>> | null): void {
-    if (!jointAngles || !this.robot) return;
+  private applyActualJointAngles(jointAngles: Readonly<Record<string, number>>): void {
+    if (!this.robot) return;
 
     for (const [name, angle] of Object.entries(jointAngles)) {
       if (Number.isFinite(angle)) this.robot.setJointValue(name, angle);
@@ -328,13 +399,12 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
   }
 
   private updateActualMarkerPosition(robot: URDFRobot): void {
-    const three = this.three;
     const marker = this.actualMarker;
     const endEffector = robot.links['ee_link'];
-    if (!three || !marker || !endEffector) return;
+    if (!marker || !endEffector) return;
 
     robot.updateMatrixWorld(true);
-    const position = new three.Vector3();
+    const position = new this.three!.Vector3();
     endEffector.getWorldPosition(position);
     robot.worldToLocal(position);
     marker.position.copy(position);
@@ -348,7 +418,6 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
       if (!('geometry' in object) || !('material' in object)) return;
 
       const mesh = object as Three.Mesh;
-
       const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       const styledMaterials = materials.map(
         () =>
@@ -362,52 +431,6 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     });
   }
 
-  private addGroundGrid(robot: URDFRobot): void {
-    const scene = this.scene;
-    const three = this.three;
-    if (!scene || !three) return;
-
-    robot.updateMatrixWorld(true);
-    const bounds = new three.Box3().setFromObject(robot);
-    const size = bounds.getSize(new three.Vector3());
-    const gridSize = Math.max(size.x, size.z, 1.4);
-    const grid = new three.GridHelper(gridSize, 14, 0x405064, 0x263341);
-
-    grid.position.y = bounds.min.y;
-    scene.add(grid);
-    this.groundGrid = grid;
-  }
-
-  private frameRobot(robot: URDFRobot): void {
-    const camera = this.camera;
-    const controls = this.controls;
-    const three = this.three;
-    if (!camera || !controls || !three) return;
-
-    robot.updateMatrixWorld(true);
-    let bounds = new three.Box3().setFromObject(robot);
-    const centre = bounds.getCenter(new three.Vector3());
-
-    robot.position.x -= centre.x;
-    robot.position.y -= bounds.min.y;
-    robot.position.z -= centre.z;
-    robot.updateMatrixWorld(true);
-
-    bounds = new three.Box3().setFromObject(robot);
-    const size = bounds.getSize(new three.Vector3());
-    const height = Math.max(size.y, 0.1);
-    const distance = Math.max(size.x, size.y, size.z) * 1.3;
-    const target = new three.Vector3(0, height * 0.45, 0);
-
-    camera.near = Math.max(distance / 100, 0.001);
-    camera.far = Math.max(distance * 20, 10);
-    camera.position.set(-distance * 0.95, distance * 0.85, distance * 1.15);
-    camera.lookAt(target);
-    controls.target.copy(target);
-    controls.update();
-    camera.updateProjectionMatrix();
-  }
-
   private animate(): void {
     if (!this.renderer || !this.scene || !this.camera) return;
 
@@ -416,23 +439,9 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     this.renderer.render(this.scene, this.camera);
   }
 
-  private disposeRobot(): void {
-    const three = this.three;
-    if (!three) return;
-
-    this.robot?.traverse((object) => {
-      if (!('geometry' in object) || !('material' in object)) return;
-
-      const mesh = object as Three.Mesh;
-
-      mesh.geometry.dispose();
-      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      materials.forEach((material) => material.dispose());
-    });
-  }
-
   private disposeViewer(): void {
     this.armIkCoordinator.reset();
+    this.initialPoseNeedsFraming = false;
 
     if (this.animationFrame !== null && typeof window !== 'undefined') {
       window.cancelAnimationFrame(this.animationFrame);
@@ -441,10 +450,7 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
 
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
-
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('resize', this.resizeScene);
-    }
+    if (typeof window !== 'undefined') window.removeEventListener('resize', this.resizeScene);
 
     this.controls?.dispose();
     this.controls = null;
@@ -467,5 +473,16 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     this.camera = null;
     this.targetMarker = null;
     this.actualMarker = null;
+  }
+
+  private disposeRobot(): void {
+    this.robot?.traverse((object) => {
+      if (!('geometry' in object) || !('material' in object)) return;
+
+      const mesh = object as Three.Mesh;
+      mesh.geometry.dispose();
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      materials.forEach((material) => material.dispose());
+    });
   }
 }

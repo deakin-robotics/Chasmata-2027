@@ -78,7 +78,10 @@ export class ArmIkCoordinator {
 
       const endEffectorPose = this.armIkSolver.endEffectorPose();
       this.ikOrientation = endEffectorPose.orientation;
-      if (!this.targetInitialized) this.setPosition(endEffectorPose.position);
+      if (!this.targetInitialized) {
+        this.setPosition(endEffectorPose.position);
+        this.targetInitialized = true;
+      }
       this.ikReady = true;
       this.scheduleSolve(this.positionState());
     } catch (error) {
