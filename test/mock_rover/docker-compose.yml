@@ -1,0 +1,6 @@
+services:
+  mock-rover:
+    build: .
+    ports:
+      - '9090:9090'
+    restart: unless-stopped

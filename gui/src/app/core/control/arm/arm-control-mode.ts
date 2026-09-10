@@ -1,9 +1,11 @@
-import { Service, computed, inject, signal } from '@angular/core';
+import { Service, computed, effect, inject, signal } from '@angular/core';
 
+import { ArmIkCoordinator } from '../../arm/arm-ik-coordinator';
 import { GamepadInput, GamepadSnapshot } from '../../gamepad/gamepad-input';
 import { ArmMode } from '../../fma/fma-state.service';
 import { RosConnection } from '../../ros/ros-connection';
 import { ControlModeService } from '../control-mode';
+import { ArmCommandPublisher } from './arm-command-publisher';
 import { ArmManualControl } from './arm-manual-control';
 import { ArmPositionControl } from './arm-position-control';
 
@@ -20,6 +22,8 @@ export class ArmControlModeService {
   private readonly rosConnection = inject(RosConnection);
   private readonly controlMode = inject(ControlModeService);
   private readonly gamepad = inject(GamepadInput);
+  private readonly armIkCoordinator = inject(ArmIkCoordinator);
+  private readonly armCommandPublisher = inject(ArmCommandPublisher);
   private readonly armManualControl = inject(ArmManualControl);
   private readonly armPositionControl = inject(ArmPositionControl);
 
@@ -41,6 +45,17 @@ export class ArmControlModeService {
   readonly canControlArm = computed(
     () => this.enabledState() && this.rosConnection.isConnected() && this.controlMode.isArmActive(),
   );
+
+  private readonly jointTargetEffect = effect(() => {
+    const enabled = this.enabledState();
+    const mode = this.modeState();
+    const ikStatus = this.armIkCoordinator.status();
+    const jointAngles = this.armIkCoordinator.jointAngles();
+
+    if (!enabled || mode !== ArmMode.Position || ikStatus !== 'valid' || !jointAngles) return;
+
+    this.armCommandPublisher.publishJointTarget(jointAngles);
+  });
 
   /** Returns the reason Arm control cannot be enabled, or null when ready. */
   readiness(): string | null {

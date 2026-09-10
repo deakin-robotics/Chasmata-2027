@@ -16,12 +16,14 @@ import type URDFLoader from 'urdf-loader';
 import type { URDFRobot } from 'urdf-loader/src/URDFClasses';
 
 import { ArmIkCoordinator } from '../../../core/arm/arm-ik-coordinator';
+import { ArmTelemetryService } from '../../../core/arm/arm-telemetry.service';
 import { RosConnection } from '../../../core/ros/ros-connection';
 import { UnavailableOverlay } from '../../../shared/unavailable-overlay/unavailable-overlay';
 
 const ARM_URDF_URL = '/assets/kinematics/arm.urdf';
 const ARM_MODEL_COLOR = '#697482';
 const ARM_TARGET_COLOR = '#62a8e5';
+const ARM_ACTUAL_COLOR = '#62c77a';
 
 type ViewerStatus = 'unavailable' | 'loading' | 'ready' | 'error';
 type ThreeModule = typeof import('three');
@@ -35,6 +37,7 @@ type ThreeModule = typeof import('three');
 })
 export class ArmModelViewer implements AfterViewInit, OnDestroy {
   private readonly armIkCoordinator = inject(ArmIkCoordinator);
+  private readonly armTelemetry = inject(ArmTelemetryService);
   private readonly rosConnection = inject(RosConnection);
 
   @ViewChild('sceneHost', { static: true })
@@ -69,6 +72,7 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
   private resizeObserver: ResizeObserver | null = null;
   private animationFrame: number | null = null;
   private targetMarker: Three.Mesh | null = null;
+  private actualMarker: Three.Mesh | null = null;
   private groundGrid: Three.GridHelper | null = null;
   private initializing = false;
   private destroyed = false;
@@ -88,10 +92,12 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
 
   private readonly targetPositionEffect = effect(() => {
     const position = this.armIkCoordinator.position();
-    const jointAngles = this.armIkCoordinator.jointAngles();
-    const ikStatus = this.armIkCoordinator.status();
+    const actualJointAngles = this.armTelemetry.actualJointAngles();
     this.targetMarker?.position.set(...position);
-    if (ikStatus === 'valid') this.applyJointAngles(jointAngles);
+
+    if (actualJointAngles) {
+      this.applyActualJointAngles(actualJointAngles);
+    }
   });
 
   ngAfterViewInit(): void {
@@ -260,8 +266,10 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
         this.addGroundGrid(robot);
         this.frameRobot(robot);
         this.addTargetMarker(robot);
-        if (this.ikStatus() === 'valid') {
-          this.applyJointAngles(this.armIkCoordinator.jointAngles());
+        this.addActualMarker(robot);
+        const actualJointAngles = this.armTelemetry.actualJointAngles();
+        if (actualJointAngles) {
+          this.applyActualJointAngles(actualJointAngles);
         }
         this.status.set('ready');
         this.statusMessage.set('Ready');
@@ -292,7 +300,23 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     this.targetMarker = marker;
   }
 
-  private applyJointAngles(jointAngles: Readonly<Record<string, number>> | null): void {
+  private addActualMarker(robot: URDFRobot): void {
+    const three = this.three;
+    if (!three) return;
+
+    const marker = new three.Mesh(
+      new three.SphereGeometry(0.035, 20, 12),
+      new three.MeshBasicMaterial({
+        color: new three.Color(ARM_ACTUAL_COLOR).convertSRGBToLinear(),
+      }),
+    );
+    marker.name = 'arm-position-actual';
+    robot.add(marker);
+    this.actualMarker = marker;
+    this.updateActualMarkerPosition(robot);
+  }
+
+  private applyActualJointAngles(jointAngles: Readonly<Record<string, number>> | null): void {
     if (!jointAngles || !this.robot) return;
 
     for (const [name, angle] of Object.entries(jointAngles)) {
@@ -300,6 +324,20 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     }
 
     this.robot.updateMatrixWorld(true);
+    this.updateActualMarkerPosition(this.robot);
+  }
+
+  private updateActualMarkerPosition(robot: URDFRobot): void {
+    const three = this.three;
+    const marker = this.actualMarker;
+    const endEffector = robot.links['ee_link'];
+    if (!three || !marker || !endEffector) return;
+
+    robot.updateMatrixWorld(true);
+    const position = new three.Vector3();
+    endEffector.getWorldPosition(position);
+    robot.worldToLocal(position);
+    marker.position.copy(position);
   }
 
   private styleRobot(robot: URDFRobot): void {
@@ -428,5 +466,6 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     this.scene = null;
     this.camera = null;
     this.targetMarker = null;
+    this.actualMarker = null;
   }
 }

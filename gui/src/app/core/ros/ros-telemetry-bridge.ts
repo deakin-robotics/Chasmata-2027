@@ -1,0 +1,184 @@
+import { Service, effect, inject, untracked } from '@angular/core';
+import { Ros, Topic } from 'roslib';
+
+import { ArmTelemetryService } from '../arm/arm-telemetry.service';
+import { ArmJointState } from '../arm/arm-ik-types';
+import {
+  ArmMode,
+  DriveMode,
+  FmaStateService,
+  LawMode,
+  LinkMode,
+  SystemMode,
+  GimbalPriorityOwner,
+} from '../fma/fma-state.service';
+import { RosConnection } from './ros-connection';
+
+const FMA_STATE_TOPIC = '/fma/state';
+const JOINT_STATE_TOPIC = '/joint_states';
+const STRING_MESSAGE_TYPE = 'std_msgs/String';
+const JOINT_STATE_MESSAGE_TYPE = 'sensor_msgs/JointState';
+
+interface StringMessage {
+  data?: unknown;
+}
+
+interface JointStateMessage {
+  name?: unknown;
+  position?: unknown;
+  velocity?: unknown;
+}
+
+interface FmaModeState {
+  confirmed?: unknown;
+  pending?: unknown;
+  rejected?: unknown;
+}
+
+interface FmaTelemetryMessage {
+  drive?: FmaModeState;
+  arm?: FmaModeState;
+  law?: unknown;
+  system?: unknown;
+  link?: unknown;
+  gimbal_priority?: unknown;
+}
+
+/** Adapts ROS telemetry messages into the GUI's shared state services. */
+@Service()
+export class RosTelemetryBridge {
+  private readonly rosConnection = inject(RosConnection);
+  private readonly fmaState = inject(FmaStateService);
+  private readonly armTelemetry = inject(ArmTelemetryService);
+
+  private activeClient: Ros | null = null;
+  private fmaTopic: Topic | null = null;
+  private jointStateTopic: Topic | null = null;
+
+  private readonly connectionEffect = effect(() => {
+    const client = this.rosConnection.client();
+    const connected = this.rosConnection.isConnected();
+
+    untracked(() => this.updateSubscriptions(connected ? client : null));
+  });
+
+  private updateSubscriptions(client: Ros | null): void {
+    if (client === this.activeClient) return;
+
+    this.disposeSubscriptions();
+    if (!client) {
+      this.armTelemetry.clear();
+      return;
+    }
+
+    this.activeClient = client;
+    this.fmaTopic = new Topic({
+      ros: client,
+      name: FMA_STATE_TOPIC,
+      messageType: STRING_MESSAGE_TYPE,
+    });
+    this.jointStateTopic = new Topic({
+      ros: client,
+      name: JOINT_STATE_TOPIC,
+      messageType: JOINT_STATE_MESSAGE_TYPE,
+    });
+
+    this.fmaTopic.subscribe((message) => this.handleFmaMessage(message as StringMessage));
+    this.jointStateTopic.subscribe((message) =>
+      this.handleJointStateMessage(message as JointStateMessage),
+    );
+  }
+
+  private handleFmaMessage(message: StringMessage): void {
+    if (typeof message.data !== 'string') return;
+
+    let telemetry: FmaTelemetryMessage;
+    try {
+      telemetry = JSON.parse(message.data) as FmaTelemetryMessage;
+    } catch {
+      return;
+    }
+
+    this.applyModeTelemetry(telemetry.drive, 'drive');
+    this.applyModeTelemetry(telemetry.arm, 'arm');
+
+    const law = this.enumValue(telemetry.law, Object.values(LawMode));
+    const system = this.enumValue(telemetry.system, Object.values(SystemMode));
+    const link = this.enumValue(telemetry.link, Object.values(LinkMode));
+    const gimbalPriority = this.parseGimbalPriority(telemetry.gimbal_priority);
+
+    if (law !== undefined) this.fmaState.setLawMode(law);
+    if (system !== undefined) this.fmaState.setSystemMode(system);
+    if (link !== undefined) this.fmaState.setLinkMode(link);
+    if (gimbalPriority !== undefined) this.fmaState.setGimbalPriorityOwner(gimbalPriority);
+  }
+
+  private applyModeTelemetry(state: FmaModeState | undefined, subsystem: 'drive' | 'arm'): void {
+    if (!state) return;
+
+    if (subsystem === 'drive') {
+      const confirmed = this.enumValue(state.confirmed, Object.values(DriveMode));
+      const pending = this.enumValue(state.pending, Object.values(DriveMode));
+      if (confirmed !== undefined && pending !== undefined) {
+        this.fmaState.setDriveTelemetry(confirmed, pending);
+      } else if (confirmed !== undefined) {
+        this.fmaState.setDriveTelemetry(confirmed, null);
+      } else if (pending !== undefined) {
+        this.fmaState.setDriveTelemetry(null, pending);
+      }
+
+      return;
+    }
+
+    const confirmed = this.enumValue(state.confirmed, Object.values(ArmMode));
+    const pending = this.enumValue(state.pending, Object.values(ArmMode));
+    if (confirmed !== undefined && pending !== undefined) {
+      this.fmaState.setArmTelemetry(confirmed, pending);
+    } else if (confirmed !== undefined) {
+      this.fmaState.setArmTelemetry(confirmed, null);
+    } else if (pending !== undefined) {
+      this.fmaState.setArmTelemetry(null, pending);
+    }
+  }
+
+  private handleJointStateMessage(message: JointStateMessage): void {
+    if (!Array.isArray(message.name) || !Array.isArray(message.position)) return;
+
+    const names = message.name.filter((name): name is string => typeof name === 'string');
+    const positions = message.position.filter(
+      (position): position is number => typeof position === 'number' && Number.isFinite(position),
+    );
+    const rawVelocities = Array.isArray(message.velocity) ? message.velocity : undefined;
+    const velocities = rawVelocities
+      ? rawVelocities.filter(
+          (velocity): velocity is number =>
+            typeof velocity === 'number' && Number.isFinite(velocity),
+        )
+      : undefined;
+
+    if (names.length !== message.name.length || positions.length !== message.position.length)
+      return;
+    if (velocities && rawVelocities && velocities.length !== rawVelocities.length) return;
+
+    const state: ArmJointState = { names, positions, velocities };
+    this.armTelemetry.setJointState(state);
+  }
+
+  private enumValue<T extends string>(value: unknown, values: readonly T[]): T | null | undefined {
+    if (value === null) return null;
+    return typeof value === 'string' && values.includes(value as T) ? (value as T) : undefined;
+  }
+
+  private parseGimbalPriority(value: unknown): GimbalPriorityOwner | null | undefined {
+    if (value === null || value === 'UNKNOWN') return null;
+    return value === 'DRIVER' || value === 'ARM OPS' ? value : undefined;
+  }
+
+  private disposeSubscriptions(): void {
+    this.fmaTopic?.unsubscribe();
+    this.jointStateTopic?.unsubscribe();
+    this.fmaTopic = null;
+    this.jointStateTopic = null;
+    this.activeClient = null;
+  }
+}

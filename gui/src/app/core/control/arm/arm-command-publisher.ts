@@ -11,9 +11,19 @@ export interface ArmJoyCommand {
 }
 
 const ARM_JOY_TOPIC = '/arm/joy';
+const ARM_JOINT_COMMAND_TOPIC = '/joint_commands';
 const JOY_MESSAGE_TYPE = 'sensor_msgs/Joy';
+const JOINT_STATE_MESSAGE_TYPE = 'sensor_msgs/JointState';
 const ARM_AXES_COUNT = 8;
 const ARM_BUTTON_COUNT = 12;
+const ARM_JOINT_NAMES = [
+  'base_joint',
+  'shoulder_joint',
+  'elbow_joint',
+  'yaw_joint',
+  'pitch_joint',
+  'roll_joint',
+] as const;
 const CLEAR_FAULTS_BUTTON_INDEX = 10;
 const STOP_COMMAND: ArmJoyCommand = {
   axes: new Array(ARM_AXES_COUNT).fill(0),
@@ -21,9 +31,7 @@ const STOP_COMMAND: ArmJoyCommand = {
 };
 const CLEAR_FAULTS_COMMAND: ArmJoyCommand = {
   axes: [...STOP_COMMAND.axes],
-  buttons: STOP_COMMAND.buttons.map((_, index) =>
-    index === CLEAR_FAULTS_BUTTON_INDEX ? 1 : 0,
-  ),
+  buttons: STOP_COMMAND.buttons.map((_, index) => (index === CLEAR_FAULTS_BUTTON_INDEX ? 1 : 0)),
 };
 
 /** Publishes Arm Joy commands using the old base-station mapping. */
@@ -33,6 +41,7 @@ export class ArmCommandPublisher {
   private readonly controlMode = inject(ControlModeService);
 
   private joyTopic: Topic | null = null;
+  private jointCommandTopic: Topic | null = null;
   private topicClient: Ros | null = null;
 
   readonly canPublish = computed(
@@ -44,6 +53,24 @@ export class ArmCommandPublisher {
     if (!this.canPublish()) return false;
 
     return this.publishCommand(this.toArmJoyCommand(snapshot));
+  }
+
+  /** Publishes solved Position-mode joint targets in radians. */
+  publishJointTarget(jointAngles: Readonly<Record<string, number>>): boolean {
+    if (!this.canPublish() || !this.isValidJointTarget(jointAngles)) return false;
+
+    const topic = this.getJointCommandTopic();
+    if (!topic) return false;
+
+    topic.publish({
+      header: {
+        stamp: { sec: 0, nanosec: 0 },
+        frame_id: '',
+      },
+      name: [...ARM_JOINT_NAMES],
+      position: ARM_JOINT_NAMES.map((name) => jointAngles[name]),
+    });
+    return true;
   }
 
   /** Sends a zeroed Arm Joy command. */
@@ -90,6 +117,25 @@ export class ArmCommandPublisher {
     return this.joyTopic;
   }
 
+  private getJointCommandTopic(): Topic | null {
+    const client = this.rosConnection.client();
+    if (!client || !this.rosConnection.isConnected()) return null;
+
+    if (this.jointCommandTopic && this.topicClient === client) {
+      return this.jointCommandTopic;
+    }
+
+    this.topicClient = client;
+    this.joyTopic = null;
+    this.jointCommandTopic = new Topic({
+      ros: client,
+      name: ARM_JOINT_COMMAND_TOPIC,
+      messageType: JOINT_STATE_MESSAGE_TYPE,
+    });
+
+    return this.jointCommandTopic;
+  }
+
   private toArmJoyCommand(snapshot: GamepadSnapshot): ArmJoyCommand {
     const rawAxes = snapshot.axes;
     const rawButtons = snapshot.buttons;
@@ -131,6 +177,10 @@ export class ArmCommandPublisher {
       command.axes.every(Number.isFinite) &&
       command.buttons.every(Number.isFinite)
     );
+  }
+
+  private isValidJointTarget(jointAngles: Readonly<Record<string, number>>): boolean {
+    return ARM_JOINT_NAMES.every((name) => Number.isFinite(jointAngles[name]));
   }
 
   private toJoyMessage(command: ArmJoyCommand): Record<string, unknown> {

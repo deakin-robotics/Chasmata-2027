@@ -1,6 +1,7 @@
 import { Service, effect, inject, untracked } from '@angular/core';
 
 import { ArmControlMode, ArmControlModeService } from './arm/arm-control-mode';
+import { ControlModeCommandPublisher } from './control-mode-command-publisher';
 import { DriverControlMode, DriverControlModeService } from './drive/drive-control-mode';
 import { FmaStateService } from '../fma/fma-state.service';
 import { RosConnection } from '../ros/ros-connection';
@@ -12,6 +13,7 @@ export class ControlModeCoordinator {
   private readonly armControlMode = inject(ArmControlModeService);
   private readonly fmaState = inject(FmaStateService);
   private readonly rosConnection = inject(RosConnection);
+  private readonly commandPublisher = inject(ControlModeCommandPublisher);
 
   private readonly connectionEffect = effect(() => {
     const connected = this.rosConnection.isConnected();
@@ -33,7 +35,7 @@ export class ControlModeCoordinator {
     if (!this.rosConnection.isConnected()) return;
 
     this.fmaState.requestDriveMode(mode);
-    // Future ROS command publishing belongs at this boundary.
+    this.commandPublisher.publishDriveMode(mode);
   }
 
   /** Selects the Arm mode and requests it from the rover when connected. */
@@ -43,11 +45,16 @@ export class ControlModeCoordinator {
     if (!this.rosConnection.isConnected()) return;
 
     this.fmaState.requestArmMode(mode);
-    // Future ROS command publishing belongs at this boundary.
+    this.commandPublisher.publishArmMode(mode);
   }
 
   private requestCurrentModes(): void {
-    this.fmaState.requestDriveMode(this.driverControlMode.mode());
-    this.fmaState.requestArmMode(this.armControlMode.mode());
+    const driveMode = this.driverControlMode.mode();
+    const armMode = this.armControlMode.mode();
+
+    this.fmaState.requestDriveMode(driveMode);
+    this.fmaState.requestArmMode(armMode);
+    this.commandPublisher.publishDriveMode(driveMode);
+    this.commandPublisher.publishArmMode(armMode);
   }
 }

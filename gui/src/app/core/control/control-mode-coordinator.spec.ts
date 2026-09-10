@@ -12,12 +12,16 @@ describe('ControlModeCoordinator', () => {
 
   beforeEach(() => {
     connected = signal(false);
+    const client = signal(null);
 
     TestBed.configureTestingModule({
       providers: [
         {
           provide: RosConnection,
-          useValue: { isConnected: connected.asReadonly() },
+          useValue: {
+            isConnected: connected.asReadonly(),
+            client: client.asReadonly(),
+          },
         },
       ],
     });

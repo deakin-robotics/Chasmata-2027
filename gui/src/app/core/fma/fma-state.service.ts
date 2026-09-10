@@ -95,6 +95,11 @@ export class FmaStateService {
     this.updateDrive((column) => ({ ...column, commanded: null }));
   }
 
+  /** Applies rover telemetry for DRIVE without changing the public request flow. */
+  setDriveTelemetry(confirmed: DriveMode | null, commanded: DriveMode | null): void {
+    this.updateDrive((column) => ({ ...column, confirmed, commanded }));
+  }
+
   /** Records a requested ARM mode without changing the confirmed state. */
   requestArmMode(mode: ArmMode): void {
     this.updateArm((column) => ({
@@ -111,6 +116,26 @@ export class FmaStateService {
   /** Clears a rejected or timed-out ARM request. */
   rejectArmMode(): void {
     this.updateArm((column) => ({ ...column, commanded: null }));
+  }
+
+  /** Applies rover telemetry for ARM without changing the public request flow. */
+  setArmTelemetry(confirmed: ArmMode | null, commanded: ArmMode | null): void {
+    this.updateArm((column) => ({ ...column, confirmed, commanded }));
+  }
+
+  /** Applies authoritative LAW telemetry, or clears it when unknown. */
+  setLawMode(mode: LawMode | null): void {
+    this.updateColumn('LAW', (column) => ({ ...column, confirmed: mode, commanded: null }));
+  }
+
+  /** Applies authoritative SYSTEM telemetry, or clears it when unknown. */
+  setSystemMode(mode: SystemMode | null): void {
+    this.updateColumn('SYSTEM', (column) => ({ ...column, confirmed: mode, commanded: null }));
+  }
+
+  /** Applies authoritative LINK telemetry, or clears it when unknown. */
+  setLinkMode(mode: LinkMode | null): void {
+    this.updateColumn('LINK', (column) => ({ ...column, confirmed: mode, commanded: null }));
   }
 
   /** Applies authoritative gimbal-priority telemetry, or clears it when unknown. */
@@ -146,6 +171,17 @@ export class FmaStateService {
   ): void {
     this.columnsState.update((columns) =>
       columns.map((column) => (column.label === 'ARM' ? update(column) : column)),
+    );
+  }
+
+  private updateColumn<T extends FmaColumn['label']>(
+    label: T,
+    update: (column: Extract<FmaColumn, { label: T }>) => Extract<FmaColumn, { label: T }>,
+  ): void {
+    this.columnsState.update((columns) =>
+      columns.map((column) =>
+        column.label === label ? update(column as Extract<FmaColumn, { label: T }>) : column,
+      ),
     );
   }
 }
