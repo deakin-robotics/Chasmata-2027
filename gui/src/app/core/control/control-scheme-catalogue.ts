@@ -54,6 +54,7 @@ const ARM_MANUAL_SHARED_CONTROLS: readonly ControlSchemeControl[] = [
   { input: 'button-a', label: 'A', action: 'Laser' },
   { input: 'button-b', label: 'B', action: 'Open end-effector' },
   { input: 'button-x', label: 'X', action: 'Close end-effector' },
+  { input: 'right-bumper', label: 'RB', action: 'Center EE / switch view' },
   { input: 'right-stick-click', label: 'Right joystick click', action: 'Gimbal Priority' },
 ];
 
@@ -118,6 +119,7 @@ export const CONTROL_SCHEME_CATALOGUE: {
           { input: 'button-a', label: 'A', action: 'Laser' },
           { input: 'button-b', label: 'B', action: 'Open end-effector' },
           { input: 'button-x', label: 'X', action: 'Close end-effector' },
+          { input: 'right-bumper', label: 'RB', action: 'Center EE / switch view' },
           { input: 'right-stick-click', label: 'Right joystick click', action: 'Gimbal Priority' },
         ],
       },

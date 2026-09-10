@@ -35,6 +35,7 @@ describe('CONTROL_SCHEME_CATALOGUE', () => {
         { input: 'd-pad-x', label: 'D-pad X', action: 'Joint 6' },
         { input: 'button-a', label: 'A', action: 'Laser' },
         { input: 'button-x', label: 'X', action: 'Close end-effector' },
+        { input: 'right-bumper', label: 'RB', action: 'Center EE / switch view' },
         { input: 'left-bumper', label: 'LB', action: 'Gimbal control (Hold)' },
       ]),
     );
@@ -52,6 +53,7 @@ describe('CONTROL_SCHEME_CATALOGUE', () => {
         { input: 'button-a', label: 'A', action: 'Laser' },
         { input: 'button-b', label: 'B', action: 'Open end-effector' },
         { input: 'button-x', label: 'X', action: 'Close end-effector' },
+        { input: 'right-bumper', label: 'RB', action: 'Center EE / switch view' },
         { input: 'right-stick-click', label: 'Right joystick click', action: 'Gimbal Priority' },
       ]),
     );

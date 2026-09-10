@@ -17,6 +17,7 @@ import type { URDFRobot } from 'urdf-loader/src/URDFClasses';
 
 import { ArmIkCoordinator } from '../../../core/arm/arm-ik-coordinator';
 import { ArmTelemetryService } from '../../../core/arm/arm-telemetry.service';
+import { GamepadInput } from '../../../core/gamepad/gamepad-input';
 import { RosConnection } from '../../../core/ros/ros-connection';
 import { UnavailableOverlay } from '../../../shared/unavailable-overlay/unavailable-overlay';
 
@@ -25,8 +26,10 @@ const ARM_MODEL_COLOR = '#697482';
 const ARM_TARGET_COLOR = '#62a8e5';
 const ARM_ACTUAL_COLOR = '#62c77a';
 const GRID_SIZE = 1.4;
+const RIGHT_BUMPER_BUTTON_INDEX = 5;
 
 type ViewerStatus = 'unavailable' | 'loading' | 'ready' | 'error';
+type CameraView = 'side' | 'top';
 type ThreeModule = typeof import('three');
 
 /** Renders the arm URDF and rover feedback in a Three.js scene. */
@@ -39,6 +42,7 @@ type ThreeModule = typeof import('three');
 export class ArmModelViewer implements AfterViewInit, OnDestroy {
   private readonly armIkCoordinator = inject(ArmIkCoordinator);
   private readonly armTelemetry = inject(ArmTelemetryService);
+  private readonly gamepad = inject(GamepadInput);
   private readonly rosConnection = inject(RosConnection);
 
   @ViewChild('sceneHost', { static: true })
@@ -76,6 +80,8 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
   private resizeObserver: ResizeObserver | null = null;
   private animationFrame: number | null = null;
   private initialPoseNeedsFraming = false;
+  private cameraView: CameraView = 'side';
+  private rightBumperPressed = false;
   private initializing = false;
   private destroyed = false;
 
@@ -106,6 +112,17 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
       this.frameInitialView(this.robot);
       this.initialPoseNeedsFraming = false;
     }
+  });
+
+  private readonly rightBumperEffect = effect(() => {
+    const snapshot = this.gamepad.snapshot();
+    const pressed = (snapshot?.buttons[RIGHT_BUMPER_BUTTON_INDEX] ?? 0) > 0.5;
+
+    if (pressed && !this.rightBumperPressed && this.robot) {
+      this.toggleCameraView();
+    }
+
+    this.rightBumperPressed = pressed;
   });
 
   ngAfterViewInit(): void {
@@ -201,6 +218,7 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     renderer.outputEncoding = three.sRGBEncoding;
 
     camera.position.set(1.5, 1.2, 1.5);
+    camera.up.set(0, 1, 0);
     camera.lookAt(0, 0, 0);
 
     controls.enableDamping = true;
@@ -304,6 +322,7 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
 
     camera.near = Math.max(distance / 100, 0.001);
     camera.far = Math.max(distance * 20, 10);
+    camera.up.set(0, 1, 0);
     camera.position.set(
       target.x - distance * 0.95,
       target.y + distance * 0.85,
@@ -313,6 +332,40 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     controls.target.copy(target);
     controls.update();
     camera.updateProjectionMatrix();
+    this.cameraView = 'side';
+  }
+
+  private toggleCameraView(): void {
+    const robot = this.robot;
+    const camera = this.camera;
+    const controls = this.controls;
+    const three = this.three;
+    if (!robot || !camera || !controls || !three) return;
+
+    const target = this.getEndEffectorPosition(robot);
+    if (!target) return;
+
+    const bounds = this.getModelBounds(robot);
+    const size = bounds.getSize(new three.Vector3());
+    const distance = Math.max(size.x, size.y, size.z, 0.1) * 1.5;
+    const nextView: CameraView = this.cameraView === 'side' ? 'top' : 'side';
+
+    camera.near = Math.max(distance / 100, 0.001);
+    camera.far = Math.max(distance * 20, 10);
+
+    if (nextView === 'top') {
+      camera.up.set(0, 0, -1);
+      camera.position.set(target.x, target.y + distance, target.z);
+    } else {
+      camera.up.set(0, 1, 0);
+      camera.position.set(target.x - distance, target.y + distance * 0.2, target.z);
+    }
+
+    camera.lookAt(target);
+    controls.target.copy(target);
+    controls.update();
+    camera.updateProjectionMatrix();
+    this.cameraView = nextView;
   }
 
   private getBaseVisualPosition(robot: URDFRobot): Three.Vector3 {
@@ -321,6 +374,16 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     const baseVisual = baseLink.children.find((child) => child.type === 'URDFVisual');
     const position = new three!.Vector3();
     (baseVisual ?? baseLink).getWorldPosition(position);
+    return position;
+  }
+
+  private getEndEffectorPosition(robot: URDFRobot): Three.Vector3 | null {
+    const endEffector = robot.links['ee_link'];
+    if (!endEffector || !this.three) return null;
+
+    robot.updateMatrixWorld(true);
+    const position = new this.three.Vector3();
+    endEffector.getWorldPosition(position);
     return position;
   }
 
@@ -442,6 +505,8 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
   private disposeViewer(): void {
     this.armIkCoordinator.reset();
     this.initialPoseNeedsFraming = false;
+    this.cameraView = 'side';
+    this.rightBumperPressed = false;
 
     if (this.animationFrame !== null && typeof window !== 'undefined') {
       window.cancelAnimationFrame(this.animationFrame);
