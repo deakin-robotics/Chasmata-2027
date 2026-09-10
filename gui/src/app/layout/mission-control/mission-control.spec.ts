@@ -27,7 +27,8 @@ describe('MissionControl', () => {
 
     expect(element.querySelector('h1')?.textContent).toContain('Mission Control');
     expect(element.textContent).toContain('DRIVE');
-    expect(element.textContent).toContain('LINK');
+    expect(element.textContent).toContain('GIMBAL');
+    expect(element.textContent).not.toContain('LINK');
     expect(element.querySelector('[aria-label="Open operator views"]')).toBeTruthy();
     expect(element.textContent).toContain('E-stop');
   });

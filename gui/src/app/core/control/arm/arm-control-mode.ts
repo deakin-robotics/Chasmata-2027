@@ -5,12 +5,14 @@ import { GamepadInput, GamepadSnapshot } from '../../gamepad/gamepad-input';
 import { ArmMode } from '../../fma/fma-state.service';
 import { RosConnection } from '../../ros/ros-connection';
 import { ControlModeService } from '../control-mode';
+import { GimbalPriorityCommandPublisher } from '../gimbal-priority-command-publisher';
 import { ArmCommandPublisher } from './arm-command-publisher';
 import { ArmManualControl } from './arm-manual-control';
 import { ArmPositionControl } from './arm-position-control';
 
 const PUBLISH_INTERVAL_MS = 20;
 const MINIMUM_ARM_AXES = 4;
+const RIGHT_STICK_CLICK_BUTTON_INDEX = 11;
 
 export type ArmControlMode = ArmMode.Manual | ArmMode.Position;
 
@@ -23,6 +25,7 @@ export class ArmControlModeService {
   private readonly controlMode = inject(ControlModeService);
   private readonly gamepad = inject(GamepadInput);
   private readonly armIkCoordinator = inject(ArmIkCoordinator);
+  private readonly gimbalPriorityPublisher = inject(GimbalPriorityCommandPublisher);
   private readonly armCommandPublisher = inject(ArmCommandPublisher);
   private readonly armManualControl = inject(ArmManualControl);
   private readonly armPositionControl = inject(ArmPositionControl);
@@ -31,6 +34,7 @@ export class ArmControlModeService {
   private readonly enabledState = signal(false);
   private readonly readinessErrorState = signal<string | null>(null);
   private publishTimer: ReturnType<typeof setInterval> | null = null;
+  private rightStickClickPressed = false;
 
   readonly mode = this.modeState.asReadonly();
   readonly isManual = computed(() => this.modeState() === ArmMode.Manual);
@@ -102,6 +106,7 @@ export class ArmControlModeService {
 
     if (this.isManual()) this.armManualControl.release();
     if (this.controlMode.isArmActive()) this.controlMode.release();
+    this.rightStickClickPressed = false;
     this.enabledState.set(false);
   }
 
@@ -115,7 +120,18 @@ export class ArmControlModeService {
 
   /** Routes one validated gamepad snapshot to the currently selected handler. */
   route(snapshot: GamepadSnapshot): void {
+    this.publishGimbalPriorityRequest(snapshot);
     this.selectedControl().handle(snapshot);
+  }
+
+  private publishGimbalPriorityRequest(snapshot: GamepadSnapshot): void {
+    const pressed = (snapshot.buttons[RIGHT_STICK_CLICK_BUTTON_INDEX] ?? 0) > 0.5;
+
+    if (pressed && !this.rightStickClickPressed) {
+      this.gimbalPriorityPublisher.publish('ARM OPS');
+    }
+
+    this.rightStickClickPressed = pressed;
   }
 
   private startRouting(): void {

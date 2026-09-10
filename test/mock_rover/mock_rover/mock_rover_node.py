@@ -39,6 +39,7 @@ DRIVE_JOY_TOPIC = '/joy'
 ARM_JOY_TOPIC = '/arm/joy'
 DRIVE_MODE_REQUEST_TOPIC = '/fma/drive/request'
 ARM_MODE_REQUEST_TOPIC = '/fma/arm/request'
+GIMBAL_PRIORITY_REQUEST_TOPIC = '/fma/gimbal/request'
 FMA_STATE_TOPIC = '/fma/state'
 
 DRIVE_TRIGGER_AXES = (4, 5)
@@ -46,6 +47,7 @@ ARM_TRIGGER_AXES = (8, 9)
 
 DRIVE_MODES = {'MANUAL', 'VELOCITY', 'MANAGED'}
 ARM_MODES = {'MANUAL', 'POSITION', 'MANAGED', 'STOWED'}
+GIMBAL_PRIORITY_OWNERS = {'DRIVER', 'ARM OPS'}
 
 
 class MockRoverNode(Node):
@@ -68,6 +70,7 @@ class MockRoverNode(Node):
         self.joints = JointSimulator(JOINT_NAMES, JOINT_LIMITS, joint_speed)
         self.drive_mode: Optional[str] = None
         self.arm_mode: Optional[str] = None
+        self.gimbal_priority: Optional[str] = None
         self.pending_modes: Dict[str, Optional[Tuple[str, float]]] = {
             'drive': None,
             'arm': None,
@@ -121,6 +124,12 @@ class MockRoverNode(Node):
             lambda message: self.mode_request_callback('arm', message.data),
             10,
         )
+        self.create_subscription(
+            String,
+            GIMBAL_PRIORITY_REQUEST_TOPIC,
+            self.gimbal_priority_request_callback,
+            10,
+        )
 
         self.create_timer(1.0 / publish_rate, self.tick)
         self.publish_fma()
@@ -172,6 +181,16 @@ class MockRoverNode(Node):
             self.get_logger().warn(f'Ignored unknown joints: {sorted(unknown_joints)}')
         if accepted_values:
             self.get_logger().debug(f'Accepted joint target: {accepted_values}')
+
+    def gimbal_priority_request_callback(self, message: String) -> None:
+        owner = message.data.strip().upper()
+        if owner not in GIMBAL_PRIORITY_OWNERS:
+            self.get_logger().warn(f'Rejected Gimbal priority request: {owner}')
+            return
+
+        self.gimbal_priority = owner
+        self.publish_fma()
+        self.get_logger().info(f'Confirmed Gimbal priority: {owner}')
 
     def joy_callback(self, subsystem: str, message: Joy, trigger_axes: Tuple[int, int]) -> None:
         if len(message.axes) <= trigger_axes[1]:
@@ -247,8 +266,7 @@ class MockRoverNode(Node):
             'arm': self.mode_state('arm', self.arm_mode),
             'law': 'NORMAL',
             'system': 'GOOD',
-            'link': 'GOOD',
-            'gimbal_priority': None,
+            'gimbal_priority': self.gimbal_priority,
         }
         message = String()
         message.data = json.dumps(payload, separators=(',', ':'))

@@ -3,10 +3,12 @@ import { Service, computed, inject, signal } from '@angular/core';
 import { GamepadInput } from '../../gamepad/gamepad-input';
 import { RosConnection } from '../../ros/ros-connection';
 import { ControlModeService } from '../control-mode';
+import { GimbalPriorityCommandPublisher } from '../gimbal-priority-command-publisher';
 import { DriveCommandPublisher } from './drive-command-publisher';
 
 const PUBLISH_INTERVAL_MS = 20;
 const MINIMUM_DRIVE_AXES = 4;
+const RIGHT_STICK_CLICK_BUTTON_INDEX = 11;
 
 /** Coordinates authorised gamepad input with gated drivetrain publishing. */
 @Service()
@@ -14,9 +16,11 @@ export class DriverControl {
   private readonly rosConnection = inject(RosConnection);
   private readonly controlMode = inject(ControlModeService);
   private readonly gamepad = inject(GamepadInput);
+  private readonly gimbalPriorityPublisher = inject(GimbalPriorityCommandPublisher);
   private readonly publisher = inject(DriveCommandPublisher);
 
   private publishTimer: ReturnType<typeof setInterval> | null = null;
+  private rightStickClickPressed = false;
   private readonly enabledState = signal(false);
   private readonly readinessErrorState = signal<string | null>(null);
 
@@ -72,6 +76,7 @@ export class DriverControl {
     }
 
     this.publisher.releaseDriverControl();
+    this.rightStickClickPressed = false;
     this.enabledState.set(false);
   }
 
@@ -90,5 +95,16 @@ export class DriverControl {
     }
 
     this.publisher.publish(snapshot);
+    this.publishGimbalPriorityRequest(snapshot);
+  }
+
+  private publishGimbalPriorityRequest(snapshot: { buttons: readonly number[] }): void {
+    const pressed = (snapshot.buttons[RIGHT_STICK_CLICK_BUTTON_INDEX] ?? 0) > 0.5;
+
+    if (pressed && !this.rightStickClickPressed) {
+      this.gimbalPriorityPublisher.publish('DRIVER');
+    }
+
+    this.rightStickClickPressed = pressed;
   }
 }

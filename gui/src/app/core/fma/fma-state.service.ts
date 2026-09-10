@@ -26,20 +26,14 @@ export enum SystemMode {
   EStop = 'E-STOP',
 }
 
-export enum LinkMode {
-  Good = 'GOOD',
-  Degraded = 'DEGRADED',
-  Lost = 'LOST',
-}
-
 export type GimbalPriorityOwner = 'DRIVER' | 'ARM OPS';
 
 export type FmaColumn =
   | { label: 'DRIVE'; confirmed: DriveMode | null; commanded: DriveMode | null }
   | { label: 'ARM'; confirmed: ArmMode | null; commanded: ArmMode | null }
   | { label: 'LAW'; confirmed: LawMode | null; commanded: null }
-  | { label: 'SYSTEM'; confirmed: SystemMode | null; commanded: SystemMode | null }
-  | { label: 'LINK'; confirmed: LinkMode | null; commanded: LinkMode | null };
+  | { label: 'GIMBAL'; confirmed: GimbalPriorityOwner | null; commanded: null }
+  | { label: 'SYSTEM'; confirmed: SystemMode | null; commanded: SystemMode | null };
 
 /** Holds shared FMA state for the operator displays. */
 @Service()
@@ -48,16 +42,20 @@ export class FmaStateService {
     { label: 'DRIVE', confirmed: null, commanded: null },
     { label: 'ARM', confirmed: null, commanded: null },
     { label: 'LAW', confirmed: null, commanded: null },
+    { label: 'GIMBAL', confirmed: null, commanded: null },
     { label: 'SYSTEM', confirmed: null, commanded: null },
-    { label: 'LINK', confirmed: null, commanded: null },
   ]);
 
-  private readonly gimbalPriorityOwnerState = signal<GimbalPriorityOwner | null>(null);
-
   readonly columns = this.columnsState.asReadonly();
-  readonly gimbalPriorityOwner = this.gimbalPriorityOwnerState.asReadonly();
+  readonly gimbalPriorityOwner = computed(() => {
+    const column = this.columnsState().find(
+      (candidate): candidate is Extract<FmaColumn, { label: 'GIMBAL' }> =>
+        candidate.label === 'GIMBAL',
+    );
+    return column?.confirmed ?? null;
+  });
   readonly gimbalPriorityDisplay = computed(() => {
-    switch (this.gimbalPriorityOwnerState()) {
+    switch (this.gimbalPriorityOwner()) {
       case 'DRIVER':
         return '← DRIVER';
       case 'ARM OPS':
@@ -67,7 +65,7 @@ export class FmaStateService {
     }
   });
   readonly gimbalPriorityAriaLabel = computed(() => {
-    switch (this.gimbalPriorityOwnerState()) {
+    switch (this.gimbalPriorityOwner()) {
       case 'DRIVER':
         return 'Gimbal priority: Driver';
       case 'ARM OPS':
@@ -133,14 +131,9 @@ export class FmaStateService {
     this.updateColumn('SYSTEM', (column) => ({ ...column, confirmed: mode, commanded: null }));
   }
 
-  /** Applies authoritative LINK telemetry, or clears it when unknown. */
-  setLinkMode(mode: LinkMode | null): void {
-    this.updateColumn('LINK', (column) => ({ ...column, confirmed: mode, commanded: null }));
-  }
-
   /** Applies authoritative gimbal-priority telemetry, or clears it when unknown. */
   setGimbalPriorityOwner(owner: GimbalPriorityOwner | null): void {
-    this.gimbalPriorityOwnerState.set(owner);
+    this.updateColumn('GIMBAL', (column) => ({ ...column, confirmed: owner, commanded: null }));
   }
 
   /** Clears DRIVE and ARM state when the rover connection is unavailable. */

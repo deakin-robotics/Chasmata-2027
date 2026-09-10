@@ -8,7 +8,6 @@ import {
   DriveMode,
   FmaStateService,
   LawMode,
-  LinkMode,
   SystemMode,
   GimbalPriorityOwner,
 } from '../fma/fma-state.service';
@@ -40,7 +39,6 @@ interface FmaTelemetryMessage {
   arm?: FmaModeState;
   law?: unknown;
   system?: unknown;
-  link?: unknown;
   gimbal_priority?: unknown;
 }
 
@@ -104,12 +102,10 @@ export class RosTelemetryBridge {
 
     const law = this.enumValue(telemetry.law, Object.values(LawMode));
     const system = this.enumValue(telemetry.system, Object.values(SystemMode));
-    const link = this.enumValue(telemetry.link, Object.values(LinkMode));
     const gimbalPriority = this.parseGimbalPriority(telemetry.gimbal_priority);
 
     if (law !== undefined) this.fmaState.setLawMode(law);
     if (system !== undefined) this.fmaState.setSystemMode(system);
-    if (link !== undefined) this.fmaState.setLinkMode(link);
     if (gimbalPriority !== undefined) this.fmaState.setGimbalPriorityOwner(gimbalPriority);
   }
 

@@ -19,12 +19,12 @@ describe('FmaStateService', () => {
     );
   });
 
-  it('starts telemetry-backed LAW, SYSTEM, and LINK states as unknown', () => {
+  it('starts telemetry-backed LAW, GIMBAL, and SYSTEM states as unknown', () => {
     expect(service.columns()).toEqual(
       expect.arrayContaining([
         { label: 'LAW', confirmed: null, commanded: null },
+        { label: 'GIMBAL', confirmed: null, commanded: null },
         { label: 'SYSTEM', confirmed: null, commanded: null },
-        { label: 'LINK', confirmed: null, commanded: null },
       ]),
     );
   });

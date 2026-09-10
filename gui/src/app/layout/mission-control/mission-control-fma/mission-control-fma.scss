@@ -68,12 +68,17 @@ h2 {
 }
 
 .gimbal-priority {
+  width: 100%;
+  color: var(--dcr-color-caution);
+}
+
+.gimbal-priority-unknown {
+  grid-row: 3;
   width: calc(200% + 0.3rem);
   justify-self: start;
   position: relative;
   z-index: 2;
   background: var(--dcr-color-background);
-  color: var(--dcr-color-caution);
 }
 
 .gimbal-priority-known {

@@ -3,32 +3,35 @@
     <div class="fma-column">
       <h2>{{ column.label }}</h2>
       @if (rosConnected()) {
-        <span
-          class="mode mode-active"
-          [class.mode-managed]="column.confirmed === 'MANAGED'"
-          [class.mode-placeholder]="!column.confirmed"
-          [attr.aria-hidden]="!column.confirmed"
-        >
-          {{ column.confirmed }}
-        </span>
-
-        @if (column.label !== 'LAW' && column.label !== 'SYSTEM') {
+        @if (column.label === 'GIMBAL') {
           <span
-            class="mode mode-commanded"
-            [class.mode-managed]="column.commanded === 'MANAGED'"
-            [class.mode-placeholder]="!column.commanded"
-            [attr.aria-hidden]="!column.commanded"
-          >
-            {{ column.commanded ?? '' }}
-          </span>
-        } @else if (column.label === 'LAW') {
-          <span
-            class="mode gimbal-priority"
+            class="mode mode-active gimbal-priority"
             [class.gimbal-priority-known]="gimbalPriorityOwner()"
+            [class.gimbal-priority-unknown]="!gimbalPriorityOwner()"
             [attr.aria-label]="gimbalPriorityAriaLabel()"
           >
             {{ gimbalPriorityDisplay() }}
           </span>
+        } @else {
+          <span
+            class="mode mode-active"
+            [class.mode-managed]="column.confirmed === 'MANAGED'"
+            [class.mode-placeholder]="!column.confirmed"
+            [attr.aria-hidden]="!column.confirmed"
+          >
+            {{ column.confirmed }}
+          </span>
+
+          @if (column.label === 'DRIVE' || column.label === 'ARM') {
+            <span
+              class="mode mode-commanded"
+              [class.mode-managed]="column.commanded === 'MANAGED'"
+              [class.mode-placeholder]="!column.commanded"
+              [attr.aria-hidden]="!column.commanded"
+            >
+              {{ column.commanded ?? '' }}
+            </span>
+          }
         }
       }
     </div>

@@ -2,7 +2,7 @@
 
 This document defines the five Functional Mode Annunciator (FMA) columns used in the rover GUI:
 
-**DRIVE | ARM | LAW | SYSTEM | LINK**
+**DRIVE | ARM | LAW | GIMBAL | SYSTEM**
 
 The FMA should display the rover's **confirmed active state**, not merely a requested state.
 
@@ -160,14 +160,52 @@ This annunciation makes it clear that the arm is operating without its normal pr
 
 ---
 
-## 🎥 GIMBAL PRIORITY
+## 🎥 GIMBAL
 
-The Gimbal Priority indicator is displayed directly beneath the `LAW` state in
-the FMA. It is a separate secondary indicator and is **not** an additional LAW
-state or a sixth FMA column.
+This column answers:
 
-The indicator shows which operator station currently owns authority to command
-the shared physical Gimbal camera:
+> **Which operator station currently owns authority to control the shared Gimbal camera?**
+
+This column carries the existing **GIMBAL PRIORITY** owner indicator. It is not
+a selectable control mode and is independent from the Arm protection `LAW`
+state. The rover owns the authoritative owner and broadcasts the confirmed
+state to every GUI.
+
+### Confirmed Driver owner
+
+Display:
+
+```text
+← DRIVER
+```
+
+The Driver station currently owns Gimbal priority and may issue accepted Gimbal
+movement commands.
+
+### Confirmed Arm Operator owner
+
+Display:
+
+```text
+ARM OPS →
+```
+
+The Arm Operator station currently owns Gimbal priority and may issue accepted
+Gimbal movement commands.
+
+### `UNKNOWN`
+
+ROS is connected, but the authoritative Gimbal owner telemetry is null, invalid,
+or stale. The FMA displays:
+
+```text
+GIMBAL PRIORITY UNKNOWN
+```
+
+When ROS is disconnected, the FMA hides the Gimbal value and shows the overall
+unavailable red X instead. `UNKNOWN` is only used after a ROS connection exists.
+
+The FMA may render the owner with the existing directional labels:
 
 ```text
 ← DRIVER       ARM OPS →
@@ -178,7 +216,7 @@ the Arm Operator owns Gimbal priority.
 
 The arrow direction is an ownership indication, not the direction of Gimbal
 movement. The left arrow always represents `DRIVER`; the right arrow always
-represents `ARM_OPS`.
+represents `ARM OPS`.
 
 #### Shared Gimbal ownership
 
@@ -231,15 +269,8 @@ periodically thereafter so that GUI instances can recover from missed updates or
 reconnects.
 
 If ROS is connected but owner telemetry is null, explicitly unknown, or stale,
-the GUI must not continue to show the last known owner as valid. The FMA must
-instead display:
-
-```text
-GIMBAL PRIORITY UNKNOWN
-```
-
-The GUI must receive a fresh authoritative owner state before showing either
-`← DRIVER` or `ARM OPS →` again.
+the GUI must not continue to show the last known owner as valid. It must show
+`GIMBAL PRIORITY UNKNOWN` until a fresh authoritative owner state is received.
 
 Verbal callouts such as “I have gimbal” and “You have gimbal” may be used as
 human operating procedure, but they have no software effect. The mapped
@@ -271,36 +302,12 @@ Emergency stop is active. Actuation is disabled and a deliberate reset/re-arm ac
 
 ---
 
-## 📡 LINK
-
-This column answers:
-
-> **How healthy is the communication link between the rover and base station?**
-
-### `GOOD`
-Communication is healthy. Commands, telemetry, and other required data are being transmitted normally.
-
-### `DEGRADED`
-The link is still usable, but communication quality has deteriorated due to latency, packet loss, reduced bandwidth, or similar issues.
-
-### `LOST`
-Communication with the rover has been lost.
-
-### No displayed mode
-If link status is not available or has not yet been established, **display nothing**.
-
----
-
 ## FMA Summary
 
-| Column | Purpose | Modes |
+| Column | Purpose | Values / display |
 |---|---|---|
 | **DRIVE** | Current drivetrain control method | `MANUAL`, `VELOCITY`, `MANAGED •` |
 | **ARM** | Current arm control/configuration | `MANUAL`, `POSITION`, `MANAGED •`, `STOWED` |
 | **LAW** | Arm protection level | `NORMAL`, `ALTERNATE`, `DIRECT` |
+| **GIMBAL** | Existing Gimbal Priority owner indicator | `← DRIVER`, `ARM OPS →`, `GIMBAL PRIORITY UNKNOWN` |
 | **SYSTEM** | Overall rover/control-stack health | `GOOD`, `DEGRADED`, `FAULT`, `E-STOP` |
-| **LINK** | Rover/base-station communication health | `GOOD`, `DEGRADED`, `LOST` |
-
-The Gimbal Priority indicator is displayed beneath the `LAW` column but is not
-part of the LAW value. It reports shared Gimbal ownership independently from the
-Arm protection state.
