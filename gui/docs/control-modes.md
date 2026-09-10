@@ -80,6 +80,21 @@ connection is lost, each browser hides or clears its displayed rover state
 without changing the local Driver or Arm defaults/selections. When the
 connection returns, those preserved local selections are requested again.
 
+## Gamepad Joy contract
+
+The browser Gamepad API reports LT and RT as analogue button values. Before a
+Joy message is published, the GUI puts those values into `axes[]` and keeps
+`buttons[]` digital:
+
+| Topic | LT axis | RT axis | Trigger range |
+| --- | ---: | ---: | --- |
+| `/joy` | `axes[4]` | `axes[5]` | `0..1` |
+| `/arm/joy` | `axes[8]` | `axes[9]` | `0..1` |
+
+The corresponding trigger positions in `buttons[]` remain reserved as `0` so
+the existing digital button indexes do not shift. Rover-side consumers must
+read LT/RT from the agreed axes rather than from `buttons[]`.
+
 ## FMA state ownership
 
 `FmaStateService` remains the shared store for the main FMA columns:

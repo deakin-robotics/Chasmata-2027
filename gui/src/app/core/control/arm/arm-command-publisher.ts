@@ -14,8 +14,10 @@ const ARM_JOY_TOPIC = '/arm/joy';
 const ARM_JOINT_COMMAND_TOPIC = '/joint_commands';
 const JOY_MESSAGE_TYPE = 'sensor_msgs/Joy';
 const JOINT_STATE_MESSAGE_TYPE = 'sensor_msgs/JointState';
-const ARM_AXES_COUNT = 8;
+const ARM_AXES_COUNT = 10;
 const ARM_BUTTON_COUNT = 12;
+const LEFT_TRIGGER_BUTTON_INDEX = 6;
+const RIGHT_TRIGGER_BUTTON_INDEX = 7;
 const ARM_JOINT_NAMES = [
   'base_joint',
   'shoulder_joint',
@@ -152,6 +154,8 @@ export class ArmCommandPublisher {
         0,
         dpadX,
         dpadY,
+        rawButtons[LEFT_TRIGGER_BUTTON_INDEX] ?? 0,
+        rawButtons[RIGHT_TRIGGER_BUTTON_INDEX] ?? 0,
       ],
       buttons: [
         rawButtons[0] ?? 0,
@@ -160,8 +164,8 @@ export class ArmCommandPublisher {
         rawButtons[2] ?? 0,
         rawButtons[4] ?? 0,
         rawButtons[5] ?? 0,
-        rawButtons[6] ?? 0,
-        rawButtons[7] ?? 0,
+        0,
+        0,
         rawButtons[8] ?? 0,
         rawButtons[9] ?? 0,
         rawButtons[16] ?? rawButtons[10] ?? 0,

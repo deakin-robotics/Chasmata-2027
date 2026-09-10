@@ -12,11 +12,20 @@ From this directory:
 docker compose up --build
 ```
 
-The container runs the mock node and ROSbridge on port `9090`. Connect the GUI
+The container runs the mock node and ROSbridge on port `9090`, plus three canned
+camera endpoints on ports `8080`, `8090`, and `8091`. Connect the GUI normally
 to:
 
 ```text
 ws://localhost:9090
+```
+
+The GUI dashboards use these legacy-shaped camera feeds automatically:
+
+```text
+Front camera:  http://localhost:8080/?action=stream
+Arm camera:    http://localhost:8091/?action=stream
+Gimbal camera: http://localhost:8090/?action=stream
 ```
 
 ## Simulated behaviour
@@ -30,6 +39,7 @@ ws://localhost:9090
 - Accepts arm joint targets, clamps them to the current six-joint limits, and
   moves each simulated joint toward its target at a configurable speed.
 - Publishes actual arm state on `/joint_states` at 20 Hz.
+- Serves canned GIF feeds through the legacy HTTP camera endpoint shape.
 
 The default joint names match the current GUI URDF:
 
@@ -41,11 +51,17 @@ base_joint, shoulder_joint, elbow_joint, yaw_joint, pitch_joint, roll_joint
 
 | Direction | Topic | Type | Purpose |
 | --- | --- | --- | --- |
+| GUI → mock rover | `/joy` | `sensor_msgs/msg/Joy` | Driver gamepad input; LT/RT are analogue `axes[4]`/`axes[5]` values in the range `0..1`. |
+| GUI → mock rover | `/arm/joy` | `sensor_msgs/msg/Joy` | Manual Arm gamepad input; LT/RT are analogue `axes[8]`/`axes[9]` values in the range `0..1`. |
 | GUI → mock rover | `/joint_commands` | `sensor_msgs/msg/JointState` | Target joint positions in radians. |
 | Mock rover → GUI | `/joint_states` | `sensor_msgs/msg/JointState` | Simulated actual joint positions and velocities. |
 | GUI → mock rover | `/fma/drive/request` | `std_msgs/msg/String` | Driver mode value, such as `VELOCITY`. |
 | GUI → mock rover | `/fma/arm/request` | `std_msgs/msg/String` | Arm mode value, such as `POSITION`. |
 | Mock rover → GUI | `/fma/state` | `std_msgs/msg/String` | JSON FMA telemetry broadcast. |
+
+For both Joy topics, `buttons[]` contains only digital button values (`0` or
+`1`). LT and RT are not read from `buttons[]`; their browser analogue values
+are sent through the dedicated axes listed above.
 
 The provisional `/fma/state` JSON shape is:
 
@@ -76,5 +92,5 @@ ros2 run mock_rover mock_rover --ros-args \
   -p mode_ack_delay_ms:=150.0
 ```
 
-The mock does not model wheel motion, CAN, camera streams, or MoveIt 2. Its
+The mock does not model wheel motion, CAN, camera movement, or MoveIt 2. Its
 purpose is the smallest useful end-to-end feedback loop for the GUI.

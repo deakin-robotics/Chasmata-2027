@@ -27,7 +27,7 @@ import { ArmControlPanel } from '../arm-control-panel/arm-control-panel';
   styleUrl: './arm-dashboard.scss',
 })
 export class ArmDashboard {
-  readonly frontCameraUrl = signal('http://dcr-rover.local:8080/?action=stream');
-  readonly armCameraUrl = signal('http://dcr-rover.local:8091/?action=stream');
-  readonly gimbalCameraUrl = signal('');
+  readonly frontCameraUrl = signal('http://localhost:8080/?action=stream');
+  readonly armCameraUrl = signal('http://localhost:8091/?action=stream');
+  readonly gimbalCameraUrl = signal('http://localhost:8090/?action=stream');
 }

@@ -8,7 +8,7 @@ from typing import Dict, Optional, Tuple
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
-from sensor_msgs.msg import JointState
+from sensor_msgs.msg import JointState, Joy
 from std_msgs.msg import String
 
 from .simulation import JointSimulator
@@ -35,9 +35,14 @@ JOINT_LIMITS: Dict[str, Tuple[float, float]] = {
 
 JOINT_COMMAND_TOPIC = '/joint_commands'
 JOINT_STATE_TOPIC = '/joint_states'
+DRIVE_JOY_TOPIC = '/joy'
+ARM_JOY_TOPIC = '/arm/joy'
 DRIVE_MODE_REQUEST_TOPIC = '/fma/drive/request'
 ARM_MODE_REQUEST_TOPIC = '/fma/arm/request'
 FMA_STATE_TOPIC = '/fma/state'
+
+DRIVE_TRIGGER_AXES = (4, 5)
+ARM_TRIGGER_AXES = (8, 9)
 
 DRIVE_MODES = {'MANUAL', 'VELOCITY', 'MANAGED'}
 ARM_MODES = {'MANUAL', 'POSITION', 'MANAGED', 'STOWED'}
@@ -90,6 +95,18 @@ class MockRoverNode(Node):
             JointState,
             JOINT_COMMAND_TOPIC,
             self.joint_command_callback,
+            10,
+        )
+        self.create_subscription(
+            Joy,
+            DRIVE_JOY_TOPIC,
+            lambda message: self.joy_callback('drive', message, DRIVE_TRIGGER_AXES),
+            10,
+        )
+        self.create_subscription(
+            Joy,
+            ARM_JOY_TOPIC,
+            lambda message: self.joy_callback('arm', message, ARM_TRIGGER_AXES),
             10,
         )
         self.create_subscription(
@@ -155,6 +172,32 @@ class MockRoverNode(Node):
             self.get_logger().warn(f'Ignored unknown joints: {sorted(unknown_joints)}')
         if accepted_values:
             self.get_logger().debug(f'Accepted joint target: {accepted_values}')
+
+    def joy_callback(self, subsystem: str, message: Joy, trigger_axes: Tuple[int, int]) -> None:
+        if len(message.axes) <= trigger_axes[1]:
+            self.get_logger().warn(
+                f'Ignored {subsystem} Joy command without LT/RT axes '
+                f'{trigger_axes[0]}/{trigger_axes[1]}'
+            )
+            return
+
+        trigger_values = [float(message.axes[index]) for index in trigger_axes]
+        if not all(math.isfinite(value) and 0.0 <= value <= 1.0 for value in trigger_values):
+            self.get_logger().warn(
+                f'Ignored {subsystem} Joy command with invalid LT/RT values: '
+                f'{trigger_values}'
+            )
+            return
+
+        if any(value not in (0, 1) for value in message.buttons):
+            self.get_logger().warn(
+                f'Ignored {subsystem} Joy command with non-digital button values'
+            )
+            return
+
+        self.get_logger().debug(
+            f'Accepted {subsystem} Joy command with LT/RT={trigger_values}'
+        )
 
     def tick(self) -> None:
         now = time.monotonic()
