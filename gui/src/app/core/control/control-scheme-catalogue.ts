@@ -47,10 +47,11 @@ export interface ControlSchemeMode {
 }
 
 const ARM_MANUAL_SHARED_CONTROLS: readonly ControlSchemeControl[] = [
-  { input: 'left-stick-x', label: 'Left joystick X', action: 'Joint 1' },
-  { input: 'left-stick-y', label: 'Left joystick Y', action: 'Joint 2' },
-  { input: 'd-pad-x', label: 'D-pad X', action: 'Joint 6' },
-  { input: 'd-pad-y', label: 'D-pad Y', action: 'Joint 5' },
+  { input: 'left-stick-x', label: 'Left joystick X', action: 'Joint 4 yaw' },
+  { input: 'left-stick-y', label: 'Left joystick Y', action: 'Joint 5 pitch' },
+  { input: 'd-pad-y', label: 'D-pad Y', action: 'Joint 3' },
+  { input: 'left-trigger', label: 'LT', action: 'Joint 6 roll' },
+  { input: 'right-trigger', label: 'RT', action: 'Joint 6 roll' },
   { input: 'button-a', label: 'A', action: 'Laser' },
   { input: 'button-b', label: 'B', action: 'Open end-effector' },
   { input: 'button-x', label: 'X', action: 'Close end-effector' },
@@ -91,8 +92,8 @@ export const CONTROL_SCHEME_CATALOGUE: {
       default: {
         controls: [
           ...ARM_MANUAL_SHARED_CONTROLS,
-          { input: 'right-stick-x', label: 'Right joystick X', action: 'Joint 4' },
-          { input: 'right-stick-y', label: 'Right joystick Y', action: 'Joint 3' },
+          { input: 'right-stick-x', label: 'Right joystick X', action: 'Joint 1 yaw' },
+          { input: 'right-stick-y', label: 'Right joystick Y', action: 'Joint 2 pitch' },
           { input: 'left-bumper', label: 'LB', action: 'Gimbal control (Hold)' },
         ],
       },

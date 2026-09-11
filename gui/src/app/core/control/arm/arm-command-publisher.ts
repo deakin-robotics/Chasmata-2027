@@ -14,6 +14,7 @@ const ARM_JOY_TOPIC = '/arm/joy';
 const JOY_MESSAGE_TYPE = 'sensor_msgs/Joy';
 const ARM_AXES_COUNT = 10;
 const ARM_BUTTON_COUNT = 12;
+const LEFT_BUMPER_BUTTON_INDEX = 4;
 const LEFT_TRIGGER_BUTTON_INDEX = 6;
 const RIGHT_TRIGGER_BUTTON_INDEX = 7;
 const CLEAR_FAULTS_BUTTON_INDEX = 10;
@@ -115,41 +116,46 @@ export class ArmCommandPublisher {
   private toArmJoyCommand(snapshot: GamepadSnapshot): ArmJoyCommand {
     const rawAxes = snapshot.axes;
     const rawButtons = snapshot.buttons;
-    const dpadX = (rawButtons[15] ?? 0) - (rawButtons[14] ?? 0);
     const dpadY = (rawButtons[12] ?? 0) - (rawButtons[13] ?? 0);
+    const rightStickX = -(rawAxes[2] ?? 0);
+    const rightStickY = -(rawAxes[3] ?? 0);
+    const gimbalHeld = (rawButtons[LEFT_BUMPER_BUTTON_INDEX] ?? 0) > 0.5;
 
     return {
       axes: [
+        gimbalHeld ? 0 : rightStickX,
+        gimbalHeld ? 0 : rightStickY,
+        0,
+        gimbalHeld ? rightStickX : 0,
+        gimbalHeld ? rightStickY : dpadY,
+        0,
         -(rawAxes[0] ?? 0),
         -(rawAxes[1] ?? 0),
-        0,
-        -(rawAxes[2] ?? 0),
-        -(rawAxes[3] ?? 0),
-        0,
-        dpadX,
-        dpadY,
         rawButtons[RIGHT_TRIGGER_BUTTON_INDEX] ?? 0,
         rawButtons[LEFT_TRIGGER_BUTTON_INDEX] ?? 0,
       ],
-      buttons: [
-        rawButtons[0] ?? 0,
-        rawButtons[1] ?? 0,
-        rawButtons[3] ?? 0,
-        rawButtons[2] ?? 0,
-        rawButtons[4] ?? 0,
-        rawButtons[5] ?? 0,
-        0,
-        0,
-        rawButtons[8] ?? 0,
-        rawButtons[9] ?? 0,
-        rawButtons[16] ?? rawButtons[10] ?? 0,
-        rawButtons[11] ?? 0,
-      ],
+      buttons: this.toButtons(snapshot),
     };
   }
 
   private toPositionJoyCommand(snapshot: GamepadSnapshot): ArmJoyCommand {
-    const command = this.toArmJoyCommand(snapshot);
+    const rawAxes = snapshot.axes;
+    const rawButtons = snapshot.buttons;
+    const command: ArmJoyCommand = {
+      axes: [
+        -(rawAxes[0] ?? 0),
+        -(rawAxes[1] ?? 0),
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        rawButtons[RIGHT_TRIGGER_BUTTON_INDEX] ?? 0,
+        rawButtons[LEFT_TRIGGER_BUTTON_INDEX] ?? 0,
+      ],
+      buttons: this.toButtons(snapshot),
+    };
 
     // On gamepads without an extended button slot, button 10 is the L3
     // fallback. Position mode consumes L3 as the orientation-lock toggle.
@@ -160,6 +166,25 @@ export class ArmCommandPublisher {
     }
 
     return command;
+  }
+
+  private toButtons(snapshot: GamepadSnapshot): readonly number[] {
+    const rawButtons = snapshot.buttons;
+
+    return [
+      rawButtons[0] ?? 0,
+      rawButtons[1] ?? 0,
+      rawButtons[3] ?? 0,
+      rawButtons[2] ?? 0,
+      rawButtons[LEFT_BUMPER_BUTTON_INDEX] ?? 0,
+      rawButtons[5] ?? 0,
+      0,
+      0,
+      rawButtons[8] ?? 0,
+      rawButtons[9] ?? 0,
+      rawButtons[16] ?? rawButtons[10] ?? 0,
+      rawButtons[11] ?? 0,
+    ];
   }
 
   private isValidCommand(command: ArmJoyCommand): boolean {

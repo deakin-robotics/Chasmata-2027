@@ -31,6 +31,83 @@ describe('ArmCommandPublisher', () => {
     expect(controlMode.mode()).toBe('none');
   });
 
+  it('maps Manual mode inputs to the expanded joint layout', () => {
+    const toArmJoyCommand = (
+      service as unknown as {
+        toArmJoyCommand(snapshot: GamepadSnapshot): ArmJoyCommand;
+      }
+    ).toArmJoyCommand.bind(service);
+    const snapshot: GamepadSnapshot = {
+      axes: [0.1, 0.2, 0.3, 0.4],
+      buttons: Array.from({ length: 16 }, (_, index) => (index === 12 ? 1 : 0)),
+    };
+
+    const command = toArmJoyCommand(snapshot);
+
+    expect(command.axes).toEqual([-0.3, -0.4, 0, 0, 1, 0, -0.1, -0.2, 0, 0]);
+  });
+
+  it('leaves D-pad X unused in Manual mode', () => {
+    const toArmJoyCommand = (
+      service as unknown as {
+        toArmJoyCommand(snapshot: GamepadSnapshot): ArmJoyCommand;
+      }
+    ).toArmJoyCommand.bind(service);
+    const snapshot: GamepadSnapshot = {
+      axes: [0, 0, 0, 0],
+      buttons: Array.from({ length: 16 }, (_, index) => (index === 15 ? 1 : 0)),
+    };
+
+    expect(toArmJoyCommand(snapshot).axes.every((axis) => axis === 0)).toBe(true);
+  });
+
+  it('preserves the analogue trigger directions in Manual mode', () => {
+    const toArmJoyCommand = (
+      service as unknown as {
+        toArmJoyCommand(snapshot: GamepadSnapshot): ArmJoyCommand;
+      }
+    ).toArmJoyCommand.bind(service);
+    const leftTrigger: GamepadSnapshot = {
+      axes: [0, 0, 0, 0],
+      buttons: Array.from({ length: 16 }, (_, index) => (index === 6 ? 1 : 0)),
+    };
+    const rightTrigger: GamepadSnapshot = {
+      axes: [0, 0, 0, 0],
+      buttons: Array.from({ length: 16 }, (_, index) => (index === 7 ? 1 : 0)),
+    };
+
+    expect(toArmJoyCommand(leftTrigger).axes.slice(8)).toEqual([0, 1]);
+    expect(toArmJoyCommand(rightTrigger).axes.slice(8)).toEqual([1, 0]);
+  });
+
+  it('switches the right stick to the existing Gimbal path while LB is held', () => {
+    const toArmJoyCommand = (
+      service as unknown as {
+        toArmJoyCommand(snapshot: GamepadSnapshot): ArmJoyCommand;
+      }
+    ).toArmJoyCommand.bind(service);
+    const snapshot: GamepadSnapshot = {
+      axes: [0.1, 0.2, 0.3, 0.4],
+      buttons: Array.from({ length: 16 }, (_, index) => (index === 4 ? 1 : 0)),
+    };
+
+    expect(toArmJoyCommand(snapshot).axes).toEqual([0, 0, 0, -0.3, -0.4, 0, -0.1, -0.2, 0, 0]);
+  });
+
+  it('keeps Position-mode left-stick wrist input independent of Manual remapping', () => {
+    const toPositionJoyCommand = (
+      service as unknown as {
+        toPositionJoyCommand(snapshot: GamepadSnapshot): ArmJoyCommand;
+      }
+    ).toPositionJoyCommand.bind(service);
+    const snapshot: GamepadSnapshot = {
+      axes: [0.1, 0.2, 0.3, 0.4],
+      buttons: [],
+    };
+
+    expect(toPositionJoyCommand(snapshot).axes.slice(0, 2)).toEqual([-0.1, -0.2]);
+  });
+
   it('does not forward L3 as the Position-mode clear-fault button', () => {
     const toPositionJoyCommand = (
       service as unknown as {
