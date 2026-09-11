@@ -1,11 +1,11 @@
-import { Service, inject, signal } from '@angular/core';
+import { Service, computed, inject, signal } from '@angular/core';
 
 import {
   ArmClosedChainIkProvider,
   DEFAULT_ARM_URDF_URL,
 } from './providers/arm-closed-chain-ik-provider';
 import { ArmMoveItIkProvider } from './providers/arm-moveit-ik-provider';
-import { ArmIkPose, ArmIkSolveResult } from './arm-ik-types';
+import { ArmIkExecutionStatus, ArmIkPose, ArmIkSolveResult } from './arm-ik-types';
 import type { ArmIkProvider, ArmIkProviderName } from './arm-ik-coordinator';
 
 interface PendingSolve {
@@ -29,6 +29,11 @@ export class ArmIkSolveService {
   private activeSolve: PendingSolve | null = null;
 
   readonly provider = this.providerState.asReadonly();
+  readonly executionStatus = computed<ArmIkExecutionStatus>(() =>
+    this.providerState() === 'moveit2'
+      ? this.armMoveItIkProvider.executionStatus()
+      : 'idle',
+  );
 
   setProvider(provider: ArmIkProviderName): void {
     if (provider === this.providerState()) return;
@@ -94,7 +99,7 @@ export class ArmIkSolveService {
 
     this.activeSolve = solve;
 
-    let result: ArmIkSolveResult | Promise<ArmIkSolveResult>;
+    let result: ArmIkSolveResult | null | Promise<ArmIkSolveResult | null>;
     try {
       result = this.selectedProvider().solve(solve.target);
     } catch (error) {

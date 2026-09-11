@@ -1,8 +1,9 @@
 import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { vi } from 'vitest';
 
 import { ArmClosedChainIkProvider } from './providers/arm-closed-chain-ik-provider';
-import { ArmIkPose } from './arm-ik-types';
+import { ArmIkExecutionStatus, ArmIkPose } from './arm-ik-types';
 import { ArmIkSolveService } from './arm-ik-solve.service';
 import { ArmMoveItIkProvider } from './providers/arm-moveit-ik-provider';
 
@@ -26,6 +27,7 @@ describe('ArmIkSolveService', () => {
   let moveItProvider: {
     solve: ReturnType<typeof vi.fn>;
     reset: ReturnType<typeof vi.fn>;
+    executionStatus: ReturnType<typeof signal<ArmIkExecutionStatus>>;
   };
 
   beforeEach(() => {
@@ -37,6 +39,7 @@ describe('ArmIkSolveService', () => {
     moveItProvider = {
       solve: vi.fn().mockReturnValue(convergedResult),
       reset: vi.fn(),
+      executionStatus: signal<ArmIkExecutionStatus>('idle'),
     };
 
     TestBed.configureTestingModule({
@@ -68,6 +71,15 @@ describe('ArmIkSolveService', () => {
     vi.runAllTimers();
     await expect(closedChainResult).resolves.toEqual(convergedResult);
     expect(closedChainProvider.solve).toHaveBeenCalledWith(target);
+  });
+
+  it('exposes MoveIt2 execution status only for the selected provider', () => {
+    moveItProvider.executionStatus.set('executing');
+    expect(service.executionStatus()).toBe('executing');
+
+    service.setProvider('closed-chain-ik');
+
+    expect(service.executionStatus()).toBe('idle');
   });
 
   it('loads the URDF and returns the initial end-effector pose', async () => {

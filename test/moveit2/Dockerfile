@@ -5,6 +5,7 @@ SHELL ["/bin/bash", "-c"]
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         python3-colcon-common-extensions \
+        ros-jazzy-control-msgs \
         ros-jazzy-moveit \
         ros-jazzy-moveit-configs-utils \
         ros-jazzy-moveit-ros-planning-interface \

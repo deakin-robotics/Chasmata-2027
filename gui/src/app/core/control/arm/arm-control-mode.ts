@@ -53,10 +53,19 @@ export class ArmControlModeService {
   private readonly jointTargetEffect = effect(() => {
     const enabled = this.enabledState();
     const mode = this.modeState();
+    const provider = this.armIkCoordinator.provider();
     const ikStatus = this.armIkCoordinator.status();
     const jointAngles = this.armIkCoordinator.jointAngles();
 
-    if (!enabled || mode !== ArmMode.Position || ikStatus !== 'valid' || !jointAngles) return;
+    if (
+      !enabled ||
+      mode !== ArmMode.Position ||
+      provider !== 'closed-chain-ik' ||
+      ikStatus !== 'valid' ||
+      !jointAngles
+    ) {
+      return;
+    }
 
     this.armCommandPublisher.publishJointTarget(jointAngles);
   });

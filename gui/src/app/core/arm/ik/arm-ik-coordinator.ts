@@ -3,6 +3,7 @@ import { Service, computed, effect, inject, signal } from '@angular/core';
 import { ArmIkSolveService } from './arm-ik-solve.service';
 import {
   ArmIkPose,
+  ArmIkExecutionStatus,
   ArmIkSolveResult,
   ArmIkStatus,
   ArmPosition,
@@ -13,7 +14,7 @@ const DEFAULT_ARM_POSITION: ArmPosition = [0, 0, 0];
 
 /** Contract shared by the local closed-chain and MoveIt2 providers. */
 export interface ArmIkProvider {
-  solve(target: ArmIkPose): ArmIkSolveResult | Promise<ArmIkSolveResult>;
+  solve(target: ArmIkPose): ArmIkSolveResult | null | Promise<ArmIkSolveResult | null>;
   reset?(): void;
 }
 
@@ -31,6 +32,7 @@ export class ArmIkCoordinator {
   readonly position = this.positionState.asReadonly();
   readonly provider = this.armIkSolveService.provider;
   readonly status = this.statusState.asReadonly();
+  readonly executionStatus = this.armIkSolveService.executionStatus;
   readonly jointAngles = this.jointAnglesState.asReadonly();
   readonly statusLabel = computed(() => {
     switch (this.statusState()) {

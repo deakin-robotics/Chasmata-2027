@@ -49,6 +49,7 @@ def generate_launch_description():
                 package='arm_moveit_bridge',
                 executable='arm_moveit_bridge',
                 name='arm_moveit_bridge',
+                parameters=[moveit_config.to_dict()],
                 output='screen',
             ),
         ]

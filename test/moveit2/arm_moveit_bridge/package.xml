@@ -2,17 +2,21 @@
 <package format="3">
   <name>arm_moveit_bridge</name>
   <version>0.0.1</version>
-  <description>Bridges GUI arm IK targets into MoveIt 2 joint solutions.</description>
+  <description>Bridges GUI arm targets into MoveIt 2 Cartesian trajectories.</description>
 
   <maintainer email="robotics@example.com">Deakin Competitive Robotics Club</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <depend>control_msgs</depend>
   <depend>geometry_msgs</depend>
+  <depend>moveit_core</depend>
+  <depend>moveit_msgs</depend>
   <depend>moveit_ros_planning_interface</depend>
   <depend>rclcpp</depend>
-  <depend>sensor_msgs</depend>
+  <depend>rclcpp_action</depend>
+  <depend>std_msgs</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

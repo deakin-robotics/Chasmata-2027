@@ -65,6 +65,21 @@ class JointSimulator:
 
         return accepted
 
+    def set_actual_positions(
+        self,
+        joint_values: Mapping[str, float],
+        velocities: Mapping[str, float] | None = None,
+    ) -> Dict[str, float]:
+        """Expose validated simulated positions and their measured velocities."""
+        accepted = self.set_target(joint_values)
+
+        for name, value in accepted.items():
+            self._positions[name] = value
+            velocity = velocities.get(name, 0.0) if velocities is not None else 0.0
+            self._velocities[name] = float(velocity)
+
+        return accepted
+
     def step(self, elapsed_seconds: float) -> None:
         """Advance each joint by at most max speed times elapsed time."""
         if elapsed_seconds <= 0:

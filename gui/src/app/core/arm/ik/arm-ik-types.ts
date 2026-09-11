@@ -21,6 +21,14 @@ export type ArmIkSolveStatus = 'converged' | 'stalled' | 'diverged' | 'timeout';
 
 export type ArmIkStatus = 'idle' | 'solving' | 'valid' | 'unreachable' | 'invalid';
 
+export type ArmIkExecutionStatus =
+  | 'idle'
+  | 'planning'
+  | 'executing'
+  | 'succeeded'
+  | 'canceled'
+  | 'failed';
+
 export interface ArmIkSolveResult {
   status: ArmIkSolveStatus;
   jointAngles: Readonly<Record<string, number>>;

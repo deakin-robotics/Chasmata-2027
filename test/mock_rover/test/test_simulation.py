@@ -46,3 +46,22 @@ def test_joint_targets_can_be_exposed_as_actual_positions_immediately():
     assert accepted == {'base_joint': 0.2}
     assert simulator.positions()['base_joint'] == pytest.approx(0.2)
     assert simulator.velocities()['base_joint'] == pytest.approx(0.0)
+
+
+def test_actual_positions_keep_measured_velocity_and_limits():
+    simulator = JointSimulator(JOINT_NAMES, JOINT_LIMITS, 1.0)
+
+    accepted = simulator.set_actual_positions(
+        {'base_joint': 0.4, 'shoulder_joint': 2.0},
+        {'base_joint': 0.7, 'shoulder_joint': -0.2},
+    )
+
+    assert accepted == {'base_joint': 0.4, 'shoulder_joint': 0.5}
+    assert simulator.positions() == {
+        'base_joint': pytest.approx(0.4),
+        'shoulder_joint': pytest.approx(0.5),
+    }
+    assert simulator.velocities() == {
+        'base_joint': pytest.approx(0.7),
+        'shoulder_joint': pytest.approx(-0.2),
+    }

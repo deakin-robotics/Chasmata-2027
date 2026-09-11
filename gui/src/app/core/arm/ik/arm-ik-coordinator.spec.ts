@@ -5,6 +5,7 @@ import { vi } from 'vitest';
 import { ArmIkCoordinator } from './arm-ik-coordinator';
 import { ArmIkProviderName } from './arm-ik-coordinator';
 import { ArmIkSolveService } from './arm-ik-solve.service';
+import { ArmIkExecutionStatus } from './arm-ik-types';
 
 describe('ArmIkCoordinator', () => {
   let coordinator: ArmIkCoordinator;
@@ -14,6 +15,7 @@ describe('ArmIkCoordinator', () => {
     reset: ReturnType<typeof vi.fn>;
     load: ReturnType<typeof vi.fn>;
     solve: ReturnType<typeof vi.fn>;
+    executionStatus: ReturnType<typeof signal<ArmIkExecutionStatus>>;
   };
 
   beforeEach(() => {
@@ -27,6 +29,7 @@ describe('ArmIkCoordinator', () => {
         status: 'converged',
         jointAngles: { base_joint: 0 },
       }),
+      executionStatus: signal<ArmIkExecutionStatus>('idle'),
     };
 
     solveService.load.mockResolvedValue({

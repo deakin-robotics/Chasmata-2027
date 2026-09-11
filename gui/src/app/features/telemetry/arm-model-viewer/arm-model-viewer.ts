@@ -64,6 +64,23 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
   });
   readonly ikStatus = this.armIkCoordinator.status;
   readonly ikStatusLabel = this.armIkCoordinator.statusLabel;
+  readonly executionStatus = this.armIkCoordinator.executionStatus;
+  readonly executionStatusLabel = computed(() => {
+    switch (this.executionStatus()) {
+      case 'planning':
+        return 'PLANNING';
+      case 'executing':
+        return 'EXECUTING';
+      case 'succeeded':
+        return 'DONE';
+      case 'canceled':
+        return 'CANCELED';
+      case 'failed':
+        return 'FAILED';
+      default:
+        return 'WAITING';
+    }
+  });
   readonly rosConnected = this.rosConnection.isConnected;
 
   private three: ThreeModule | null = null;

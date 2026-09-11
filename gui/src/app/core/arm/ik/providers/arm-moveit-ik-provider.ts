@@ -1,132 +1,190 @@
-import { Service, inject } from '@angular/core';
+import { Service, inject, signal } from '@angular/core';
 import { Ros, Topic } from 'roslib';
 
-import { ArmIkPose, ArmIkSolveResult } from '../arm-ik-types';
+import {
+  ArmIkExecutionStatus,
+  ArmIkPose,
+  ArmIkSolveResult,
+} from '../arm-ik-types';
 import type { ArmIkProvider } from '../arm-ik-coordinator';
 import { RosConnection } from '../../../ros/ros-connection';
 
 const MOVEIT_TARGET_TOPIC = '/arm/target_pose';
-const MOVEIT_SOLUTION_TOPIC = '/arm/moveit/solution';
+const MOVEIT_STATUS_TOPIC = '/arm/moveit/status';
 const POSE_STAMPED_MESSAGE_TYPE = 'geometry_msgs/PoseStamped';
-const JOINT_STATE_MESSAGE_TYPE = 'sensor_msgs/JointState';
-const MOVEIT_RESPONSE_TIMEOUT_MS = 7000;
+const STRING_MESSAGE_TYPE = 'std_msgs/String';
+const MOVEIT_RESPONSE_TIMEOUT_MS = 15_000;
+const MOVEIT_LOG_PREFIX = '[MoveIt2]';
 
-interface JointStateMessage {
-  name?: unknown;
-  position?: unknown;
+type MoveItStatus = 'PLANNING' | 'EXECUTING' | 'SUCCEEDED' | 'CANCELED' | 'FAILED';
+
+interface StatusMessage {
+  request_id?: unknown;
+  state?: unknown;
+  message?: unknown;
 }
 
 interface PendingRequest {
+  readonly id: number;
   readonly target: ArmIkPose;
-  readonly resolve: (result: ArmIkSolveResult) => void;
+  readonly resolve: (result: ArmIkSolveResult | null) => void;
   readonly reject: (error: Error) => void;
 }
 
-/** Adapts the base-station MoveIt2 target/solution topics to the IK contract. */
+/** Sends target poses to the base-station trajectory executor. */
 @Service()
 export class ArmMoveItIkProvider implements ArmIkProvider {
   private readonly rosConnection = inject(RosConnection);
 
+  private readonly executionStatusState = signal<ArmIkExecutionStatus>('idle');
+  readonly executionStatus = this.executionStatusState.asReadonly();
+
   private activeClient: Ros | null = null;
   private targetTopic: Topic | null = null;
-  private solutionTopic: Topic | null = null;
+  private statusTopic: Topic | null = null;
   private activeRequest: PendingRequest | null = null;
-  private queuedRequest: PendingRequest | null = null;
   private responseTimer: ReturnType<typeof setTimeout> | null = null;
+  private requestSequence = 0;
+  private activeStartedAt: number | null = null;
 
-  solve(target: ArmIkPose): Promise<ArmIkSolveResult> {
+  solve(target: ArmIkPose): Promise<ArmIkSolveResult | null> {
     this.assertFinitePose(target);
 
     return new Promise((resolve, reject) => {
-      this.queuedRequest?.reject(new Error('The previous MoveIt2 target was superseded.'));
-      this.queuedRequest = { target, resolve, reject };
-      this.pumpRequest();
+      const id = ++this.requestSequence;
+      const topics = this.ensureTopics();
+
+      if (!topics) {
+        this.executionStatusState.set('failed');
+        reject(new Error('Connect to ROSbridge before using MoveIt2.'));
+        return;
+      }
+
+      if (this.activeRequest) {
+        console.log(`${MOVEIT_LOG_PREFIX} target superseded`, {
+          previousRequestId: this.activeRequest.id,
+          requestId: id,
+        });
+        this.activeRequest.resolve(null);
+      }
+
+      const request: PendingRequest = { id, target, resolve, reject };
+      this.activeRequest = request;
+      this.activeStartedAt = performance.now();
+      this.executionStatusState.set('planning');
+      this.clearResponseTimer();
+
+      try {
+        topics.target.publish(this.toPoseStamped(target, id));
+        console.log(`${MOVEIT_LOG_PREFIX} target sent`, {
+          requestId: id,
+          topic: MOVEIT_TARGET_TOPIC,
+          position: target.position,
+        });
+      } catch (error) {
+        this.finishRequest(null, this.toError(error, 'MoveIt2 target publish failed.'));
+        return;
+      }
+
+      this.responseTimer = setTimeout(
+        () => this.finishRequest(null, new Error('MoveIt2 did not finish the trajectory in time.')),
+        MOVEIT_RESPONSE_TIMEOUT_MS,
+      );
     });
   }
 
   reset(): void {
+    console.log(`${MOVEIT_LOG_PREFIX} reset`);
     this.clearResponseTimer();
-    this.activeRequest?.reject(new Error('MoveIt2 solve was reset.'));
-    this.queuedRequest?.reject(new Error('MoveIt2 solve was reset.'));
+    this.activeStartedAt = null;
+    this.activeRequest?.resolve(null);
     this.activeRequest = null;
-    this.queuedRequest = null;
+    this.executionStatusState.set('idle');
     this.disposeTopics();
   }
 
-  private pumpRequest(): void {
-    if (this.activeRequest || !this.queuedRequest) return;
+  private handleStatus(message: StatusMessage): void {
+    const request = this.activeRequest;
+    const requestId = this.numberValue(message.request_id);
+    const state = this.statusValue(message.state);
+    if (!request || requestId !== request.id || !state) return;
 
-    const request = this.queuedRequest;
-    this.queuedRequest = null;
-    const topics = this.ensureTopics();
-    if (!topics) {
-      request.reject(new Error('Connect to ROSbridge before using MoveIt2.'));
-      this.pumpRequest();
+    if (state === 'PLANNING') {
+      this.executionStatusState.set('planning');
       return;
     }
 
-    this.activeRequest = request;
-    topics.target.publish(this.toPoseStamped(request.target));
-    this.responseTimer = setTimeout(
-      () => this.finishRequest(null, new Error('MoveIt2 did not return a solution in time.')),
-      MOVEIT_RESPONSE_TIMEOUT_MS,
-    );
-  }
-
-  private handleSolution(message: JointStateMessage): void {
-    if (!this.activeRequest) return;
-
-    const names = message.name;
-    const positions = message.position;
-
-    if (!Array.isArray(names) || !Array.isArray(positions)) {
-      this.finishRequest(null, new Error('MoveIt2 returned an invalid joint solution.'));
+    if (state === 'EXECUTING') {
+      this.executionStatusState.set('executing');
       return;
     }
 
-    if (
-      names.length === 0 ||
-      names.length !== positions.length ||
-      !names.every((name): name is string => typeof name === 'string') ||
-      !positions.every(
-        (position): position is number =>
-          typeof position === 'number' && Number.isFinite(position),
-      )
-    ) {
-      this.finishRequest(null, new Error('MoveIt2 returned invalid joint values.'));
+    if (state === 'CANCELED') {
+      this.executionStatusState.set('canceled');
+      this.finishRequest(null, null);
       return;
     }
 
-    this.finishRequest(
-      {
-        status: 'converged',
-        jointAngles: Object.fromEntries(
-          names.map((name, index) => [name, positions[index]]),
+    if (state === 'FAILED') {
+      this.finishRequest(
+        null,
+        new Error(
+          typeof message.message === 'string'
+            ? message.message
+            : 'MoveIt2 trajectory execution failed.',
         ),
-      },
-      null,
-    );
+      );
+      return;
+    }
+
+    this.executionStatusState.set('succeeded');
+    this.finishRequest({ status: 'converged', jointAngles: {} }, null);
   }
 
-  private finishRequest(result: ArmIkSolveResult | null, error: Error | null): void {
+  private finishRequest(
+    result: ArmIkSolveResult | null,
+    error: Error | null,
+  ): void {
     this.clearResponseTimer();
 
     const request = this.activeRequest;
     this.activeRequest = null;
-    if (request) {
-      if (error) request.reject(error);
-      else if (result) request.resolve(result);
+    const elapsedMs = this.activeStartedAt === null
+      ? null
+      : Math.round(performance.now() - this.activeStartedAt);
+    this.activeStartedAt = null;
+
+    if (!request) return;
+
+    if (error) {
+      this.executionStatusState.set('failed');
+      console.error(`${MOVEIT_LOG_PREFIX} request failed`, {
+        requestId: request.id,
+        elapsedMs,
+        error: error.message,
+      });
+      request.reject(error);
+      return;
     }
 
-    this.pumpRequest();
+    if (result) {
+      console.log(`${MOVEIT_LOG_PREFIX} trajectory completed`, {
+        requestId: request.id,
+        elapsedMs,
+      });
+      request.resolve(result);
+      return;
+    }
+
+    request.resolve(null);
   }
 
-  private ensureTopics(): { target: Topic; solution: Topic } | null {
+  private ensureTopics(): { target: Topic; status: Topic } | null {
     const client = this.rosConnection.client();
     if (!client || !this.rosConnection.isConnected()) return null;
 
-    if (client === this.activeClient && this.targetTopic && this.solutionTopic) {
-      return { target: this.targetTopic, solution: this.solutionTopic };
+    if (client === this.activeClient && this.targetTopic && this.statusTopic) {
+      return { target: this.targetTopic, status: this.statusTopic };
     }
 
     this.disposeTopics();
@@ -136,20 +194,33 @@ export class ArmMoveItIkProvider implements ArmIkProvider {
       name: MOVEIT_TARGET_TOPIC,
       messageType: POSE_STAMPED_MESSAGE_TYPE,
     });
-    this.solutionTopic = new Topic({
+    this.statusTopic = new Topic({
       ros: client,
-      name: MOVEIT_SOLUTION_TOPIC,
-      messageType: JOINT_STATE_MESSAGE_TYPE,
+      name: MOVEIT_STATUS_TOPIC,
+      messageType: STRING_MESSAGE_TYPE,
     });
-    this.solutionTopic.subscribe((message) => this.handleSolution(message as JointStateMessage));
+    this.statusTopic.subscribe((message) => this.handleStatusMessage(message));
 
-    return { target: this.targetTopic, solution: this.solutionTopic };
+    return { target: this.targetTopic, status: this.statusTopic };
+  }
+
+  private handleStatusMessage(message: unknown): void {
+    if (!message || typeof message !== 'object' || !('data' in message)) return;
+
+    const data = (message as { data?: unknown }).data;
+    if (typeof data !== 'string') return;
+
+    try {
+      this.handleStatus(JSON.parse(data) as StatusMessage);
+    } catch {
+      console.warn(`${MOVEIT_LOG_PREFIX} ignored malformed status message`);
+    }
   }
 
   private disposeTopics(): void {
-    this.solutionTopic?.unsubscribe();
+    this.statusTopic?.unsubscribe();
     this.targetTopic = null;
-    this.solutionTopic = null;
+    this.statusTopic = null;
     this.activeClient = null;
   }
 
@@ -160,10 +231,13 @@ export class ArmMoveItIkProvider implements ArmIkProvider {
     this.responseTimer = null;
   }
 
-  private toPoseStamped(target: ArmIkPose): Record<string, unknown> {
+  private toPoseStamped(target: ArmIkPose, requestId: number): Record<string, unknown> {
     return {
       header: {
-        stamp: { sec: 0, nanosec: 0 },
+        stamp: {
+          sec: Math.floor(requestId / 1_000_000_000),
+          nanosec: requestId % 1_000_000_000,
+        },
         frame_id: 'base_link',
       },
       pose: {
@@ -180,6 +254,24 @@ export class ArmMoveItIkProvider implements ArmIkProvider {
         },
       },
     };
+  }
+
+  private statusValue(value: unknown): MoveItStatus | null {
+    return value === 'PLANNING' ||
+      value === 'EXECUTING' ||
+      value === 'SUCCEEDED' ||
+      value === 'CANCELED' ||
+      value === 'FAILED'
+      ? value
+      : null;
+  }
+
+  private numberValue(value: unknown): number | null {
+    return typeof value === 'number' && Number.isSafeInteger(value) ? value : null;
+  }
+
+  private toError(error: unknown, fallback: string): Error {
+    return error instanceof Error ? error : new Error(fallback);
   }
 
   private assertFinitePose(target: ArmIkPose): void {

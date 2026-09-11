@@ -1,9 +1,9 @@
-# MoveIt 2 test stack
+# MoveIt 2 Cartesian trajectory test stack
 
 This folder is an isolated MoveIt 2 experiment for the current six-joint arm.
-It runs MoveIt 2 in a base-station-style container and connects it to the
-mock rover through the standard `FollowJointTrajectory` action. It also
-provides the MoveIt2 source used by the GUI's `ArmIkCoordinator`.
+It runs MoveIt 2 in a base-station-style container and sends complete,
+time-parameterized Cartesian trajectories to the mock rover through the
+standard `FollowJointTrajectory` action.
 
 ## Start
 
@@ -17,13 +17,13 @@ The stack starts:
 
 - an isolated mock rover and ROSbridge on `ws://localhost:19090`;
 - a headless MoveIt 2 `move_group` node with the `arm` planning group;
-- an `arm_moveit_bridge` node exposing the MoveIt2 source contract;
+- an `arm_moveit_bridge` node that owns Cartesian planning and rover action
+  execution;
 - an identity `world` to `base_link` transform and robot state publisher.
 
-The alternate host ports let this stack run beside the normal
-`test/mock_rover` compose. If the GUI should connect to this isolated rover,
-use `localhost:19090` as its ROSbridge endpoint. The port defaults can be
-overridden with `MOVEIT2_ROSBRIDGE_PORT`, `MOVEIT2_FRONT_CAMERA_PORT`,
+If the GUI should connect to this isolated rover, use `localhost:19090` as its
+ROSbridge endpoint. The port defaults can be overridden with
+`MOVEIT2_ROSBRIDGE_PORT`, `MOVEIT2_FRONT_CAMERA_PORT`,
 `MOVEIT2_GIMBAL_CAMERA_PORT`, and `MOVEIT2_ARM_CAMERA_PORT`.
 
 The MoveIt container stays running after launch. In another terminal, run the
@@ -36,13 +36,28 @@ docker compose exec moveit2 bash -lc \
    ros2 run arm_moveit_demo plan_and_execute'
 ```
 
-The CLI demo plans a small Z displacement from the current end-effector pose
-and, by default, executes the resulting trajectory. The mock rover accepts the
-trajectory, immediately publishes its final joint state on `/joint_states`,
-and the GUI can render that telemetry through ROSbridge. The coordinator
-defaults to the `moveit2` source: it sends targets on `/arm/target_pose`,
-receives named joint angles on `/arm/moveit/solution`, and the existing
-`/joint_commands` publisher continues to send the result to the rover.
+The GUI path is:
+
+```text
+GUI target pose
+  -> /arm/target_pose
+  -> arm_moveit_bridge
+  -> Cartesian interpolation + MoveIt IK + time parameterization
+  -> /arm_controller/follow_joint_trajectory
+  -> mock/real rover controller
+  -> /joint_states
+  -> GUI model viewer
+```
+
+MoveIt2 keeps the current end-effector orientation and generates a straight
+Cartesian position path. Collision checking is disabled for this first path;
+joint limits and rover-side safety checks remain active.
+
+Moving the target while a trajectory is active cancels the current action and
+causes the bridge to plan from the latest rover state. The GUI never schedules
+trajectory points and does not publish `/joint_commands` while the MoveIt2
+provider is selected. The closed-chain provider remains available as the fast
+direct-joint fallback.
 
 To plan without execution:
 
@@ -53,7 +68,7 @@ docker compose exec moveit2 bash -lc \
    ros2 run arm_moveit_demo plan_and_execute --ros-args -p execute:=false'
 ```
 
-Useful parameters:
+Useful demo parameters:
 
 ```text
 target_dx   Cartesian X displacement in metres (default: 0.0)
@@ -67,40 +82,40 @@ execute     Send the planned trajectory to the mock rover (default: true)
 ```mermaid
 flowchart LR
     gui[GUI ArmIkCoordinator]
-    target[/arm/target_pose]
+    target[/arm/target_pose<br/>PoseStamped]
     bridge[arm_moveit_bridge]
-    move_group[MoveIt 2<br/>move_group]
-    planner[OMPL planner<br/>time parameterization]
-    solution[/arm/moveit/solution]
-    command[/joint_commands<br/>existing GUI publisher]
+    cartesian[Cartesian path<br/>fixed orientation]
+    time[IK + time parameterization]
+    status[/arm/moveit/status<br/>planning/execution state]
     action[FollowJointTrajectory<br/>/arm_controller]
-    rover[Mock rover<br/>limit + execute]
-    telemetry[/joint_states]
+    rover[Rover controller<br/>limits + execution]
+    telemetry[/joint_states<br/>actual feedback]
 
     gui --> target
     target --> bridge
-    bridge --> move_group
-    move_group --> planner
-    planner --> solution
-    solution --> gui
-    gui --> command
-    command --> rover
-    planner --> action
+    bridge --> cartesian
+    cartesian --> time
+    time --> action
     action --> rover
+    bridge --> status
+    status --> gui
     rover --> telemetry
     telemetry --> gui
 ```
 
-This test package uses the current GUI URDF as a checked-in test copy. When
-the mechanical model changes, update `arm_moveit_config/config/arm.urdf` and
-regenerate or review the MoveIt configuration before trusting plans on real
-hardware.
+The bridge publishes JSON status events on `/arm/moveit/status` using the
+`std_msgs/msg/String` shape:
 
-The copied URDF currently contains visual geometry but no collision geometry,
-so this first probe tests joint-limit-aware kinematic planning, time
-parameterization, action execution, and telemetry—not collision avoidance.
-Adding collision geometry and scene objects is a separate follow-up.
+```json
+{"request_id":1,"state":"EXECUTING","message":""}
+```
 
-The test keeps the production `ArmIkCoordinator` contract. MoveIt2 is an
-interchangeable source that returns the same named joint-angle result as the
-local IK source; the existing GUI command boundary remains unchanged.
+`state` is one of `PLANNING`, `EXECUTING`, `SUCCEEDED`, `CANCELED`, or
+`FAILED`. The request ID is carried in the target pose timestamp so stale
+status events cannot complete a newer GUI request.
+
+The checked-in URDF currently contains visual geometry but no collision
+geometry. This stack therefore tests Cartesian kinematics, joint-limit-aware
+time parameterization, action execution, cancellation, and telemetry—not
+real-world obstacle avoidance. OMPL remains configured in MoveIt2 for a later
+collision-aware planning mode.

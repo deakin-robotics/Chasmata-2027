@@ -9,6 +9,10 @@
         3D: {{ viewerStatusLabel() }}
       </span>
       <span class="status-separator" aria-hidden="true">|</span>
+      <span class="execution-status" aria-live="polite">
+        MOVE: {{ rosConnected() ? executionStatusLabel() : '—' }}
+      </span>
+      <span class="status-separator" aria-hidden="true">|</span>
       <span
         class="ik-status"
         [class.ik-status-solving]="ikStatus() === 'solving'"

@@ -3,11 +3,14 @@
 import json
 import math
 import time
+import threading
 from typing import Dict, Optional, Tuple
 
 from control_msgs.action import FollowJointTrajectory
 import rclpy
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import JointState, Joy
@@ -71,10 +74,11 @@ class MockRoverNode(Node):
             0.0,
         )
 
-        # The mock is an immediate command/telemetry loop. The simulator keeps
-        # the rover-side limit checks and state shape, while accepted commands
-        # are reflected in /joint_states without modelling motor dynamics.
+        # The simulator keeps the rover-side limit checks and state shape, while
+        # the action server models timed trajectory execution.
         self.joints = JointSimulator(JOINT_NAMES, JOINT_LIMITS, max_speed_rad_s=1.0)
+        self.trajectory_execution_lock = threading.Lock()
+        self.trajectory_callback_group = ReentrantCallbackGroup()
         self.drive_mode: Optional[str] = None
         self.arm_mode: Optional[str] = None
         self.law_mode = 'NORMAL'
@@ -110,6 +114,7 @@ class MockRoverNode(Node):
             execute_callback=self.execute_trajectory,
             goal_callback=self.trajectory_goal_callback,
             cancel_callback=self.trajectory_cancel_callback,
+            callback_group=self.trajectory_callback_group,
         )
 
         self.create_subscription(
@@ -216,7 +221,11 @@ class MockRoverNode(Node):
     def trajectory_cancel_callback(self, _goal_handle) -> CancelResponse:
         return CancelResponse.ACCEPT
 
-    async def execute_trajectory(self, goal_handle):
+    def execute_trajectory(self, goal_handle):
+        with self.trajectory_execution_lock:
+            return self._execute_trajectory(goal_handle)
+
+    def _execute_trajectory(self, goal_handle):
         result = FollowJointTrajectory.Result()
         trajectory = goal_handle.request.trajectory
         joint_names = list(trajectory.joint_names)
@@ -227,12 +236,35 @@ class MockRoverNode(Node):
             goal_handle.abort()
             return result
 
-        final_point = trajectory.points[-1]
-        if len(final_point.positions) != len(joint_names) or not all(
-            math.isfinite(float(position)) for position in final_point.positions
-        ):
+        previous_time = 0.0
+        for point in trajectory.points:
+            point_time = float(point.time_from_start.sec) + float(point.time_from_start.nanosec) / 1e9
+            if point_time < previous_time or len(point.positions) != len(joint_names):
+                result.error_code = FollowJointTrajectory.Result.INVALID_GOAL
+                result.error_string = 'The trajectory points have invalid timing or positions.'
+                goal_handle.abort()
+                return result
+
+            point_values = [float(position) for position in point.positions]
+            if not all(math.isfinite(position) for position in point_values):
+                result.error_code = FollowJointTrajectory.Result.INVALID_GOAL
+                result.error_string = 'The trajectory contains non-finite positions.'
+                goal_handle.abort()
+                return result
+
+            for joint_name, position in zip(joint_names, point_values):
+                lower, upper = JOINT_LIMITS[joint_name]
+                if position < lower or position > upper:
+                    result.error_code = FollowJointTrajectory.Result.INVALID_GOAL
+                    result.error_string = f'Trajectory exceeds the limit for {joint_name}.'
+                    goal_handle.abort()
+                    return result
+
+            previous_time = point_time
+
+        if previous_time <= 0.0:
             result.error_code = FollowJointTrajectory.Result.INVALID_GOAL
-            result.error_string = 'The trajectory final point has invalid positions.'
+            result.error_string = 'The trajectory must have a positive duration.'
             goal_handle.abort()
             return result
 
@@ -242,15 +274,72 @@ class MockRoverNode(Node):
             result.error_string = 'The trajectory was cancelled before execution.'
             return result
 
-        accepted_values = self.joints.set_target_immediately(
-            dict(zip(joint_names, final_point.positions))
-        )
-        if len(accepted_values) != len(JOINT_NAMES):
-            result.error_code = FollowJointTrajectory.Result.INVALID_GOAL
-            result.error_string = 'The trajectory contained an unknown arm joint.'
-            goal_handle.abort()
-            return result
+        start_positions = self.joints.positions()
+        elapsed_start = time.monotonic()
+        previous_point_time = 0.0
+        previous_positions = [start_positions[name] for name in joint_names]
 
+        for point in trajectory.points:
+            point_time = float(point.time_from_start.sec) + float(point.time_from_start.nanosec) / 1e9
+            target_positions = [float(position) for position in point.positions]
+            segment_duration = point_time - previous_point_time
+
+            while True:
+                if goal_handle.is_cancel_requested:
+                    goal_handle.canceled()
+                    result.error_code = FollowJointTrajectory.Result.INVALID_GOAL
+                    result.error_string = 'The trajectory was cancelled during execution.'
+                    return result
+
+                elapsed = time.monotonic() - elapsed_start
+                if segment_duration <= 0.0:
+                    fraction = 1.0
+                else:
+                    fraction = min(
+                        max((elapsed - previous_point_time) / segment_duration, 0.0),
+                        1.0,
+                    )
+
+                positions = [
+                    start + (target - start) * fraction
+                    for start, target in zip(previous_positions, target_positions)
+                ]
+                velocities = {
+                    name: (
+                        (target - start) / segment_duration
+                        if segment_duration > 0.0
+                        else 0.0
+                    )
+                    for name, start, target in zip(
+                        joint_names,
+                        previous_positions,
+                        target_positions,
+                    )
+                }
+                self.joints.set_actual_positions(
+                    dict(zip(joint_names, positions)),
+                    velocities,
+                )
+                self.publish_joint_state()
+
+                feedback = FollowJointTrajectory.Feedback()
+                feedback.joint_names = joint_names
+                feedback.actual.positions = positions
+                feedback.actual.velocities = [velocities[name] for name in joint_names]
+                goal_handle.publish_feedback(feedback)
+
+                if fraction >= 1.0:
+                    break
+
+                time.sleep(0.02)
+
+            previous_point_time = point_time
+            previous_positions = target_positions
+
+        self.joints.set_actual_positions(
+            dict(zip(joint_names, previous_positions)),
+            {name: 0.0 for name in joint_names},
+        )
         self.publish_joint_state()
         goal_handle.succeed()
         result.error_code = FollowJointTrajectory.Result.SUCCESSFUL
@@ -423,11 +512,14 @@ class MockRoverNode(Node):
 def main(args=None) -> None:
     rclpy.init(args=args)
     node = MockRoverNode()
+    executor = MultiThreadedExecutor(num_threads=4)
+    executor.add_node(node)
 
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:
+        executor.shutdown()
         node.destroy_node()
         rclpy.shutdown()

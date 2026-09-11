@@ -46,6 +46,11 @@ Gimbal camera: http://localhost:8090/?action=stream
   immediately publishes the accepted positions as rover telemetry. This keeps
   the GUI's rendered arm on the same `/joint_states` path as the real rover
   without modelling motor dynamics.
+- Accepts complete `FollowJointTrajectory` goals on
+  `/arm_controller/follow_joint_trajectory`, validates every point against the
+  rover joint limits, interpolates the points over their timestamps, and
+  publishes the simulated actual positions and velocities while executing.
+  New goals can cancel an active trajectory.
 - Publishes actual arm state on `/joint_states` at 20 Hz.
 - Serves canned GIF feeds through the legacy HTTP camera endpoint shape.
 
@@ -62,6 +67,7 @@ base_joint, shoulder_joint, elbow_joint, yaw_joint, pitch_joint, roll_joint
 | GUI → mock rover | `/joy` | `sensor_msgs/msg/Joy` | Driver gamepad input; LT/RT are analogue `axes[4]`/`axes[5]` values in the range `0..1`. |
 | GUI → mock rover | `/arm/joy` | `sensor_msgs/msg/Joy` | Manual Arm gamepad input; LT/RT are analogue `axes[8]`/`axes[9]` values in the range `0..1`. |
 | GUI → mock rover | `/joint_commands` | `sensor_msgs/msg/JointState` | Target joint positions in radians. |
+| MoveIt2 → mock rover | `/arm_controller/follow_joint_trajectory` | `control_msgs/action/FollowJointTrajectory` | Complete timed arm trajectory. |
 | Mock rover → GUI | `/joint_states` | `sensor_msgs/msg/JointState` | Simulated actual joint positions and velocities. |
 | GUI → mock rover | `/fma/drive/request` | `std_msgs/msg/String` | Driver mode value, such as `VELOCITY`. |
 | GUI → mock rover | `/fma/arm/request` | `std_msgs/msg/String` | Arm mode value, such as `POSITION`. |
