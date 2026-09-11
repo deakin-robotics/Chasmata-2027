@@ -89,8 +89,16 @@ export class DriverControl {
   private publishCurrentInput(): void {
     const snapshot = this.gamepad.snapshot();
 
-    if (!this.rosConnection.isConnected() || !snapshot || snapshot.axes.length < MINIMUM_DRIVE_AXES) {
+    if (!this.rosConnection.isConnected() || !this.gamepad.connected()) {
       this.disable();
+      return;
+    }
+
+    // Keep Drive authority during a transient browser snapshot gap, but make
+    // sure the rover continues receiving a safe zero command until input
+    // resumes.
+    if (!snapshot || snapshot.axes.length < MINIMUM_DRIVE_AXES) {
+      this.publisher.publishStop();
       return;
     }
 

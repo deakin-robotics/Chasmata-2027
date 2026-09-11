@@ -51,9 +51,10 @@ Gimbal camera: http://localhost:8090/?action=stream
   every point against the rover joint limits, interpolates the points over
   their timestamps, and publishes the simulated actual positions and
   velocities while executing. New goals can cancel an active trajectory.
-- Accepts `/arm/orientation_lock` and simulates Position-mode J4-J6 wrist
-  input from `/arm/joy` while orientation is UNLOCKED. Partial trajectory
-  execution preserves the other joints.
+- Accepts `/arm/orientation_lock` and simulates Arm `/arm/joy` input. In
+  MANUAL mode it applies the direct J1-J6 command; in Position-mode UNLOCKED
+  it applies only the J4-J6 wrist input. Partial trajectory execution
+  preserves the other joints.
 - Publishes actual arm state on `/joint_states` at 10 Hz.
 - Serves canned GIF feeds through the legacy HTTP camera endpoint shape.
 
@@ -82,6 +83,12 @@ base_joint, shoulder_joint, elbow_joint, yaw_joint, pitch_joint, roll_joint
 For both Joy topics, `buttons[]` contains only digital button values (`0` or
 `1`). LT and RT are not read from `buttons[]`; their browser analogue values
 are sent through the dedicated axes listed above.
+
+In Arm MANUAL mode, `/arm/joy` uses `axes[0]`/`axes[1]` for J1/J2,
+`axes[4]` for J3, `axes[6]`/`axes[7]` for J4/J5, and
+`axes[9] - axes[8]` for J6. While LB is held, the GUI reserves the right-stick
+channels for its Gimbal modifier, so the mock does not apply `axes[4]` to J3.
+The left-stick wrist and trigger controls remain active.
 
 In Position-mode UNLOCKED operation, `/arm/joy` uses `axes[6]` for J4 yaw,
 `axes[7]` for J5 pitch, and `axes[8]`/`axes[9]` for J6 roll. The GUI places

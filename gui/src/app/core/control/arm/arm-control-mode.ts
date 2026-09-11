@@ -6,6 +6,7 @@ import { ArmMode } from '../../fma/fma-state.service';
 import { RosConnection } from '../../ros/ros-connection';
 import { ControlModeService } from '../control-mode';
 import { GimbalPriorityCommandPublisher } from '../gimbal-priority-command-publisher';
+import { ArmCommandPublisher } from './arm-command-publisher';
 import { ArmManualControl } from './arm-manual-control';
 import { ArmPositionControl } from './arm-position-control';
 
@@ -26,6 +27,7 @@ export class ArmControlModeService {
   private readonly gamepad = inject(GamepadInput);
   private readonly armIkCoordinator = inject(ArmIkCoordinator);
   private readonly gimbalPriorityPublisher = inject(GimbalPriorityCommandPublisher);
+  private readonly armCommandPublisher = inject(ArmCommandPublisher);
   private readonly armManualControl = inject(ArmManualControl);
   private readonly armPositionControl = inject(ArmPositionControl);
 
@@ -94,6 +96,7 @@ export class ArmControlModeService {
     }
 
     if (this.isManual()) this.armManualControl.release();
+    else this.armCommandPublisher.publishStop();
     this.armIkCoordinator.setOrientationMode('unlocked');
     if (this.controlMode.isArmActive()) this.controlMode.release();
     this.leftStickClickPressed = false;
@@ -121,9 +124,7 @@ export class ArmControlModeService {
     const pressed = (snapshot.buttons[LEFT_STICK_CLICK_BUTTON_INDEX] ?? 0) > 0.5;
 
     if (this.isPosition() && pressed && !this.leftStickClickPressed) {
-      const nextMode = this.armIkCoordinator.orientationMode() === 'locked'
-        ? 'unlocked'
-        : 'locked';
+      const nextMode = this.armIkCoordinator.orientationMode() === 'locked' ? 'unlocked' : 'locked';
       this.armIkCoordinator.setOrientationMode(nextMode);
     }
 
@@ -151,11 +152,15 @@ export class ArmControlModeService {
 
     if (
       !this.rosConnection.isConnected() ||
-      !this.controlMode.isArmActive() ||
-      !snapshot ||
-      snapshot.axes.length < MINIMUM_ARM_AXES
+      !this.gamepad.connected() ||
+      !this.controlMode.isArmActive()
     ) {
       this.disable();
+      return;
+    }
+
+    if (!snapshot || snapshot.axes.length < MINIMUM_ARM_AXES) {
+      this.armCommandPublisher.publishStop();
       return;
     }
 

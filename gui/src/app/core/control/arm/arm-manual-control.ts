@@ -29,7 +29,7 @@ export class ArmManualControl {
     const rawAxes = snapshot.axes;
     const rawButtons = snapshot.buttons;
     const dpadY = (rawButtons[12] ?? 0) - (rawButtons[13] ?? 0);
-    const rightStickX = -(rawAxes[2] ?? 0);
+    const rightStickX = rawAxes[2] ?? 0;
     const rightStickY = -(rawAxes[3] ?? 0);
     const gimbalHeld = (rawButtons[LEFT_BUMPER_BUTTON_INDEX] ?? 0) > 0.5;
 

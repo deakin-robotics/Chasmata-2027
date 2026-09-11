@@ -56,6 +56,7 @@ PROXIMAL_JOINT_NAMES = ('base_joint', 'shoulder_joint', 'elbow_joint')
 WRIST_JOINT_NAMES = ('yaw_joint', 'pitch_joint', 'roll_joint')
 POSITION_WRIST_SPEED_RAD_S = 0.5
 POSITION_INPUT_PERIOD_SECONDS = 0.02
+MANUAL_JOINT_SPEED_RAD_S = 0.5
 
 DRIVE_MODES = {'MANUAL', 'VELOCITY', 'MANAGED'}
 ARM_MODES = {'MANUAL', 'POSITION', 'MANAGED', 'STOWED'}
@@ -421,7 +422,12 @@ class MockRoverNode(Node):
             f'Accepted {subsystem} Joy command with LT/RT={trigger_values}'
         )
 
-        if subsystem == 'arm' and self.arm_mode == 'POSITION' and not self.orientation_locked:
+        if subsystem != 'arm':
+            return
+
+        if self.arm_mode == 'MANUAL':
+            self.apply_manual_arm_command(message)
+        elif self.arm_mode == 'POSITION' and not self.orientation_locked:
             self.apply_position_wrist_command(message)
 
     def orientation_lock_callback(self, message: Bool) -> None:
@@ -434,21 +440,54 @@ class MockRoverNode(Node):
         dpad_yaw = float(message.axes[6])
         dpad_pitch = float(message.axes[7])
         roll = float(message.axes[9]) - float(message.axes[8])
-        current = self.joints.positions()
         deltas = {
             'yaw_joint': dpad_yaw,
             'pitch_joint': dpad_pitch,
             'roll_joint': roll,
         }
+        self.apply_arm_joint_deltas(
+            deltas,
+            POSITION_WRIST_SPEED_RAD_S,
+            POSITION_INPUT_PERIOD_SECONDS,
+        )
+
+    def apply_manual_arm_command(self, message: Joy) -> None:
+        """Apply the direct six-joint Manual-mode Arm mapping."""
+        gimbal_held = len(message.buttons) > 4 and message.buttons[4] > 0.5
+        deltas = {
+            'base_joint': float(message.axes[0]),
+            'shoulder_joint': float(message.axes[1]),
+            # ArmManualControl uses axes[4] for J3 unless LB changes those
+            # channels into the Gimbal modifier.
+            'elbow_joint': 0.0 if gimbal_held else float(message.axes[4]),
+            'yaw_joint': float(message.axes[6]),
+            'pitch_joint': float(message.axes[7]),
+            'roll_joint': float(message.axes[9]) - float(message.axes[8]),
+        }
+        self.apply_arm_joint_deltas(
+            deltas,
+            MANUAL_JOINT_SPEED_RAD_S,
+            POSITION_INPUT_PERIOD_SECONDS,
+        )
+
+    def apply_arm_joint_deltas(
+        self,
+        deltas: Dict[str, float],
+        speed_rad_s: float,
+        elapsed_seconds: float,
+    ) -> None:
+        current = self.joints.positions()
         targets = {
-            name: current[name] + value * POSITION_WRIST_SPEED_RAD_S * POSITION_INPUT_PERIOD_SECONDS
+            name: current[name] + value * speed_rad_s * elapsed_seconds
             for name, value in deltas.items()
             if value != 0.0
         }
-        if targets:
-            accepted = self.joints.set_target_immediately(targets)
-            if accepted:
-                self.publish_joint_state()
+        if not targets:
+            return
+
+        accepted = self.joints.set_target_immediately(targets)
+        if accepted:
+            self.publish_joint_state()
 
     def tick(self) -> None:
         now = time.monotonic()

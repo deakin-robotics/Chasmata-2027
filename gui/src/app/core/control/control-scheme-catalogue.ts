@@ -110,6 +110,7 @@ export const CONTROL_SCHEME_CATALOGUE: {
     [ArmMode.Position]: {
       default: {
         controls: [
+          { input: 'left-trigger', label: 'LT', action: 'J6 roll (UNLOCKED)' },
           {
             input: 'left-stick-x',
             label: 'Left joystick X',
@@ -122,7 +123,6 @@ export const CONTROL_SCHEME_CATALOGUE: {
           },
           { input: 'd-pad-x', label: 'D-pad X', action: 'Move J4 pivot X/Y' },
           { input: 'd-pad-y', label: 'D-pad Y', action: 'Move J4 pivot X/Y' },
-          { input: 'left-trigger', label: 'LT', action: 'J6 roll (UNLOCKED)' },
           { input: 'right-trigger', label: 'RT', action: 'J6 roll (UNLOCKED)' },
           { input: 'right-stick', label: 'Right joystick', action: 'Gimbal' },
           { input: 'button-a', label: 'A', action: 'Laser' },
