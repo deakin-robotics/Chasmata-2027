@@ -1,8 +1,8 @@
 import { Service, effect, inject, untracked } from '@angular/core';
 import { Ros, Topic } from 'roslib';
 
-import { ArmTelemetryService } from '../arm/arm-telemetry.service';
-import { ArmJointState } from '../arm/arm-ik-types';
+import { ArmTelemetryService } from '../arm/telemetry/arm-telemetry.service';
+import { ArmJointState } from '../arm/ik/arm-ik-types';
 import {
   ArmMode,
   DriveMode,

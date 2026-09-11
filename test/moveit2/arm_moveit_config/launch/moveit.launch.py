@@ -45,5 +45,11 @@ def generate_launch_description():
                 ],
                 output='screen',
             ),
+            Node(
+                package='arm_moveit_bridge',
+                executable='arm_moveit_bridge',
+                name='arm_moveit_bridge',
+                output='screen',
+            ),
         ]
     )

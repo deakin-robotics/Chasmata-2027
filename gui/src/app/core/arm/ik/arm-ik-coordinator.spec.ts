@@ -1,32 +1,41 @@
 import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { vi } from 'vitest';
 
-import { ArmIkSolver } from './arm-ik-solver';
 import { ArmIkCoordinator } from './arm-ik-coordinator';
+import { ArmIkProviderName } from './arm-ik-coordinator';
+import { ArmIkSolveService } from './arm-ik-solve.service';
 
 describe('ArmIkCoordinator', () => {
   let coordinator: ArmIkCoordinator;
-  let solver: {
+  let solveService: {
+    provider: ReturnType<typeof signal<ArmIkProviderName>>;
+    setProvider: ReturnType<typeof vi.fn>;
+    reset: ReturnType<typeof vi.fn>;
     load: ReturnType<typeof vi.fn>;
-    endEffectorPose: ReturnType<typeof vi.fn>;
     solve: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
-    solver = {
+    const provider = signal<ArmIkProviderName>('moveit2');
+    solveService = {
+      provider,
+      setProvider: vi.fn((nextProvider: ArmIkProviderName) => provider.set(nextProvider)),
+      reset: vi.fn(),
       load: vi.fn().mockResolvedValue(undefined),
-      endEffectorPose: vi.fn().mockReturnValue({
-        position: [0, 0, 0],
-        orientation: [0, 0, 0, 1],
-      }),
-      solve: vi.fn().mockReturnValue({
+      solve: vi.fn().mockResolvedValue({
         status: 'converged',
         jointAngles: { base_joint: 0 },
       }),
     };
 
+    solveService.load.mockResolvedValue({
+        position: [0, 0, 0],
+        orientation: [0, 0, 0, 1],
+    });
+
     TestBed.configureTestingModule({
-      providers: [{ provide: ArmIkSolver, useValue: solver }],
+      providers: [{ provide: ArmIkSolveService, useValue: solveService }],
     });
     coordinator = TestBed.inject(ArmIkCoordinator);
   });
@@ -37,6 +46,7 @@ describe('ArmIkCoordinator', () => {
 
   it('starts with a neutral target and no solve result', () => {
     expect(coordinator.position()).toEqual([0, 0, 0]);
+    expect(coordinator.provider()).toBe('moveit2');
     expect(coordinator.status()).toBe('idle');
     expect(coordinator.jointAngles()).toBeNull();
   });
@@ -52,7 +62,7 @@ describe('ArmIkCoordinator', () => {
   });
 
   it('defaults the target to the loaded end-effector pose', async () => {
-    solver.endEffectorPose.mockReturnValue({
+    solveService.load.mockResolvedValue({
       position: [0.25, 0.1, 0.4],
       orientation: [0, 0, 0, 1],
     });
@@ -69,12 +79,13 @@ describe('ArmIkCoordinator', () => {
   });
 
   it('exposes a valid result after the solver converges', async () => {
-    vi.useFakeTimers();
+    coordinator.setProvider('closed-chain-ik');
 
     await coordinator.load();
-    vi.runAllTimers();
+    await Promise.resolve();
 
-    expect(solver.solve).toHaveBeenCalledWith({
+    expect(solveService.setProvider).toHaveBeenCalledWith('closed-chain-ik');
+    expect(solveService.solve).toHaveBeenCalledWith({
       position: [0, 0, 0],
       orientation: [0, 0, 0, 1],
     });
@@ -83,13 +94,23 @@ describe('ArmIkCoordinator', () => {
   });
 
   it('reports an unsuccessful solve as unreachable', async () => {
-    vi.useFakeTimers();
-    solver.solve.mockReturnValue({ status: 'stalled', jointAngles: {} });
+    coordinator.setProvider('closed-chain-ik');
+    solveService.solve.mockResolvedValue({ status: 'stalled', jointAngles: {} });
 
     await coordinator.load();
-    vi.runAllTimers();
+    await Promise.resolve();
 
     expect(coordinator.status()).toBe('unreachable');
+    expect(coordinator.jointAngles()).toBeNull();
+  });
+
+  it('reports a rejected solve as invalid', async () => {
+    solveService.solve.mockRejectedValue(new Error('IK provider failed'));
+
+    await coordinator.load();
+    await Promise.resolve();
+
+    expect(coordinator.status()).toBe('invalid');
     expect(coordinator.jointAngles()).toBeNull();
   });
 });

@@ -15,8 +15,8 @@ import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js
 import type URDFLoader from 'urdf-loader';
 import type { URDFRobot } from 'urdf-loader/src/URDFClasses';
 
-import { ArmIkCoordinator } from '../../../core/arm/arm-ik-coordinator';
-import { ArmTelemetryService } from '../../../core/arm/arm-telemetry.service';
+import { ArmIkCoordinator } from '../../../core/arm/ik/arm-ik-coordinator';
+import { ArmTelemetryService } from '../../../core/arm/telemetry/arm-telemetry.service';
 import { GamepadInput } from '../../../core/gamepad/gamepad-input';
 import { RosConnection } from '../../../core/ros/ros-connection';
 import { UnavailableOverlay } from '../../../shared/unavailable-overlay/unavailable-overlay';

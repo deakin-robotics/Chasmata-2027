@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 
-import { ArmIkCoordinator } from '../../arm/arm-ik-coordinator';
+import { ArmIkCoordinator } from '../../arm/ik/arm-ik-coordinator';
 import { GamepadSnapshot } from '../../gamepad/gamepad-input';
 import { ArmPositionControl } from './arm-position-control';
 

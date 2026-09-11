@@ -16,7 +16,7 @@ import {
   ArmJointLimit,
   ArmPosition,
   ArmQuaternion,
-} from './arm-ik-types';
+} from '../arm-ik-types';
 
 export const DEFAULT_ARM_URDF_URL = '/assets/kinematics/arm.urdf';
 export const ARM_END_EFFECTOR_LINK = 'ee_link';
@@ -53,7 +53,7 @@ interface LoadedArm {
  * command interface after the rover-side limit check is available.
  */
 @Service()
-export class ArmIkSolver {
+export class ArmClosedChainIkProvider {
   private readonly loader = new URDFLoader();
   private readonly modelState = signal<LoadedArm | null>(null);
 

@@ -1,6 +1,6 @@
 import { Service, signal } from '@angular/core';
 
-import { ArmJointState } from './arm-ik-types';
+import { ArmJointState } from '../ik/arm-ik-types';
 
 /** Stores authoritative arm feedback received from the rover. */
 @Service()

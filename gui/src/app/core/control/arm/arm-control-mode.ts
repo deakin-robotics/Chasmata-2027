@@ -1,6 +1,6 @@
 import { Service, computed, effect, inject, signal } from '@angular/core';
 
-import { ArmIkCoordinator } from '../../arm/arm-ik-coordinator';
+import { ArmIkCoordinator } from '../../arm/ik/arm-ik-coordinator';
 import { GamepadInput, GamepadSnapshot } from '../../gamepad/gamepad-input';
 import { ArmMode } from '../../fma/fma-state.service';
 import { RosConnection } from '../../ros/ros-connection';

@@ -1,4 +1,4 @@
-import { ArmIkSolver } from './arm-ik-solver';
+import { ArmClosedChainIkProvider } from './arm-closed-chain-ik-provider';
 
 const SIX_JOINT_URDF = `
   <robot name="test_arm">
@@ -47,9 +47,9 @@ const SIX_JOINT_URDF = `
   </robot>
 `;
 
-describe('ArmIkSolver', () => {
+describe('ArmClosedChainIkProvider', () => {
   it('loads a six-joint URDF and solves its current pose', () => {
-    const solver = new ArmIkSolver();
+    const solver = new ArmClosedChainIkProvider();
     solver.loadUrdf(SIX_JOINT_URDF);
 
     expect(solver.jointNames()).toEqual([
@@ -72,7 +72,7 @@ describe('ArmIkSolver', () => {
   });
 
   it('returns joint angles that reach a moved position with a fixed base', () => {
-    const solver = new ArmIkSolver();
+    const solver = new ArmClosedChainIkProvider();
     solver.loadUrdf(SIX_JOINT_URDF);
 
     const start = solver.endEffectorPose();
@@ -87,7 +87,7 @@ describe('ArmIkSolver', () => {
     // Replaying only the serialized six-joint command must reproduce the
     // target. This catches a solver that reaches the target by moving a hidden
     // floating root that the rover never receives.
-    const commandedModel = new ArmIkSolver();
+    const commandedModel = new ArmClosedChainIkProvider();
     commandedModel.loadUrdf(SIX_JOINT_URDF);
     commandedModel.setJointAngles(result.jointAngles);
     const actual = commandedModel.endEffectorPose().position;

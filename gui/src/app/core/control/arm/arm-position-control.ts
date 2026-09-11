@@ -1,7 +1,7 @@
 import { Service, inject } from '@angular/core';
 
-import { ArmIkCoordinator } from '../../arm/arm-ik-coordinator';
-import { ArmPosition } from '../../arm/arm-ik-types';
+import { ArmIkCoordinator } from '../../arm/ik/arm-ik-coordinator';
+import { ArmPosition } from '../../arm/ik/arm-ik-types';
 import { GamepadSnapshot } from '../../gamepad/gamepad-input';
 
 const POSITION_UPDATE_SECONDS = 0.02;

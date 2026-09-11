@@ -1,9 +1,10 @@
 # Arm inverse kinematics (IK)
 
-This document describes the browser-side arm IK workflow in the Angular GUI.
-It converts an Arm Operator position target into named joint angles. The
-current Position mode solves the target XYZ position; end-effector orientation
-is free. It does **not** drive motors or replace rover-side safety checks.
+This document describes the provider-independent arm IK workflow in the Angular
+GUI. It converts an Arm Operator position target into named joint angles using
+the selected IK provider. The coordinator keeps the GUI contract stable whether
+the provider is `closed-chain-ik` or MoveIt 2. It does **not** replace rover-side
+safety checks.
 
 In Position mode, the gamepad updates the target through
 `ArmPositionControl`; in Manual mode, `ArmManualControl` continues to publish
@@ -17,19 +18,21 @@ handlers while the master control remains active.
 flowchart TD
     target[1. Operator target pose]
     coordinator[2. ArmIkCoordinator<br/>stable GUI boundary]
-    ros[4. ROS 2]
-    rover[5. Rover: validate limits<br/>execute/reject<br/>publish telemetry]
+    solveService[3. ArmIkSolveService<br/>select provider<br/>schedule/cancel solves]
+    ros[5. ROS 2]
+    rover[6. Rover: validate limits<br/>execute/reject<br/>publish telemetry]
 
-    subgraph solverBox[3. IK source]
+    subgraph solverBox[4. IK provider]
         subgraph solverOptions[ ]
             direction LR
-            current[3a. Now: closed-chain-ik<br/>returns target joint angles]
-            future[3b. Later: MoveIt 2<br/>returns trajectory or<br/>target joint angles]
+            current[3a. Now: MoveIt 2<br/>returns target joint angles]
+            future[3b. Alternate: closed-chain-ik<br/>returns target joint angles]
         end
     end
 
     target --> coordinator
-    coordinator <--> solverBox
+    coordinator <--> solveService
+    solveService <--> solverBox
     coordinator --> ros
     ros --> rover
 
@@ -37,10 +40,10 @@ flowchart TD
 ```
 
 `ArmIkCoordinator` is the stable boundary between the GUI and the selected IK
-source. The current path uses `closed-chain-ik`; a future path can replace it
-with MoveIt 2 without changing the operator controls, model viewer, or rover
-command boundary. The rover remains the authoritative source of whether a
-command is accepted and what the arm actually did.
+provider. The current provider is MoveIt 2; `closed-chain-ik` remains selectable
+without changing the operator controls, model viewer, or rover command
+boundary. The rover remains the authoritative source of whether a command is
+accepted and what the arm actually did.
 
 The IK math can run without ROS, which is useful for unit tests. The dashboard
 runtime waits for a ROS connection before starting the Arm IK workflow because
@@ -76,18 +79,27 @@ update as well.
 
 ## GUI implementation
 
-[`src/app/core/arm/arm-ik-solver.ts`](../src/app/core/arm/arm-ik-solver.ts)
-is the calculation engine built on:
+[`src/app/core/arm/ik/providers/arm-closed-chain-ik-provider.ts`](../src/app/core/arm/ik/providers/arm-closed-chain-ik-provider.ts)
+is the local provider for the calculation engine built on:
 
 - `urdf-loader` to parse the URDF.
 - `closed-chain-ik` to solve the kinematic chain.
 
-[`src/app/core/arm/arm-ik-coordinator.ts`](../src/app/core/arm/arm-ik-coordinator.ts)
+[`src/app/core/arm/ik/arm-ik-coordinator.ts`](../src/app/core/arm/ik/arm-ik-coordinator.ts)
 is the Angular singleton that owns the dashboard workflow. It stores and
-validates the target position, loads the solver, runs a solve when the target
-changes, and exposes the status and latest valid joint angles. The
+validates the target position, requests solves when the target changes, and
+exposes the status and latest valid joint angles. The
 `ArmModelViewer` consumes those outputs and only renders the URDF, target
 marker, and valid joint angles.
+
+The `ArmIkProvider` contract is defined alongside the coordinator.
+`ArmClosedChainIkProvider` implements the local `closed-chain-ik` provider, while
+[`src/app/core/arm/ik/providers/arm-moveit-ik-provider.ts`](../src/app/core/arm/ik/providers/arm-moveit-ik-provider.ts)
+adapts the remote MoveIt2 request/solution topics to the same result shape.
+[`src/app/core/arm/ik/arm-ik-solve.service.ts`](../src/app/core/arm/ik/arm-ik-solve.service.ts)
+loads the model, selects between those providers, schedules the latest target,
+handles stale asynchronous results, and keeps provider-specific execution
+details out of the coordinator.
 
 On the first successful model load, the coordinator initializes the blue target
 marker from the URDF model's current end-effector pose. Later reloads preserve
@@ -99,36 +111,27 @@ horizontal target movement and D-pad up/down input into height movement, then
 passes the resulting target delta to `ArmIkCoordinator`. It does not publish
 joint commands to ROS.
 
-The low-level solver flow is:
+The provider-independent solve flow is:
 
 ```ts
-await armIk.load();
-
-// Seed from the latest rover telemetry when that interface exists.
-armIk.setJointAngles({
-  base_joint: 0,
-  shoulder_joint: 0,
-  elbow_joint: 0,
-  yaw_joint: 0,
-  pitch_joint: 0,
-  roll_joint: 0,
-});
-
-const result = armIk.solve({
+const initialPose = await armIkSolveService.load();
+const result = await armIkSolveService.solve({
   position: [x, y, z],
   orientation: [qx, qy, qz, qw],
 });
 
 // result.status: converged | stalled | diverged | timeout
 // result.jointAngles: { base_joint: ..., shoulder_joint: ..., ... }
+// a superseded target resolves as null
 ```
 
 For the current coordinator workflow, the position comes from its shared
-target. The solver keeps the orientation field in its pose interface for
-compatibility, but Position mode does not constrain end-effector orientation.
-The target position must use the same coordinate frame as
-`armIk.endEffectorPose()`. Do not mix a camera frame, map frame, or another
-visualisation frame into the solver without a defined transform.
+target. The coordinator keeps the orientation from the loaded arm pose while
+Position mode moves the XYZ target, then delegates the solve to
+`ArmIkSolveService`.
+The target position must use the same coordinate frame as the initial pose
+returned by `ArmIkSolveService.load()`. Do not mix a camera frame, map frame,
+or another visualisation frame into the solver without a defined transform.
 
 The GUI should use the latest measured arm telemetry as the solve seed where
 available. That produces a solution close to the physical arm's present pose
@@ -142,6 +145,7 @@ Implemented now:
 - Reading movable joint names and URDF limits.
 - Solving a full end-effector pose.
 - Returning named joint angles and a solver status.
+- Selecting between `closed-chain-ik` and MoveIt 2 through one coordinator.
 - Storing and validating the Arm Position-mode target position.
 - Updating the target from the Position-mode gamepad controls.
 - Coordinating target changes through `ArmIkCoordinator`.
@@ -152,7 +156,7 @@ Implemented now:
 Not implemented yet:
 
 - Live joint telemetry as the normal IK seed for the next IK solve.
-- The ROS message/topic/service contract for joint-angle commands.
+- Planner status and rejection details from the MoveIt2 bridge.
 - Rover acknowledgement/rejection display.
 - Collision checking and motion-path planning.
 
