@@ -32,7 +32,7 @@ interface PendingRequest {
   readonly reject: (error: Error) => void;
 }
 
-/** Sends target poses to the base-station trajectory executor. */
+  /** Sends target poses to the base-station trajectory executor. */
 @Service()
 export class ArmMoveItIkProvider {
   private readonly rosConnection = inject(RosConnection);
@@ -48,6 +48,19 @@ export class ArmMoveItIkProvider {
   private responseTimer: ReturnType<typeof setTimeout> | null = null;
   private requestSequence = 0;
   private activeStartedAt: number | null = null;
+
+  /** Synchronizes orientation ownership without submitting a target. */
+  synchronizeOrientationLock(locked: boolean): void {
+    const topics = this.ensureTopics();
+    if (!topics) return;
+
+    try {
+      topics.orientationLock.publish({ data: locked });
+      console.log(`${MOVEIT_LOG_PREFIX} orientation lock synchronized`, { locked });
+    } catch (error) {
+      console.warn(`${MOVEIT_LOG_PREFIX} orientation lock synchronization failed`, error);
+    }
+  }
 
   solve(target: ArmIkPose): Promise<ArmIkSolveResult | null> {
     this.assertFinitePose(target);

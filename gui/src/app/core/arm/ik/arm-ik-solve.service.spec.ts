@@ -18,6 +18,7 @@ describe('ArmIkSolveService', () => {
   let moveItProvider: {
     solve: ReturnType<typeof vi.fn>;
     reset: ReturnType<typeof vi.fn>;
+    synchronizeOrientationLock: ReturnType<typeof vi.fn>;
     executionStatus: ReturnType<typeof signal<ArmIkExecutionStatus>>;
   };
 
@@ -25,6 +26,7 @@ describe('ArmIkSolveService', () => {
     moveItProvider = {
       solve: vi.fn().mockReturnValue(convergedResult),
       reset: vi.fn(),
+      synchronizeOrientationLock: vi.fn(),
       executionStatus: signal<ArmIkExecutionStatus>('idle'),
     };
 
@@ -103,6 +105,8 @@ describe('ArmIkSolveService', () => {
     );
 
     await expect(service.load('/test-arm.urdf')).resolves.toBe(true);
+    expect(moveItProvider.synchronizeOrientationLock).toHaveBeenCalledWith(false);
+    expect(moveItProvider.solve).not.toHaveBeenCalled();
   });
 
   it('resolves superseded requests as null', async () => {

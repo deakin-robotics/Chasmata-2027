@@ -103,6 +103,17 @@ describe('ArmMoveItIkProvider', () => {
     expect(provider.executionStatus()).toBe('succeeded');
   });
 
+  it('synchronizes orientation ownership without publishing a target', () => {
+    provider.synchronizeOrientationLock(false);
+
+    expect(rosMocks.sentMessages).toContainEqual(expect.objectContaining({
+      op: 'publish',
+      topic: '/arm/orientation_lock',
+      msg: { data: false },
+    }));
+    expect(rosMocks.sentMessages.some((message) => message['topic'] === '/arm/target_pose')).toBe(false);
+  });
+
   it('supersedes an active target and keeps the newest request', async () => {
     const firstRequest = provider.solve(target);
     const secondRequest = provider.solve({

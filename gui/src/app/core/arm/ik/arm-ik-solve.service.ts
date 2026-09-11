@@ -49,6 +49,12 @@ export class ArmIkSolveService {
       throw error;
     }
 
+    if (request !== this.loadRequest) return false;
+
+    // Synchronize the rover's orientation ownership for this GUI session
+    // without creating an initial target or MoveIt2 trajectory.
+    this.armMoveItIkProvider.synchronizeOrientationLock(false);
+
     return request === this.loadRequest;
   }
 
