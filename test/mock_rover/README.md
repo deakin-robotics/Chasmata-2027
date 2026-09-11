@@ -86,8 +86,9 @@ are sent through the dedicated axes listed above.
 In Position-mode UNLOCKED operation, `/arm/joy` uses `axes[6]` for J4 yaw,
 `axes[7]` for J5 pitch, and `axes[8]`/`axes[9]` for J6 roll. The GUI places
 the Position-mode left-stick yaw/pitch values into those wrist axes. In
-LOCKED operation the GUI sends zero wrist axes and uses those same physical
-inputs to adjust the requested EE orientation before replanning.
+LOCKED operation the GUI sends zero wrist axes; joystick and trigger input is
+ignored and the captured EE orientation remains fixed. Digital buttons remain
+available.
 
 The provisional `/fma/state` JSON shape is:
 

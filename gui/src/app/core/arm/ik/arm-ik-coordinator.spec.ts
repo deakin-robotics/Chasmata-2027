@@ -139,4 +139,31 @@ describe('ArmIkCoordinator', () => {
       orientationMode: 'locked',
     }));
   });
+
+  it('keeps the captured orientation fixed while locked', async () => {
+    const telemetry = TestBed.inject(ArmTelemetryService);
+    telemetry.setJointState({
+      names: [
+        'base_joint',
+        'shoulder_joint',
+        'elbow_joint',
+        'yaw_joint',
+        'pitch_joint',
+        'roll_joint',
+      ],
+      positions: [0, 0.1, 0.2, 0.3, 0.4, 0.5],
+    });
+    const capturedOrientation = [0.1, 0.2, 0.3, 0.9] as const;
+    solveService.poseFromJointAngles.mockReturnValue({
+      position: [0.2, 0.3, 0.4],
+      orientation: capturedOrientation,
+    });
+
+    await coordinator.load();
+
+    expect(coordinator.setOrientationMode('locked')).toBe(true);
+    coordinator.setPosition([0.3, 0.4, 0.5]);
+
+    expect(coordinator.orientation()).toEqual(capturedOrientation);
+  });
 });

@@ -59,6 +59,10 @@ GUI target pose
 - `true` (LOCKED): the full `arm` group generates a complete J1-J6 trajectory
   while constraining `ee_link` to the requested orientation.
 
+While LOCKED, the GUI ignores joystick and trigger wrist input. The captured
+EE orientation remains fixed until the operator unlocks, adjusts the wrist,
+and locks again; digital button commands remain available.
+
 For LOCKED requests, the bridge first solves the proximal `position_arm` group
 and then uses that result as the J1-J3 goal for the full `arm` plan. This keeps
 the J4-pivot and EE orientation requirements compatible with the configured

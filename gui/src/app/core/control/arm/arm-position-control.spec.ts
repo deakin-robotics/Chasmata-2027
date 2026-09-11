@@ -10,14 +10,12 @@ import { ArmPositionControl } from './arm-position-control';
 describe('ArmPositionControl', () => {
   let service: ArmPositionControl;
   const translate = vi.fn();
-  const adjustOrientation = vi.fn();
   const publishPositionButtons = vi.fn();
   const publishPositionWrist = vi.fn();
   const orientationMode = signal<'locked' | 'unlocked'>('unlocked');
 
   beforeEach(() => {
     translate.mockReset();
-    adjustOrientation.mockReset();
     publishPositionButtons.mockReset();
     publishPositionWrist.mockReset();
     orientationMode.set('unlocked');
@@ -25,7 +23,7 @@ describe('ArmPositionControl', () => {
       providers: [
         {
           provide: ArmIkCoordinator,
-          useValue: { translate, adjustOrientation, orientationMode },
+          useValue: { translate, orientationMode },
         },
         {
           provide: ArmCommandPublisher,
@@ -72,21 +70,28 @@ describe('ArmPositionControl', () => {
     expect(publishPositionButtons).not.toHaveBeenCalled();
   });
 
-  it('uses joystick and triggers for locked orientation', () => {
+  it('ignores wrist input while locked but keeps digital buttons active', () => {
+    orientationMode.set('locked');
+    const snapshot: GamepadSnapshot = {
+      axes: [1, -1, 0, 0],
+      buttons: Array.from({ length: 16 }, (_, index) => (index === 7 ? 1 : 0)),
+    };
+
+    service.handle(snapshot);
+
+    expect(publishPositionButtons).toHaveBeenCalledWith(snapshot);
+    expect(publishPositionWrist).not.toHaveBeenCalled();
+  });
+
+  it('keeps locked D-pad target movement active', () => {
     orientationMode.set('locked');
 
     service.handle({
-      axes: [1, -1, 0, 0],
-      buttons: Array.from({ length: 16 }, (_, index) => (index === 7 ? 1 : 0)),
+      axes: [0, 0, 0, 0],
+      buttons: Array.from({ length: 16 }, (_, index) => (index === 15 ? 1 : 0)),
     });
 
-    const amount = Math.PI / 6 * 0.02;
-    expect(adjustOrientation).toHaveBeenCalledWith({
-      roll: -amount,
-      pitch: amount,
-      yaw: amount,
-    });
+    expect(translate).toHaveBeenCalledWith([0, -0.004, 0]);
     expect(publishPositionButtons).toHaveBeenCalledOnce();
-    expect(publishPositionWrist).not.toHaveBeenCalled();
   });
 });

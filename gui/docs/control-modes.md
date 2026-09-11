@@ -12,7 +12,7 @@ names are similar, but they answer different questions.
 | `src/app/core/control/drive/drive-control-mode.ts` | Driver control interpretation: `MANUAL` or `VELOCITY`.                                                                                                          |
 | `src/app/core/control/arm/arm-control-mode.ts`     | Owns Arm interpretation mode, the shared Arm input session, and routing to the selected handler.                                                                |
 | `src/app/core/control/arm/arm-manual-control.ts`   | Handles the Manual Arm gamepad mapping and publishes the existing `/arm/joy` command.                                                                           |
-| `src/app/core/control/arm/arm-position-control.ts` | Handles the MoveIt2 Position Arm mapping, updates the J4-pivot target/orientation through `ArmIkCoordinator`, and sends UNLOCKED wrist input.                    |
+| `src/app/core/control/arm/arm-position-control.ts` | Handles the MoveIt2 Position Arm mapping, updates the J4-pivot target through `ArmIkCoordinator`, and sends UNLOCKED wrist input.                              |
 
 In short:
 
@@ -21,14 +21,15 @@ In short:
 - `ArmControlModeService` answers: **Which Arm input interpretation is selected, and which handler receives input?**
 - `ControlModeCoordinator` answers: **How do selections and ROS connection become mode requests?**
 - `ArmManualControl` answers: **How is the legacy direct-joint Arm mapping executed?**
-- `ArmPositionControl` answers: **How does Position-mode input move the IK target and wrist?**
+- `ArmPositionControl` answers: **How does Position-mode input move the IK target and unlocked wrist?**
 
 In MoveIt2 Position mode, D-pad X/Y moves the `j4_pivot_link` target in the
 visible TOP/SIDE plane. The left joystick controls wrist yaw/pitch and LT/RT
-control wrist roll through `/arm/joy` while UNLOCKED. In LOCKED mode those
-joystick and trigger inputs adjust the requested `ee_link` orientation and
-MoveIt2 owns all six joints. Target and wrist/orientation input can be used at
-the same time.
+control wrist roll through `/arm/joy` while UNLOCKED. In LOCKED mode joystick
+and trigger wrist input is ignored; MoveIt2 owns all six joints and preserves
+the EE orientation captured from rover telemetry when LOCKED was entered. To
+change orientation, unlock, adjust the wrist, and lock again. Digital buttons,
+target movement, RB camera controls, and Gimbal priority remain available.
 
 ## Control authority versus control interpretation
 

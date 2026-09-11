@@ -6,7 +6,6 @@ import {
   ArmIkExecutionStatus,
   ArmIkSolveResult,
   ArmIkStatus,
-  ArmOrientationDelta,
   ArmOrientationMode,
   ArmPosition,
   ArmQuaternion,
@@ -135,22 +134,6 @@ export class ArmIkCoordinator {
     return true;
   }
 
-  /** Adjusts the desired locked EE orientation in the arm base frame. */
-  adjustOrientation(delta: ArmOrientationDelta): void {
-    if (this.orientationModeState() !== 'locked') return;
-    this.assertFiniteOrientationDelta(delta);
-    if (delta.roll === 0 && delta.pitch === 0 && delta.yaw === 0) return;
-
-    const euler = this.quaternionToEuler(this.orientationState());
-    this.orientationState.set(this.eulerToQuaternion({
-      roll: euler.roll + delta.roll,
-      pitch: euler.pitch + delta.pitch,
-      yaw: euler.yaw + delta.yaw,
-    }));
-
-    if (this.ikReady) this.requestSolve(this.positionState());
-  }
-
   private requestSolve(position: ArmPosition): void {
     if (!this.ikReady) return;
 
@@ -199,38 +182,4 @@ export class ArmIkCoordinator {
     ].every((name) => Number.isFinite(jointAngles[name]));
   }
 
-  private assertFiniteOrientationDelta(delta: ArmOrientationDelta): void {
-    if (![delta.roll, delta.pitch, delta.yaw].every(Number.isFinite)) {
-      throw new Error('The arm orientation delta must contain finite numbers.');
-    }
-  }
-
-  private quaternionToEuler(quaternion: ArmQuaternion): ArmOrientationDelta {
-    const [x, y, z, w] = quaternion;
-    const roll = Math.atan2(2 * (w * x + y * z), 1 - 2 * (x * x + y * y));
-    const pitchInput = 2 * (w * y - z * x);
-    const pitch = Math.asin(Math.max(-1, Math.min(1, pitchInput)));
-    const yaw = Math.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z));
-
-    return { roll, pitch, yaw };
-  }
-
-  private eulerToQuaternion(euler: ArmOrientationDelta): ArmQuaternion {
-    const halfRoll = euler.roll / 2;
-    const halfPitch = euler.pitch / 2;
-    const halfYaw = euler.yaw / 2;
-    const cr = Math.cos(halfRoll);
-    const sr = Math.sin(halfRoll);
-    const cp = Math.cos(halfPitch);
-    const sp = Math.sin(halfPitch);
-    const cy = Math.cos(halfYaw);
-    const sy = Math.sin(halfYaw);
-
-    return [
-      sr * cp * cy - cr * sp * sy,
-      cr * sp * cy + sr * cp * sy,
-      cr * cp * sy - sr * sp * cy,
-      cr * cp * cy + sr * sp * sy,
-    ];
-  }
 }

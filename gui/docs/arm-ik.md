@@ -50,7 +50,9 @@ In UNLOCKED mode, MoveIt2 uses the `position_arm` group and sends a partial
 J1-J3 trajectory. The operator independently controls J4-J6 through
 `/arm/joy`. In LOCKED mode, MoveIt2 uses the full `arm` group, plans to the
 J4-pivot position while constraining `ee_link` to the requested orientation,
-and sends a complete J1-J6 trajectory. Both modes use global joint-space
+and sends a complete J1-J6 trajectory. While LOCKED, joystick and trigger
+wrist input is ignored and the captured orientation remains fixed until the
+operator unlocks and locks again. Both modes use global joint-space
 planning with time parameterization; neither requires a mathematically
 straight-line end-effector path.
 
@@ -77,8 +79,9 @@ is `ee_link`. The six movable joints are:
 
 The browser loads the URDF for rendering and forward-kinematics display only;
 it does not solve IK. Entering LOCKED uses the current rover joint telemetry
-to capture the current EE orientation. Leaving LOCKED returns J4-J6 to the
-operator without a local preview or command jump.
+to capture the current EE orientation. While LOCKED, MoveIt2 retains that
+orientation and direct wrist input is inactive. Leaving LOCKED returns J4-J6
+to the operator without a local preview or command jump.
 
 ## GUI API
 

@@ -2,15 +2,14 @@ import { Service, inject } from '@angular/core';
 
 import { ArmIkCoordinator } from '../../arm/ik/arm-ik-coordinator';
 import { ArmViewModeService } from '../../arm/arm-view-mode';
-import { ArmOrientationDelta, ArmPosition } from '../../arm/ik/arm-ik-types';
+import { ArmPosition } from '../../arm/ik/arm-ik-types';
 import { GamepadSnapshot } from '../../gamepad/gamepad-input';
 import { ArmCommandPublisher } from './arm-command-publisher';
 
 const POSITION_UPDATE_SECONDS = 0.02;
 const POSITION_SPEED_METRES_PER_SECOND = 0.2;
-const ORIENTATION_SPEED_RADIANS_PER_SECOND = Math.PI / 6;
 
-/** Handles Position-mode gamepad input for the MoveIt2 pivot and wrist. */
+/** Handles Position-mode gamepad input for the MoveIt2 pivot and unlocked wrist. */
 @Service()
 export class ArmPositionControl {
   private readonly armIkCoordinator = inject(ArmIkCoordinator);
@@ -28,7 +27,6 @@ export class ArmPositionControl {
     }
 
     if (this.armIkCoordinator.orientationMode() === 'locked') {
-      this.armIkCoordinator.adjustOrientation(this.orientationDelta(snapshot));
       this.armCommandPublisher.publishPositionButtons(snapshot);
       return;
     }
@@ -52,17 +50,4 @@ export class ArmPositionControl {
     return [0, leftStickX === 0 ? 0 : -leftStickX * amount, leftStickY * amount];
   }
 
-  private orientationDelta(snapshot: GamepadSnapshot): ArmOrientationDelta {
-    const amount = ORIENTATION_SPEED_RADIANS_PER_SECOND * POSITION_UPDATE_SECONDS;
-    const leftStickX = this.finiteInput(snapshot.axes[0]);
-    const leftStickY = this.finiteInput(snapshot.axes[1]);
-    const leftTrigger = this.finiteInput(snapshot.buttons[6]);
-    const rightTrigger = this.finiteInput(snapshot.buttons[7]);
-
-    return {
-      roll: (leftTrigger - rightTrigger) * amount,
-      pitch: -leftStickY * amount,
-      yaw: leftStickX * amount,
-    };
-  }
 }
