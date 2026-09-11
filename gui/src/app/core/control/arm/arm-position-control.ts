@@ -26,16 +26,35 @@ export class ArmPositionControl {
       this.armIkCoordinator.translate(delta);
     }
 
-    if (this.armIkCoordinator.orientationMode() === 'locked') {
-      this.armCommandPublisher.publishPositionButtons(snapshot);
-      return;
-    }
-
-    this.armCommandPublisher.publishPositionWrist(snapshot);
+    const locked = this.armIkCoordinator.orientationMode() === 'locked';
+    const command = this.armCommandPublisher.createCommand(
+      snapshot,
+      locked ? new Array(10).fill(0) : this.toWristAxes(snapshot),
+      {
+        suppressClearFaultButton: snapshot.buttons[16] === undefined,
+        includeTriggers: !locked,
+      },
+    );
+    this.armCommandPublisher.publish(command);
   }
 
   private finiteInput(value: number | undefined): number {
     return value !== undefined && Number.isFinite(value) ? value : 0;
+  }
+
+  private toWristAxes(snapshot: GamepadSnapshot): readonly number[] {
+    return [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      -(snapshot.axes[0] ?? 0),
+      -(snapshot.axes[1] ?? 0),
+      0,
+      0,
+    ];
   }
 
   private targetDelta(leftStickX: number, leftStickY: number): ArmPosition {

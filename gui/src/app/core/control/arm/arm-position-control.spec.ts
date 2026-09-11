@@ -10,15 +10,21 @@ import { ArmPositionControl } from './arm-position-control';
 describe('ArmPositionControl', () => {
   let service: ArmPositionControl;
   const translate = vi.fn();
-  const publishPositionButtons = vi.fn();
-  const publishPositionWrist = vi.fn();
+  const createCommand = vi.fn();
+  const publish = vi.fn();
   const orientationMode = signal<'locked' | 'unlocked'>('unlocked');
 
   beforeEach(() => {
     translate.mockReset();
-    publishPositionButtons.mockReset();
-    publishPositionWrist.mockReset();
+    createCommand.mockReset();
+    publish.mockReset();
     orientationMode.set('unlocked');
+    createCommand.mockImplementation(
+      (_snapshot: GamepadSnapshot, axes: readonly number[]) => ({
+        axes,
+        buttons: [],
+      }),
+    );
     TestBed.configureTestingModule({
       providers: [
         {
@@ -27,7 +33,7 @@ describe('ArmPositionControl', () => {
         },
         {
           provide: ArmCommandPublisher,
-          useValue: { publishPositionButtons, publishPositionWrist },
+          useValue: { createCommand, publish },
         },
       ],
     });
@@ -42,7 +48,7 @@ describe('ArmPositionControl', () => {
     });
 
     expect(translate).toHaveBeenCalledWith([0, 0, 0.004]);
-    expect(publishPositionWrist).toHaveBeenCalledOnce();
+    expect(publish).toHaveBeenCalledOnce();
   });
 
   it('moves the J4 pivot in the visible top plane', () => {
@@ -66,8 +72,12 @@ describe('ArmPositionControl', () => {
 
     service.handle(snapshot);
 
-    expect(publishPositionWrist).toHaveBeenCalledWith(snapshot);
-    expect(publishPositionButtons).not.toHaveBeenCalled();
+    expect(createCommand).toHaveBeenCalledWith(
+      snapshot,
+      [0, 0, 0, 0, 0, 0, -1, 1, 0, 0],
+      { suppressClearFaultButton: true, includeTriggers: true },
+    );
+    expect(publish).toHaveBeenCalledOnce();
   });
 
   it('ignores wrist input while locked but keeps digital buttons active', () => {
@@ -79,8 +89,12 @@ describe('ArmPositionControl', () => {
 
     service.handle(snapshot);
 
-    expect(publishPositionButtons).toHaveBeenCalledWith(snapshot);
-    expect(publishPositionWrist).not.toHaveBeenCalled();
+    expect(createCommand).toHaveBeenCalledWith(
+      snapshot,
+      new Array(10).fill(0),
+      { suppressClearFaultButton: true, includeTriggers: false },
+    );
+    expect(publish).toHaveBeenCalledOnce();
   });
 
   it('keeps locked D-pad target movement active', () => {
@@ -92,6 +106,6 @@ describe('ArmPositionControl', () => {
     });
 
     expect(translate).toHaveBeenCalledWith([0, -0.004, 0]);
-    expect(publishPositionButtons).toHaveBeenCalledOnce();
+    expect(publish).toHaveBeenCalledOnce();
   });
 });

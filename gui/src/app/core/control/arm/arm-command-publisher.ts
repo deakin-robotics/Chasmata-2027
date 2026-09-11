@@ -10,6 +10,11 @@ export interface ArmJoyCommand {
   buttons: readonly number[];
 }
 
+export interface ArmJoyCommandOptions {
+  readonly suppressClearFaultButton?: boolean;
+  readonly includeTriggers?: boolean;
+}
+
 const ARM_JOY_TOPIC = '/arm/joy';
 const JOY_MESSAGE_TYPE = 'sensor_msgs/Joy';
 const ARM_AXES_COUNT = 10;
@@ -27,7 +32,7 @@ const CLEAR_FAULTS_COMMAND: ArmJoyCommand = {
   buttons: STOP_COMMAND.buttons.map((_, index) => (index === CLEAR_FAULTS_BUTTON_INDEX ? 1 : 0)),
 };
 
-/** Publishes Arm Joy commands using the old base-station mapping. */
+/** Adapts Arm Joy commands to the ROS /arm/joy protocol. */
 @Service()
 export class ArmCommandPublisher {
   private readonly rosConnection = inject(RosConnection);
@@ -40,33 +45,36 @@ export class ArmCommandPublisher {
     () => this.rosConnection.isConnected() && this.controlMode.isArmActive(),
   );
 
-  /** Publishes one remapped Arm Joy command when Arm control is active. */
-  publish(snapshot: GamepadSnapshot): boolean {
-    if (!this.canPublish()) return false;
+  /** Builds a Joy command from mode-specific axes and shared gamepad fields. */
+  createCommand(
+    snapshot: GamepadSnapshot,
+    axes: readonly number[],
+    options: ArmJoyCommandOptions = {},
+  ): ArmJoyCommand {
+    const rawButtons = snapshot.buttons;
+    const commandAxes = new Array(ARM_AXES_COUNT).fill(0);
 
-    return this.publishCommand(this.toArmJoyCommand(snapshot));
+    axes.slice(0, ARM_AXES_COUNT).forEach((value, index) => {
+      commandAxes[index] = value;
+    });
+    if (options.includeTriggers !== false) {
+      commandAxes[8] = rawButtons[RIGHT_TRIGGER_BUTTON_INDEX] ?? 0;
+      commandAxes[9] = rawButtons[LEFT_TRIGGER_BUTTON_INDEX] ?? 0;
+    }
+
+    const buttons = [...this.toButtons(snapshot)];
+    if (options.suppressClearFaultButton) {
+      buttons[CLEAR_FAULTS_BUTTON_INDEX] = 0;
+    }
+
+    return { axes: commandAxes, buttons };
   }
 
-  /** Publishes Position-mode wrist input while leaving J1-J3 neutral. */
-  publishPositionWrist(snapshot: GamepadSnapshot): boolean {
+  /** Publishes one validated Arm Joy command when Arm control is active. */
+  publish(command: ArmJoyCommand): boolean {
     if (!this.canPublish()) return false;
 
-    const command = this.toPositionJoyCommand(snapshot);
-    return this.publishCommand({
-      axes: [0, 0, 0, 0, 0, 0, command.axes[0], command.axes[1], command.axes[8], command.axes[9]],
-      buttons: command.buttons,
-    });
-  }
-
-  /** Publishes Position-mode buttons without directly commanding J4-J6. */
-  publishPositionButtons(snapshot: GamepadSnapshot): boolean {
-    if (!this.canPublish()) return false;
-
-    const command = this.toPositionJoyCommand(snapshot);
-    return this.publishCommand({
-      axes: new Array(ARM_AXES_COUNT).fill(0),
-      buttons: command.buttons,
-    });
+    return this.publishCommand(command);
   }
 
   /** Sends a zeroed Arm Joy command. */
@@ -111,61 +119,6 @@ export class ArmCommandPublisher {
     });
 
     return this.joyTopic;
-  }
-
-  private toArmJoyCommand(snapshot: GamepadSnapshot): ArmJoyCommand {
-    const rawAxes = snapshot.axes;
-    const rawButtons = snapshot.buttons;
-    const dpadY = (rawButtons[12] ?? 0) - (rawButtons[13] ?? 0);
-    const rightStickX = -(rawAxes[2] ?? 0);
-    const rightStickY = -(rawAxes[3] ?? 0);
-    const gimbalHeld = (rawButtons[LEFT_BUMPER_BUTTON_INDEX] ?? 0) > 0.5;
-
-    return {
-      axes: [
-        gimbalHeld ? 0 : rightStickX,
-        gimbalHeld ? 0 : rightStickY,
-        0,
-        gimbalHeld ? rightStickX : 0,
-        gimbalHeld ? rightStickY : dpadY,
-        0,
-        -(rawAxes[0] ?? 0),
-        -(rawAxes[1] ?? 0),
-        rawButtons[RIGHT_TRIGGER_BUTTON_INDEX] ?? 0,
-        rawButtons[LEFT_TRIGGER_BUTTON_INDEX] ?? 0,
-      ],
-      buttons: this.toButtons(snapshot),
-    };
-  }
-
-  private toPositionJoyCommand(snapshot: GamepadSnapshot): ArmJoyCommand {
-    const rawAxes = snapshot.axes;
-    const rawButtons = snapshot.buttons;
-    const command: ArmJoyCommand = {
-      axes: [
-        -(rawAxes[0] ?? 0),
-        -(rawAxes[1] ?? 0),
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        rawButtons[RIGHT_TRIGGER_BUTTON_INDEX] ?? 0,
-        rawButtons[LEFT_TRIGGER_BUTTON_INDEX] ?? 0,
-      ],
-      buttons: this.toButtons(snapshot),
-    };
-
-    // On gamepads without an extended button slot, button 10 is the L3
-    // fallback. Position mode consumes L3 as the orientation-lock toggle.
-    if (snapshot.buttons[16] === undefined) {
-      const buttons = [...command.buttons];
-      buttons[CLEAR_FAULTS_BUTTON_INDEX] = 0;
-      return { ...command, buttons };
-    }
-
-    return command;
   }
 
   private toButtons(snapshot: GamepadSnapshot): readonly number[] {
