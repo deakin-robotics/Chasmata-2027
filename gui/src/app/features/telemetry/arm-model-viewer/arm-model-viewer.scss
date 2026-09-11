@@ -71,6 +71,14 @@ h2 {
   font-weight: 700;
 }
 
+.execution-status-success {
+  color: var(--dcr-color-normal);
+}
+
+.execution-status-error {
+  color: var(--dcr-color-critical);
+}
+
 .ik-status {
   display: inline-flex;
   align-items: center;

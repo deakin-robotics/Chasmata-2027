@@ -9,7 +9,12 @@
         3D: {{ viewerStatusLabel() }}
       </span>
       <span class="status-separator" aria-hidden="true">|</span>
-      <span class="execution-status" aria-live="polite">
+      <span
+        class="execution-status"
+        [class.execution-status-success]="executionStatus() === 'succeeded'"
+        [class.execution-status-error]="executionStatus() === 'failed'"
+        aria-live="polite"
+      >
         MOVE: {{ rosConnected() ? executionStatusLabel() : '—' }}
       </span>
       <span class="status-separator" aria-hidden="true">|</span>
