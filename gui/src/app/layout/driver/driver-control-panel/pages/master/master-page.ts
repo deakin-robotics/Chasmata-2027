@@ -1,8 +1,14 @@
 import { Component, computed, inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 
-import { GamepadInput } from '../../../../../core/gamepad/gamepad-input';
 import { DriverControl } from '../../../../../core/control/drive/driver-control';
+import {
+  DriverControlMode,
+  DriverControlModeService,
+} from '../../../../../core/control/drive/drive-control-mode';
+import { ControlModeCoordinator } from '../../../../../core/control/control-mode-coordinator';
+import { GamepadInput } from '../../../../../core/gamepad/gamepad-input';
+import { DriveMode } from '../../../../../core/fma/fma-state.service';
 import { RosConnection } from '../../../../../core/ros/ros-connection';
 import { ConnectionManager } from '../../../../../features/connection/connection-manager/connection-manager';
 import { ActionButton, ActionButtonTone } from '../../../../../shared/action-button/action-button';
@@ -22,20 +28,37 @@ import {
   StatusIndicator,
   StatusIndicatorTone,
 } from '../../../../../shared/status-indicator/status-indicator';
+import {
+  ControlModeOption,
+  ControlModeSelector,
+} from '../../../../../shared/control-mode-selector/control-mode-selector';
 
 @Component({
   selector: 'app-driver-master-page',
-  imports: [ActionButton, ControlFlowConnector, ControlSwitch, StatusIndicator],
+  imports: [
+    ActionButton,
+    ControlFlowConnector,
+    ControlModeSelector,
+    ControlSwitch,
+    StatusIndicator,
+  ],
   templateUrl: './master-page.html',
   styleUrl: './master-page.scss',
 })
 export class DriverMasterPage {
   private readonly driverControl = inject(DriverControl);
+  private readonly driverControlMode = inject(DriverControlModeService);
+  private readonly controlModeCoordinator = inject(ControlModeCoordinator);
   private readonly gamepad = inject(GamepadInput);
   private readonly rosConnection = inject(RosConnection);
   private readonly dialog = inject(MatDialog);
 
   readonly masterDriveEnabled = this.driverControl.enabled;
+  readonly driveMode = this.driverControlMode.mode;
+  readonly driveModeOptions: readonly ControlModeOption[] = [
+    { label: DriveMode.Manual, value: DriveMode.Manual },
+    { label: DriveMode.Velocity, value: DriveMode.Velocity },
+  ];
   readonly masterDriveTone: ControlSwitchTone = 'normal';
   readonly readinessError = this.driverControl.readinessError;
   readonly rosConnected = this.rosConnection.isConnected;
@@ -121,5 +144,11 @@ export class DriverMasterPage {
       .subscribe((confirmed) => {
         if (confirmed === true) this.driverControl.enable();
       });
+  }
+
+  selectDriveMode(mode: string): void {
+    if (mode === DriveMode.Manual || mode === DriveMode.Velocity) {
+      this.controlModeCoordinator.selectDriveMode(mode as DriverControlMode);
+    }
   }
 }

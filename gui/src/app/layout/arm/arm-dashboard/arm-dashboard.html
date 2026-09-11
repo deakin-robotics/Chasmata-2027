@@ -1,12 +1,12 @@
 <main class="arm-dashboard" aria-label="Arm operator dashboard">
   <section class="arm-camera-column" aria-label="Arm rover and model workspace">
+    <app-arm-model-viewer />
+
     <app-camera-stream
       label="Front camera"
       [url]="frontCameraUrl()"
       (urlChange)="frontCameraUrl.set($event)"
     />
-
-    <app-arm-model-viewer />
   </section>
 
   <section class="arm-operator-column" aria-label="Arm operator workspace">

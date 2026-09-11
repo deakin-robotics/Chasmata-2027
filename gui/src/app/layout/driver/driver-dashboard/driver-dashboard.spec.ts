@@ -45,9 +45,12 @@ describe('DriverDashboard', () => {
 
   it('should render the reserved space in the left column', () => {
     const reserved = fixture.nativeElement.querySelector('.reserved-space');
+    const leftColumn = fixture.nativeElement.querySelector('.arm-camera-column');
 
     expect(reserved?.textContent.trim()).toBe('Reserved');
     expect(fixture.nativeElement.querySelector('.arm-camera-column .reserved-space')).toBeTruthy();
+    expect(leftColumn?.firstElementChild?.matches('.reserved-space')).toBe(true);
+    expect(leftColumn?.lastElementChild?.matches('app-camera-stream')).toBe(true);
     expect(
       fixture.nativeElement.querySelector('.driver-control-column .reserved-space'),
     ).toBeFalsy();

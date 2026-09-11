@@ -1,14 +1,14 @@
 <main class="driver-dashboard" aria-label="Driver dashboard">
   <section class="arm-camera-column" aria-label="Driver arm camera workspace">
+    <section class="reserved-space" aria-label="Reserved">
+      <span>Reserved</span>
+    </section>
+
     <app-camera-stream
       label="Arm camera"
       [url]="armCameraUrl()"
       (urlChange)="armCameraUrl.set($event)"
     />
-
-    <section class="reserved-space" aria-label="Reserved">
-      <span>Reserved</span>
-    </section>
   </section>
 
   <section class="rover-camera-column" aria-label="Driver rover camera workspace">

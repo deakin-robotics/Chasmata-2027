@@ -36,12 +36,8 @@ describe('DriverControlPanel', () => {
     expect(fixture.nativeElement.querySelector('.active-tab')?.textContent.trim()).toBe('Master');
   });
 
-  it('should render the Mode page when its tab is selected', () => {
-    const modeTab = fixture.nativeElement.querySelectorAll('.tab-button')[1] as HTMLButtonElement;
-    modeTab.click();
-    fixture.detectChanges();
-
-    expect(fixture.nativeElement.querySelector('app-driver-mode-page')).toBeTruthy();
+  it('should only expose the Master tab', () => {
+    expect(fixture.nativeElement.querySelectorAll('.tab-button')).toHaveLength(1);
     expect(fixture.nativeElement.querySelector('app-control-mode-selector')).toBeTruthy();
   });
 });

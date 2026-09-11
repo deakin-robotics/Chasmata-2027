@@ -27,6 +27,15 @@
     (checkedChange)="toggleMasterDriveControl($event)"
   />
 
+  <app-control-mode-selector
+    class="drive-mode-selector"
+    label="Drive control mode"
+    [options]="driveModeOptions"
+    [value]="driveMode()"
+    [disabled]="!rosConnected()"
+    (valueChange)="selectDriveMode($event)"
+  />
+
   @if (readinessError(); as error) {
     <p class="control-readiness" role="status">{{ error }}</p>
   }
