@@ -12,7 +12,7 @@ names are similar, but they answer different questions.
 | `src/app/core/control/drive/drive-control-mode.ts` | Driver control interpretation: `MANUAL` or `VELOCITY`.                                                                                                          |
 | `src/app/core/control/arm/arm-control-mode.ts`     | Owns Arm interpretation mode, the shared Arm input session, and routing to the selected handler.                                                                |
 | `src/app/core/control/arm/arm-manual-control.ts`   | Handles the Manual Arm gamepad mapping and publishes the existing `/arm/joy` command.                                                                           |
-| `src/app/core/control/arm/arm-position-control.ts` | Handles the Position Arm gamepad mapping, updates the J4-pivot target/orientation through `ArmIkCoordinator`, and sends UNLOCKED wrist input.                    |
+| `src/app/core/control/arm/arm-position-control.ts` | Handles the MoveIt2 Position Arm mapping, updates the J4-pivot target/orientation through `ArmIkCoordinator`, and sends UNLOCKED wrist input.                    |
 
 In short:
 
@@ -23,10 +23,12 @@ In short:
 - `ArmManualControl` answers: **How is the legacy direct-joint Arm mapping executed?**
 - `ArmPositionControl` answers: **How does Position-mode input move the IK target and wrist?**
 
-In MoveIt2 Position mode, the left stick moves the `j4_pivot_link` target in
-the visible plane. D-pad X/Y and LT/RT control J4 yaw, J5 pitch, and J6 roll
-through `/arm/joy` while UNLOCKED. In LOCKED mode those same wrist inputs
-adjust the requested `ee_link` orientation and MoveIt2 owns all six joints.
+In MoveIt2 Position mode, D-pad X/Y moves the `j4_pivot_link` target in the
+visible TOP/SIDE plane. The left joystick controls wrist yaw/pitch and LT/RT
+control wrist roll through `/arm/joy` while UNLOCKED. In LOCKED mode those
+joystick and trigger inputs adjust the requested `ee_link` orientation and
+MoveIt2 owns all six joints. Target and wrist/orientation input can be used at
+the same time.
 
 ## Control authority versus control interpretation
 

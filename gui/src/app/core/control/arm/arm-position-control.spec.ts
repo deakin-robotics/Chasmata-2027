@@ -13,25 +13,19 @@ describe('ArmPositionControl', () => {
   const adjustOrientation = vi.fn();
   const publishPositionButtons = vi.fn();
   const publishPositionWrist = vi.fn();
-  const provider = signal<'closed-chain-ik' | 'moveit2'>('closed-chain-ik');
   const orientationMode = signal<'locked' | 'unlocked'>('unlocked');
-  const snapshot: GamepadSnapshot = {
-    axes: [1, -1, 0, 0],
-    buttons: Array.from({ length: 16 }, (_, index) => (index === 12 ? 1 : 0)),
-  };
 
   beforeEach(() => {
     translate.mockReset();
     adjustOrientation.mockReset();
     publishPositionButtons.mockReset();
     publishPositionWrist.mockReset();
-    provider.set('closed-chain-ik');
     orientationMode.set('unlocked');
     TestBed.configureTestingModule({
       providers: [
         {
           provide: ArmIkCoordinator,
-          useValue: { translate, adjustOrientation, provider, orientationMode },
+          useValue: { translate, adjustOrientation, orientationMode },
         },
         {
           provide: ArmCommandPublisher,
@@ -43,83 +37,56 @@ describe('ArmPositionControl', () => {
     service = TestBed.inject(ArmPositionControl);
   });
 
-  it('translates the IK target from gamepad input', () => {
-    service.handle(snapshot);
-
-    expect(translate).toHaveBeenCalledWith([0.004, 0.004, -0.004]);
-  });
-
-  it('sends unlocked MoveIt2 wrist input separately from the J4 pivot target', () => {
-    provider.set('moveit2');
-
+  it('moves the J4 pivot with the D-pad in the visible side plane', () => {
     service.handle({
-      axes: [1, -1, 0, 0],
+      axes: [0, 0, 0, 0],
       buttons: Array.from({ length: 16 }, (_, index) => (index === 12 ? 1 : 0)),
     });
 
-    expect(translate).toHaveBeenCalledWith([0, -0.004, 0.004]);
+    expect(translate).toHaveBeenCalledWith([0, 0, 0.004]);
     expect(publishPositionWrist).toHaveBeenCalledOnce();
-    expect(publishPositionButtons).not.toHaveBeenCalled();
   });
 
-  it('keeps the MoveIt2 pivot in the visible X-Y plane from top view', () => {
-    provider.set('moveit2');
+  it('moves the J4 pivot in the visible top plane', () => {
     TestBed.inject(ArmViewModeService).set('top');
 
     service.handle({
-      axes: [1, -1, 0, 0],
-      buttons: Array.from({ length: 16 }, () => 0),
+      axes: [0, 0, 0, 0],
+      buttons: Array.from({ length: 16 }, (_, index) =>
+        index === 15 || index === 12 ? 1 : 0,
+      ),
     });
 
     expect(translate).toHaveBeenCalledWith([0.004, 0.004, 0]);
   });
 
-  it('keeps Position-mode buttons while locked orientation owns wrist axes', () => {
-    provider.set('moveit2');
-    orientationMode.set('locked');
+  it('keeps direct wrist input separate from the pivot target while unlocked', () => {
+    const snapshot: GamepadSnapshot = {
+      axes: [1, -1, 0, 0],
+      buttons: Array.from({ length: 16 }, () => 0),
+    };
 
-    service.handle({
-      axes: [0, 0, 0, 0],
-      buttons: Array.from({ length: 16 }, (_, index) => (index === 1 ? 1 : 0)),
-    });
+    service.handle(snapshot);
 
-    expect(adjustOrientation).toHaveBeenCalledWith({ roll: 0, pitch: 0, yaw: 0 });
-    expect(publishPositionButtons).toHaveBeenCalledOnce();
-    expect(publishPositionWrist).not.toHaveBeenCalled();
+    expect(publishPositionWrist).toHaveBeenCalledWith(snapshot);
+    expect(publishPositionButtons).not.toHaveBeenCalled();
   });
 
-  it('inverts both D-pad axes for locked orientation control', () => {
-    provider.set('moveit2');
+  it('uses joystick and triggers for locked orientation', () => {
     orientationMode.set('locked');
 
     service.handle({
-      axes: [0, 0, 0, 0],
-      buttons: Array.from({ length: 16 }, (_, index) =>
-        index === 12 || index === 14 ? 1 : 0,
-      ),
+      axes: [1, -1, 0, 0],
+      buttons: Array.from({ length: 16 }, (_, index) => (index === 7 ? 1 : 0)),
     });
 
     const amount = Math.PI / 6 * 0.02;
     expect(adjustOrientation).toHaveBeenCalledWith({
-      roll: 0,
+      roll: -amount,
       pitch: amount,
-      yaw: -amount,
+      yaw: amount,
     });
-  });
-
-  it('inverts trigger roll direction for locked orientation control', () => {
-    provider.set('moveit2');
-    orientationMode.set('locked');
-
-    service.handle({
-      axes: [0, 0, 0, 0],
-      buttons: Array.from({ length: 16 }, (_, index) => (index === 7 ? 1 : 0)),
-    });
-
-    expect(adjustOrientation).toHaveBeenCalledWith({
-      roll: -(Math.PI / 6 * 0.02),
-      pitch: 0,
-      yaw: 0,
-    });
+    expect(publishPositionButtons).toHaveBeenCalledOnce();
+    expect(publishPositionWrist).not.toHaveBeenCalled();
   });
 });

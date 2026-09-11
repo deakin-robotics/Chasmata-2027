@@ -10,7 +10,7 @@ const POSITION_UPDATE_SECONDS = 0.02;
 const POSITION_SPEED_METRES_PER_SECOND = 0.2;
 const ORIENTATION_SPEED_RADIANS_PER_SECOND = Math.PI / 6;
 
-/** Handles Position-mode gamepad input by updating the GUI IK target. */
+/** Handles Position-mode gamepad input for the MoveIt2 pivot and wrist. */
 @Service()
 export class ArmPositionControl {
   private readonly armIkCoordinator = inject(ArmIkCoordinator);
@@ -19,18 +19,13 @@ export class ArmPositionControl {
 
   /** Applies one gamepad snapshot to the current IK target. */
   handle(snapshot: GamepadSnapshot): void {
-    const leftStickX = this.finiteInput(snapshot.axes[0]);
-    const leftStickY = this.finiteInput(snapshot.axes[1]);
-    const provider = this.armIkCoordinator.provider?.();
-    const delta = provider === 'moveit2'
-      ? this.targetDelta(leftStickX, leftStickY)
-      : this.legacyTargetDelta(leftStickX, leftStickY, snapshot);
+    const dpadX = this.finiteInput(snapshot.buttons[15]) - this.finiteInput(snapshot.buttons[14]);
+    const dpadY = this.finiteInput(snapshot.buttons[12]) - this.finiteInput(snapshot.buttons[13]);
+    const delta = this.targetDelta(dpadX, dpadY);
 
     if (delta.some((coordinate) => coordinate !== 0)) {
       this.armIkCoordinator.translate(delta);
     }
-
-    if (provider !== 'moveit2') return;
 
     if (this.armIkCoordinator.orientationMode() === 'locked') {
       this.armIkCoordinator.adjustOrientation(this.orientationDelta(snapshot));
@@ -49,41 +44,25 @@ export class ArmPositionControl {
     const amount = POSITION_SPEED_METRES_PER_SECOND * POSITION_UPDATE_SECONDS;
 
     if (this.armViewMode.view() === 'top') {
-      return [leftStickX * amount, -leftStickY * amount, 0];
+      return [leftStickX * amount, leftStickY * amount, 0];
     }
 
     // Side view looks along the arm's X axis, so the visible plane is Y-Z.
     // Positive screen X points toward negative model Y from this camera.
-    return [0, -leftStickX * amount, -leftStickY * amount];
-  }
-
-  private legacyTargetDelta(
-    leftStickX: number,
-    leftStickY: number,
-    snapshot: GamepadSnapshot,
-  ): ArmPosition {
-    const amount = POSITION_SPEED_METRES_PER_SECOND * POSITION_UPDATE_SECONDS;
-    const dpadUp = this.finiteInput(snapshot.buttons[12]);
-    const dpadDown = this.finiteInput(snapshot.buttons[13]);
-
-    return [
-      leftStickX * amount,
-      -leftStickY * amount,
-      (dpadDown - dpadUp) * amount,
-    ];
+    return [0, leftStickX === 0 ? 0 : -leftStickX * amount, leftStickY * amount];
   }
 
   private orientationDelta(snapshot: GamepadSnapshot): ArmOrientationDelta {
     const amount = ORIENTATION_SPEED_RADIANS_PER_SECOND * POSITION_UPDATE_SECONDS;
-    const dpadX = this.finiteInput(snapshot.buttons[15]) - this.finiteInput(snapshot.buttons[14]);
-    const dpadY = this.finiteInput(snapshot.buttons[12]) - this.finiteInput(snapshot.buttons[13]);
+    const leftStickX = this.finiteInput(snapshot.axes[0]);
+    const leftStickY = this.finiteInput(snapshot.axes[1]);
     const leftTrigger = this.finiteInput(snapshot.buttons[6]);
     const rightTrigger = this.finiteInput(snapshot.buttons[7]);
 
     return {
       roll: (leftTrigger - rightTrigger) * amount,
-      pitch: dpadY * amount,
-      yaw: dpadX * amount,
+      pitch: -leftStickY * amount,
+      yaw: leftStickX * amount,
     };
   }
 }

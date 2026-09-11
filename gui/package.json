@@ -20,7 +20,6 @@
     "@angular/material": "^22.0.4",
     "@angular/platform-browser": "^22.0.0",
     "@angular/router": "^22.0.0",
-    "closed-chain-ik": "^0.0.3",
     "roslib": "^2.1.0",
     "rxjs": "~7.8.0",
     "three": "^0.138.0",

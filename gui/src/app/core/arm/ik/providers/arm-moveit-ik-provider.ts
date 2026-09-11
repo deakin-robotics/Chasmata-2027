@@ -6,7 +6,6 @@ import {
   ArmIkPose,
   ArmIkSolveResult,
 } from '../arm-ik-types';
-import type { ArmIkProvider } from '../arm-ik-coordinator';
 import { RosConnection } from '../../../ros/ros-connection';
 
 const MOVEIT_TARGET_TOPIC = '/arm/target_pose';
@@ -35,7 +34,7 @@ interface PendingRequest {
 
 /** Sends target poses to the base-station trajectory executor. */
 @Service()
-export class ArmMoveItIkProvider implements ArmIkProvider {
+export class ArmMoveItIkProvider {
   private readonly rosConnection = inject(RosConnection);
 
   private readonly executionStatusState = signal<ArmIkExecutionStatus>('idle');

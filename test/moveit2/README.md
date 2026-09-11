@@ -1,8 +1,8 @@
-# MoveIt 2 Cartesian trajectory test stack
+# MoveIt 2 arm planning test stack
 
 This folder is an isolated MoveIt 2 experiment for the current six-joint arm.
 It runs MoveIt 2 in a base-station-style container and sends either partial or
-complete, time-parameterized Cartesian trajectories to the mock rover through
+complete, time-parameterized planned trajectories to the mock rover through
 the standard `FollowJointTrajectory` action.
 
 ## Start
@@ -18,7 +18,7 @@ The stack starts:
 - an isolated mock rover and ROSbridge on `ws://localhost:19090`;
 - a headless MoveIt 2 `move_group` node with the `position_arm` and `arm`
   planning groups;
-- an `arm_moveit_bridge` node that owns Cartesian planning and rover action
+- an `arm_moveit_bridge` node that owns MoveIt2 planning and rover action
   execution;
 - an identity `world` to `base_link` transform and robot state publisher.
 
@@ -43,7 +43,7 @@ The GUI path is:
 GUI target pose
   -> /arm/target_pose
   -> arm_moveit_bridge
-  -> J4-pivot Cartesian interpolation + MoveIt IK + time parameterization
+  -> MoveIt2 global planning + time parameterization
   -> /arm_controller/follow_joint_trajectory (J1-J3 or J1-J6)
   -> mock/real rover controller
   -> /joint_states
@@ -54,20 +54,23 @@ GUI target pose
 `j4_pivot_link`, and its orientation is the desired `ee_link` orientation.
 `/arm/orientation_lock` selects the execution path:
 
-- `false` (UNLOCKED): position-only IK in the `position_arm` group generates a partial J1-J3
+- `false` (UNLOCKED): position-only planning in the `position_arm` group generates a partial J1-J3
   trajectory; J4-J6 remain under `/arm/joy`.
 - `true` (LOCKED): the full `arm` group generates a complete J1-J6 trajectory
   while constraining `ee_link` to the requested orientation.
 
-Both paths use a straight J4-pivot Cartesian path. Collision checking is
-disabled for this first path; joint limits and rover-side safety checks remain
-active.
+For LOCKED requests, the bridge first solves the proximal `position_arm` group
+and then uses that result as the J1-J3 goal for the full `arm` plan. This keeps
+the J4-pivot and EE orientation requirements compatible with the configured
+kinematics solver.
+
+Both paths use smooth joint-space planning. Collision checking is disabled for
+this first path; joint limits and rover-side safety checks remain active.
 
 Moving the target while a trajectory is active cancels the current action and
 causes the bridge to plan from the latest rover state. The GUI never schedules
-trajectory points and does not publish `/joint_commands` while the MoveIt2
-provider is selected. The closed-chain provider remains available as the fast
-direct-joint fallback.
+trajectory points or publishes trajectory points. The browser-side FK model is
+used for display only; MoveIt2 is the only Position mode solver.
 
 To plan without execution:
 
@@ -81,9 +84,9 @@ docker compose exec moveit2 bash -lc \
 Useful demo parameters:
 
 ```text
-target_dx   Cartesian X displacement in metres (default: 0.0)
-target_dy   Cartesian Y displacement in metres (default: 0.0)
-target_dz   Cartesian Z displacement in metres (default: 0.03)
+target_dx   X displacement in metres (default: 0.0)
+target_dy   Y displacement in metres (default: 0.0)
+target_dz   Z displacement in metres (default: 0.03)
 execute     Send the planned trajectory to the mock rover (default: true)
 ```
 
@@ -96,9 +99,9 @@ flowchart TB
     lock[/arm/orientation_lock<br/>Bool]
     bridge[arm_moveit_bridge]
     mode{Orientation mode}
-    unlocked[position_arm<br/>J1-J3 pivot path]
-    locked[arm<br/>J1-J6 pivot path<br/>EE orientation constraint]
-    time[IK + time parameterization]
+    unlocked[position_arm<br/>J1-J3 pivot goal]
+    locked[arm<br/>J1-J6 pivot goal<br/>EE orientation constraint]
+    time[MoveIt2 planning + time parameterization]
     status[/arm/moveit/status<br/>planning/execution state]
     action[FollowJointTrajectory<br/>/arm_controller]
     rover[Rover controller<br/>limits + execution]
@@ -129,7 +132,7 @@ The bridge publishes JSON status events on `/arm/moveit/status` using the
 status events cannot complete a newer GUI request.
 
 The checked-in URDF currently contains visual geometry but no collision
-geometry. This stack therefore tests Cartesian kinematics, joint-limit-aware
+geometry. This stack therefore tests joint-space planning, joint-limit-aware
 time parameterization, action execution, cancellation, and telemetry—not
-real-world obstacle avoidance. OMPL remains configured in MoveIt2 for a later
+real-world obstacle avoidance. OMPL remains configured for later
 collision-aware planning mode.

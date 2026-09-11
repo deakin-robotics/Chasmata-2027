@@ -16,15 +16,7 @@ import { ArmTelemetryService } from '../telemetry/arm-telemetry.service';
 
 const DEFAULT_ARM_POSITION: ArmPosition = [0, 0, 0];
 
-/** Contract shared by the local closed-chain and MoveIt2 providers. */
-export interface ArmIkProvider {
-  solve(target: ArmIkPose): ArmIkSolveResult | null | Promise<ArmIkSolveResult | null>;
-  reset?(): void;
-}
-
-export type ArmIkProviderName = 'closed-chain-ik' | 'moveit2';
-
-/** Coordinates the shared target and delegates solving to the selected provider. */
+/** Coordinates the GUI target and delegates execution to MoveIt2. */
 @Service()
 export class ArmIkCoordinator {
   private readonly armIkSolveService = inject(ArmIkSolveService);
@@ -37,15 +29,10 @@ export class ArmIkCoordinator {
   private readonly jointAnglesState = signal<Readonly<Record<string, number>> | null>(null);
 
   readonly position = this.positionState.asReadonly();
-  readonly provider = this.armIkSolveService.provider;
-  readonly targetFrame = computed<ArmTargetFrame>(() =>
-    this.provider() === 'moveit2' ? 'j4_pivot_link' : 'ee_link',
-  );
+  readonly targetFrame = computed<ArmTargetFrame>(() => 'j4_pivot_link');
   readonly orientation = this.orientationState.asReadonly();
   readonly orientationMode = this.orientationModeState.asReadonly();
-  readonly canChangeOrientationMode = computed(
-    () => this.provider() === 'moveit2' && this.armTelemetry.actualJointAngles() !== null,
-  );
+  readonly canChangeOrientationMode = computed(() => this.armTelemetry.actualJointAngles() !== null);
   readonly status = this.statusState.asReadonly();
   readonly executionStatus = this.armIkSolveService.executionStatus;
   readonly jointAngles = this.jointAnglesState.asReadonly();
@@ -78,18 +65,6 @@ export class ArmIkCoordinator {
     this.positionState.set([...position] as ArmPosition);
   }
 
-  /** Selects the interchangeable provider used to solve Position-mode targets. */
-  setProvider(provider: ArmIkProviderName): void {
-    if (provider === this.provider()) return;
-
-    this.armIkSolveService.setProvider(provider);
-    this.orientationModeState.set('unlocked');
-    this.jointAnglesState.set(null);
-    this.statusState.set('idle');
-
-    if (this.ikReady) this.requestSolve(this.positionState());
-  }
-
   /** Seeds the target from the arm's current forward-kinematics pose. */
   setFromPose(pose: ArmIkPose): void {
     this.setPosition(pose.position);
@@ -102,7 +77,7 @@ export class ArmIkCoordinator {
     this.setPosition([current[0] + delta[0], current[1] + delta[1], current[2] + delta[2]]);
   }
 
-  /** Loads the arm model and begins solving the current target with the selected provider. */
+  /** Loads the arm model and begins solving the current target with MoveIt2. */
   async load(url?: string): Promise<void> {
     this.armIkSolveService.reset();
     this.ikReady = false;
@@ -145,8 +120,6 @@ export class ArmIkCoordinator {
   /** Switches MoveIt2's ownership of the wrist orientation. */
   setOrientationMode(mode: ArmOrientationMode): boolean {
     if (mode === this.orientationModeState()) return true;
-    if (mode === 'locked' && this.provider() !== 'moveit2') return false;
-
     if (mode === 'locked') {
       const actualJointAngles = this.armTelemetry.actualJointAngles();
       if (!actualJointAngles || !this.hasCompleteJointState(actualJointAngles)) return false;

@@ -1,29 +1,33 @@
-#include <algorithm>
 #include <atomic>
+#include <array>
 #include <chrono>
-#include <cmath>
 #include <condition_variable>
 #include <cstdint>
+#include <cmath>
 #include <future>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
 #include <thread>
-#include <vector>
 
+#include <Eigen/Geometry>
 #include <control_msgs/action/follow_joint_trajectory.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <moveit/move_group_interface/move_group_interface.hpp>
 #include <moveit/robot_trajectory/robot_trajectory.hpp>
 #include <moveit/trajectory_processing/time_optimal_trajectory_generation.hpp>
-#include <moveit/move_group_interface/move_group_interface.hpp>
+#include <moveit_msgs/action/move_group.hpp>
 #include <moveit_msgs/msg/constraints.hpp>
+#include <moveit_msgs/msg/move_it_error_codes.hpp>
+#include <moveit_msgs/msg/motion_plan_request.hpp>
+#include <moveit_msgs/msg/joint_constraint.hpp>
 #include <moveit_msgs/msg/position_constraint.hpp>
-#include <moveit_msgs/msg/robot_trajectory.hpp>
 #include <moveit_msgs/msg/orientation_constraint.hpp>
+#include <shape_msgs/msg/solid_primitive.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
-#include <shape_msgs/msg/solid_primitive.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/string.hpp>
 
@@ -33,24 +37,34 @@ constexpr char TARGET_TOPIC[] = "/arm/target_pose";
 constexpr char ORIENTATION_LOCK_TOPIC[] = "/arm/orientation_lock";
 constexpr char STATUS_TOPIC[] = "/arm/moveit/status";
 constexpr char TRAJECTORY_ACTION[] = "/arm_controller/follow_joint_trajectory";
+constexpr char MOVEIT_PLANNING_ACTION[] = "/move_action";
 constexpr char PLANNING_GROUP[] = "arm";
 constexpr char POSITION_PLANNING_GROUP[] = "position_arm";
 constexpr char REFERENCE_FRAME[] = "base_link";
 constexpr char END_EFFECTOR_LINK[] = "ee_link";
 constexpr char J4_PIVOT_LINK[] = "j4_pivot_link";
-constexpr double CARTESIAN_STEP_METRES = 0.01;
-constexpr double CARTESIAN_FRACTION_REQUIRED = 0.999;
 constexpr double PIVOT_POSITION_TOLERANCE_METRES = 0.005;
 constexpr double VELOCITY_SCALING = 0.5;
 constexpr double ACCELERATION_SCALING = 0.5;
+constexpr double PI = 3.14159265358979323846;
 
 using FollowJointTrajectory = control_msgs::action::FollowJointTrajectory;
 using GoalHandle = rclcpp_action::ClientGoalHandle<FollowJointTrajectory>;
+using MoveGroup = moveit_msgs::action::MoveGroup;
+using PlanningGoalHandle = rclcpp_action::ClientGoalHandle<MoveGroup>;
+
+double wrapToPi(double angle)
+{
+  while (angle > PI) angle -= 2.0 * PI;
+  while (angle < -PI) angle += 2.0 * PI;
+  return angle;
+}
 
 struct TargetRequest
 {
   geometry_msgs::msg::Pose pose;
   std::uint64_t request_id;
+  std::uint64_t generation;
   bool orientation_locked;
 };
 
@@ -81,20 +95,73 @@ void publishStatus(
   publisher->publish(status);
 }
 
-bool orientationsMatch(
-  const geometry_msgs::msg::Quaternion & first,
-  const geometry_msgs::msg::Quaternion & second)
+moveit_msgs::msg::OrientationConstraint orientationConstraint(
+  const geometry_msgs::msg::Quaternion & orientation)
 {
-  const auto first_norm = std::sqrt(
-    first.x * first.x + first.y * first.y + first.z * first.z + first.w * first.w);
-  const auto second_norm = std::sqrt(
-    second.x * second.x + second.y * second.y + second.z * second.z + second.w * second.w);
-  if (first_norm <= 1e-12 || second_norm <= 1e-12) return false;
+  moveit_msgs::msg::OrientationConstraint orientation_constraint;
+  orientation_constraint.header.frame_id = REFERENCE_FRAME;
+  orientation_constraint.link_name = END_EFFECTOR_LINK;
+  orientation_constraint.orientation = orientation;
+  orientation_constraint.absolute_x_axis_tolerance = 0.02;
+  orientation_constraint.absolute_y_axis_tolerance = 0.02;
+  orientation_constraint.absolute_z_axis_tolerance = 0.02;
+  orientation_constraint.weight = 1.0;
+  return orientation_constraint;
+}
 
-  const auto dot = std::abs(
-    (first.x * second.x + first.y * second.y + first.z * second.z + first.w * second.w) /
-    (first_norm * second_norm));
-  return dot >= 1.0 - 1e-6;
+moveit_msgs::msg::PositionConstraint linkPositionConstraint(
+  const std::string & link_name,
+  const geometry_msgs::msg::Point & position,
+  double tolerance)
+{
+  moveit_msgs::msg::PositionConstraint position_constraint;
+  position_constraint.header.frame_id = REFERENCE_FRAME;
+  position_constraint.link_name = link_name;
+  position_constraint.weight = 1.0;
+
+  shape_msgs::msg::SolidPrimitive region;
+  region.type = shape_msgs::msg::SolidPrimitive::BOX;
+  region.dimensions = {
+    tolerance * 2.0,
+    tolerance * 2.0,
+    tolerance * 2.0};
+
+  geometry_msgs::msg::Pose region_pose;
+  region_pose.position = position;
+  region_pose.orientation.w = 1.0;
+  position_constraint.constraint_region.primitives.push_back(region);
+  position_constraint.constraint_region.primitive_poses.push_back(region_pose);
+  return position_constraint;
+}
+
+moveit_msgs::msg::PositionConstraint pivotPositionConstraint(
+  const geometry_msgs::msg::Point & position)
+{
+  return linkPositionConstraint(J4_PIVOT_LINK, position, PIVOT_POSITION_TOLERANCE_METRES);
+}
+
+moveit_msgs::msg::JointConstraint jointConstraint(
+  const std::string & joint_name,
+  double position)
+{
+  moveit_msgs::msg::JointConstraint constraint;
+  constraint.joint_name = joint_name;
+  constraint.position = position;
+  constraint.tolerance_above = 0.01;
+  constraint.tolerance_below = 0.01;
+  constraint.weight = 1.0;
+  return constraint;
+}
+
+moveit_msgs::msg::Constraints targetConstraints(const TargetRequest & request)
+{
+  moveit_msgs::msg::Constraints constraints;
+  constraints.position_constraints.push_back(pivotPositionConstraint(request.pose.position));
+  if (request.orientation_locked) {
+    constraints.orientation_constraints.push_back(orientationConstraint(request.pose.orientation));
+  }
+
+  return constraints;
 }
 }
 
@@ -109,17 +176,24 @@ int main(int argc, char * argv[])
   const auto trajectory_client = rclcpp_action::create_client<FollowJointTrajectory>(
     node,
     TRAJECTORY_ACTION);
+  const auto planning_client = rclcpp_action::create_client<MoveGroup>(
+    node,
+    MOVEIT_PLANNING_ACTION);
 
   std::mutex target_mutex;
   std::condition_variable target_condition;
   std::optional<TargetRequest> pending_target;
+  std::optional<geometry_msgs::msg::Pose> latest_pose;
   std::atomic<bool> orientation_locked{false};
   std::atomic<std::uint64_t> latest_request_id{0};
+  std::atomic<std::uint64_t> latest_generation{0};
   std::atomic<std::uint64_t> fallback_sequence{0};
   bool shutting_down = false;
 
   std::mutex action_mutex;
   GoalHandle::SharedPtr active_goal;
+  std::mutex planning_mutex;
+  PlanningGoalHandle::SharedPtr active_planning_goal;
 
   const auto target_subscription = node->create_subscription<geometry_msgs::msg::PoseStamped>(
     TARGET_TOPIC,
@@ -128,9 +202,15 @@ int main(int argc, char * argv[])
       if (!message) return;
 
       const auto request_id = requestIdFromMessage(*message, fallback_sequence);
+      const auto generation = latest_generation.fetch_add(1) + 1;
       {
         std::lock_guard<std::mutex> lock(target_mutex);
-        pending_target = TargetRequest{message->pose, request_id, orientation_locked.load()};
+        latest_pose = message->pose;
+        pending_target = TargetRequest{
+          message->pose,
+          request_id,
+          generation,
+          orientation_locked.load()};
         latest_request_id.store(request_id);
       }
 
@@ -140,6 +220,13 @@ int main(int argc, char * argv[])
         goal = active_goal;
       }
       if (goal) trajectory_client->async_cancel_goal(goal);
+
+      PlanningGoalHandle::SharedPtr planning_goal;
+      {
+        std::lock_guard<std::mutex> lock(planning_mutex);
+        planning_goal = active_planning_goal;
+      }
+      if (planning_goal) planning_client->async_cancel_goal(planning_goal);
 
       target_condition.notify_one();
     });
@@ -152,7 +239,11 @@ int main(int argc, char * argv[])
     [&](const std_msgs::msg::Bool::SharedPtr message) {
       if (!message) return;
 
-      orientation_locked.store(message->data);
+      const auto previous_lock = orientation_locked.exchange(message->data);
+      if (previous_lock == message->data) {
+        return;
+      }
+
       RCLCPP_INFO(
         node->get_logger(),
         "Orientation lock update received: %s",
@@ -160,7 +251,16 @@ int main(int argc, char * argv[])
 
       {
         std::lock_guard<std::mutex> lock(target_mutex);
-        if (pending_target) pending_target->orientation_locked = message->data;
+        if (latest_pose) {
+          const auto generation = latest_generation.fetch_add(1) + 1;
+          pending_target = TargetRequest{
+            *latest_pose,
+            latest_request_id.load(),
+            generation,
+            message->data};
+        } else if (pending_target) {
+          pending_target->orientation_locked = message->data;
+        }
       }
 
       GoalHandle::SharedPtr goal;
@@ -169,11 +269,18 @@ int main(int argc, char * argv[])
         goal = active_goal;
       }
       if (goal) trajectory_client->async_cancel_goal(goal);
+
+      PlanningGoalHandle::SharedPtr planning_goal;
+      {
+        std::lock_guard<std::mutex> lock(planning_mutex);
+        planning_goal = active_planning_goal;
+      }
+      if (planning_goal) planning_client->async_cancel_goal(planning_goal);
     });
 
   (void)orientation_lock_subscription;
 
-  rclcpp::executors::SingleThreadedExecutor executor;
+  rclcpp::executors::MultiThreadedExecutor executor;
   executor.add_node(node);
 
   std::thread planning_thread([&]() {
@@ -186,20 +293,95 @@ int main(int argc, char * argv[])
       move_group->setPoseReferenceFrame(REFERENCE_FRAME);
       move_group->setMaxVelocityScalingFactor(VELOCITY_SCALING);
       move_group->setMaxAccelerationScalingFactor(ACCELERATION_SCALING);
+      move_group->setPlanningTime(5.0);
+      move_group->setNumPlanningAttempts(5);
     }
-    position_move_group.setEndEffectorLink(J4_PIVOT_LINK);
-    full_move_group.setEndEffectorLink(END_EFFECTOR_LINK);
 
     RCLCPP_INFO(
       node->get_logger(),
-      "MoveIt2 Cartesian bridge ready: %s -> %s -> %s",
+      "MoveIt2 planning bridge ready: %s -> %s -> %s",
       TARGET_TOPIC,
       STATUS_TOPIC,
       TRAJECTORY_ACTION);
 
-    auto is_superseded = [&](std::uint64_t request_id) {
-        return latest_request_id.load() > request_id;
-      };
+    auto is_superseded = [&](std::uint64_t generation) {
+      return latest_generation.load() > generation;
+    };
+
+    auto planWithMoveIt = [&](const moveit_msgs::msg::MotionPlanRequest & motion_request,
+        std::uint64_t generation,
+        std::uint64_t request_id) -> std::optional<moveit_msgs::msg::RobotTrajectory> {
+      if (!planning_client->wait_for_action_server(std::chrono::seconds(2))) {
+        RCLCPP_WARN(
+          node->get_logger(),
+          "Planning request %llu failed: MoveIt2 planning action unavailable",
+          static_cast<unsigned long long>(request_id));
+        return std::nullopt;
+      }
+
+      MoveGroup::Goal planning_goal;
+      planning_goal.request = motion_request;
+      planning_goal.planning_options.plan_only = true;
+      planning_goal.planning_options.replan = false;
+      const auto planning_goal_future = planning_client->async_send_goal(planning_goal);
+
+      while (rclcpp::ok() &&
+        planning_goal_future.wait_for(std::chrono::milliseconds(50)) != std::future_status::ready)
+      {
+        // A newer target cancels the planning action once its goal handle exists.
+      }
+
+      if (!rclcpp::ok()) return std::nullopt;
+      if (planning_goal_future.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
+        return std::nullopt;
+      }
+
+      const auto planning_goal_handle = planning_goal_future.get();
+      if (!planning_goal_handle) {
+        return std::nullopt;
+      }
+
+      {
+        std::lock_guard<std::mutex> lock(planning_mutex);
+        active_planning_goal = planning_goal_handle;
+      }
+
+      const auto planning_result_future = planning_client->async_get_result(planning_goal_handle);
+      bool cancel_requested = false;
+      while (rclcpp::ok() &&
+        planning_result_future.wait_for(std::chrono::milliseconds(50)) != std::future_status::ready)
+      {
+        if (is_superseded(generation) && !cancel_requested) {
+          planning_client->async_cancel_goal(planning_goal_handle);
+          cancel_requested = true;
+        }
+      }
+
+      {
+        std::lock_guard<std::mutex> lock(planning_mutex);
+        if (active_planning_goal == planning_goal_handle) active_planning_goal.reset();
+      }
+
+      if (!rclcpp::ok() || is_superseded(generation)) return std::nullopt;
+      if (planning_result_future.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
+        return std::nullopt;
+      }
+
+      const auto wrapped_result = planning_result_future.get();
+      if (wrapped_result.code != rclcpp_action::ResultCode::SUCCEEDED ||
+        !wrapped_result.result ||
+        wrapped_result.result->error_code.val != moveit_msgs::msg::MoveItErrorCodes::SUCCESS)
+      {
+        RCLCPP_WARN(
+          node->get_logger(),
+          "Planning request %llu failed: MoveIt2 returned error code %d",
+          static_cast<unsigned long long>(request_id),
+          wrapped_result.result ? wrapped_result.result->error_code.val : -1);
+        return std::nullopt;
+      }
+
+      return wrapped_result.result->planned_trajectory;
+    };
 
     while (rclcpp::ok()) {
       TargetRequest request;
@@ -213,177 +395,222 @@ int main(int argc, char * argv[])
         pending_target.reset();
       }
 
-      // The lock flag and target are separate ROS topics. Read the current
-      // flag at the planning boundary so a target cannot use stale mode data
-      // when the two callbacks arrive in either order.
-      request.orientation_locked = orientation_locked.load();
-
       publishStatus(status_publisher, request.request_id, "PLANNING");
 
-      if (is_superseded(request.request_id)) continue;
+      if (is_superseded(request.generation)) continue;
 
       auto & move_group = request.orientation_locked ? full_move_group : position_move_group;
       const auto planning_group = request.orientation_locked
         ? PLANNING_GROUP
         : POSITION_PLANNING_GROUP;
-      move_group.setEndEffectorLink(
-        request.orientation_locked ? END_EFFECTOR_LINK : J4_PIVOT_LINK);
 
-      const auto current_pose_result = move_group.getCurrentPose(J4_PIVOT_LINK);
-      auto current_pose = current_pose_result.pose;
-      const auto current_end_effector_pose = move_group.getCurrentPose(END_EFFECTOR_LINK).pose;
-      if (!std::isfinite(current_pose.position.x) ||
-        !std::isfinite(current_pose.position.y) ||
-        !std::isfinite(current_pose.position.z))
-      {
-        publishStatus(
-          status_publisher,
-          request.request_id,
-          "FAILED",
-          "MoveIt2 has no valid current J4 pivot pose.");
-        continue;
-      }
+      move_group.clearPoseTargets();
+      move_group.clearPathConstraints();
+      move_group.setEndEffectorLink(J4_PIVOT_LINK);
+      move_group.setStartStateToCurrentState();
 
-      RCLCPP_INFO(
-        node->get_logger(),
-        "Cartesian request %llu (%s): current J4 pivot=(%.3f, %.3f, %.3f), target=(%.3f, %.3f, %.3f)",
-        static_cast<unsigned long long>(request.request_id),
-        request.orientation_locked ? "locked" : "unlocked",
-        current_pose.position.x,
-        current_pose.position.y,
-        current_pose.position.z,
-        request.pose.position.x,
-        request.pose.position.y,
-        request.pose.position.z);
+      moveit_msgs::msg::MotionPlanRequest motion_request;
+      move_group.constructRobotState(motion_request.start_state);
+      motion_request.group_name = planning_group;
+      motion_request.pipeline_id = "ompl";
+      motion_request.num_planning_attempts = 5;
+      motion_request.allowed_planning_time = 5.0;
+      motion_request.max_velocity_scaling_factor = VELOCITY_SCALING;
+      motion_request.max_acceleration_scaling_factor = ACCELERATION_SCALING;
 
-      geometry_msgs::msg::Pose target_pose = request.pose;
-      moveit_msgs::msg::Constraints path_constraints;
-
-      if (request.orientation_locked) {
-        moveit_msgs::msg::OrientationConstraint orientation_constraint;
-        orientation_constraint.header.frame_id = REFERENCE_FRAME;
-        orientation_constraint.link_name = END_EFFECTOR_LINK;
-        orientation_constraint.orientation = request.pose.orientation;
-        orientation_constraint.absolute_x_axis_tolerance = 0.02;
-        orientation_constraint.absolute_y_axis_tolerance = 0.02;
-        orientation_constraint.absolute_z_axis_tolerance = 0.02;
-        orientation_constraint.weight = 1.0;
-        path_constraints.orientation_constraints.push_back(orientation_constraint);
+      std::optional<moveit_msgs::msg::RobotTrajectory> planned_trajectory;
+      if (!request.orientation_locked) {
+        motion_request.goal_constraints.push_back(targetConstraints(request));
+        planned_trajectory = planWithMoveIt(motion_request, request.generation, request.request_id);
       } else {
-        move_group.clearPathConstraints();
-      }
+        // MoveIt's KDL solver can solve the position_arm tip, but cannot sample
+        // IK for a secondary pivot link inside the full arm group. First ask the
+        // position_arm group for the proximal solution, then let the full group
+        // plan the wrist joints while constraining the EE orientation.
+        moveit_msgs::msg::MotionPlanRequest pivot_request;
+        position_move_group.constructRobotState(pivot_request.start_state);
+        pivot_request.group_name = POSITION_PLANNING_GROUP;
+        pivot_request.pipeline_id = "ompl";
+        pivot_request.num_planning_attempts = 5;
+        pivot_request.allowed_planning_time = 5.0;
+        pivot_request.max_velocity_scaling_factor = VELOCITY_SCALING;
+        pivot_request.max_acceleration_scaling_factor = ACCELERATION_SCALING;
+        TargetRequest pivot_target = request;
+        pivot_target.orientation_locked = false;
+        pivot_request.goal_constraints.push_back(targetConstraints(pivot_target));
 
-      const auto dx = target_pose.position.x - current_pose.position.x;
-      const auto dy = target_pose.position.y - current_pose.position.y;
-      const auto dz = target_pose.position.z - current_pose.position.z;
-      const auto distance = std::sqrt(dx * dx + dy * dy + dz * dz);
-      const auto orientation_matches = orientationsMatch(
-        current_end_effector_pose.orientation,
-        request.pose.orientation);
-      if (distance < 1e-6 && (!request.orientation_locked || orientation_matches)) {
+        const auto pivot_trajectory = planWithMoveIt(
+          pivot_request,
+          request.generation,
+          request.request_id);
+        if (!pivot_trajectory) {
+          if (is_superseded(request.generation)) continue;
+          publishStatus(
+            status_publisher,
+            request.request_id,
+            "FAILED",
+            "MoveIt2 could not position the J4 pivot.");
+          continue;
+        }
+
+        const auto & pivot_joint_names = pivot_trajectory->joint_trajectory.joint_names;
+        const auto & pivot_points = pivot_trajectory->joint_trajectory.points;
+        const auto & pivot_positions = pivot_points.back().positions;
+        moveit_msgs::msg::Constraints locked_goal;
+        const auto full_start_state = full_move_group.getCurrentState(2.0);
+        if (!full_start_state) {
+          publishStatus(
+            status_publisher,
+            request.request_id,
+            "FAILED",
+            "MoveIt2 could not read the current joint state.");
+          continue;
+        }
+        moveit::core::RobotState locked_goal_state(*full_start_state);
+        for (std::size_t index = 0; index < pivot_joint_names.size(); ++index) {
+          if (index >= pivot_positions.size()) continue;
+          if (pivot_joint_names[index] == "base_joint" ||
+            pivot_joint_names[index] == "shoulder_joint" ||
+            pivot_joint_names[index] == "elbow_joint")
+          {
+            locked_goal_state.setVariablePosition(pivot_joint_names[index], pivot_positions[index]);
+          }
+        }
+        const auto pivot_transform = locked_goal_state.getGlobalLinkTransform(J4_PIVOT_LINK);
+        Eigen::Quaterniond target_orientation(
+          request.pose.orientation.w,
+          request.pose.orientation.x,
+          request.pose.orientation.y,
+          request.pose.orientation.z);
+        target_orientation.normalize();
+        const auto relative_wrist_rotation =
+          pivot_transform.rotation().transpose() * target_orientation.toRotationMatrix();
+        const auto wrist_angles = relative_wrist_rotation.eulerAngles(1, 0, 2);
+        const std::array<Eigen::Vector3d, 2> wrist_candidates = {{
+          Eigen::Vector3d{
+            -wrapToPi(wrist_angles[0]),
+            wrapToPi(wrist_angles[1]),
+            wrapToPi(wrist_angles[2])},
+          Eigen::Vector3d{
+            -wrapToPi(wrist_angles[0] + PI),
+            wrapToPi(PI - wrist_angles[1]),
+            wrapToPi(wrist_angles[2] + PI)}}};
+        const Eigen::Vector3d current_wrist{
+          full_start_state->getVariablePosition("yaw_joint"),
+          full_start_state->getVariablePosition("pitch_joint"),
+          full_start_state->getVariablePosition("roll_joint")};
+        std::optional<Eigen::Vector3d> selected_wrist;
+        double best_wrist_distance = std::numeric_limits<double>::max();
+        for (const auto & candidate : wrist_candidates) {
+          auto candidate_state = locked_goal_state;
+          candidate_state.setVariablePosition("yaw_joint", candidate[0]);
+          candidate_state.setVariablePosition("pitch_joint", candidate[1]);
+          candidate_state.setVariablePosition("roll_joint", candidate[2]);
+          candidate_state.update();
+          if (!candidate_state.satisfiesBounds()) continue;
+
+          double distance = 0.0;
+          for (int index = 0; index < 3; ++index) {
+            distance += std::abs(wrapToPi(candidate[index] - current_wrist[index]));
+          }
+          if (distance < best_wrist_distance) {
+            best_wrist_distance = distance;
+            selected_wrist = candidate;
+          }
+        }
+        if (!selected_wrist) {
+          publishStatus(
+            status_publisher,
+            request.request_id,
+            "FAILED",
+            "The requested locked orientation exceeds the wrist joint limits.");
+          continue;
+        }
+        locked_goal_state.setVariablePosition("yaw_joint", (*selected_wrist)[0]);
+        locked_goal_state.setVariablePosition("pitch_joint", (*selected_wrist)[1]);
+        locked_goal_state.setVariablePosition("roll_joint", (*selected_wrist)[2]);
+        locked_goal_state.update();
+        for (const auto & joint_name : {
+          std::string{"base_joint"},
+          std::string{"shoulder_joint"},
+          std::string{"elbow_joint"},
+          std::string{"yaw_joint"},
+          std::string{"pitch_joint"},
+          std::string{"roll_joint"}})
+        {
+          locked_goal.joint_constraints.push_back(
+            jointConstraint(joint_name, locked_goal_state.getVariablePosition(joint_name)));
+        }
+        const Eigen::Quaterniond solved_orientation(
+          locked_goal_state.getGlobalLinkTransform(END_EFFECTOR_LINK).rotation());
+        const auto target_ee_translation =
+          locked_goal_state.getGlobalLinkTransform(END_EFFECTOR_LINK).translation();
+        geometry_msgs::msg::Point target_ee_position;
+        target_ee_position.x = target_ee_translation.x();
+        target_ee_position.y = target_ee_translation.y();
+        target_ee_position.z = target_ee_translation.z();
         RCLCPP_INFO(
           node->get_logger(),
-          "Cartesian request %llu already at target; no trajectory required",
-          static_cast<unsigned long long>(request.request_id));
-        publishStatus(status_publisher, request.request_id, "SUCCEEDED");
-        continue;
+          "Locked goal pivot joints: base=%.4f shoulder=%.4f elbow=%.4f; EE position seed=(%.4f, %.4f, %.4f)",
+          locked_goal_state.getVariablePosition("base_joint"),
+          locked_goal_state.getVariablePosition("shoulder_joint"),
+          locked_goal_state.getVariablePosition("elbow_joint"),
+          target_ee_position.x,
+          target_ee_position.y,
+          target_ee_position.z);
+        RCLCPP_INFO(
+          node->get_logger(),
+          "Locked wrist seed: yaw=%.4f pitch=%.4f roll=%.4f; solved EE quaternion=(%.4f, %.4f, %.4f, %.4f)",
+          locked_goal_state.getVariablePosition("yaw_joint"),
+          locked_goal_state.getVariablePosition("pitch_joint"),
+          locked_goal_state.getVariablePosition("roll_joint"),
+          solved_orientation.x(),
+          solved_orientation.y(),
+          solved_orientation.z(),
+          solved_orientation.w());
+        // The proximal joint constraints carry the J4-pivot solution. The
+        // full group then solves the wrist joints for the requested EE
+        // orientation. Keep orientation as a goal constraint rather than a
+        // path constraint so the operator can adjust orientation while the
+        // arm is already away from that new orientation.
+        // The six joint constraints encode the MoveIt-generated state whose
+        // FK satisfies both the pivot position and requested EE orientation.
+        // Keeping the goal in joint space avoids asking OMPL to sample a
+        // narrow geometric intersection around a wrist singularity.
+        locked_goal.position_constraints.push_back(pivotPositionConstraint(request.pose.position));
+        locked_goal.orientation_constraints.push_back(orientationConstraint(request.pose.orientation));
+        motion_request.goal_constraints.push_back(locked_goal);
+        planned_trajectory = planWithMoveIt(motion_request, request.generation, request.request_id);
       }
 
-      const auto waypoint_count = std::max<std::size_t>(
-        1,
-        static_cast<std::size_t>(std::ceil(distance / CARTESIAN_STEP_METRES)));
-
-      if (request.orientation_locked) {
-        // The full group uses ee_link as its Cartesian tip, so add a small
-        // sphere for every requested pivot waypoint. This keeps the wrist
-        // orientation constraint while requiring the off-chain J4 pivot to
-        // stay on the same straight line as the target.
-        moveit_msgs::msg::PositionConstraint pivot_constraint;
-        pivot_constraint.header.frame_id = REFERENCE_FRAME;
-        pivot_constraint.link_name = J4_PIVOT_LINK;
-        pivot_constraint.weight = 1.0;
-
-        shape_msgs::msg::SolidPrimitive pivot_region;
-        pivot_region.type = shape_msgs::msg::SolidPrimitive::SPHERE;
-        pivot_region.dimensions = {PIVOT_POSITION_TOLERANCE_METRES};
-
-        for (std::size_t index = 1; index <= waypoint_count; ++index) {
-          const auto fraction = static_cast<double>(index) / waypoint_count;
-          geometry_msgs::msg::Pose pivot_waypoint;
-          pivot_waypoint.position.x = current_pose.position.x + dx * fraction;
-          pivot_waypoint.position.y = current_pose.position.y + dy * fraction;
-          pivot_waypoint.position.z = current_pose.position.z + dz * fraction;
-          pivot_waypoint.orientation.w = 1.0;
-          pivot_constraint.constraint_region.primitives.push_back(pivot_region);
-          pivot_constraint.constraint_region.primitive_poses.push_back(pivot_waypoint);
-        }
-
-        path_constraints.position_constraints.push_back(pivot_constraint);
-      }
-
-      std::vector<geometry_msgs::msg::Pose> waypoints;
-      waypoints.reserve(waypoint_count);
-      for (std::size_t index = 1; index <= waypoint_count; ++index) {
-        const auto fraction = static_cast<double>(index) / waypoint_count;
-        auto waypoint = request.orientation_locked ? current_end_effector_pose : current_pose;
-        if (request.orientation_locked) {
-          waypoint.position.x += dx * fraction;
-          waypoint.position.y += dy * fraction;
-          waypoint.position.z += dz * fraction;
-          waypoint.orientation = request.pose.orientation;
-        } else {
-          waypoint.position.x += dx * fraction;
-          waypoint.position.y += dy * fraction;
-          waypoint.position.z += dz * fraction;
-          waypoint.orientation = current_pose.orientation;
-        }
-        waypoints.push_back(waypoint);
-      }
-
-      move_group.setStartStateToCurrentState();
-      moveit_msgs::msg::RobotTrajectory trajectory;
-      const auto fraction = request.orientation_locked
-        ? move_group.computeCartesianPath(
-          waypoints,
-          CARTESIAN_STEP_METRES,
-          trajectory,
-          path_constraints,
-          false)
-        : move_group.computeCartesianPath(
-          waypoints,
-          CARTESIAN_STEP_METRES,
-          trajectory,
-          false);
-
-      RCLCPP_INFO(
-        node->get_logger(),
-        "Cartesian request %llu: %.1f%% of path, %zu trajectory points",
-        static_cast<unsigned long long>(request.request_id),
-        fraction * 100.0,
-        trajectory.joint_trajectory.points.size());
-
-      if (is_superseded(request.request_id)) continue;
-
-      if (fraction < CARTESIAN_FRACTION_REQUIRED ||
-        trajectory.joint_trajectory.joint_names.empty() ||
-        trajectory.joint_trajectory.points.empty())
-      {
+      if (!planned_trajectory) {
+        if (is_superseded(request.generation)) continue;
         RCLCPP_WARN(
           node->get_logger(),
-          "Cartesian request %llu rejected because the path was incomplete",
+          "Planning request %llu failed: no complete joint-space plan",
           static_cast<unsigned long long>(request.request_id));
         publishStatus(
           status_publisher,
           request.request_id,
           "FAILED",
-          "MoveIt2 could not complete the Cartesian path.");
+          "MoveIt2 could not find a joint-space plan.");
         continue;
       }
 
-      RCLCPP_INFO(
-        node->get_logger(),
-        "Cartesian request %llu reading current joint state",
-        static_cast<unsigned long long>(request.request_id));
+      auto trajectory = *planned_trajectory;
+
+      if (is_superseded(request.generation)) continue;
+      if (trajectory.joint_trajectory.joint_names.empty() ||
+        trajectory.joint_trajectory.points.empty())
+      {
+        publishStatus(
+          status_publisher,
+          request.request_id,
+          "FAILED",
+          "MoveIt2 returned an empty joint-space plan.");
+        continue;
+      }
+
       const auto current_state = move_group.getCurrentState(2.0);
       if (!current_state) {
         publishStatus(
@@ -393,10 +620,6 @@ int main(int argc, char * argv[])
           "MoveIt2 could not read the current joint state.");
         continue;
       }
-      RCLCPP_INFO(
-        node->get_logger(),
-        "Cartesian request %llu received current joint state",
-        static_cast<unsigned long long>(request.request_id));
 
       robot_trajectory::RobotTrajectory timed_trajectory(
         move_group.getRobotModel(),
@@ -412,18 +635,19 @@ int main(int argc, char * argv[])
           status_publisher,
           request.request_id,
           "FAILED",
-          "MoveIt2 could not time-parameterize the Cartesian path.");
+          "MoveIt2 could not time-parameterize the plan.");
         continue;
       }
       timed_trajectory.getRobotTrajectoryMsg(trajectory);
 
       RCLCPP_INFO(
         node->get_logger(),
-        "Cartesian request %llu time-parameterized with %zu points",
+        "Planning request %llu produced %zu points for %zu joints",
         static_cast<unsigned long long>(request.request_id),
-        trajectory.joint_trajectory.points.size());
+        trajectory.joint_trajectory.points.size(),
+        trajectory.joint_trajectory.joint_names.size());
 
-      if (is_superseded(request.request_id)) continue;
+      if (is_superseded(request.generation)) continue;
 
       if (!trajectory_client->wait_for_action_server(std::chrono::seconds(2))) {
         publishStatus(
@@ -439,7 +663,7 @@ int main(int argc, char * argv[])
       goal.trajectory.header.stamp = node->now();
       RCLCPP_INFO(
         node->get_logger(),
-        "Cartesian request %llu sending %zu-joint trajectory to %s",
+        "Planning request %llu sending %zu-joint trajectory to %s",
         static_cast<unsigned long long>(request.request_id),
         goal.trajectory.joint_names.size(),
         TRAJECTORY_ACTION);
@@ -448,9 +672,13 @@ int main(int argc, char * argv[])
       while (rclcpp::ok() &&
         goal_future.wait_for(std::chrono::milliseconds(50)) != std::future_status::ready)
       {
-        // Wait for the goal handle even if a newer target arrives. Once the
-        // handle exists, the result loop can cancel it cleanly.
+        // Wait for the handle so a newer target can cancel it cleanly.
       }
+
+      RCLCPP_INFO(
+        node->get_logger(),
+        "Planning request %llu received trajectory goal response",
+        static_cast<unsigned long long>(request.request_id));
 
       if (!rclcpp::ok()) break;
       if (goal_future.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
@@ -483,7 +711,7 @@ int main(int argc, char * argv[])
       while (rclcpp::ok() &&
         result_future.wait_for(std::chrono::milliseconds(50)) != std::future_status::ready)
       {
-        if (is_superseded(request.request_id) && !cancel_requested) {
+        if (is_superseded(request.generation) && !cancel_requested) {
           trajectory_client->async_cancel_goal(goal_handle);
           cancel_requested = true;
         }
@@ -493,6 +721,11 @@ int main(int argc, char * argv[])
         std::lock_guard<std::mutex> lock(action_mutex);
         if (active_goal == goal_handle) active_goal.reset();
       }
+
+      RCLCPP_INFO(
+        node->get_logger(),
+        "Planning request %llu received trajectory result",
+        static_cast<unsigned long long>(request.request_id));
 
       if (!rclcpp::ok()) break;
       if (result_future.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
@@ -509,9 +742,9 @@ int main(int argc, char * argv[])
         wrapped_result.result &&
         wrapped_result.result->error_code == FollowJointTrajectory::Result::SUCCESSFUL;
 
-      if (succeeded && !is_superseded(request.request_id)) {
+      if (succeeded && !is_superseded(request.generation)) {
         publishStatus(status_publisher, request.request_id, "SUCCEEDED");
-      } else if (cancel_requested || is_superseded(request.request_id) ||
+      } else if (cancel_requested || is_superseded(request.generation) ||
         wrapped_result.code == rclcpp_action::ResultCode::CANCELED)
       {
         publishStatus(status_publisher, request.request_id, "CANCELED");

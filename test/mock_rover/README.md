@@ -42,10 +42,9 @@ Gimbal camera: http://localhost:8090/?action=stream
   blue. The latest valid request wins.
 - Publishes a complete FMA state immediately and once per second for late
   subscribers/recovery.
-- Accepts arm joint targets, clamps them to the current six-joint limits, and
-  immediately publishes the accepted positions as rover telemetry. This keeps
-  the GUI's rendered arm on the same `/joint_states` path as the real rover
-  without modelling motor dynamics.
+- Accepts legacy named arm joint targets, clamps them to the current six-joint
+  limits, and immediately publishes the accepted positions as rover telemetry.
+  Position mode itself uses MoveIt2 trajectories for proximal joints.
 - Accepts `FollowJointTrajectory` goals on
   `/arm_controller/follow_joint_trajectory`. In UNLOCKED mode it accepts a
   partial J1-J3 goal; in LOCKED mode it requires all six joints. It validates
@@ -84,10 +83,11 @@ For both Joy topics, `buttons[]` contains only digital button values (`0` or
 `1`). LT and RT are not read from `buttons[]`; their browser analogue values
 are sent through the dedicated axes listed above.
 
-In Position-mode UNLOCKED operation, `/arm/joy` uses the existing wrist fields:
-`axes[6]` for J4 yaw, `axes[7]` for J5 pitch, and `axes[8]`/`axes[9]` for J6
-roll. In LOCKED operation those inputs adjust the requested EE orientation in
-the GUI instead of directly moving J4-J6.
+In Position-mode UNLOCKED operation, `/arm/joy` uses `axes[6]` for J4 yaw,
+`axes[7]` for J5 pitch, and `axes[8]`/`axes[9]` for J6 roll. The GUI places
+the Position-mode left-stick yaw/pitch values into those wrist axes. In
+LOCKED operation the GUI sends zero wrist axes and uses those same physical
+inputs to adjust the requested EE orientation before replanning.
 
 The provisional `/fma/state` JSON shape is:
 

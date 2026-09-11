@@ -1,4 +1,4 @@
-import { Service, computed, effect, inject, signal } from '@angular/core';
+import { Service, computed, inject, signal } from '@angular/core';
 
 import { ArmIkCoordinator } from '../../arm/ik/arm-ik-coordinator';
 import { GamepadInput, GamepadSnapshot } from '../../gamepad/gamepad-input';
@@ -6,7 +6,6 @@ import { ArmMode } from '../../fma/fma-state.service';
 import { RosConnection } from '../../ros/ros-connection';
 import { ControlModeService } from '../control-mode';
 import { GimbalPriorityCommandPublisher } from '../gimbal-priority-command-publisher';
-import { ArmCommandPublisher } from './arm-command-publisher';
 import { ArmManualControl } from './arm-manual-control';
 import { ArmPositionControl } from './arm-position-control';
 
@@ -26,7 +25,6 @@ export class ArmControlModeService {
   private readonly gamepad = inject(GamepadInput);
   private readonly armIkCoordinator = inject(ArmIkCoordinator);
   private readonly gimbalPriorityPublisher = inject(GimbalPriorityCommandPublisher);
-  private readonly armCommandPublisher = inject(ArmCommandPublisher);
   private readonly armManualControl = inject(ArmManualControl);
   private readonly armPositionControl = inject(ArmPositionControl);
 
@@ -49,26 +47,6 @@ export class ArmControlModeService {
   readonly canControlArm = computed(
     () => this.enabledState() && this.rosConnection.isConnected() && this.controlMode.isArmActive(),
   );
-
-  private readonly jointTargetEffect = effect(() => {
-    const enabled = this.enabledState();
-    const mode = this.modeState();
-    const provider = this.armIkCoordinator.provider();
-    const ikStatus = this.armIkCoordinator.status();
-    const jointAngles = this.armIkCoordinator.jointAngles();
-
-    if (
-      !enabled ||
-      mode !== ArmMode.Position ||
-      provider !== 'closed-chain-ik' ||
-      ikStatus !== 'valid' ||
-      !jointAngles
-    ) {
-      return;
-    }
-
-    this.armCommandPublisher.publishJointTarget(jointAngles);
-  });
 
   /** Returns the reason Arm control cannot be enabled, or null when ready. */
   readiness(): string | null {

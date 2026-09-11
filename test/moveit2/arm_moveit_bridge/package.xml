@@ -2,7 +2,7 @@
 <package format="3">
   <name>arm_moveit_bridge</name>
   <version>0.0.1</version>
-  <description>Bridges GUI arm targets into MoveIt 2 Cartesian trajectories.</description>
+  <description>Bridges GUI arm targets into MoveIt 2 planned trajectories.</description>
 
   <maintainer email="robotics@example.com">Deakin Competitive Robotics Club</maintainer>
   <license>Apache-2.0</license>

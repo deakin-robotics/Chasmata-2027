@@ -110,14 +110,19 @@ export const CONTROL_SCHEME_CATALOGUE: {
       default: {
         controls: [
           {
-            input: 'left-stick',
-            label: 'Left joystick',
-            action: 'J4 pivot position',
+            input: 'left-stick-x',
+            label: 'Left joystick X',
+            action: 'J4 yaw / EE yaw',
           },
-          { input: 'd-pad-x', label: 'D-pad X', action: 'J4 yaw' },
-          { input: 'd-pad-y', label: 'D-pad Y', action: 'J5 pitch' },
-          { input: 'left-trigger', label: 'LT', action: 'J6 roll' },
-          { input: 'right-trigger', label: 'RT', action: 'J6 roll' },
+          {
+            input: 'left-stick-y',
+            label: 'Left joystick Y',
+            action: 'J5 pitch / EE pitch',
+          },
+          { input: 'd-pad-x', label: 'D-pad X', action: 'Move J4 pivot X/Y' },
+          { input: 'd-pad-y', label: 'D-pad Y', action: 'Move J4 pivot X/Y' },
+          { input: 'left-trigger', label: 'LT', action: 'J6 roll / EE roll' },
+          { input: 'right-trigger', label: 'RT', action: 'J6 roll / EE roll' },
           { input: 'right-stick', label: 'Right joystick', action: 'Gimbal' },
           { input: 'button-a', label: 'A', action: 'Laser' },
           { input: 'button-b', label: 'B', action: 'Open end-effector' },
