@@ -15,6 +15,8 @@ interface PendingSolve {
   readonly reject: (error: unknown) => void;
 }
 
+const MOVEIT_REQUEST_INTERVAL_MS = 500;
+
 /** Owns provider selection, model loading, scheduling, and IK execution. */
 @Service()
 export class ArmIkSolveService {
@@ -27,6 +29,7 @@ export class ArmIkSolveService {
   private solveTimer: ReturnType<typeof setTimeout> | null = null;
   private queuedSolve: PendingSolve | null = null;
   private activeSolve: PendingSolve | null = null;
+  private lastMoveItDispatchAtMs: number | null = null;
 
   readonly provider = this.providerState.asReadonly();
   readonly executionStatus = computed<ArmIkExecutionStatus>(() =>
@@ -68,7 +71,7 @@ export class ArmIkSolveService {
 
     return new Promise<ArmIkSolveResult | null>((resolve, reject) => {
       this.queuedSolve = { request, target, resolve, reject };
-      this.solveTimer = setTimeout(() => this.startQueuedSolve(), 0);
+      this.scheduleQueuedSolve();
     });
   }
 
@@ -84,7 +87,25 @@ export class ArmIkSolveService {
     this.activeSolve?.resolve(null);
     this.queuedSolve = null;
     this.activeSolve = null;
+    this.lastMoveItDispatchAtMs = null;
     this.armMoveItIkProvider.reset?.();
+  }
+
+  private scheduleQueuedSolve(): void {
+    const delay = this.providerState() === 'moveit2'
+      ? this.moveItDispatchDelayMs()
+      : 0;
+
+    this.solveTimer = setTimeout(() => this.startQueuedSolve(), delay);
+  }
+
+  private moveItDispatchDelayMs(): number {
+    if (this.lastMoveItDispatchAtMs === null) return 0;
+
+    return Math.max(
+      MOVEIT_REQUEST_INTERVAL_MS - (Date.now() - this.lastMoveItDispatchAtMs),
+      0,
+    );
   }
 
   private startQueuedSolve(): void {
@@ -98,6 +119,9 @@ export class ArmIkSolveService {
     }
 
     this.activeSolve = solve;
+    if (this.providerState() === 'moveit2') {
+      this.lastMoveItDispatchAtMs = Date.now();
+    }
 
     let result: ArmIkSolveResult | null | Promise<ArmIkSolveResult | null>;
     try {

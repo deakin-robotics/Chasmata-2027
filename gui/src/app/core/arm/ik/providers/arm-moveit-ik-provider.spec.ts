@@ -1,34 +1,39 @@
 import { TestBed } from '@angular/core/testing';
-import { Topic } from 'roslib';
+import type { Ros } from 'roslib';
 import { vi } from 'vitest';
 
 import { RosConnection } from '../../../ros/ros-connection';
 import { ArmMoveItIkProvider } from './arm-moveit-ik-provider';
 
-const rosMocks = vi.hoisted(() => ({
-  subscriptions: new Map<string, (message: unknown) => void>(),
-  topics: new Map<string, {
-    publish: ReturnType<typeof vi.fn>;
-    unsubscribe: ReturnType<typeof vi.fn>;
-  }>(),
-}));
+const rosMocks = {
+  handlers: new Map<string, (message: unknown) => void>(),
+  sentMessages: [] as Record<string, unknown>[],
+  rosClient: null as Ros | null,
+};
 
-vi.mock('roslib', () => ({
-  Ros: class {},
-  Topic: vi.fn(function (this: unknown, options: { name: string }) {
-    const topic = {
-      publish: vi.fn(),
-      unsubscribe: vi.fn(),
-    };
-    rosMocks.topics.set(options.name, topic);
-    return {
-      ...topic,
-      subscribe: vi.fn((callback: (message: unknown) => void) => {
-        rosMocks.subscriptions.set(options.name, callback);
-      }),
-    };
-  }),
-}));
+function createRosClient(): Ros {
+  const handlers = rosMocks.handlers;
+
+  return {
+    on: vi.fn((event: string, callback: (message: unknown) => void) => {
+      handlers.set(event, callback);
+    }),
+    off: vi.fn((event: string, callback: (message: unknown) => void) => {
+      if (handlers.get(event) === callback) handlers.delete(event);
+    }),
+    once: vi.fn(),
+    callOnConnection: vi.fn((message: Record<string, unknown>) => {
+      rosMocks.sentMessages.push(message);
+    }),
+  } as unknown as Ros;
+}
+
+function publishStatus(data: string): void {
+  rosMocks.handlers.get('/arm/moveit/status')?.({
+    op: 'publish',
+    msg: { data },
+  });
+}
 
 const target = {
   position: [0.2, 0.1, 0.3] as const,
@@ -39,8 +44,9 @@ describe('ArmMoveItIkProvider', () => {
   let provider: ArmMoveItIkProvider;
 
   beforeEach(() => {
-    rosMocks.subscriptions.clear();
-    rosMocks.topics.clear();
+    rosMocks.handlers.clear();
+    rosMocks.sentMessages.length = 0;
+    rosMocks.rosClient = createRosClient();
 
     TestBed.configureTestingModule({
       providers: [
@@ -48,7 +54,7 @@ describe('ArmMoveItIkProvider', () => {
         {
           provide: RosConnection,
           useValue: {
-            client: () => ({}),
+            client: () => rosMocks.rosClient,
             isConnected: () => true,
           },
         },
@@ -64,10 +70,11 @@ describe('ArmMoveItIkProvider', () => {
 
   it('publishes a target pose and resolves on a successful execution event', async () => {
     const request = provider.solve(target);
-    const targetTopic = rosMocks.topics.get('/arm/target_pose');
-    const statusCallback = rosMocks.subscriptions.get('/arm/moveit/status');
+    const targetMessage = rosMocks.sentMessages.find(
+      (message) => message['op'] === 'publish' && message['topic'] === '/arm/target_pose',
+    );
 
-    expect(targetTopic?.publish).toHaveBeenCalledWith(expect.objectContaining({
+    expect(targetMessage?.['msg']).toEqual(expect.objectContaining({
       header: expect.objectContaining({
         stamp: { sec: 0, nanosec: 1 },
         frame_id: 'base_link',
@@ -77,11 +84,11 @@ describe('ArmMoveItIkProvider', () => {
       }),
     }));
 
-    statusCallback?.({ data: '{"request_id":1,"state":"PLANNING"}' });
+    publishStatus('{"request_id":1,"state":"PLANNING"}');
     expect(provider.executionStatus()).toBe('planning');
-    statusCallback?.({ data: '{"request_id":1,"state":"EXECUTING"}' });
+    publishStatus('{"request_id":1,"state":"EXECUTING"}');
     expect(provider.executionStatus()).toBe('executing');
-    statusCallback?.({ data: '{"request_id":1,"state":"SUCCEEDED"}' });
+    publishStatus('{"request_id":1,"state":"SUCCEEDED"}');
 
     await expect(request).resolves.toEqual({
       status: 'converged',
@@ -99,8 +106,7 @@ describe('ArmMoveItIkProvider', () => {
 
     await expect(firstRequest).resolves.toBeNull();
 
-    const statusCallback = rosMocks.subscriptions.get('/arm/moveit/status');
-    statusCallback?.({ data: '{"request_id":2,"state":"SUCCEEDED"}' });
+    publishStatus('{"request_id":2,"state":"SUCCEEDED"}');
 
     await expect(secondRequest).resolves.toEqual({
       status: 'converged',
@@ -110,11 +116,8 @@ describe('ArmMoveItIkProvider', () => {
 
   it('propagates a failed execution event', async () => {
     const request = provider.solve(target);
-    const statusCallback = rosMocks.subscriptions.get('/arm/moveit/status');
 
-    statusCallback?.({
-      data: '{"request_id":1,"state":"FAILED","message":"path incomplete"}',
-    });
+    publishStatus('{"request_id":1,"state":"FAILED","message":"path incomplete"}');
 
     await expect(request).rejects.toThrow('path incomplete');
     expect(provider.executionStatus()).toBe('failed');

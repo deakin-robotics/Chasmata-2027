@@ -73,6 +73,44 @@ describe('ArmIkSolveService', () => {
     expect(closedChainProvider.solve).toHaveBeenCalledWith(target);
   });
 
+  it('coalesces MoveIt2 targets and dispatches at most every 500 ms', async () => {
+    vi.useFakeTimers();
+
+    const firstResult = service.solve(target);
+    vi.advanceTimersByTime(0);
+
+    const secondResult = service.solve({ ...target, position: [0.3, 0.1, 0.3] });
+    const latestResult = service.solve({ ...target, position: [0.4, 0.1, 0.3] });
+
+    await expect(firstResult).resolves.toBeNull();
+    await expect(secondResult).resolves.toBeNull();
+    expect(moveItProvider.solve).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(499);
+    expect(moveItProvider.solve).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(1);
+    expect(moveItProvider.solve).toHaveBeenCalledTimes(2);
+    expect(moveItProvider.solve).toHaveBeenLastCalledWith({
+      ...target,
+      position: [0.4, 0.1, 0.3],
+    });
+
+    await expect(latestResult).resolves.toEqual(convergedResult);
+  });
+
+  it('keeps the in-house IK provider immediate', () => {
+    vi.useFakeTimers();
+    service.setProvider('closed-chain-ik');
+
+    service.solve(target);
+    vi.advanceTimersByTime(0);
+    service.solve({ ...target, position: [0.3, 0.1, 0.3] });
+    vi.advanceTimersByTime(0);
+
+    expect(closedChainProvider.solve).toHaveBeenCalledTimes(2);
+  });
+
   it('exposes MoveIt2 execution status only for the selected provider', () => {
     moveItProvider.executionStatus.set('executing');
     expect(service.executionStatus()).toBe('executing');
@@ -120,6 +158,32 @@ describe('ArmIkSolveService', () => {
 
     await expect(pendingResult).resolves.toBeNull();
     expect(moveItProvider.reset).toHaveBeenCalled();
+  });
+
+  it('cancels scheduled MoveIt2 work when reset or switching providers', async () => {
+    vi.useFakeTimers();
+
+    const resetResult = service.solve(target);
+    service.reset();
+    vi.advanceTimersByTime(500);
+
+    await expect(resetResult).resolves.toBeNull();
+    expect(moveItProvider.solve).not.toHaveBeenCalled();
+
+    const moveItResult = service.solve(target);
+    vi.advanceTimersByTime(0);
+    const scheduledResult = service.solve({ ...target, position: [0.3, 0.1, 0.3] });
+    service.setProvider('closed-chain-ik');
+    vi.advanceTimersByTime(500);
+
+    await expect(moveItResult).resolves.toBeNull();
+    await expect(scheduledResult).resolves.toBeNull();
+    expect(moveItProvider.solve).toHaveBeenCalledTimes(1);
+
+    const closedChainResult = service.solve(target);
+    vi.advanceTimersByTime(0);
+    await expect(closedChainResult).resolves.toEqual(convergedResult);
+    expect(closedChainProvider.solve).toHaveBeenCalledWith(target);
   });
 
   it('propagates provider failures', async () => {

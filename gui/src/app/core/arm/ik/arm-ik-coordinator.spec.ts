@@ -116,4 +116,14 @@ describe('ArmIkCoordinator', () => {
     expect(coordinator.status()).toBe('invalid');
     expect(coordinator.jointAngles()).toBeNull();
   });
+
+  it('ignores a superseded solve without reporting it as invalid', async () => {
+    solveService.solve.mockResolvedValue(null);
+
+    await coordinator.load();
+    await Promise.resolve();
+
+    expect(coordinator.status()).toBe('solving');
+    expect(coordinator.jointAngles()).toBeNull();
+  });
 });
