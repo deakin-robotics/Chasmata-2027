@@ -9,6 +9,7 @@ find_package(moveit_msgs REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
+find_package(shape_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 
 add_executable(arm_moveit_bridge src/arm_moveit_bridge.cpp)
@@ -20,6 +21,7 @@ ament_target_dependencies(arm_moveit_bridge
   moveit_ros_planning_interface
   rclcpp
   rclcpp_action
+  shape_msgs
   std_msgs
 )
 

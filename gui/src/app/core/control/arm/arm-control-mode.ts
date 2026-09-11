@@ -114,6 +114,7 @@ export class ArmControlModeService {
     }
 
     if (this.isManual()) this.armManualControl.release();
+    this.armIkCoordinator.setOrientationMode('unlocked');
     if (this.controlMode.isArmActive()) this.controlMode.release();
     this.rightStickClickPressed = false;
     this.enabledState.set(false);
@@ -124,6 +125,7 @@ export class ArmControlModeService {
     if (mode === this.modeState()) return;
 
     if (this.enabledState() && this.isManual()) this.armManualControl.stop();
+    if (mode === ArmMode.Manual) this.armIkCoordinator.setOrientationMode('unlocked');
     this.modeState.set(mode);
   }
 

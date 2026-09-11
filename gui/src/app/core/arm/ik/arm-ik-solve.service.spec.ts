@@ -22,6 +22,8 @@ describe('ArmIkSolveService', () => {
   let closedChainProvider: {
     load: ReturnType<typeof vi.fn>;
     endEffectorPose: ReturnType<typeof vi.fn>;
+    j4PivotPose: ReturnType<typeof vi.fn>;
+    setJointAngles: ReturnType<typeof vi.fn>;
     solve: ReturnType<typeof vi.fn>;
   };
   let moveItProvider: {
@@ -34,6 +36,8 @@ describe('ArmIkSolveService', () => {
     closedChainProvider = {
       load: vi.fn().mockResolvedValue(undefined),
       endEffectorPose: vi.fn().mockReturnValue(target),
+      j4PivotPose: vi.fn().mockReturnValue(target),
+      setJointAngles: vi.fn(),
       solve: vi.fn().mockReturnValue(convergedResult),
     };
     moveItProvider = {
@@ -120,12 +124,29 @@ describe('ArmIkSolveService', () => {
     expect(service.executionStatus()).toBe('idle');
   });
 
-  it('loads the URDF and returns the initial end-effector pose', async () => {
+  it('loads the URDF and returns the initial J4 pivot pose for MoveIt2', async () => {
     const pose = await service.load('/test-arm.urdf');
 
     expect(closedChainProvider.load).toHaveBeenCalledWith('/test-arm.urdf');
+    expect(closedChainProvider.j4PivotPose).toHaveBeenCalled();
+    expect(pose).toEqual(target);
+  });
+
+  it('returns the end-effector pose for the in-house provider', async () => {
+    service.setProvider('closed-chain-ik');
+
+    const pose = await service.load('/test-arm.urdf');
+
     expect(closedChainProvider.endEffectorPose).toHaveBeenCalled();
     expect(pose).toEqual(target);
+  });
+
+  it('delegates telemetry forward kinematics for orientation capture', () => {
+    const jointAngles = { base_joint: 0.1 };
+
+    expect(service.poseFromJointAngles(jointAngles)).toEqual(target);
+    expect(closedChainProvider.setJointAngles).toHaveBeenCalledWith(jointAngles);
+    expect(closedChainProvider.endEffectorPose).toHaveBeenCalled();
   });
 
   it('resolves a superseded request as null', async () => {

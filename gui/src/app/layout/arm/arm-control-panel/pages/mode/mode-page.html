@@ -6,4 +6,14 @@
     [disabled]="!rosConnected()"
     (valueChange)="selectArmMode($event)"
   />
+
+  @if (armMode() === 'POSITION') {
+    <app-control-mode-selector
+      label="Position orientation"
+      [options]="orientationModeOptions"
+      [value]="orientationMode()"
+      [disabled]="!rosConnected() || !canChangeOrientationMode()"
+      (valueChange)="selectOrientationMode($event)"
+    />
+  }
 </section>

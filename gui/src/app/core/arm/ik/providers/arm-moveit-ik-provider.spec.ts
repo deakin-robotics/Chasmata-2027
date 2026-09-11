@@ -84,6 +84,12 @@ describe('ArmMoveItIkProvider', () => {
       }),
     }));
 
+    expect(rosMocks.sentMessages).toContainEqual(expect.objectContaining({
+      op: 'publish',
+      topic: '/arm/orientation_lock',
+      msg: { data: false },
+    }));
+
     publishStatus('{"request_id":1,"state":"PLANNING"}');
     expect(provider.executionStatus()).toBe('planning');
     publishStatus('{"request_id":1,"state":"EXECUTING"}');

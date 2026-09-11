@@ -12,7 +12,7 @@ names are similar, but they answer different questions.
 | `src/app/core/control/drive/drive-control-mode.ts` | Driver control interpretation: `MANUAL` or `VELOCITY`.                                                                                                          |
 | `src/app/core/control/arm/arm-control-mode.ts`     | Owns Arm interpretation mode, the shared Arm input session, and routing to the selected handler.                                                                |
 | `src/app/core/control/arm/arm-manual-control.ts`   | Handles the Manual Arm gamepad mapping and publishes the existing `/arm/joy` command.                                                                           |
-| `src/app/core/control/arm/arm-position-control.ts` | Handles the Position Arm gamepad mapping and updates the IK target through `ArmIkCoordinator`.                                                                  |
+| `src/app/core/control/arm/arm-position-control.ts` | Handles the Position Arm gamepad mapping, updates the J4-pivot target/orientation through `ArmIkCoordinator`, and sends UNLOCKED wrist input.                    |
 
 In short:
 
@@ -21,7 +21,12 @@ In short:
 - `ArmControlModeService` answers: **Which Arm input interpretation is selected, and which handler receives input?**
 - `ControlModeCoordinator` answers: **How do selections and ROS connection become mode requests?**
 - `ArmManualControl` answers: **How is the legacy direct-joint Arm mapping executed?**
-- `ArmPositionControl` answers: **How does Position-mode input move the IK target?**
+- `ArmPositionControl` answers: **How does Position-mode input move the IK target and wrist?**
+
+In MoveIt2 Position mode, the left stick moves the `j4_pivot_link` target in
+the visible plane. D-pad X/Y and LT/RT control J4 yaw, J5 pitch, and J6 roll
+through `/arm/joy` while UNLOCKED. In LOCKED mode those same wrist inputs
+adjust the requested `ee_link` orientation and MoveIt2 owns all six joints.
 
 ## Control authority versus control interpretation
 
@@ -48,8 +53,8 @@ The defaults are local GUI selections. They are not confirmed rover states.
 
 The Arm master switch is the safety and authority gate used before a mission.
 Once Arm control is active, the Arm Operator can still change between Manual
-and Position. `ArmControlModeService` stops the current worker and starts the
-newly selected worker while preserving the gamepad session.
+and Position. Position mode also has a local UNLOCKED/LOCKED orientation
+selector; it does not create an FMA state.
 
 ## Selection and connection flow
 

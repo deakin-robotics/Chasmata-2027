@@ -20,6 +20,7 @@ import {
 
 export const DEFAULT_ARM_URDF_URL = '/assets/kinematics/arm.urdf';
 export const ARM_END_EFFECTOR_LINK = 'ee_link';
+export const ARM_J4_PIVOT_LINK = 'j4_pivot_link';
 
 // closed-chain-ik publishes these as ambient const enums, which cannot be
 // consumed from an Angular isolated-modules build. Their runtime values are
@@ -40,6 +41,7 @@ interface LoadedArm {
   readonly robot: LoadedRobot;
   readonly ikRoot: ReturnType<typeof urdfRobotToIKRoot>;
   readonly endEffector: Link;
+  readonly j4Pivot: Link;
   readonly goal: Goal;
   readonly solver: Solver;
   readonly jointNames: readonly string[];
@@ -107,17 +109,13 @@ export class ArmClosedChainIkProvider {
   /** Returns the current end-effector pose from the IK model. */
   endEffectorPose(): ArmIkPose {
     const model = this.requireModel();
-    const position: number[] = [];
-    const orientation: number[] = [];
+    return this.poseForLinks(model.endEffector, model.endEffector);
+  }
 
-    model.ikRoot.updateMatrixWorld();
-    model.endEffector.getWorldPosition(position);
-    model.endEffector.getWorldQuaternion(orientation);
-
-    return {
-      position: this.toPosition(position),
-      orientation: this.toQuaternion(orientation),
-    };
+  /** Returns the J4 pivot position with the current EE orientation. */
+  j4PivotPose(): ArmIkPose {
+    const model = this.requireModel();
+    return this.poseForLinks(model.j4Pivot, model.endEffector);
   }
 
   /** Solves for the joint angles needed to reach a target pose. */
@@ -156,11 +154,21 @@ export class ArmClosedChainIkProvider {
       throw new Error(`The URDF must contain an end-effector link named ${ARM_END_EFFECTOR_LINK}.`);
     }
 
+    // Older test URDFs do not have the explicit pivot frame yet. The yaw link
+    // is coincident with the J4 pivot, so it is a safe compatibility fallback.
+    const j4Pivot = (
+      ikRoot.find((frame) => frame.name === ARM_J4_PIVOT_LINK) ??
+      ikRoot.find((frame) => frame.name === 'yaw')
+    ) as Link | null;
+    if (!j4Pivot?.isLink) {
+      throw new Error(`The URDF must contain a J4 pivot link named ${ARM_J4_PIVOT_LINK}.`);
+    }
+
     const goal = new Goal();
-    // Position mode moves the end effector to the blue target. Its orientation
-    // is intentionally free so the fixed-base solver can choose a reachable
-    // joint configuration instead of stalling on an unnecessary orientation
-    // constraint.
+    // The in-house fallback keeps its original EE-position target. Its
+    // orientation is intentionally free so the fixed-base solver can choose a
+    // reachable joint configuration instead of stalling on an unnecessary
+    // orientation constraint. Only MoveIt2 uses the J4-pivot target.
     goal.setGoalDoF(DOF_X, DOF_Y, DOF_Z);
     goal.makeClosure(endEffector);
 
@@ -185,6 +193,7 @@ export class ArmClosedChainIkProvider {
       robot,
       ikRoot,
       endEffector,
+      j4Pivot,
       goal,
       solver,
       jointNames,
@@ -222,6 +231,21 @@ export class ArmClosedChainIkProvider {
 
   private toPosition(values: readonly number[]): ArmPosition {
     return [values[0], values[1], values[2]];
+  }
+
+  private poseForLinks(positionLink: Link, orientationLink: Link): ArmIkPose {
+    const position: number[] = [];
+    const orientation: number[] = [];
+
+    const model = this.requireModel();
+    model.ikRoot.updateMatrixWorld();
+    positionLink.getWorldPosition(position);
+    orientationLink.getWorldQuaternion(orientation);
+
+    return {
+      position: this.toPosition(position),
+      orientation: this.toQuaternion(orientation),
+    };
   }
 
   private toQuaternion(values: readonly number[]): ArmQuaternion {

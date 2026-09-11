@@ -10,8 +10,10 @@ import type { ArmIkProvider } from '../arm-ik-coordinator';
 import { RosConnection } from '../../../ros/ros-connection';
 
 const MOVEIT_TARGET_TOPIC = '/arm/target_pose';
+const MOVEIT_ORIENTATION_LOCK_TOPIC = '/arm/orientation_lock';
 const MOVEIT_STATUS_TOPIC = '/arm/moveit/status';
 const POSE_STAMPED_MESSAGE_TYPE = 'geometry_msgs/PoseStamped';
+const BOOL_MESSAGE_TYPE = 'std_msgs/Bool';
 const STRING_MESSAGE_TYPE = 'std_msgs/String';
 const MOVEIT_RESPONSE_TIMEOUT_MS = 15_000;
 const MOVEIT_LOG_PREFIX = '[MoveIt2]';
@@ -41,6 +43,7 @@ export class ArmMoveItIkProvider implements ArmIkProvider {
 
   private activeClient: Ros | null = null;
   private targetTopic: Topic | null = null;
+  private orientationLockTopic: Topic | null = null;
   private statusTopic: Topic | null = null;
   private activeRequest: PendingRequest | null = null;
   private responseTimer: ReturnType<typeof setTimeout> | null = null;
@@ -75,11 +78,13 @@ export class ArmMoveItIkProvider implements ArmIkProvider {
       this.clearResponseTimer();
 
       try {
+        topics.orientationLock.publish({ data: target.orientationMode === 'locked' });
         topics.target.publish(this.toPoseStamped(target, id));
         console.log(`${MOVEIT_LOG_PREFIX} target sent`, {
           requestId: id,
           topic: MOVEIT_TARGET_TOPIC,
           position: target.position,
+          orientationMode: target.orientationMode ?? 'unlocked',
         });
       } catch (error) {
         this.finishRequest(null, this.toError(error, 'MoveIt2 target publish failed.'));
@@ -179,12 +184,21 @@ export class ArmMoveItIkProvider implements ArmIkProvider {
     request.resolve(null);
   }
 
-  private ensureTopics(): { target: Topic; status: Topic } | null {
+  private ensureTopics(): { target: Topic; orientationLock: Topic; status: Topic } | null {
     const client = this.rosConnection.client();
     if (!client || !this.rosConnection.isConnected()) return null;
 
-    if (client === this.activeClient && this.targetTopic && this.statusTopic) {
-      return { target: this.targetTopic, status: this.statusTopic };
+    if (
+      client === this.activeClient &&
+      this.targetTopic &&
+      this.orientationLockTopic &&
+      this.statusTopic
+    ) {
+      return {
+        target: this.targetTopic,
+        orientationLock: this.orientationLockTopic,
+        status: this.statusTopic,
+      };
     }
 
     this.disposeTopics();
@@ -194,6 +208,11 @@ export class ArmMoveItIkProvider implements ArmIkProvider {
       name: MOVEIT_TARGET_TOPIC,
       messageType: POSE_STAMPED_MESSAGE_TYPE,
     });
+    this.orientationLockTopic = new Topic({
+      ros: client,
+      name: MOVEIT_ORIENTATION_LOCK_TOPIC,
+      messageType: BOOL_MESSAGE_TYPE,
+    });
     this.statusTopic = new Topic({
       ros: client,
       name: MOVEIT_STATUS_TOPIC,
@@ -201,7 +220,11 @@ export class ArmMoveItIkProvider implements ArmIkProvider {
     });
     this.statusTopic.subscribe((message) => this.handleStatusMessage(message));
 
-    return { target: this.targetTopic, status: this.statusTopic };
+    return {
+      target: this.targetTopic,
+      orientationLock: this.orientationLockTopic,
+      status: this.statusTopic,
+    };
   }
 
   private handleStatusMessage(message: unknown): void {
@@ -220,6 +243,7 @@ export class ArmMoveItIkProvider implements ArmIkProvider {
   private disposeTopics(): void {
     this.statusTopic?.unsubscribe();
     this.targetTopic = null;
+    this.orientationLockTopic = null;
     this.statusTopic = null;
     this.activeClient = null;
   }

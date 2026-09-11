@@ -49,7 +49,11 @@ describe('CONTROL_SCHEME_CATALOGUE', () => {
 
     expect(CONTROL_SCHEME_CATALOGUE.arm[ArmMode.Position].default.controls).toEqual(
       expect.arrayContaining([
-        { input: 'd-pad-y', label: 'D-pad', action: 'IK height' },
+        { input: 'left-stick', label: 'Left joystick', action: 'J4 pivot position' },
+        { input: 'd-pad-x', label: 'D-pad X', action: 'J4 yaw' },
+        { input: 'd-pad-y', label: 'D-pad Y', action: 'J5 pitch' },
+        { input: 'left-trigger', label: 'LT', action: 'J6 roll' },
+        { input: 'right-trigger', label: 'RT', action: 'J6 roll' },
         { input: 'button-a', label: 'A', action: 'Laser' },
         { input: 'button-b', label: 'B', action: 'Open end-effector' },
         { input: 'button-x', label: 'X', action: 'Close end-effector' },

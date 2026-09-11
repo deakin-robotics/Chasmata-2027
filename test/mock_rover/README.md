@@ -46,11 +46,15 @@ Gimbal camera: http://localhost:8090/?action=stream
   immediately publishes the accepted positions as rover telemetry. This keeps
   the GUI's rendered arm on the same `/joint_states` path as the real rover
   without modelling motor dynamics.
-- Accepts complete `FollowJointTrajectory` goals on
-  `/arm_controller/follow_joint_trajectory`, validates every point against the
-  rover joint limits, interpolates the points over their timestamps, and
-  publishes the simulated actual positions and velocities while executing.
-  New goals can cancel an active trajectory.
+- Accepts `FollowJointTrajectory` goals on
+  `/arm_controller/follow_joint_trajectory`. In UNLOCKED mode it accepts a
+  partial J1-J3 goal; in LOCKED mode it requires all six joints. It validates
+  every point against the rover joint limits, interpolates the points over
+  their timestamps, and publishes the simulated actual positions and
+  velocities while executing. New goals can cancel an active trajectory.
+- Accepts `/arm/orientation_lock` and simulates Position-mode J4-J6 wrist
+  input from `/arm/joy` while orientation is UNLOCKED. Partial trajectory
+  execution preserves the other joints.
 - Publishes actual arm state on `/joint_states` at 20 Hz.
 - Serves canned GIF feeds through the legacy HTTP camera endpoint shape.
 
@@ -67,7 +71,8 @@ base_joint, shoulder_joint, elbow_joint, yaw_joint, pitch_joint, roll_joint
 | GUI → mock rover | `/joy` | `sensor_msgs/msg/Joy` | Driver gamepad input; LT/RT are analogue `axes[4]`/`axes[5]` values in the range `0..1`. |
 | GUI → mock rover | `/arm/joy` | `sensor_msgs/msg/Joy` | Manual Arm gamepad input; LT/RT are analogue `axes[8]`/`axes[9]` values in the range `0..1`. |
 | GUI → mock rover | `/joint_commands` | `sensor_msgs/msg/JointState` | Target joint positions in radians. |
-| MoveIt2 → mock rover | `/arm_controller/follow_joint_trajectory` | `control_msgs/action/FollowJointTrajectory` | Complete timed arm trajectory. |
+| GUI → mock rover | `/arm/orientation_lock` | `std_msgs/msg/Bool` | Selects Position-mode UNLOCKED (`false`) or LOCKED (`true`) execution. |
+| MoveIt2 → mock rover | `/arm_controller/follow_joint_trajectory` | `control_msgs/action/FollowJointTrajectory` | Timed J1-J3 partial trajectory in UNLOCKED mode or complete J1-J6 trajectory in LOCKED mode. |
 | Mock rover → GUI | `/joint_states` | `sensor_msgs/msg/JointState` | Simulated actual joint positions and velocities. |
 | GUI → mock rover | `/fma/drive/request` | `std_msgs/msg/String` | Driver mode value, such as `VELOCITY`. |
 | GUI → mock rover | `/fma/arm/request` | `std_msgs/msg/String` | Arm mode value, such as `POSITION`. |
@@ -78,6 +83,11 @@ base_joint, shoulder_joint, elbow_joint, yaw_joint, pitch_joint, roll_joint
 For both Joy topics, `buttons[]` contains only digital button values (`0` or
 `1`). LT and RT are not read from `buttons[]`; their browser analogue values
 are sent through the dedicated axes listed above.
+
+In Position-mode UNLOCKED operation, `/arm/joy` uses the existing wrist fields:
+`axes[6]` for J4 yaw, `axes[7]` for J5 pitch, and `axes[8]`/`axes[9]` for J6
+roll. In LOCKED operation those inputs adjust the requested EE orientation in
+the GUI instead of directly moving J4-J6.
 
 The provisional `/fma/state` JSON shape is:
 

@@ -14,7 +14,7 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import JointState, Joy
-from std_msgs.msg import String
+from std_msgs.msg import Bool, String
 
 from .simulation import JointSimulator
 
@@ -43,6 +43,7 @@ ARM_TRAJECTORY_ACTION = '/arm_controller/follow_joint_trajectory'
 JOINT_STATE_TOPIC = '/joint_states'
 DRIVE_JOY_TOPIC = '/joy'
 ARM_JOY_TOPIC = '/arm/joy'
+ORIENTATION_LOCK_TOPIC = '/arm/orientation_lock'
 DRIVE_MODE_REQUEST_TOPIC = '/fma/drive/request'
 ARM_MODE_REQUEST_TOPIC = '/fma/arm/request'
 LAW_MODE_REQUEST_TOPIC = '/fma/law/request'
@@ -51,6 +52,10 @@ FMA_STATE_TOPIC = '/fma/state'
 
 DRIVE_TRIGGER_AXES = (4, 5)
 ARM_TRIGGER_AXES = (8, 9)
+PROXIMAL_JOINT_NAMES = ('base_joint', 'shoulder_joint', 'elbow_joint')
+WRIST_JOINT_NAMES = ('yaw_joint', 'pitch_joint', 'roll_joint')
+POSITION_WRIST_SPEED_RAD_S = 0.5
+POSITION_INPUT_PERIOD_SECONDS = 0.02
 
 DRIVE_MODES = {'MANUAL', 'VELOCITY', 'MANAGED'}
 ARM_MODES = {'MANUAL', 'POSITION', 'MANAGED', 'STOWED'}
@@ -81,6 +86,7 @@ class MockRoverNode(Node):
         self.trajectory_callback_group = ReentrantCallbackGroup()
         self.drive_mode: Optional[str] = None
         self.arm_mode: Optional[str] = None
+        self.orientation_locked = False
         self.law_mode = 'NORMAL'
         self.law_before_override: Optional[str] = None
         self.pending_law: Optional[Tuple[str, float]] = None
@@ -133,6 +139,12 @@ class MockRoverNode(Node):
             Joy,
             ARM_JOY_TOPIC,
             lambda message: self.joy_callback('arm', message, ARM_TRIGGER_AXES),
+            10,
+        )
+        self.create_subscription(
+            Bool,
+            ORIENTATION_LOCK_TOPIC,
+            self.orientation_lock_callback,
             10,
         )
         self.create_subscription(
@@ -230,9 +242,19 @@ class MockRoverNode(Node):
         trajectory = goal_handle.request.trajectory
         joint_names = list(trajectory.joint_names)
 
-        if len(joint_names) != len(JOINT_NAMES) or set(joint_names) != set(JOINT_NAMES):
+        joint_name_set = set(joint_names)
+        valid_partial_goal = joint_name_set.issubset(PROXIMAL_JOINT_NAMES)
+        valid_full_goal = joint_name_set == set(JOINT_NAMES)
+        if (
+            len(joint_name_set) != len(joint_names) or
+            not (valid_partial_goal or valid_full_goal) or
+            (self.orientation_locked and not valid_full_goal)
+        ):
             result.error_code = FollowJointTrajectory.Result.INVALID_JOINTS
-            result.error_string = 'The trajectory must contain the six arm joints.'
+            result.error_string = (
+                'The trajectory must contain J1-J3 when orientation is unlocked '
+                'or all six joints when orientation is locked.'
+            )
             goal_handle.abort()
             return result
 
@@ -398,6 +420,35 @@ class MockRoverNode(Node):
         self.get_logger().debug(
             f'Accepted {subsystem} Joy command with LT/RT={trigger_values}'
         )
+
+        if subsystem == 'arm' and self.arm_mode == 'POSITION' and not self.orientation_locked:
+            self.apply_position_wrist_command(message)
+
+    def orientation_lock_callback(self, message: Bool) -> None:
+        self.orientation_locked = bool(message.data)
+        self.get_logger().info(
+            f'Arm orientation is now {"LOCKED" if self.orientation_locked else "UNLOCKED"}'
+        )
+
+    def apply_position_wrist_command(self, message: Joy) -> None:
+        dpad_yaw = float(message.axes[6])
+        dpad_pitch = float(message.axes[7])
+        roll = float(message.axes[9]) - float(message.axes[8])
+        current = self.joints.positions()
+        deltas = {
+            'yaw_joint': dpad_yaw,
+            'pitch_joint': dpad_pitch,
+            'roll_joint': roll,
+        }
+        targets = {
+            name: current[name] + value * POSITION_WRIST_SPEED_RAD_S * POSITION_INPUT_PERIOD_SECONDS
+            for name, value in deltas.items()
+            if value != 0.0
+        }
+        if targets:
+            accepted = self.joints.set_target_immediately(targets)
+            if accepted:
+                self.publish_joint_state()
 
     def tick(self) -> None:
         now = time.monotonic()

@@ -6,6 +6,7 @@ import { ArmIkCoordinator } from './arm-ik-coordinator';
 import { ArmIkProviderName } from './arm-ik-coordinator';
 import { ArmIkSolveService } from './arm-ik-solve.service';
 import { ArmIkExecutionStatus } from './arm-ik-types';
+import { ArmTelemetryService } from '../telemetry/arm-telemetry.service';
 
 describe('ArmIkCoordinator', () => {
   let coordinator: ArmIkCoordinator;
@@ -15,6 +16,7 @@ describe('ArmIkCoordinator', () => {
     reset: ReturnType<typeof vi.fn>;
     load: ReturnType<typeof vi.fn>;
     solve: ReturnType<typeof vi.fn>;
+    poseFromJointAngles: ReturnType<typeof vi.fn>;
     executionStatus: ReturnType<typeof signal<ArmIkExecutionStatus>>;
   };
 
@@ -28,6 +30,10 @@ describe('ArmIkCoordinator', () => {
       solve: vi.fn().mockResolvedValue({
         status: 'converged',
         jointAngles: { base_joint: 0 },
+      }),
+      poseFromJointAngles: vi.fn().mockReturnValue({
+        position: [0, 0, 0],
+        orientation: [0, 0, 0, 1],
       }),
       executionStatus: signal<ArmIkExecutionStatus>('idle'),
     };
@@ -91,6 +97,7 @@ describe('ArmIkCoordinator', () => {
     expect(solveService.solve).toHaveBeenCalledWith({
       position: [0, 0, 0],
       orientation: [0, 0, 0, 1],
+      orientationMode: 'unlocked',
     });
     expect(coordinator.status()).toBe('valid');
     expect(coordinator.jointAngles()).toEqual({ base_joint: 0 });
@@ -125,5 +132,36 @@ describe('ArmIkCoordinator', () => {
 
     expect(coordinator.status()).toBe('solving');
     expect(coordinator.jointAngles()).toBeNull();
+  });
+
+  it('captures actual telemetry orientation when entering locked mode', async () => {
+    const telemetry = TestBed.inject(ArmTelemetryService);
+    telemetry.setJointState({
+      names: [
+        'base_joint',
+        'shoulder_joint',
+        'elbow_joint',
+        'yaw_joint',
+        'pitch_joint',
+        'roll_joint',
+      ],
+      positions: [0, 0.1, 0.2, 0.3, 0.4, 0.5],
+    });
+
+    await coordinator.load();
+
+    expect(coordinator.setOrientationMode('locked')).toBe(true);
+    expect(coordinator.orientationMode()).toBe('locked');
+    expect(solveService.poseFromJointAngles).toHaveBeenCalledWith({
+      base_joint: 0,
+      shoulder_joint: 0.1,
+      elbow_joint: 0.2,
+      yaw_joint: 0.3,
+      pitch_joint: 0.4,
+      roll_joint: 0.5,
+    });
+    expect(solveService.solve).toHaveBeenLastCalledWith(expect.objectContaining({
+      orientationMode: 'locked',
+    }));
   });
 });

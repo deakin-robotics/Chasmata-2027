@@ -57,7 +57,19 @@ export class ArmIkSolveService {
     }
 
     if (request !== this.loadRequest) return null;
-    return this.armClosedChainIkProvider.endEffectorPose();
+    return this.providerState() === 'moveit2'
+      ? this.armClosedChainIkProvider.j4PivotPose()
+      : this.armClosedChainIkProvider.endEffectorPose();
+  }
+
+  /** Returns a forward-kinematics pose for actual rover joint telemetry. */
+  poseFromJointAngles(jointAngles: Readonly<Record<string, number>>): ArmIkPose | null {
+    try {
+      this.armClosedChainIkProvider.setJointAngles(jointAngles);
+      return this.armClosedChainIkProvider.endEffectorPose();
+    } catch {
+      return null;
+    }
   }
 
   solve(target: ArmIkPose): Promise<ArmIkSolveResult | null> {

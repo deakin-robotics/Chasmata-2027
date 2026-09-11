@@ -57,6 +57,28 @@ export class ArmCommandPublisher {
     return this.publishCommand(this.toArmJoyCommand(snapshot));
   }
 
+  /** Publishes Position-mode wrist input while leaving J1-J3 neutral. */
+  publishPositionWrist(snapshot: GamepadSnapshot): boolean {
+    if (!this.canPublish()) return false;
+
+    const command = this.toArmJoyCommand(snapshot);
+    return this.publishCommand({
+      axes: [0, 0, 0, 0, 0, 0, command.axes[6], command.axes[7], command.axes[8], command.axes[9]],
+      buttons: command.buttons,
+    });
+  }
+
+  /** Publishes Position-mode buttons without directly commanding J4-J6. */
+  publishPositionButtons(snapshot: GamepadSnapshot): boolean {
+    if (!this.canPublish()) return false;
+
+    const command = this.toArmJoyCommand(snapshot);
+    return this.publishCommand({
+      axes: new Array(ARM_AXES_COUNT).fill(0),
+      buttons: command.buttons,
+    });
+  }
+
   /** Publishes solved Position-mode joint targets in radians. */
   publishJointTarget(jointAngles: Readonly<Record<string, number>>): boolean {
     if (!this.canPublish() || !this.isValidJointTarget(jointAngles)) return false;
@@ -141,8 +163,8 @@ export class ArmCommandPublisher {
   private toArmJoyCommand(snapshot: GamepadSnapshot): ArmJoyCommand {
     const rawAxes = snapshot.axes;
     const rawButtons = snapshot.buttons;
-    const dpadX = (rawButtons[14] ?? 0) - (rawButtons[15] ?? 0);
-    const dpadY = (rawButtons[13] ?? 0) - (rawButtons[12] ?? 0);
+    const dpadX = (rawButtons[15] ?? 0) - (rawButtons[14] ?? 0);
+    const dpadY = (rawButtons[12] ?? 0) - (rawButtons[13] ?? 0);
 
     return {
       axes: [
@@ -154,8 +176,8 @@ export class ArmCommandPublisher {
         0,
         dpadX,
         dpadY,
-        rawButtons[LEFT_TRIGGER_BUTTON_INDEX] ?? 0,
         rawButtons[RIGHT_TRIGGER_BUTTON_INDEX] ?? 0,
+        rawButtons[LEFT_TRIGGER_BUTTON_INDEX] ?? 0,
       ],
       buttons: [
         rawButtons[0] ?? 0,

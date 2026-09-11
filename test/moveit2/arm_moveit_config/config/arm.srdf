@@ -1,12 +1,11 @@
 <?xml version="1.0"?>
 <robot name="robot_arm">
   <group name="arm">
-    <joint name="base_joint" />
-    <joint name="shoulder_joint" />
-    <joint name="elbow_joint" />
-    <joint name="yaw_joint" />
-    <joint name="pitch_joint" />
-    <joint name="roll_joint" />
+    <chain base_link="base_link" tip_link="ee_link" />
+  </group>
+
+  <group name="position_arm">
+    <chain base_link="base_link" tip_link="j4_pivot_link" />
   </group>
 
   <group_state name="home" group="arm">

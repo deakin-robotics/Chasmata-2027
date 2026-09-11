@@ -26,6 +26,11 @@ const SIX_JOINT_URDF = `
       <origin xyz="0 0 0.6" /><axis xyz="0 -1 0" />
       <limit lower="-1.65" upper="3.14" />
     </joint>
+    <joint name="j4_pivot_joint" type="fixed">
+      <parent link="arm2" /><child link="j4_pivot_link" />
+      <origin xyz="0 0 0.6" />
+    </joint>
+    <link name="j4_pivot_link" />
     <link name="yaw" />
     <joint name="pitch_joint" type="revolute">
       <parent link="yaw" /><child link="pitch" />

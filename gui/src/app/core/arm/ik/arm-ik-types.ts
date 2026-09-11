@@ -1,9 +1,18 @@
 export type ArmPosition = readonly [number, number, number];
 export type ArmQuaternion = readonly [number, number, number, number];
+export type ArmOrientationMode = 'locked' | 'unlocked';
+export type ArmTargetFrame = 'ee_link' | 'j4_pivot_link';
+
+export interface ArmOrientationDelta {
+  readonly roll: number;
+  readonly pitch: number;
+  readonly yaw: number;
+}
 
 export interface ArmIkPose {
   position: ArmPosition;
   orientation: ArmQuaternion;
+  orientationMode?: ArmOrientationMode;
 }
 
 export interface ArmJointState {
