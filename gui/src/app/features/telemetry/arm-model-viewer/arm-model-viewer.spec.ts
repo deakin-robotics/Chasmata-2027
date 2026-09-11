@@ -31,6 +31,9 @@ describe('ArmModelViewer', () => {
       '3D: UNAVAILABLE',
     );
     expect(fixture.nativeElement.querySelector('.ik-status')?.textContent).toContain('IK: —');
+    expect(fixture.nativeElement.querySelector('.orientation-mode-status')?.textContent).toContain(
+      'MODE: —',
+    );
     expect(fixture.nativeElement.querySelector('.viewer-status-error')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('canvas')).toBeFalsy();
   });

@@ -48,7 +48,8 @@ and causes the current target to be replanned.
 
 In UNLOCKED mode, MoveIt2 uses the `position_arm` group and sends a partial
 J1-J3 trajectory. The operator independently controls J4-J6 through
-`/arm/joy`. In LOCKED mode, MoveIt2 uses the full `arm` group, plans to the
+`/arm/joy`. Pressing L3 toggles the local orientation state while Position mode
+is active. In LOCKED mode, MoveIt2 uses the full `arm` group, plans to the
 J4-pivot position while constraining `ee_link` to the requested orientation,
 and sends a complete J1-J6 trajectory. While LOCKED, joystick and trigger
 wrist input is ignored and the captured orientation remains fixed until the
@@ -111,6 +112,7 @@ Implemented:
 - Time parameterization, cancellation, replanning, and MoveIt2 status events.
 - J4-pivot target and rover-telemetry markers in the model viewer.
 - Direct UNLOCKED wrist control through `/arm/joy`.
+- L3 orientation-lock toggle in Position mode.
 
 Not enabled yet:
 

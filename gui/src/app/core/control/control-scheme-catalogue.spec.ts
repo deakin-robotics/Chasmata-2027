@@ -49,16 +49,17 @@ describe('CONTROL_SCHEME_CATALOGUE', () => {
 
     expect(CONTROL_SCHEME_CATALOGUE.arm[ArmMode.Position].default.controls).toEqual(
       expect.arrayContaining([
-        { input: 'left-stick-x', label: 'Left joystick X', action: 'J4 yaw / EE yaw' },
-        { input: 'left-stick-y', label: 'Left joystick Y', action: 'J5 pitch / EE pitch' },
+        { input: 'left-stick-x', label: 'Left joystick X', action: 'J4 yaw (UNLOCKED)' },
+        { input: 'left-stick-y', label: 'Left joystick Y', action: 'J5 pitch (UNLOCKED)' },
         { input: 'd-pad-x', label: 'D-pad X', action: 'Move J4 pivot X/Y' },
         { input: 'd-pad-y', label: 'D-pad Y', action: 'Move J4 pivot X/Y' },
-        { input: 'left-trigger', label: 'LT', action: 'J6 roll / EE roll' },
-        { input: 'right-trigger', label: 'RT', action: 'J6 roll / EE roll' },
+        { input: 'left-trigger', label: 'LT', action: 'J6 roll (UNLOCKED)' },
+        { input: 'right-trigger', label: 'RT', action: 'J6 roll (UNLOCKED)' },
         { input: 'button-a', label: 'A', action: 'Laser' },
         { input: 'button-b', label: 'B', action: 'Open end-effector' },
         { input: 'button-x', label: 'X', action: 'Close end-effector' },
         { input: 'right-bumper', label: 'RB', action: 'Center EE / switch view' },
+        { input: 'left-stick-click', label: 'Left joystick click', action: 'Toggle orientation lock' },
         { input: 'right-stick-click', label: 'Right joystick click', action: 'Gimbal Priority' },
       ]),
     );

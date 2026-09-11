@@ -11,6 +11,7 @@ import { ArmPositionControl } from './arm-position-control';
 
 const PUBLISH_INTERVAL_MS = 20;
 const MINIMUM_ARM_AXES = 4;
+const LEFT_STICK_CLICK_BUTTON_INDEX = 10;
 const RIGHT_STICK_CLICK_BUTTON_INDEX = 11;
 
 export type ArmControlMode = ArmMode.Manual | ArmMode.Position;
@@ -32,6 +33,7 @@ export class ArmControlModeService {
   private readonly enabledState = signal(false);
   private readonly readinessErrorState = signal<string | null>(null);
   private publishTimer: ReturnType<typeof setInterval> | null = null;
+  private leftStickClickPressed = false;
   private rightStickClickPressed = false;
 
   readonly mode = this.modeState.asReadonly();
@@ -94,6 +96,7 @@ export class ArmControlModeService {
     if (this.isManual()) this.armManualControl.release();
     this.armIkCoordinator.setOrientationMode('unlocked');
     if (this.controlMode.isArmActive()) this.controlMode.release();
+    this.leftStickClickPressed = false;
     this.rightStickClickPressed = false;
     this.enabledState.set(false);
   }
@@ -110,7 +113,21 @@ export class ArmControlModeService {
   /** Routes one validated gamepad snapshot to the currently selected handler. */
   route(snapshot: GamepadSnapshot): void {
     this.publishGimbalPriorityRequest(snapshot);
+    this.toggleOrientationMode(snapshot);
     this.selectedControl().handle(snapshot);
+  }
+
+  private toggleOrientationMode(snapshot: GamepadSnapshot): void {
+    const pressed = (snapshot.buttons[LEFT_STICK_CLICK_BUTTON_INDEX] ?? 0) > 0.5;
+
+    if (this.isPosition() && pressed && !this.leftStickClickPressed) {
+      const nextMode = this.armIkCoordinator.orientationMode() === 'locked'
+        ? 'unlocked'
+        : 'locked';
+      this.armIkCoordinator.setOrientationMode(nextMode);
+    }
+
+    this.leftStickClickPressed = pressed;
   }
 
   private publishGimbalPriorityRequest(snapshot: GamepadSnapshot): void {

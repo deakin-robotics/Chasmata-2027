@@ -56,8 +56,9 @@ The defaults are local GUI selections. They are not confirmed rover states.
 
 The Arm master switch is the safety and authority gate used before a mission.
 Once Arm control is active, the Arm Operator can still change between Manual
-and Position. Position mode also has a local UNLOCKED/LOCKED orientation
-selector; it does not create an FMA state.
+and Position. Position mode has a local UNLOCKED/LOCKED orientation state
+toggled by the Left joystick click (L3); it does not create an FMA state. The
+right joystick click remains Gimbal priority.
 
 ## Selection and connection flow
 

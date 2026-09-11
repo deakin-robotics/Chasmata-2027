@@ -31,7 +31,6 @@ export class ArmIkCoordinator {
   readonly targetFrame = computed<ArmTargetFrame>(() => 'j4_pivot_link');
   readonly orientation = this.orientationState.asReadonly();
   readonly orientationMode = this.orientationModeState.asReadonly();
-  readonly canChangeOrientationMode = computed(() => this.armTelemetry.actualJointAngles() !== null);
   readonly status = this.statusState.asReadonly();
   readonly executionStatus = this.armIkSolveService.executionStatus;
   readonly jointAngles = this.jointAnglesState.asReadonly();

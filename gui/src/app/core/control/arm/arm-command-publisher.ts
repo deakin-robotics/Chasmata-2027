@@ -50,7 +50,7 @@ export class ArmCommandPublisher {
   publishPositionWrist(snapshot: GamepadSnapshot): boolean {
     if (!this.canPublish()) return false;
 
-    const command = this.toArmJoyCommand(snapshot);
+    const command = this.toPositionJoyCommand(snapshot);
     return this.publishCommand({
       axes: [0, 0, 0, 0, 0, 0, command.axes[0], command.axes[1], command.axes[8], command.axes[9]],
       buttons: command.buttons,
@@ -61,7 +61,7 @@ export class ArmCommandPublisher {
   publishPositionButtons(snapshot: GamepadSnapshot): boolean {
     if (!this.canPublish()) return false;
 
-    const command = this.toArmJoyCommand(snapshot);
+    const command = this.toPositionJoyCommand(snapshot);
     return this.publishCommand({
       axes: new Array(ARM_AXES_COUNT).fill(0),
       buttons: command.buttons,
@@ -146,6 +146,20 @@ export class ArmCommandPublisher {
         rawButtons[11] ?? 0,
       ],
     };
+  }
+
+  private toPositionJoyCommand(snapshot: GamepadSnapshot): ArmJoyCommand {
+    const command = this.toArmJoyCommand(snapshot);
+
+    // On gamepads without an extended button slot, button 10 is the L3
+    // fallback. Position mode consumes L3 as the orientation-lock toggle.
+    if (snapshot.buttons[16] === undefined) {
+      const buttons = [...command.buttons];
+      buttons[CLEAR_FAULTS_BUTTON_INDEX] = 0;
+      return { ...command, buttons };
+    }
+
+    return command;
   }
 
   private isValidCommand(command: ArmJoyCommand): boolean {

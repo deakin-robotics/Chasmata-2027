@@ -31,6 +31,10 @@
         }
         IK: {{ rosConnected() ? ikStatusLabel() : '—' }}
       </span>
+      <span class="status-separator" aria-hidden="true">|</span>
+      <span class="orientation-mode-status" aria-live="polite">
+        MODE: {{ rosConnected() ? (orientationMode() === 'locked' ? 'LOCKED' : 'UNLOCKED') : '—' }}
+      </span>
     </div>
   </header>
 

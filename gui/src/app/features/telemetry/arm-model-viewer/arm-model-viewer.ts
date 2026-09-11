@@ -65,6 +65,7 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
   });
   readonly ikStatus = this.armIkCoordinator.status;
   readonly ikStatusLabel = this.armIkCoordinator.statusLabel;
+  readonly orientationMode = this.armIkCoordinator.orientationMode;
   readonly executionStatus = this.armIkCoordinator.executionStatus;
   readonly executionStatusLabel = computed(() => {
     switch (this.executionStatus()) {
