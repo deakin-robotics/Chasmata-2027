@@ -59,6 +59,10 @@ h2 {
   color: var(--dcr-color-critical);
 }
 
+.viewer-status-stale {
+  color: var(--dcr-color-caution);
+}
+
 .status-separator {
   color: var(--dcr-color-neutral);
   font-size: 0.7rem;
@@ -145,6 +149,25 @@ h2 {
   min-height: 0;
   overflow: hidden;
   height: 100%;
+}
+
+.viewer-waiting {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  color: var(--dcr-color-info);
+  font-size: 0.78rem;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.viewer-waiting mat-icon {
+  width: 1rem;
+  height: 1rem;
+  font-size: 1rem;
 }
 
 canvas {

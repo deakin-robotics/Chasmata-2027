@@ -13,15 +13,13 @@ import {
 } from './arm-ik-types';
 import { ArmTelemetryService } from '../telemetry/arm-telemetry.service';
 
-const DEFAULT_ARM_POSITION: ArmPosition = [0, 0, 0];
-
 /** Coordinates the GUI target and delegates execution to MoveIt2. */
 @Service()
 export class ArmIkCoordinator {
   private readonly armIkSolveService = inject(ArmIkSolveService);
   private readonly armTelemetry = inject(ArmTelemetryService);
 
-  private readonly positionState = signal<ArmPosition>(DEFAULT_ARM_POSITION);
+  private readonly positionState = signal<ArmPosition | null>(null);
   private readonly orientationState = signal<ArmQuaternion>([0, 0, 0, 1]);
   private readonly orientationModeState = signal<ArmOrientationMode>('unlocked');
   private readonly statusState = signal<ArmIkStatus>('idle');
@@ -50,17 +48,19 @@ export class ArmIkCoordinator {
   });
 
   private ikReady = false;
-  private targetInitialized = false;
+  private modelReady = false;
 
-  private readonly targetEffect = effect(() => {
-    const position = this.positionState();
-    if (this.ikReady) this.requestSolve(position);
+  private readonly telemetryEffect = effect(() => {
+    this.armTelemetry.actualJointAngles();
+    this.tryInitializeTargetFromTelemetry();
   });
 
   /** Target position in the arm URDF base frame, measured in metres. */
   setPosition(position: ArmPosition): void {
     this.assertFinitePosition(position);
-    this.positionState.set([...position] as ArmPosition);
+    const nextPosition = [...position] as ArmPosition;
+    this.positionState.set(nextPosition);
+    if (this.ikReady) this.requestSolve(nextPosition);
   }
 
   /** Seeds the target from the arm's current forward-kinematics pose. */
@@ -72,31 +72,32 @@ export class ArmIkCoordinator {
   translate(delta: ArmPosition): void {
     this.assertFinitePosition(delta);
     const current = this.positionState();
+    if (!current) return;
+
     this.setPosition([current[0] + delta[0], current[1] + delta[1], current[2] + delta[2]]);
   }
 
-  /** Loads the arm model and begins solving the current target with MoveIt2. */
+  /** Loads the arm model and waits for live telemetry before accepting a target. */
   async load(url?: string): Promise<void> {
     this.armIkSolveService.reset();
     this.ikReady = false;
+    this.positionState.set(null);
     this.orientationState.set([0, 0, 0, 1]);
     this.orientationModeState.set('unlocked');
     this.jointAnglesState.set(null);
     this.statusState.set('idle');
+    this.modelReady = false;
 
     try {
-      const endEffectorPose = await this.armIkSolveService.load(url);
-      if (!endEffectorPose) return;
+      const loaded = await this.armIkSolveService.load(url);
+      if (!loaded) return;
 
-      this.orientationState.set(endEffectorPose.orientation);
-      if (!this.targetInitialized) {
-        this.setPosition(endEffectorPose.position);
-        this.targetInitialized = true;
-      }
-      this.ikReady = true;
-      this.requestSolve(this.positionState());
+      this.modelReady = true;
+      this.tryInitializeTargetFromTelemetry();
     } catch (error) {
+      this.modelReady = false;
       this.ikReady = false;
+      this.positionState.set(null);
       this.orientationState.set([0, 0, 0, 1]);
       this.jointAnglesState.set(null);
       this.statusState.set('invalid');
@@ -105,10 +106,12 @@ export class ArmIkCoordinator {
     }
   }
 
-  /** Stops IK work while preserving the operator's selected target. */
+  /** Stops IK work and clears the target until the next telemetry session. */
   reset(): void {
     this.armIkSolveService.reset();
     this.ikReady = false;
+    this.modelReady = false;
+    this.positionState.set(null);
     this.orientationState.set([0, 0, 0, 1]);
     this.orientationModeState.set('unlocked');
     this.jointAnglesState.set(null);
@@ -129,7 +132,8 @@ export class ArmIkCoordinator {
     }
 
     this.orientationModeState.set(mode);
-    if (this.ikReady) this.requestSolve(this.positionState());
+    const position = this.positionState();
+    if (this.ikReady && position) this.requestSolve(position);
     return true;
   }
 
@@ -137,16 +141,18 @@ export class ArmIkCoordinator {
     if (!this.ikReady) return;
 
     this.statusState.set('solving');
-    this.armIkSolveService.solve({
-      position,
-      orientation: this.orientationState(),
-      orientationMode: this.orientationModeState(),
-    }).then(
-      (result) => {
-        if (result) this.applySolveResult(result);
-      },
-      () => this.finishSolve('invalid'),
-    );
+    this.armIkSolveService
+      .solve({
+        position,
+        orientation: this.orientationState(),
+        orientationMode: this.orientationModeState(),
+      })
+      .then(
+        (result) => {
+          if (result) this.applySolveResult(result);
+        },
+        () => this.finishSolve('invalid'),
+      );
   }
 
   private finishSolve(status: 'unreachable' | 'invalid'): void {
@@ -181,4 +187,22 @@ export class ArmIkCoordinator {
     ].every((name) => Number.isFinite(jointAngles[name]));
   }
 
+  private tryInitializeTargetFromTelemetry(): void {
+    if (this.positionState() !== null || !this.modelReady) return;
+
+    const actualJointAngles = this.armTelemetry.actualJointAngles();
+    if (!actualJointAngles || !this.hasPivotJointState(actualJointAngles)) return;
+
+    const actualPose = this.armIkSolveService.poseFromJointAngles(actualJointAngles);
+    if (!actualPose) return;
+
+    this.positionState.set(actualPose.position);
+    this.ikReady = true;
+  }
+
+  private hasPivotJointState(jointAngles: Readonly<Record<string, number>>): boolean {
+    return ['base_joint', 'shoulder_joint', 'elbow_joint'].every((name) =>
+      Number.isFinite(jointAngles[name]),
+    );
+  }
 }

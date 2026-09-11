@@ -79,15 +79,23 @@ is `ee_link`. The six movable joints are:
 6. `roll_joint`
 
 The browser loads the URDF for rendering and forward-kinematics display only;
-it does not solve IK. Entering LOCKED uses the current rover joint telemetry
-to capture the current EE orientation. While LOCKED, MoveIt2 retains that
-orientation and direct wrist input is inactive. Leaving LOCKED returns J4-J6
-to the operator without a local preview or command jump.
+it does not solve IK. The model viewer waits for valid rover telemetry before
+attaching the URDF model to the scene. Its first valid `base_joint`,
+`shoulder_joint`, and `elbow_joint` sample supplies the live `j4_pivot_link`
+position for both the actual green marker and the initial blue target. No
+initial MoveIt2 request is sent; later telemetry moves only the actual model,
+while the operator owns the blue target. Entering LOCKED uses the current rover
+joint telemetry to capture the current EE orientation. While LOCKED, MoveIt2
+retains that orientation and direct wrist input is inactive. Leaving LOCKED
+returns J4-J6 to the operator without a local preview or command jump.
+If telemetry pauses after initialization, the last model pose remains visible
+and is marked stale; a disconnected ROS session returns the viewer to
+unavailable.
 
 ## GUI API
 
 ```ts
-const initialPose = await armIkSolveService.load();
+await armIkSolveService.load();
 const result = await armIkSolveService.solve({
   position: [x, y, z],
   orientation: [qx, qy, qz, qw],

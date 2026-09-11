@@ -20,7 +20,7 @@ describe('ArmIkCoordinator', () => {
   beforeEach(() => {
     solveService = {
       reset: vi.fn(),
-      load: vi.fn().mockResolvedValue({ position: [0, 0, 0], orientation: [0, 0, 0, 1] }),
+      load: vi.fn().mockResolvedValue(true),
       solve: vi.fn().mockResolvedValue({ status: 'converged', jointAngles: {} }),
       poseFromJointAngles: vi.fn().mockReturnValue({
         position: [0, 0, 0],
@@ -35,8 +35,8 @@ describe('ArmIkCoordinator', () => {
     coordinator = TestBed.inject(ArmIkCoordinator);
   });
 
-  it('starts with a neutral target and MoveIt2 pivot frame', () => {
-    expect(coordinator.position()).toEqual([0, 0, 0]);
+  it('starts without a target until live telemetry is available', () => {
+    expect(coordinator.position()).toBeNull();
     expect(coordinator.targetFrame()).toBe('j4_pivot_link');
     expect(coordinator.orientationMode()).toBe('unlocked');
     expect(coordinator.status()).toBe('idle');
@@ -47,13 +47,18 @@ describe('ArmIkCoordinator', () => {
     coordinator.translate([0.1, -0.1, 0.05]);
 
     const position = coordinator.position();
-    expect(position[0]).toBeCloseTo(0.3);
-    expect(position[1]).toBeCloseTo(0.2);
-    expect(position[2]).toBeCloseTo(0.45);
+    expect(position?.[0]).toBeCloseTo(0.3);
+    expect(position?.[1]).toBeCloseTo(0.2);
+    expect(position?.[2]).toBeCloseTo(0.45);
   });
 
-  it('defaults the target to the loaded J4 pivot pose', async () => {
-    solveService.load.mockResolvedValue({
+  it('seeds the target from the first live J4 pivot pose', async () => {
+    const telemetry = TestBed.inject(ArmTelemetryService);
+    telemetry.setJointState({
+      names: ['base_joint', 'shoulder_joint', 'elbow_joint'],
+      positions: [0.1, 0.2, 0.3],
+    });
+    solveService.poseFromJointAngles.mockReturnValue({
       position: [0.25, 0.1, 0.4],
       orientation: [0, 0, 0, 1],
     });
@@ -61,6 +66,78 @@ describe('ArmIkCoordinator', () => {
     await coordinator.load();
 
     expect(coordinator.position()).toEqual([0.25, 0.1, 0.4]);
+    expect(solveService.solve).not.toHaveBeenCalled();
+  });
+
+  it('waits for delayed telemetry before seeding the target', async () => {
+    await coordinator.load();
+
+    expect(coordinator.position()).toBeNull();
+    expect(solveService.solve).not.toHaveBeenCalled();
+
+    const telemetry = TestBed.inject(ArmTelemetryService);
+    telemetry.setJointState({
+      names: ['base_joint', 'shoulder_joint', 'elbow_joint'],
+      positions: [0.1, 0.2, 0.3],
+    });
+    TestBed.flushEffects();
+
+    expect(coordinator.position()).toEqual([0, 0, 0]);
+    expect(solveService.solve).not.toHaveBeenCalled();
+  });
+
+  it('keeps waiting when telemetry lacks a proximal joint', async () => {
+    await coordinator.load();
+
+    const telemetry = TestBed.inject(ArmTelemetryService);
+    telemetry.setJointState({
+      names: ['base_joint', 'shoulder_joint'],
+      positions: [0.1, 0.2],
+    });
+    TestBed.flushEffects();
+
+    expect(coordinator.position()).toBeNull();
+    expect(solveService.solve).not.toHaveBeenCalled();
+  });
+
+  it('keeps the blue target under operator control after telemetry updates', async () => {
+    seedPivotTelemetry();
+    await coordinator.load();
+    coordinator.setPosition([0.5, 0.6, 0.7]);
+
+    const telemetry = TestBed.inject(ArmTelemetryService);
+    telemetry.setJointState({
+      names: ['base_joint', 'shoulder_joint', 'elbow_joint'],
+      positions: [0.4, 0.5, 0.6],
+    });
+    TestBed.flushEffects();
+
+    expect(coordinator.position()).toEqual([0.5, 0.6, 0.7]);
+  });
+
+  it('clears the target on reset and resynchronizes after reconnect', async () => {
+    const telemetry = TestBed.inject(ArmTelemetryService);
+    seedPivotTelemetry();
+    await coordinator.load();
+    coordinator.setPosition([0.5, 0.6, 0.7]);
+
+    coordinator.reset();
+    telemetry.clear();
+    await coordinator.load();
+    expect(coordinator.position()).toBeNull();
+
+    solveService.poseFromJointAngles.mockReturnValue({
+      position: [0.8, 0.9, 1],
+      orientation: [0, 0, 0, 1],
+    });
+    telemetry.setJointState({
+      names: ['base_joint', 'shoulder_joint', 'elbow_joint'],
+      positions: [0.7, 0.8, 0.9],
+    });
+    TestBed.flushEffects();
+
+    expect(coordinator.position()).toEqual([0.8, 0.9, 1]);
+    expect(solveService.solve).toHaveBeenCalledTimes(1);
   });
 
   it('rejects non-finite target positions', () => {
@@ -70,11 +147,13 @@ describe('ArmIkCoordinator', () => {
   });
 
   it('maps a converged MoveIt2 execution to valid GUI state', async () => {
+    seedPivotTelemetry();
     await coordinator.load();
+    coordinator.setPosition([0.2, 0.3, 0.4]);
     await Promise.resolve();
 
     expect(solveService.solve).toHaveBeenCalledWith({
-      position: [0, 0, 0],
+      position: [0.2, 0.3, 0.4],
       orientation: [0, 0, 0, 1],
       orientationMode: 'unlocked',
     });
@@ -84,7 +163,9 @@ describe('ArmIkCoordinator', () => {
   it('reports an unsuccessful solve as unreachable', async () => {
     solveService.solve.mockResolvedValue({ status: 'stalled', jointAngles: {} });
 
+    seedPivotTelemetry();
     await coordinator.load();
+    coordinator.setPosition([0.2, 0.3, 0.4]);
     await Promise.resolve();
 
     expect(coordinator.status()).toBe('unreachable');
@@ -93,7 +174,9 @@ describe('ArmIkCoordinator', () => {
   it('reports a rejected solve as invalid', async () => {
     solveService.solve.mockRejectedValue(new Error('MoveIt2 failed'));
 
+    seedPivotTelemetry();
     await coordinator.load();
+    coordinator.setPosition([0.2, 0.3, 0.4]);
     await Promise.resolve();
 
     expect(coordinator.status()).toBe('invalid');
@@ -102,7 +185,9 @@ describe('ArmIkCoordinator', () => {
   it('ignores a superseded solve without reporting it as invalid', async () => {
     solveService.solve.mockResolvedValue(null);
 
+    seedPivotTelemetry();
     await coordinator.load();
+    coordinator.setPosition([0.2, 0.3, 0.4]);
     await Promise.resolve();
 
     expect(coordinator.status()).toBe('solving');
@@ -135,9 +220,11 @@ describe('ArmIkCoordinator', () => {
       pitch_joint: 0.4,
       roll_joint: 0.5,
     });
-    expect(solveService.solve).toHaveBeenLastCalledWith(expect.objectContaining({
-      orientationMode: 'locked',
-    }));
+    expect(solveService.solve).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        orientationMode: 'locked',
+      }),
+    );
   });
 
   it('keeps the captured orientation fixed while locked', async () => {
@@ -166,4 +253,12 @@ describe('ArmIkCoordinator', () => {
 
     expect(coordinator.orientation()).toEqual(capturedOrientation);
   });
+
+  function seedPivotTelemetry(): void {
+    const telemetry = TestBed.inject(ArmTelemetryService);
+    telemetry.setJointState({
+      names: ['base_joint', 'shoulder_joint', 'elbow_joint'],
+      positions: [0, 0, 0],
+    });
+  }
 });

@@ -50,7 +50,7 @@ export class ArmPositionControl {
       0,
       0,
       0,
-      -(snapshot.axes[0] ?? 0),
+      snapshot.axes[0] ?? 0,
       -(snapshot.axes[1] ?? 0),
       0,
       0,

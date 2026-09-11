@@ -16,6 +16,7 @@ import type URDFLoader from 'urdf-loader';
 import type { URDFRobot } from 'urdf-loader/src/URDFClasses';
 
 import { ArmIkCoordinator } from '../../../core/arm/ik/arm-ik-coordinator';
+import { ArmPosition } from '../../../core/arm/ik/arm-ik-types';
 import { ArmTelemetryService } from '../../../core/arm/telemetry/arm-telemetry.service';
 import { ArmViewModeService } from '../../../core/arm/arm-view-mode';
 import { GamepadInput } from '../../../core/gamepad/gamepad-input';
@@ -28,8 +29,9 @@ const ARM_TARGET_COLOR = '#62a8e5';
 const ARM_ACTUAL_COLOR = '#62c77a';
 const GRID_SIZE = 1.4;
 const RIGHT_BUMPER_BUTTON_INDEX = 5;
+const ARM_TELEMETRY_STALE_AFTER_MS = 500;
 
-type ViewerStatus = 'unavailable' | 'loading' | 'ready' | 'error';
+type ViewerStatus = 'unavailable' | 'loading' | 'waiting-telemetry' | 'ready' | 'error';
 type ThreeModule = typeof import('three');
 
 /** Renders the arm URDF and rover feedback in a Three.js scene. */
@@ -51,12 +53,15 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
 
   readonly status = signal<ViewerStatus>('unavailable');
   readonly statusMessage = signal('Unavailable');
+  readonly telemetryStale = signal(false);
   readonly viewerStatusLabel = computed(() => {
     switch (this.status()) {
       case 'loading':
         return 'LOADING';
+      case 'waiting-telemetry':
+        return 'WAITING FOR TELEMETRY';
       case 'ready':
-        return 'READY';
+        return this.telemetryStale() ? 'STALE' : 'READY';
       case 'error':
         return 'ERROR';
       default:
@@ -93,12 +98,13 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
   private renderer: Three.WebGLRenderer | null = null;
   private controls: OrbitControls | null = null;
   private robot: URDFRobot | null = null;
+  private pendingRobot: URDFRobot | null = null;
   private groundGrid: Three.GridHelper | null = null;
   private targetMarker: Three.Mesh | null = null;
   private actualMarker: Three.Mesh | null = null;
   private resizeObserver: ResizeObserver | null = null;
+  private telemetryStaleTimer: ReturnType<typeof setTimeout> | null = null;
   private animationFrame: number | null = null;
-  private initialPoseNeedsFraming = false;
   private rightBumperPressed = false;
   private initializing = false;
   private destroyed = false;
@@ -116,20 +122,22 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     this.statusMessage.set('Unavailable');
   });
 
-  private readonly telemetryEffect = effect(() => {
+  private readonly targetEffect = effect(() => {
     const targetPosition = this.armIkCoordinator.position();
+    if (targetPosition) this.updateTargetMarkerPosition(targetPosition);
+
+    this.tryRenderPendingRobot();
+  });
+
+  private readonly telemetryEffect = effect(() => {
     const actualJointAngles = this.armTelemetry.actualJointAngles();
 
-    this.targetMarker?.position.set(...targetPosition);
+    this.tryRenderPendingRobot();
 
     if (!actualJointAngles || !this.robot) return;
 
     this.applyActualJointAngles(actualJointAngles);
-
-    if (this.initialPoseNeedsFraming) {
-      this.frameInitialView(this.robot);
-      this.initialPoseNeedsFraming = false;
-    }
+    this.refreshTelemetryWatchdog();
   });
 
   private readonly rightBumperEffect = effect(() => {
@@ -208,6 +216,10 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
       await this.armIkCoordinator.load(ARM_URDF_URL);
       if (this.destroyed || !this.rosConnected()) return;
 
+      if (!this.armIkCoordinator.position()) {
+        this.status.set('waiting-telemetry');
+        this.statusMessage.set('Waiting for arm telemetry');
+      }
       this.loadArmModel();
     } catch {
       if (this.destroyed || !this.rosConnected()) return;
@@ -305,25 +317,46 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
   }
 
   private onArmModelLoaded(robot: URDFRobot): void {
-    if (this.destroyed || !this.rosConnected() || !this.scene) return;
+    if (this.destroyed || !this.rosConnected() || !this.scene) {
+      this.disposeRobot(robot);
+      return;
+    }
 
+    this.pendingRobot = robot;
+    this.tryRenderPendingRobot();
+  }
+
+  private tryRenderPendingRobot(): void {
+    const robot = this.pendingRobot;
+    const actualJointAngles = this.armTelemetry.actualJointAngles();
+
+    if (
+      !robot ||
+      !this.scene ||
+      !this.armIkCoordinator.position() ||
+      !actualJointAngles ||
+      !this.hasPivotJointState(actualJointAngles)
+    ) {
+      return;
+    }
+
+    this.pendingRobot = null;
     this.robot = robot;
     robot.rotation.x = -Math.PI / 2;
     this.styleRobot(robot);
     this.scene.add(robot);
 
-    const actualJointAngles = this.armTelemetry.actualJointAngles();
-    if (actualJointAngles) this.applyActualJointAngles(actualJointAngles);
+    this.applyActualJointAngles(actualJointAngles);
 
-    // The camera is framed only after the model has its first available pose.
     this.frameInitialView(robot);
     this.addGroundGrid(robot);
     this.addTargetMarker(robot);
     this.addActualMarker(robot);
-    this.initialPoseNeedsFraming = !actualJointAngles;
 
     this.status.set('ready');
     this.statusMessage.set('Ready');
+    this.telemetryStale.set(false);
+    this.refreshTelemetryWatchdog();
   }
 
   private frameInitialView(robot: URDFRobot): void {
@@ -437,7 +470,8 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
 
   private addTargetMarker(robot: URDFRobot): void {
     const three = this.three;
-    if (!three) return;
+    const targetPosition = this.armIkCoordinator.position();
+    if (!three || !targetPosition) return;
 
     const marker = new three.Mesh(
       new three.SphereGeometry(0.035, 20, 12),
@@ -446,9 +480,9 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
       }),
     );
     marker.name = 'arm-position-target';
-    marker.position.set(...this.armIkCoordinator.position());
     robot.add(marker);
     this.targetMarker = marker;
+    this.updateTargetMarkerPosition(targetPosition);
   }
 
   private addActualMarker(robot: URDFRobot): void {
@@ -476,6 +510,33 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
 
     this.robot.updateMatrixWorld(true);
     this.updateActualMarkerPosition(this.robot);
+  }
+
+  private hasPivotJointState(jointAngles: Readonly<Record<string, number>>): boolean {
+    return ['base_joint', 'shoulder_joint', 'elbow_joint'].every((name) =>
+      Number.isFinite(jointAngles[name]),
+    );
+  }
+
+  private updateTargetMarkerPosition(targetPosition: ArmPosition): void {
+    const marker = this.targetMarker;
+    if (!marker) return;
+
+    // The coordinator target is already expressed in the robot's URDF-local
+    // base frame. The robot root rotation is applied automatically when the
+    // marker is rendered, so converting it from world space would rotate it a
+    // second time.
+    marker.position.set(...targetPosition);
+  }
+
+  private refreshTelemetryWatchdog(): void {
+    if (!this.robot || !this.rosConnected()) return;
+
+    this.telemetryStale.set(false);
+    this.clearTelemetryWatchdog();
+    this.telemetryStaleTimer = setTimeout(() => {
+      if (this.robot && this.rosConnected()) this.telemetryStale.set(true);
+    }, ARM_TELEMETRY_STALE_AFTER_MS);
   }
 
   private updateActualMarkerPosition(robot: URDFRobot): void {
@@ -521,7 +582,8 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
 
   private disposeViewer(): void {
     this.armIkCoordinator.reset();
-    this.initialPoseNeedsFraming = false;
+    this.clearTelemetryWatchdog();
+    this.telemetryStale.set(false);
     this.armViewMode.reset();
     this.rightBumperPressed = false;
 
@@ -536,8 +598,10 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
 
     this.controls?.dispose();
     this.controls = null;
-    this.disposeRobot();
+    this.disposeRobot(this.robot);
+    this.disposeRobot(this.pendingRobot);
     this.robot = null;
+    this.pendingRobot = null;
 
     if (this.groundGrid) {
       this.groundGrid.geometry.dispose();
@@ -557,8 +621,15 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     this.actualMarker = null;
   }
 
-  private disposeRobot(): void {
-    this.robot?.traverse((object) => {
+  private clearTelemetryWatchdog(): void {
+    if (this.telemetryStaleTimer === null) return;
+
+    clearTimeout(this.telemetryStaleTimer);
+    this.telemetryStaleTimer = null;
+  }
+
+  private disposeRobot(robot: URDFRobot | null): void {
+    robot?.traverse((object) => {
       if (!('geometry' in object) || !('material' in object)) return;
 
       const mesh = object as Three.Mesh;

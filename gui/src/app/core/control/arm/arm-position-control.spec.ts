@@ -74,7 +74,7 @@ describe('ArmPositionControl', () => {
 
     expect(createCommand).toHaveBeenCalledWith(
       snapshot,
-      [0, 0, 0, 0, 0, 0, -1, 1, 0, 0],
+      [0, 0, 0, 0, 0, 0, 1, 1, 0, 0],
       { suppressClearFaultButton: true, includeTriggers: true },
     );
     expect(publish).toHaveBeenCalledOnce();

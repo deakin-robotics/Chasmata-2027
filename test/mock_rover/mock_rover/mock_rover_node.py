@@ -70,7 +70,7 @@ class MockRoverNode(Node):
     def __init__(self) -> None:
         super().__init__('mock_rover')
 
-        self.declare_parameter('publish_rate_hz', 20.0)
+        self.declare_parameter('publish_rate_hz', 10.0)
         self.declare_parameter('mode_ack_delay_ms', 150.0)
 
         publish_rate = max(float(self.get_parameter('publish_rate_hz').value), 1.0)

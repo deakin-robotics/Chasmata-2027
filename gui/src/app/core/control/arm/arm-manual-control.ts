@@ -40,7 +40,7 @@ export class ArmManualControl {
       gimbalHeld ? rightStickX : 0,
       gimbalHeld ? rightStickY : dpadY,
       0,
-      -(rawAxes[0] ?? 0),
+      rawAxes[0] ?? 0,
       -(rawAxes[1] ?? 0),
       0,
       0,

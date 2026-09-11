@@ -3,11 +3,7 @@ import URDFLoader from 'urdf-loader';
 import * as Three from 'three';
 
 import { ArmMoveItIkProvider } from './providers/arm-moveit-ik-provider';
-import {
-  ArmIkExecutionStatus,
-  ArmIkPose,
-  ArmIkSolveResult,
-} from './arm-ik-types';
+import { ArmIkExecutionStatus, ArmIkPose, ArmIkSolveResult } from './arm-ik-types';
 
 interface PendingSolve {
   readonly request: number;
@@ -40,7 +36,7 @@ export class ArmIkSolveService {
     this.armMoveItIkProvider.executionStatus(),
   );
 
-  async load(url = DEFAULT_ARM_URDF_URL): Promise<ArmIkPose | null> {
+  async load(url = DEFAULT_ARM_URDF_URL): Promise<boolean> {
     const request = ++this.loadRequest;
     this.resetSolveWork();
 
@@ -49,12 +45,11 @@ export class ArmIkSolveService {
       if (!response.ok) throw new Error(`Unable to load arm URDF: ${url}`);
       this.model = this.loader.parse(await response.text());
     } catch (error) {
-      if (request !== this.loadRequest) return null;
+      if (request !== this.loadRequest) return false;
       throw error;
     }
 
-    if (request !== this.loadRequest) return null;
-    return this.j4PivotPose();
+    return request === this.loadRequest;
   }
 
   /** Returns a forward-kinematics pose for actual rover joint telemetry. */
@@ -109,10 +104,7 @@ export class ArmIkSolveService {
   private moveItDispatchDelayMs(): number {
     if (this.lastMoveItDispatchAtMs === null) return 0;
 
-    return Math.max(
-      MOVEIT_REQUEST_INTERVAL_MS - (Date.now() - this.lastMoveItDispatchAtMs),
-      0,
-    );
+    return Math.max(MOVEIT_REQUEST_INTERVAL_MS - (Date.now() - this.lastMoveItDispatchAtMs), 0);
   }
 
   private startQueuedSolve(): void {
@@ -142,11 +134,7 @@ export class ArmIkSolveService {
     );
   }
 
-  private finishSolve(
-    solve: PendingSolve,
-    result: ArmIkSolveResult | null,
-    error: unknown,
-  ): void {
+  private finishSolve(solve: PendingSolve, result: ArmIkSolveResult | null, error: unknown): void {
     if (this.activeSolve !== solve) return;
 
     this.activeSolve = null;

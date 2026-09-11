@@ -37,4 +37,16 @@ describe('ArmModelViewer', () => {
     expect(fixture.nativeElement.querySelector('.viewer-status-error')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('canvas')).toBeFalsy();
   });
+
+  it('should show a telemetry spinner without rendering the digital twin', () => {
+    fixture.componentInstance.status.set('waiting-telemetry');
+    fixture.componentInstance.statusMessage.set('Waiting for arm telemetry');
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.viewerStatusLabel()).toBe('WAITING FOR TELEMETRY');
+    expect(fixture.nativeElement.querySelector('.viewer-waiting')?.textContent).toContain(
+      'Waiting for arm telemetry',
+    );
+    expect(fixture.nativeElement.querySelector('canvas')).toBeFalsy();
+  });
 });

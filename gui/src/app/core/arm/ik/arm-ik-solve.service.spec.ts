@@ -79,10 +79,12 @@ describe('ArmIkSolveService', () => {
     expect(service.executionStatus()).toBe('executing');
   });
 
-  it('loads the URDF and returns the initial J4 pivot pose', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      text: async () => `
+  it('loads the URDF without returning a default target pose', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () => `
         <robot name="test">
           <link name="base_link" />
           <joint name="pivot_mount" type="fixed">
@@ -97,21 +99,20 @@ describe('ArmIkSolveService', () => {
           </joint>
           <link name="ee_link" />
         </robot>`,
-    }));
+      }),
+    );
 
-    await expect(service.load('/test-arm.urdf')).resolves.toEqual(expect.objectContaining({
-      position: [0.2, 0.1, 0.3],
-      orientationMode: 'unlocked',
-    }));
+    await expect(service.load('/test-arm.urdf')).resolves.toBe(true);
   });
 
   it('resolves superseded requests as null', async () => {
     vi.useFakeTimers();
     let resolveFirst!: (result: typeof convergedResult) => void;
     moveItProvider.solve.mockImplementationOnce(
-      () => new Promise((resolve) => {
-        resolveFirst = resolve;
-      }),
+      () =>
+        new Promise((resolve) => {
+          resolveFirst = resolve;
+        }),
     );
 
     const firstResult = service.solve(target);

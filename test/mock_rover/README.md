@@ -54,7 +54,7 @@ Gimbal camera: http://localhost:8090/?action=stream
 - Accepts `/arm/orientation_lock` and simulates Position-mode J4-J6 wrist
   input from `/arm/joy` while orientation is UNLOCKED. Partial trajectory
   execution preserves the other joints.
-- Publishes actual arm state on `/joint_states` at 20 Hz.
+- Publishes actual arm state on `/joint_states` at 10 Hz.
 - Serves canned GIF feeds through the legacy HTTP camera endpoint shape.
 
 The default joint names match the current GUI URDF:
@@ -114,7 +114,7 @@ mock's feedback responsibilities stay the same.
 
 ```bash
 ros2 run mock_rover mock_rover --ros-args \
-  -p publish_rate_hz:=20.0 \
+  -p publish_rate_hz:=10.0 \
   -p mode_ack_delay_ms:=150.0
 ```
 

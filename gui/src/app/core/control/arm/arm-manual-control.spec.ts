@@ -39,7 +39,7 @@ describe('ArmManualControl', () => {
 
     service.handle(snapshot);
 
-    expect(createCommand).toHaveBeenCalledWith(snapshot, [-0.3, -0.4, 0, 0, 1, 0, -0.1, -0.2, 0, 0]);
+    expect(createCommand).toHaveBeenCalledWith(snapshot, [-0.3, -0.4, 0, 0, 1, 0, 0.1, -0.2, 0, 0]);
     expect(publish).toHaveBeenCalledOnce();
   });
 
@@ -63,7 +63,7 @@ describe('ArmManualControl', () => {
 
     service.handle(snapshot);
 
-    expect(createCommand).toHaveBeenCalledWith(snapshot, [0, 0, 0, -0.3, -0.4, 0, -0.1, -0.2, 0, 0]);
+    expect(createCommand).toHaveBeenCalledWith(snapshot, [0, 0, 0, -0.3, -0.4, 0, 0.1, -0.2, 0, 0]);
   });
 
   it('can stop and release manual output', () => {

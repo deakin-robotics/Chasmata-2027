@@ -5,6 +5,7 @@
       <span
         class="viewer-status"
         [class.viewer-status-error]="status() === 'error' || !rosConnected()"
+        [class.viewer-status-stale]="telemetryStale()"
       >
         3D: {{ viewerStatusLabel() }}
       </span>
@@ -40,6 +41,13 @@
 
   <div class="viewer-frame">
     <div #sceneHost class="scene-host"></div>
+
+    @if (status() === 'loading' || status() === 'waiting-telemetry') {
+      <div class="viewer-waiting" role="status" aria-live="polite">
+        <mat-icon class="spinning" aria-hidden="true">sync</mat-icon>
+        <span>{{ statusMessage() }}</span>
+      </div>
+    }
 
     @if (!rosConnected()) {
       <app-unavailable-overlay label="Arm model unavailable" />
