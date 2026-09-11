@@ -28,6 +28,8 @@ const ARM_MODEL_COLOR = '#697482';
 const ARM_TARGET_COLOR = '#62a8e5';
 const ARM_ACTUAL_COLOR = '#62c77a';
 const GRID_SIZE = 1.4;
+const INITIAL_VIEW_DISTANCE_SCALE = 1.5;
+const CAMERA_VIEW_DISTANCE_SCALE = 1.75;
 const RIGHT_BUMPER_BUTTON_INDEX = 5;
 const ARM_TELEMETRY_STALE_AFTER_MS = 500;
 
@@ -368,7 +370,7 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     robot.updateMatrixWorld(true);
     const bounds = this.getModelBounds(robot);
     const size = bounds.getSize(new three.Vector3());
-    const distance = Math.max(size.x, size.y, size.z, 0.1) * 1.3;
+    const distance = Math.max(size.x, size.y, size.z, 0.1) * INITIAL_VIEW_DISTANCE_SCALE;
     const target = this.getBaseVisualPosition(robot);
 
     camera.near = Math.max(distance / 100, 0.001);
@@ -398,7 +400,7 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
 
     const bounds = this.getModelBounds(robot);
     const size = bounds.getSize(new three.Vector3());
-    const distance = Math.max(size.x, size.y, size.z, 0.1) * 1.5;
+    const distance = Math.max(size.x, size.y, size.z, 0.1) * CAMERA_VIEW_DISTANCE_SCALE;
     const nextView = this.armViewMode.toggle();
 
     camera.near = Math.max(distance / 100, 0.001);
