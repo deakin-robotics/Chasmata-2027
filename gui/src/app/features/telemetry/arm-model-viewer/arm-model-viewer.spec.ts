@@ -49,4 +49,49 @@ describe('ArmModelViewer', () => {
     );
     expect(fixture.nativeElement.querySelector('canvas')).toBeFalsy();
   });
+
+  it('should hide the target marker when the actual marker reaches it', () => {
+    let distance = 0.01;
+    const viewer = fixture.componentInstance as unknown as {
+      targetMarker: {
+        visible: boolean;
+        position: { distanceTo: (other: unknown) => number };
+        material: { opacity: number };
+      } | null;
+      actualMarker: { position: object } | null;
+      updateTargetMarkerVisibility: () => void;
+      animateTargetMarker: (now?: number) => void;
+      targetMarkerFadeStartedAtMs: number | null;
+    };
+
+    viewer.targetMarker = {
+      visible: true,
+      position: { distanceTo: () => distance },
+      material: { opacity: 1 },
+    };
+    viewer.actualMarker = { position: {} };
+
+    viewer.updateTargetMarkerVisibility();
+    expect(viewer.targetMarker.visible).toBe(true);
+    expect(viewer.targetMarker.material.opacity).toBe(1);
+
+    const fadeStartedAtMs = viewer.targetMarkerFadeStartedAtMs ?? 0;
+    viewer.animateTargetMarker(fadeStartedAtMs + 125);
+    expect(viewer.targetMarker.material.opacity).toBeCloseTo(0.5);
+
+    viewer.animateTargetMarker(fadeStartedAtMs + 250);
+    expect(viewer.targetMarker.material.opacity).toBe(0);
+    expect(viewer.targetMarker.visible).toBe(false);
+
+    distance = 0.03;
+    viewer.updateTargetMarkerVisibility();
+    expect(viewer.targetMarker.visible).toBe(true);
+
+    const fadeInStartedAtMs = viewer.targetMarkerFadeStartedAtMs ?? 0;
+    viewer.animateTargetMarker(fadeInStartedAtMs + 50);
+    expect(viewer.targetMarker.material.opacity).toBeCloseTo(0.5);
+
+    viewer.animateTargetMarker(fadeInStartedAtMs + 100);
+    expect(viewer.targetMarker.material.opacity).toBe(1);
+  });
 });

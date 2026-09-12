@@ -32,6 +32,9 @@ const INITIAL_VIEW_DISTANCE_SCALE = 1.5;
 const CAMERA_VIEW_DISTANCE_SCALE = 1.75;
 const RIGHT_BUMPER_BUTTON_INDEX = 5;
 const ARM_TELEMETRY_STALE_AFTER_MS = 500;
+const ARM_TARGET_REACHED_TOLERANCE = 0.01;
+const ARM_TARGET_MARKER_FADE_IN_MS = 100;
+const ARM_TARGET_MARKER_FADE_OUT_MS = 250;
 
 type ViewerStatus = 'unavailable' | 'loading' | 'waiting-telemetry' | 'ready' | 'error';
 type ThreeModule = typeof import('three');
@@ -110,6 +113,9 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
   private rightBumperPressed = false;
   private initializing = false;
   private destroyed = false;
+  private targetMarkerFadeStartedAtMs: number | null = null;
+  private targetMarkerFadeStartOpacity = 1;
+  private targetMarkerFadeTargetOpacity = 1;
 
   private readonly connectionEffect = effect(() => {
     if (this.rosConnected()) {
@@ -479,11 +485,15 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
       new three.SphereGeometry(0.035, 20, 12),
       new three.MeshBasicMaterial({
         color: new three.Color(ARM_TARGET_COLOR).convertSRGBToLinear(),
+        transparent: true,
       }),
     );
     marker.name = 'arm-position-target';
     robot.add(marker);
     this.targetMarker = marker;
+    this.targetMarkerFadeStartedAtMs = null;
+    this.targetMarkerFadeStartOpacity = 1;
+    this.targetMarkerFadeTargetOpacity = 1;
     this.updateTargetMarkerPosition(targetPosition);
   }
 
@@ -529,6 +539,7 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     // marker is rendered, so converting it from world space would rotate it a
     // second time.
     marker.position.set(...targetPosition);
+    this.updateTargetMarkerVisibility();
   }
 
   private refreshTelemetryWatchdog(): void {
@@ -551,6 +562,45 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     targetLink.getWorldPosition(position);
     robot.worldToLocal(position);
     marker.position.copy(position);
+    this.updateTargetMarkerVisibility();
+  }
+
+  private updateTargetMarkerVisibility(): void {
+    const targetMarker = this.targetMarker;
+    const actualMarker = this.actualMarker;
+    if (!targetMarker || !actualMarker) return;
+
+    const targetOpacity =
+      targetMarker.position.distanceTo(actualMarker.position) > ARM_TARGET_REACHED_TOLERANCE ? 1 : 0;
+
+    if (this.targetMarkerFadeTargetOpacity === targetOpacity) return;
+
+    const material = targetMarker.material as Three.MeshBasicMaterial;
+    this.targetMarkerFadeStartOpacity = material.opacity;
+    this.targetMarkerFadeTargetOpacity = targetOpacity;
+    this.targetMarkerFadeStartedAtMs = performance.now();
+    targetMarker.visible = true;
+  }
+
+  private animateTargetMarker(now = performance.now()): void {
+    const marker = this.targetMarker;
+    const fadeStartedAtMs = this.targetMarkerFadeStartedAtMs;
+    if (!marker || fadeStartedAtMs === null) return;
+
+    const material = marker.material as Three.MeshBasicMaterial;
+    const fadeDurationMs =
+      this.targetMarkerFadeTargetOpacity > this.targetMarkerFadeStartOpacity
+        ? ARM_TARGET_MARKER_FADE_IN_MS
+        : ARM_TARGET_MARKER_FADE_OUT_MS;
+    const progress = Math.min((now - fadeStartedAtMs) / fadeDurationMs, 1);
+    material.opacity =
+      this.targetMarkerFadeStartOpacity +
+      (this.targetMarkerFadeTargetOpacity - this.targetMarkerFadeStartOpacity) * progress;
+
+    if (progress < 1) return;
+
+    this.targetMarkerFadeStartedAtMs = null;
+    marker.visible = this.targetMarkerFadeTargetOpacity > 0;
   }
 
   private styleRobot(robot: URDFRobot): void {
@@ -579,6 +629,7 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
 
     this.animationFrame = window.requestAnimationFrame(() => this.animate());
     this.controls?.update();
+    this.animateTargetMarker();
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -621,6 +672,9 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     this.camera = null;
     this.targetMarker = null;
     this.actualMarker = null;
+    this.targetMarkerFadeStartedAtMs = null;
+    this.targetMarkerFadeStartOpacity = 1;
+    this.targetMarkerFadeTargetOpacity = 1;
   }
 
   private clearTelemetryWatchdog(): void {
