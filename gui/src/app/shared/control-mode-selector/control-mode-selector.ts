@@ -25,6 +25,8 @@ export class ControlModeSelector {
   select(value: string): void {
     if (this.disabled()) return;
 
+    if (value === this.value()) return;
+
     if (this.options().some((option) => option.value === value)) {
       this.valueChange.emit(value);
     }

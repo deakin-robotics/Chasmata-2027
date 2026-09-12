@@ -1,46 +1,75 @@
-# Arm inverse kinematics (IK)
+# Arm position control
 
-This document describes the browser-side arm IK workflow in the Angular GUI.
-It converts an Arm Operator position target, with the current fixed orientation,
-into named joint angles. It does **not** drive motors or replace rover-side
-safety checks.
+Position mode is MoveIt2-only. The GUI owns the J4-pivot target, the desired
+end-effector orientation, and the local LOCKED/UNLOCKED choice. MoveIt2 plans
+smooth joint-space motion; it does not require the GUI to interpolate or time
+trajectory points. The rover remains authoritative for limits, acceptance,
+execution, and actual joint telemetry.
 
 ## Responsibility boundary
 
-```text
-Operator target pose
-        |
-        v
-GUI: URDF model + IK solve
-        |
-        v
-Named joint angles (radians)
-        |
-        v
-Future ROS command interface
-        |
-        v
-Rover: validate limits, execute/reject, publish telemetry
+```mermaid
+flowchart TB
+    target[1. Operator target<br/>J4 pivot position + desired EE orientation]
+    coordinator[2. ArmIkCoordinator<br/>GUI target and lock state]
+    solveService[3. ArmIkSolveService<br/>MoveIt2 scheduling + FK display model]
+    moveit[4. MoveIt2 planning bridge]
+    unlocked[4a. UNLOCKED<br/>position_arm<br/>J4-pivot goal]
+    locked[4b. LOCKED<br/>arm group<br/>J4-pivot goal + EE orientation constraint]
+    partial[5a. Partial trajectory<br/>J1-J3]
+    full[5b. Complete trajectory<br/>J1-J6]
+    wrist[5c. /arm/joy<br/>J4-J6 operator wrist input]
+    action[6. FollowJointTrajectory action]
+    rover[7. Rover<br/>validate limits, execute/reject]
+    telemetry[8. /joint_states + MoveIt2 status]
+
+    target --> coordinator --> solveService --> moveit
+    moveit --> unlocked --> partial --> action
+    moveit --> locked --> full --> action
+    coordinator -. UNLOCKED .-> wrist
+    wrist --> rover
+    action --> rover --> telemetry --> coordinator
 ```
 
-The GUI owns the kinematic calculation. The rover remains the authoritative
-source of whether a command is accepted and what the arm actually did.
+`ArmIkSolveService` coalesces target updates and sends MoveIt2 a new target at
+most every 500 ms while the operator is moving the target. A newer target
+cancels the active rover trajectory and MoveIt2 replans from current rover
+telemetry. A superseded GUI request resolves without becoming `INVALID`.
 
-The IK math can run without ROS, which is useful for unit tests. The dashboard
-runtime waits for a ROS connection before starting the Arm IK workflow because
-an operational solve needs live arm context and a future command path.
+`/arm/target_pose` is a `geometry_msgs/PoseStamped` in `base_link`:
+
+- `position` is the target position of `j4_pivot_link`.
+- `orientation` is the desired orientation of `ee_link`.
+- The timestamp carries the GUI request ID.
+
+`/arm/orientation_lock` is a `std_msgs/Bool`. `false` selects UNLOCKED and
+`true` selects LOCKED. Changing the lock state cancels the active trajectory
+and causes the current target to be replanned.
+
+In UNLOCKED mode, MoveIt2 uses the `position_arm` group and sends a partial
+J1-J3 trajectory. The operator independently controls J4-J6 through
+`/arm/joy`. Pressing L3 toggles the local orientation state while Position mode
+is active. In LOCKED mode, MoveIt2 uses the full `arm` group, plans to the
+J4-pivot position while constraining `ee_link` to the requested orientation,
+and sends a complete J1-J6 trajectory. While LOCKED, joystick and trigger
+wrist input is ignored and the captured orientation remains fixed until the
+operator unlocks and locks again. Both modes use global joint-space
+planning with time parameterization; neither requires a mathematically
+straight-line end-effector path.
+
+For LOCKED planning, the bridge first solves the proximal `position_arm` group
+and then uses that result as the J1-J3 goal while the full `arm` group solves
+the wrist orientation. This keeps the J4-pivot target and EE orientation
+constraints compatible with the configured MoveIt2 kinematics solver.
 
 ## Model source of truth
 
-The current arm model is:
+The GUI model is [`public/assets/kinematics/arm.urdf`](../public/assets/kinematics/arm.urdf).
+The MoveIt2 test stack uses the matching copy in
+`test/moveit2/arm_moveit_config/config/arm.urdf`.
 
-[`public/assets/kinematics/arm.urdf`](../public/assets/kinematics/arm.urdf)
-
-It is the existing six-joint arm reused for the current rover cycle. The URDF
-defines the chain geometry, joint axes, joint limits, and the end-effector
-location used by the GUI solver.
-
-The current movable joints are, in URDF order:
+`j4_pivot_link` is a fixed frame at the `yaw_joint` origin. The terminal link
+is `ee_link`. The six movable joints are:
 
 1. `base_joint`
 2. `shoulder_joint`
@@ -49,87 +78,51 @@ The current movable joints are, in URDF order:
 5. `pitch_joint`
 6. `roll_joint`
 
-The solver expects the terminal link to be named `ee_link`. All joint angles
-and limits are in **radians**.
+The browser loads the URDF for rendering and forward-kinematics display only;
+it does not solve IK. The model viewer waits for valid rover telemetry before
+attaching the URDF model to the scene. Its first valid `base_joint`,
+`shoulder_joint`, and `elbow_joint` sample supplies the live `j4_pivot_link`
+position for both the actual green marker and the initial blue target. No
+initial MoveIt2 request is sent; later telemetry moves only the actual model,
+while the operator owns the blue target. Entering LOCKED uses the current rover
+joint telemetry to capture the current EE orientation. While LOCKED, MoveIt2
+retains that orientation and direct wrist input is inactive. Leaving LOCKED
+returns J4-J6 to the operator without a local preview or command jump.
+If telemetry pauses after initialization, the last model pose remains visible
+and is marked stale; a disconnected ROS session returns the viewer to
+unavailable.
 
-When the mechanical design changes, update the URDF first. Its joint names,
-origins, axes, limits, and `ee_link` must match the physical arm. The current
-wrapper deliberately requires six movable revolute/continuous joints; changing
-the final arm to a different degree of freedom count requires a small wrapper
-update as well.
-
-## GUI implementation
-
-[`src/app/core/arm/arm-ik-solver.ts`](../src/app/core/arm/arm-ik-solver.ts)
-is the calculation engine built on:
-
-- `urdf-loader` to parse the URDF.
-- `closed-chain-ik` to solve the kinematic chain.
-
-[`src/app/core/arm/arm-ik-coordinator.ts`](../src/app/core/arm/arm-ik-coordinator.ts)
-is the Angular singleton that owns the dashboard workflow. It stores and
-validates the target position, loads the solver, runs a solve when the target
-changes, and exposes the status and latest valid joint angles. The
-`ArmModelViewer` consumes those outputs and only renders the URDF, target
-marker, and valid joint angles.
-
-The low-level solver flow is:
+## GUI API
 
 ```ts
-await armIk.load();
-
-// Seed from the latest rover telemetry when that interface exists.
-armIk.setJointAngles({
-  base_joint: 0,
-  shoulder_joint: 0,
-  elbow_joint: 0,
-  yaw_joint: 0,
-  pitch_joint: 0,
-  roll_joint: 0,
-});
-
-const result = armIk.solve({
+await armIkSolveService.load();
+const result = await armIkSolveService.solve({
   position: [x, y, z],
   orientation: [qx, qy, qz, qw],
+  orientationMode: 'unlocked',
 });
 
-// result.status: converged | stalled | diverged | timeout
-// result.jointAngles: { base_joint: ..., shoulder_joint: ..., ... }
+// MoveIt2 accepted and completed the trajectory; jointAngles is empty.
+// A superseded target resolves as null.
 ```
 
-For the current coordinator workflow, the position comes from its shared target
-and the orientation is captured from the solver's current forward-kinematics
-pose when the model loads. `position` and `orientation` must use the same
-coordinate frame as
-`armIk.endEffectorPose()`. Do not mix a camera frame, map frame, or another
-visualisation frame into the solver without a defined transform.
+The coordinator maps a converged MoveIt2 result to `VALID`, an unsuccessful
+plan/execution result to `UNREACHABLE`, and a rejected request to `INVALID`.
+Actual joint angles shown in the viewer always come from rover telemetry.
 
-The GUI should use the latest measured arm telemetry as the solve seed where
-available. That produces a solution close to the physical arm's present pose
-and reduces unexpected motion between otherwise valid IK solutions.
+## Current limits
 
-## Current and future work
+Implemented:
 
-Implemented now:
+- MoveIt2 global planning for UNLOCKED and LOCKED Position mode.
+- Partial J1-J3 and complete J1-J6 trajectory execution.
+- EE orientation constraint in LOCKED mode.
+- Time parameterization, cancellation, replanning, and MoveIt2 status events.
+- J4-pivot target and rover-telemetry markers in the model viewer.
+- Direct UNLOCKED wrist control through `/arm/joy`.
+- L3 orientation-lock toggle in Position mode.
 
-- Loading the current URDF.
-- Reading movable joint names and URDF limits.
-- Solving a full end-effector pose.
-- Returning named joint angles and a solver status.
-- Storing and validating the Arm Position-mode target position.
-- Coordinating target changes through `ArmIkCoordinator`.
-- Showing `SOLVING`, `VALID`, `UNREACHABLE`, and `INVALID` states.
-- Rendering the target marker and applying valid solutions to the Three.js arm.
+Not enabled yet:
 
-Not implemented yet:
-
-- A Position-mode UI for choosing the target pose.
-- Live joint telemetry as the normal IK seed and actual-pose rendering.
-- The ROS message/topic/service contract for joint-angle commands.
-- Rover acknowledgement/rejection display.
-- Collision checking and motion-path planning.
-
-The hardware and control teams must agree on the eventual command and telemetry
-messages. The GUI should only publish a solution when the solver reports a
-usable result; the rover must still independently reject unsafe or invalid
-angles.
+- Collision geometry and obstacle-aware planning.
+- Optional trajectory preview in the GUI.

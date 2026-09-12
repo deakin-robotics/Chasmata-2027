@@ -19,6 +19,11 @@ export enum LawMode {
   Direct = 'DIRECT',
 }
 
+export enum LawRequest {
+  EnableOverride = 'DIRECT',
+  Restore = 'RESTORE',
+}
+
 export enum SystemMode {
   Good = 'GOOD',
   Degraded = 'DEGRADED',
@@ -26,20 +31,18 @@ export enum SystemMode {
   EStop = 'E-STOP',
 }
 
-export enum LinkMode {
-  Good = 'GOOD',
-  Degraded = 'DEGRADED',
-  Lost = 'LOST',
-}
-
 export type GimbalPriorityOwner = 'DRIVER' | 'ARM OPS';
 
 export type FmaColumn =
   | { label: 'DRIVE'; confirmed: DriveMode | null; commanded: DriveMode | null }
   | { label: 'ARM'; confirmed: ArmMode | null; commanded: ArmMode | null }
-  | { label: 'LAW'; confirmed: LawMode | null; commanded: null }
-  | { label: 'SYSTEM'; confirmed: SystemMode | null; commanded: SystemMode | null }
-  | { label: 'LINK'; confirmed: LinkMode | null; commanded: LinkMode | null };
+  | { label: 'LAW'; confirmed: LawMode | null; commanded: LawRequest | null }
+  | {
+      label: 'GIMBAL';
+      confirmed: GimbalPriorityOwner | null;
+      commanded: GimbalPriorityOwner | null;
+    }
+  | { label: 'SYSTEM'; confirmed: SystemMode | null; commanded: SystemMode | null };
 
 /** Holds shared FMA state for the operator displays. */
 @Service()
@@ -48,26 +51,48 @@ export class FmaStateService {
     { label: 'DRIVE', confirmed: null, commanded: null },
     { label: 'ARM', confirmed: null, commanded: null },
     { label: 'LAW', confirmed: null, commanded: null },
+    { label: 'GIMBAL', confirmed: null, commanded: null },
     { label: 'SYSTEM', confirmed: null, commanded: null },
-    { label: 'LINK', confirmed: null, commanded: null },
   ]);
 
-  private readonly gimbalPriorityOwnerState = signal<GimbalPriorityOwner | null>(null);
-
   readonly columns = this.columnsState.asReadonly();
-  readonly gimbalPriorityOwner = this.gimbalPriorityOwnerState.asReadonly();
+  readonly lawOverrideActive = computed(() =>
+    this.columnsState().some(
+      (column) => column.label === 'LAW' && column.confirmed === LawMode.Direct,
+    ),
+  );
+  readonly lawOverridePending = computed(() =>
+    this.columnsState().some(
+      (column) => column.label === 'LAW' && column.commanded === LawRequest.EnableOverride,
+    ),
+  );
+
+  readonly gimbalPriorityOwner = computed(() => {
+    const column = this.columnsState().find(
+      (candidate): candidate is Extract<FmaColumn, { label: 'GIMBAL' }> =>
+        candidate.label === 'GIMBAL',
+    );
+    return column?.confirmed ?? null;
+  });
+  readonly gimbalPriorityPending = computed(() => {
+    const column = this.columnsState().find(
+      (candidate): candidate is Extract<FmaColumn, { label: 'GIMBAL' }> =>
+        candidate.label === 'GIMBAL',
+    );
+    return column?.commanded ?? null;
+  });
   readonly gimbalPriorityDisplay = computed(() => {
-    switch (this.gimbalPriorityOwnerState()) {
+    switch (this.gimbalPriorityOwner()) {
       case 'DRIVER':
         return '← DRIVER';
       case 'ARM OPS':
         return 'ARM OPS →';
       default:
-        return 'GIMBAL PRIORITY UNKNOWN';
+        return 'PRIORITY UNK';
     }
   });
   readonly gimbalPriorityAriaLabel = computed(() => {
-    switch (this.gimbalPriorityOwnerState()) {
+    switch (this.gimbalPriorityOwner()) {
       case 'DRIVER':
         return 'Gimbal priority: Driver';
       case 'ARM OPS':
@@ -75,6 +100,14 @@ export class FmaStateService {
       default:
         return 'Gimbal priority unknown';
     }
+  });
+  readonly gimbalPriorityPendingDisplay = computed(() => {
+    const pending = this.gimbalPriorityPending();
+    return pending ?? '';
+  });
+  readonly gimbalPriorityPendingAriaLabel = computed(() => {
+    const pending = this.gimbalPriorityPending();
+    return pending ? `Gimbal priority request pending: ${pending}` : '';
   });
 
   /** Records a requested DRIVE mode without changing the confirmed state. */
@@ -95,6 +128,11 @@ export class FmaStateService {
     this.updateDrive((column) => ({ ...column, commanded: null }));
   }
 
+  /** Applies rover telemetry for DRIVE without changing the public request flow. */
+  setDriveTelemetry(confirmed: DriveMode | null, commanded: DriveMode | null): void {
+    this.updateDrive((column) => ({ ...column, confirmed, commanded }));
+  }
+
   /** Records a requested ARM mode without changing the confirmed state. */
   requestArmMode(mode: ArmMode): void {
     this.updateArm((column) => ({
@@ -113,9 +151,37 @@ export class FmaStateService {
     this.updateArm((column) => ({ ...column, commanded: null }));
   }
 
+  /** Applies rover telemetry for ARM without changing the public request flow. */
+  setArmTelemetry(confirmed: ArmMode | null, commanded: ArmMode | null): void {
+    this.updateArm((column) => ({ ...column, confirmed, commanded }));
+  }
+
+  /** Applies authoritative LAW telemetry, or clears it when unknown. */
+  setLawMode(mode: LawMode | null): void {
+    this.setLawTelemetry(mode, null);
+  }
+
+  /** Applies authoritative LAW telemetry, including a pending override request. */
+  setLawTelemetry(confirmed: LawMode | null, commanded: LawRequest | null): void {
+    this.updateColumn('LAW', (column) => ({ ...column, confirmed, commanded }));
+  }
+
+  /** Applies authoritative SYSTEM telemetry, or clears it when unknown. */
+  setSystemMode(mode: SystemMode | null): void {
+    this.updateColumn('SYSTEM', (column) => ({ ...column, confirmed: mode, commanded: null }));
+  }
+
   /** Applies authoritative gimbal-priority telemetry, or clears it when unknown. */
   setGimbalPriorityOwner(owner: GimbalPriorityOwner | null): void {
-    this.gimbalPriorityOwnerState.set(owner);
+    this.setGimbalPriorityTelemetry(owner, null);
+  }
+
+  /** Applies authoritative Gimbal priority telemetry, including pending takeover. */
+  setGimbalPriorityTelemetry(
+    confirmed: GimbalPriorityOwner | null,
+    commanded: GimbalPriorityOwner | null,
+  ): void {
+    this.updateColumn('GIMBAL', (column) => ({ ...column, confirmed, commanded }));
   }
 
   /** Clears DRIVE and ARM state when the rover connection is unavailable. */
@@ -146,6 +212,17 @@ export class FmaStateService {
   ): void {
     this.columnsState.update((columns) =>
       columns.map((column) => (column.label === 'ARM' ? update(column) : column)),
+    );
+  }
+
+  private updateColumn<T extends FmaColumn['label']>(
+    label: T,
+    update: (column: Extract<FmaColumn, { label: T }>) => Extract<FmaColumn, { label: T }>,
+  ): void {
+    this.columnsState.update((columns) =>
+      columns.map((column) =>
+        column.label === label ? update(column as Extract<FmaColumn, { label: T }>) : column,
+      ),
     );
   }
 }

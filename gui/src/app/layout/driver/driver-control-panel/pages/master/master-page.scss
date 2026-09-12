@@ -13,6 +13,7 @@
     '. gamepad ros .'
     '. gamepad-stem ros-flow .'
     '. gamepad-flow master .'
+    '. drive-mode drive-mode .'
     '. error error .';
   grid-template-columns: repeat(4, 1fr);
   column-gap: 0.5rem;
@@ -25,7 +26,8 @@
 app-status-indicator,
 app-action-button,
 app-control-flow-connector,
-app-control-switch {
+app-control-switch,
+app-control-mode-selector {
   justify-self: center;
 }
 
@@ -53,6 +55,10 @@ app-status-indicator {
 
 app-control-switch {
   grid-area: master;
+}
+
+.drive-mode-selector {
+  grid-area: drive-mode;
 }
 
 .control-readiness {

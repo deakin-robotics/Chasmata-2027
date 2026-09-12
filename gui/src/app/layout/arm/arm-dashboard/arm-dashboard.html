@@ -1,16 +1,12 @@
 <main class="arm-dashboard" aria-label="Arm operator dashboard">
-  <section class="arm-camera-column" aria-label="Arm rover camera workspace">
+  <section class="arm-camera-column" aria-label="Arm rover and model workspace">
+    <app-arm-model-viewer />
+
     <app-camera-stream
       label="Front camera"
       [url]="frontCameraUrl()"
       (urlChange)="frontCameraUrl.set($event)"
     />
-
-    <app-rover-schematic />
-
-    <app-control-scheme class="control-scheme" context="arm">
-      <app-gamepad-control-panel scheme-gamepad />
-    </app-control-scheme>
   </section>
 
   <section class="arm-operator-column" aria-label="Arm operator workspace">
@@ -29,8 +25,12 @@
     />
   </section>
 
-  <section class="arm-schematic-column" aria-label="Arm schematic workspace">
+  <section class="arm-schematic-column" aria-label="Arm controls and reference workspace">
     <app-arm-control-panel />
-    <app-arm-model-viewer />
+    <app-rover-schematic />
+
+    <app-control-scheme class="control-scheme" context="arm">
+      <app-gamepad-control-panel scheme-gamepad />
+    </app-control-scheme>
   </section>
 </main>

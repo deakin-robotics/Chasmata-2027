@@ -2,6 +2,7 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { ArmControlModeService } from './arm/arm-control-mode';
+import { ControlModeCommandPublisher } from './control-mode-command-publisher';
 import { ControlModeCoordinator } from './control-mode-coordinator';
 import { DriverControlModeService } from './drive/drive-control-mode';
 import { ArmMode, DriveMode, FmaStateService } from '../fma/fma-state.service';
@@ -9,15 +10,27 @@ import { RosConnection } from '../ros/ros-connection';
 
 describe('ControlModeCoordinator', () => {
   let connected: ReturnType<typeof signal<boolean>>;
+  let publishDriveMode: ReturnType<typeof vi.fn>;
+  let publishArmMode: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     connected = signal(false);
+    const client = signal(null);
+    publishDriveMode = vi.fn();
+    publishArmMode = vi.fn();
 
     TestBed.configureTestingModule({
       providers: [
         {
           provide: RosConnection,
-          useValue: { isConnected: connected.asReadonly() },
+          useValue: {
+            isConnected: connected.asReadonly(),
+            client: client.asReadonly(),
+          },
+        },
+        {
+          provide: ControlModeCommandPublisher,
+          useValue: { publishDriveMode, publishArmMode },
         },
       ],
     });
@@ -77,6 +90,21 @@ describe('ControlModeCoordinator', () => {
       confirmed: null,
       commanded: ArmMode.Manual,
     });
+  });
+
+  it('does not publish when the selected mode is clicked again', () => {
+    const coordinator = TestBed.inject(ControlModeCoordinator);
+
+    connected.set(true);
+    TestBed.flushEffects();
+    const initialDriveRequests = publishDriveMode.mock.calls.length;
+    const initialArmRequests = publishArmMode.mock.calls.length;
+
+    coordinator.selectDriveMode(DriveMode.Velocity);
+    coordinator.selectArmMode(ArmMode.Position);
+
+    expect(publishDriveMode).toHaveBeenCalledTimes(initialDriveRequests);
+    expect(publishArmMode).toHaveBeenCalledTimes(initialArmRequests);
   });
 
   it('clears FMA control state on disconnect while preserving local modes', () => {

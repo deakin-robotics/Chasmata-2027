@@ -1,9 +1,15 @@
 import { Component, computed, inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 
-import { ArmControl } from '../../../../../core/control/arm/arm-control';
+import {
+  ArmControlMode,
+  ArmControlModeService,
+} from '../../../../../core/control/arm/arm-control-mode';
 import { ArmCommandPublisher } from '../../../../../core/control/arm/arm-command-publisher';
+import { ControlModeCoordinator } from '../../../../../core/control/control-mode-coordinator';
+import { ControlModeCommandPublisher } from '../../../../../core/control/control-mode-command-publisher';
 import { GamepadInput } from '../../../../../core/gamepad/gamepad-input';
+import { ArmMode, LawRequest } from '../../../../../core/fma/fma-state.service';
 import { RosConnection } from '../../../../../core/ros/ros-connection';
 import { ConnectionManager } from '../../../../../features/connection/connection-manager/connection-manager';
 import { ActionButton, ActionButtonTone } from '../../../../../shared/action-button/action-button';
@@ -24,6 +30,10 @@ import {
   StatusIndicatorTone,
 } from '../../../../../shared/status-indicator/status-indicator';
 import { TwoStepActionButton } from '../../../../../shared/two-step-action-button/two-step-action-button';
+import {
+  ControlModeOption,
+  ControlModeSelector,
+} from '../../../../../shared/control-mode-selector/control-mode-selector';
 
 @Component({
   selector: 'app-arm-master-page',
@@ -33,20 +43,28 @@ import { TwoStepActionButton } from '../../../../../shared/two-step-action-butto
     ControlSwitch,
     StatusIndicator,
     TwoStepActionButton,
+    ControlModeSelector,
   ],
   templateUrl: './master-page.html',
   styleUrl: './master-page.scss',
 })
 export class ArmMasterPage {
-  private readonly armControl = inject(ArmControl);
+  private readonly armControlMode = inject(ArmControlModeService);
   private readonly armCommandPublisher = inject(ArmCommandPublisher);
+  private readonly controlModeCoordinator = inject(ControlModeCoordinator);
+  private readonly controlModeCommandPublisher = inject(ControlModeCommandPublisher);
   private readonly gamepad = inject(GamepadInput);
   private readonly rosConnection = inject(RosConnection);
   private readonly dialog = inject(MatDialog);
 
-  readonly masterDriveEnabled = this.armControl.enabled;
+  readonly masterDriveEnabled = this.armControlMode.enabled;
+  readonly armMode = this.armControlMode.mode;
+  readonly armModeOptions: readonly ControlModeOption[] = [
+    { label: ArmMode.Manual, value: ArmMode.Manual },
+    { label: ArmMode.Position, value: ArmMode.Position },
+  ];
   readonly masterDriveTone: ControlSwitchTone = 'normal';
-  readonly readinessError = this.armControl.readinessError;
+  readonly readinessError = this.armControlMode.readinessError;
   readonly rosConnected = this.rosConnection.isConnected;
   readonly gamepadConnected = this.gamepad.connected;
   readonly gamepadStatusLabel = computed(() =>
@@ -108,10 +126,10 @@ export class ArmMasterPage {
     });
   }
 
-  /** Requests enabled Arm publishing or immediately stops active publishing. */
+  /** Enables the input worker selected by ArmControlModeService. */
   toggleMasterDriveControl(nextState: boolean): void {
     if (!nextState) {
-      this.armControl.disable();
+      this.armControlMode.disable();
       return;
     }
 
@@ -128,12 +146,28 @@ export class ArmMasterPage {
       })
       .afterClosed()
       .subscribe((confirmed) => {
-        if (confirmed === true) this.armControl.enable();
+        if (confirmed !== true) return;
+
+        this.armControlMode.enable();
       });
   }
 
   /** Sends the explicit two-step motor-driver fault reset command. */
   clearArmFaults(button: TwoStepActionButton): void {
     if (this.armCommandPublisher.publishClearFaults()) button.reset();
+  }
+
+  selectArmMode(mode: string): void {
+    if (mode === ArmMode.Manual || mode === ArmMode.Position) {
+      this.controlModeCoordinator.selectArmMode(mode as ArmControlMode);
+    }
+  }
+
+  activateLawOverride(): void {
+    this.controlModeCommandPublisher.publishLawRequest(LawRequest.EnableOverride);
+  }
+
+  deactivateLawOverride(): void {
+    this.controlModeCommandPublisher.publishLawRequest(LawRequest.Restore);
   }
 }

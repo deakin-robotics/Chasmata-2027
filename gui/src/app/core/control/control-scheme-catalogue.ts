@@ -47,13 +47,15 @@ export interface ControlSchemeMode {
 }
 
 const ARM_MANUAL_SHARED_CONTROLS: readonly ControlSchemeControl[] = [
-  { input: 'left-stick-x', label: 'Left joystick X', action: 'Joint 1' },
-  { input: 'left-stick-y', label: 'Left joystick Y', action: 'Joint 2' },
-  { input: 'd-pad-x', label: 'D-pad X', action: 'Joint 6' },
-  { input: 'd-pad-y', label: 'D-pad Y', action: 'Joint 5' },
+  { input: 'left-stick-x', label: 'Left joystick X', action: 'Joint 4 yaw' },
+  { input: 'left-stick-y', label: 'Left joystick Y', action: 'Joint 5 pitch' },
+  { input: 'd-pad-y', label: 'D-pad Y', action: 'Joint 3' },
+  { input: 'left-trigger', label: 'LT', action: 'Joint 6 roll' },
+  { input: 'right-trigger', label: 'RT', action: 'Joint 6 roll' },
   { input: 'button-a', label: 'A', action: 'Laser' },
   { input: 'button-b', label: 'B', action: 'Open end-effector' },
   { input: 'button-x', label: 'X', action: 'Close end-effector' },
+  { input: 'right-bumper', label: 'RB', action: 'Center EE / switch view' },
   { input: 'right-stick-click', label: 'Right joystick click', action: 'Gimbal Priority' },
 ];
 
@@ -90,8 +92,8 @@ export const CONTROL_SCHEME_CATALOGUE: {
       default: {
         controls: [
           ...ARM_MANUAL_SHARED_CONTROLS,
-          { input: 'right-stick-x', label: 'Right joystick X', action: 'Joint 4' },
-          { input: 'right-stick-y', label: 'Right joystick Y', action: 'Joint 3' },
+          { input: 'right-stick-x', label: 'Right joystick X', action: 'Joint 1 yaw' },
+          { input: 'right-stick-y', label: 'Right joystick Y', action: 'Joint 2 pitch' },
           { input: 'left-bumper', label: 'LB', action: 'Gimbal control (Hold)' },
         ],
       },
@@ -108,16 +110,26 @@ export const CONTROL_SCHEME_CATALOGUE: {
     [ArmMode.Position]: {
       default: {
         controls: [
+          { input: 'left-trigger', label: 'LT', action: 'J6 roll (UNLOCKED)' },
           {
-            input: 'left-stick',
-            label: 'Left joystick',
-            action: 'IK horizontal position',
+            input: 'left-stick-x',
+            label: 'Left joystick X',
+            action: 'J4 yaw (UNLOCKED)',
           },
-          { input: 'd-pad-y', label: 'D-pad', action: 'IK height' },
+          {
+            input: 'left-stick-y',
+            label: 'Left joystick Y',
+            action: 'J5 pitch (UNLOCKED)',
+          },
+          { input: 'd-pad-x', label: 'D-pad X', action: 'Move J4 pivot X/Y' },
+          { input: 'd-pad-y', label: 'D-pad Y', action: 'Move J4 pivot X/Y' },
+          { input: 'right-trigger', label: 'RT', action: 'J6 roll (UNLOCKED)' },
           { input: 'right-stick', label: 'Right joystick', action: 'Gimbal' },
           { input: 'button-a', label: 'A', action: 'Laser' },
           { input: 'button-b', label: 'B', action: 'Open end-effector' },
           { input: 'button-x', label: 'X', action: 'Close end-effector' },
+          { input: 'right-bumper', label: 'RB', action: 'Center EE / switch view' },
+          { input: 'left-stick-click', label: 'Left joystick click', action: 'Toggle orientation lock' },
           { input: 'right-stick-click', label: 'Right joystick click', action: 'Gimbal Priority' },
         ],
       },

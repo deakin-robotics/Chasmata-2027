@@ -1,0 +1,6 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: arm_moveit_config
+    relative_path: config/arm.urdf
+  srdf:
+    relative_path: config/arm.srdf

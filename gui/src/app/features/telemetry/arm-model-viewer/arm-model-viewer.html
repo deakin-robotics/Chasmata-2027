@@ -5,8 +5,18 @@
       <span
         class="viewer-status"
         [class.viewer-status-error]="status() === 'error' || !rosConnected()"
+        [class.viewer-status-stale]="telemetryStale()"
       >
         3D: {{ viewerStatusLabel() }}
+      </span>
+      <span class="status-separator" aria-hidden="true">|</span>
+      <span
+        class="execution-status"
+        [class.execution-status-success]="executionStatus() === 'succeeded'"
+        [class.execution-status-error]="executionStatus() === 'failed'"
+        aria-live="polite"
+      >
+        MOVE: {{ rosConnected() ? executionStatusLabel() : '—' }}
       </span>
       <span class="status-separator" aria-hidden="true">|</span>
       <span
@@ -22,11 +32,22 @@
         }
         IK: {{ rosConnected() ? ikStatusLabel() : '—' }}
       </span>
+      <span class="status-separator" aria-hidden="true">|</span>
+      <span class="orientation-mode-status" aria-live="polite">
+        MODE: {{ rosConnected() ? (orientationMode() === 'locked' ? 'LOCKED' : 'UNLOCKED') : '—' }}
+      </span>
     </div>
   </header>
 
   <div class="viewer-frame">
     <div #sceneHost class="scene-host"></div>
+
+    @if (status() === 'loading' || status() === 'waiting-telemetry') {
+      <div class="viewer-waiting" role="status" aria-live="polite">
+        <mat-icon class="spinning" aria-hidden="true">sync</mat-icon>
+        <span>{{ statusMessage() }}</span>
+      </div>
+    }
 
     @if (!rosConnected()) {
       <app-unavailable-overlay label="Arm model unavailable" />

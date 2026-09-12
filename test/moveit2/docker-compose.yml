@@ -1,0 +1,30 @@
+services:
+  mock-rover:
+    build:
+      context: ../mock_rover
+    environment:
+      ROS_DOMAIN_ID: '0'
+      ROS_LOCALHOST_ONLY: '0'
+    ports:
+      - '${MOVEIT2_ROSBRIDGE_PORT:-19090}:9090'
+      - '${MOVEIT2_FRONT_CAMERA_PORT:-18080}:8080'
+      - '${MOVEIT2_GIMBAL_CAMERA_PORT:-18090}:8090'
+      - '${MOVEIT2_ARM_CAMERA_PORT:-18091}:8091'
+    networks:
+      - rover-test
+
+  moveit2:
+    build:
+      context: ../..
+      dockerfile: test/moveit2/Dockerfile
+    depends_on:
+      - mock-rover
+    environment:
+      ROS_DOMAIN_ID: '0'
+      ROS_LOCALHOST_ONLY: '0'
+    networks:
+      - rover-test
+
+networks:
+  rover-test:
+    driver: bridge

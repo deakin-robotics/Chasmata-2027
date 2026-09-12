@@ -12,6 +12,8 @@ export interface JoyCommand {
 const JOY_TOPIC = '/joy';
 const JOY_MESSAGE_TYPE = 'sensor_msgs/Joy';
 const MINIMUM_DRIVE_AXES = 4;
+const LEFT_TRIGGER_BUTTON_INDEX = 6;
+const RIGHT_TRIGGER_BUTTON_INDEX = 7;
 const STOP_COMMAND: JoyCommand = {
   axes: [0, 0, 0, 0],
   buttons: [],
@@ -88,8 +90,14 @@ export class DriveCommandPublisher {
         stamp: { sec: 0, nanosec: 0 },
         frame_id: '',
       },
-      axes: [...command.axes],
-      buttons: [...command.buttons],
+      axes: [
+        ...command.axes,
+        command.buttons[LEFT_TRIGGER_BUTTON_INDEX] ?? 0,
+        command.buttons[RIGHT_TRIGGER_BUTTON_INDEX] ?? 0,
+      ],
+      buttons: command.buttons.map((value, index) =>
+        index === LEFT_TRIGGER_BUTTON_INDEX || index === RIGHT_TRIGGER_BUTTON_INDEX ? 0 : value,
+      ),
     };
   }
 }

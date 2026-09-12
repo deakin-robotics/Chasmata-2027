@@ -63,21 +63,39 @@ h2 {
   color: var(--dcr-color-info);
 }
 
+.law-override-indicator {
+  color: var(--dcr-color-info);
+}
+
+.law-override-confirmed {
+  color: var(--dcr-color-critical);
+}
+
+.law-override-pending {
+  color: var(--dcr-color-info);
+}
+
 .mode-placeholder {
   visibility: hidden;
 }
 
 .gimbal-priority {
-  width: calc(200% + 0.3rem);
-  justify-self: start;
-  position: relative;
-  z-index: 2;
-  background: var(--dcr-color-background);
+  width: 100%;
   color: var(--dcr-color-caution);
+}
+
+.gimbal-priority-unknown {
+  grid-row: 2;
+  width: 100%;
 }
 
 .gimbal-priority-known {
   color: var(--dcr-color-normal);
+}
+
+.gimbal-priority-pending {
+  grid-row: 3;
+  color: var(--dcr-color-info);
 }
 
 .mode-managed::after {

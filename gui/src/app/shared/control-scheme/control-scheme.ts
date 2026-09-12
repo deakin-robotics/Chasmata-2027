@@ -24,6 +24,7 @@ const LEFT_SIDE_INPUTS = new Set<CatalogueGamepadInput>([
   'd-pad-y',
   'left-bumper',
   'left-trigger',
+  'left-stick-click',
 ]);
 
 /** Reusable three-part control reference with mappings around its gamepad. */

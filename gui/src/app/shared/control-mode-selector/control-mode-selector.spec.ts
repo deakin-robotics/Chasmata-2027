@@ -41,6 +41,18 @@ describe('ControlModeSelector', () => {
     expect(selected).toEqual(['MANUAL']);
   });
 
+  it('should not emit the already-selected option', () => {
+    const selected: string[] = [];
+    component.valueChange.subscribe((value) => selected.push(value));
+
+    const buttons = fixture.nativeElement.querySelectorAll(
+      'button',
+    ) as NodeListOf<HTMLButtonElement>;
+    buttons[1].click();
+
+    expect(selected).toEqual([]);
+  });
+
   it('should ignore values outside its options', () => {
     const selected: string[] = [];
     component.valueChange.subscribe((value) => selected.push(value));

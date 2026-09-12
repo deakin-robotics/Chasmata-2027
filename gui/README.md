@@ -34,6 +34,7 @@ The mission-control interface is inspired by the Airbus glass cockpit philosophy
 - [ECAM Code Dictionary](docs/ecam-code-dictionary.md) — stable alert codes, severities, display text, and meanings.
 - [Telemetry requirements](docs/telemetry-requirements.md) — FMA, ECAM, and System Display (SD) telemetry, update rates, and recovery behaviour.
 - [Arm inverse kinematics](docs/arm-ik.md) — URDF model, browser-side IK solver, and the future joint-angle command handoff.
+- [Mock rover](../test/mock_rover/README.md) — ROS 2 feedback simulator for GUI integration testing.
 
 ## 🖥️ Current Angular implementation
 
@@ -55,12 +56,12 @@ The mission-control interface is inspired by the Airbus glass cockpit philosophy
 
 ## 🧭 System overview
 
-```text
-Gamepad API ───────────────┐
-                          │
-Angular mission control ──┼── JSON/WebSocket ── ROSbridge :9090 ── ROS 2 nodes
-                          │
-Camera <img> elements ────┴── HTTP/MJPEG ────── Camera stream servers
+```mermaid
+flowchart LR
+    gamepad[Gamepad API] --> gui[Angular mission control]
+    gui -->|JSON/WebSocket| rosbridge[ROSbridge :9090]
+    rosbridge --> ros[ROS 2 nodes]
+    camera[Camera img elements] -->|HTTP/MJPEG| streams[Camera stream servers]
 ```
 
 The GUI communicates directly with the rover on its private operator network:
@@ -172,54 +173,6 @@ src/app/
 - Operator dashboards own their own viewport layout; `MissionControl` remains a shell.
 - Components should not create independent ROS connections.
 - ROS and gamepad logic should remain outside presentation-only components.
-
-## 🛡️ Control safety principles
-
-The combined dashboard must have explicit control modes:
-
-```text
-DISCONNECTED
-     ↓
-SAFE / IDLE
-     ├── DRIVE → publish only drivetrain commands
-     └── ARM   → publish only arm commands
-```
-
-- Drive and Arm commands must not be active simultaneously from the same controller.
-- Switching modes must stop the previously active subsystem first.
-- Gamepad, ROS, or radio disconnection must result in a safe stop.
-- Movement-command behaviour must be validated on the physical rover.
-
-## 📷 Camera reliability requirement
-
-Camera feeds must recover from temporary radio or stream interruptions without requiring a page refresh. The camera feature should provide:
-
-- Automatic reconnection with bounded retry delays
-- Clear loading, disconnected, and reconnecting states
-- A manual retry action
-- Configurable camera endpoints
-- Cleanup of retry activity when a component is destroyed
-
-The team is also evaluating uStreamer as a maintained alternative to the existing `mjpg-streamer` setup for UVC cameras.
-
-The Gimbal camera is shared between the Driver and Arm Operator stations. Each
-station can request priority with its mapped **GIMBAL PRIORITY** controller
-button. The rover owns the confirmed owner, validates every Gimbal movement
-command, and broadcasts the current owner to all GUI instances. The GUI must
-show `GIMBAL PRIORITY UNKNOWN` when owner telemetry is stale or unavailable.
-
-## 🔄 Migration plan
-
-1. Connect to ROSbridge and display connection state.
-2. Display one resilient MJPEG camera stream.
-3. Subscribe to one harmless telemetry topic.
-4. Publish one harmless test message.
-5. Detect and display gamepad input without issuing motor commands.
-6. Port motor telemetry and existing operator controls.
-7. Implement centralized and mutually exclusive Drive/Arm modes.
-8. Reach feature parity with the existing Next.js GUI.
-9. Validate the replacement with the real controller, radio, cameras, and rover.
-10. Add new capabilities only after the port is stable.
 
 ## 🛠️ Development commands
 

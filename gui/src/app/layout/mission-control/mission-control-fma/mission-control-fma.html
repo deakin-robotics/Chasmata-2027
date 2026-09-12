@@ -3,32 +3,56 @@
     <div class="fma-column">
       <h2>{{ column.label }}</h2>
       @if (rosConnected()) {
-        <span
-          class="mode mode-active"
-          [class.mode-managed]="column.confirmed === 'MANAGED'"
-          [class.mode-placeholder]="!column.confirmed"
-          [attr.aria-hidden]="!column.confirmed"
-        >
-          {{ column.confirmed }}
-        </span>
-
-        @if (column.label !== 'LAW' && column.label !== 'SYSTEM') {
+        @if (column.label === 'GIMBAL') {
           <span
-            class="mode mode-commanded"
-            [class.mode-managed]="column.commanded === 'MANAGED'"
-            [class.mode-placeholder]="!column.commanded"
-            [attr.aria-hidden]="!column.commanded"
-          >
-            {{ column.commanded ?? '' }}
-          </span>
-        } @else if (column.label === 'LAW') {
-          <span
-            class="mode gimbal-priority"
+            class="mode mode-active gimbal-priority"
             [class.gimbal-priority-known]="gimbalPriorityOwner()"
+            [class.gimbal-priority-unknown]="!gimbalPriorityOwner()"
             [attr.aria-label]="gimbalPriorityAriaLabel()"
           >
-            {{ gimbalPriorityDisplay() }}
+            {{ gimbalPriorityOwner() ? gimbalPriorityDisplay() : 'PRIORITY UNK' }}
           </span>
+
+          @if (gimbalPriorityPending()) {
+            <span
+              class="mode gimbal-priority-pending"
+              [attr.aria-label]="gimbalPriorityPendingAriaLabel()"
+            >
+              {{ gimbalPriorityPendingDisplay() }}
+            </span>
+          }
+        } @else {
+          <span
+            class="mode mode-active"
+            [class.mode-managed]="column.confirmed === 'MANAGED'"
+            [class.mode-placeholder]="!column.confirmed"
+            [attr.aria-hidden]="!column.confirmed"
+          >
+            {{ column.confirmed }}
+          </span>
+
+          @if (column.label === 'DRIVE' || column.label === 'ARM') {
+            <span
+              class="mode mode-commanded"
+              [class.mode-managed]="column.commanded === 'MANAGED'"
+              [class.mode-placeholder]="!column.commanded"
+              [attr.aria-hidden]="!column.commanded"
+            >
+              {{ column.commanded ?? '' }}
+            </span>
+          }
+
+          @if (column.label === 'LAW') {
+            <span
+              class="mode law-override-indicator"
+              [class.law-override-pending]="lawOverridePending() && !lawOverrideActive()"
+              [class.law-override-confirmed]="lawOverrideActive()"
+              [class.mode-placeholder]="!lawOverridePending() && !lawOverrideActive()"
+              [attr.aria-hidden]="!lawOverridePending() && !lawOverrideActive()"
+            >
+              {{ lawOverridePending() || lawOverrideActive() ? 'OVERRIDE' : '' }}
+            </span>
+          }
         }
       }
     </div>

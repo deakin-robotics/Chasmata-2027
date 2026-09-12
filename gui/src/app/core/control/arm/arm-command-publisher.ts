@@ -10,10 +10,18 @@ export interface ArmJoyCommand {
   buttons: readonly number[];
 }
 
+export interface ArmJoyCommandOptions {
+  readonly suppressClearFaultButton?: boolean;
+  readonly includeTriggers?: boolean;
+}
+
 const ARM_JOY_TOPIC = '/arm/joy';
 const JOY_MESSAGE_TYPE = 'sensor_msgs/Joy';
-const ARM_AXES_COUNT = 8;
+const ARM_AXES_COUNT = 10;
 const ARM_BUTTON_COUNT = 12;
+const LEFT_BUMPER_BUTTON_INDEX = 4;
+const LEFT_TRIGGER_BUTTON_INDEX = 6;
+const RIGHT_TRIGGER_BUTTON_INDEX = 7;
 const CLEAR_FAULTS_BUTTON_INDEX = 10;
 const STOP_COMMAND: ArmJoyCommand = {
   axes: new Array(ARM_AXES_COUNT).fill(0),
@@ -21,12 +29,10 @@ const STOP_COMMAND: ArmJoyCommand = {
 };
 const CLEAR_FAULTS_COMMAND: ArmJoyCommand = {
   axes: [...STOP_COMMAND.axes],
-  buttons: STOP_COMMAND.buttons.map((_, index) =>
-    index === CLEAR_FAULTS_BUTTON_INDEX ? 1 : 0,
-  ),
+  buttons: STOP_COMMAND.buttons.map((_, index) => (index === CLEAR_FAULTS_BUTTON_INDEX ? 1 : 0)),
 };
 
-/** Publishes Arm Joy commands using the old base-station mapping. */
+/** Adapts Arm Joy commands to the ROS /arm/joy protocol. */
 @Service()
 export class ArmCommandPublisher {
   private readonly rosConnection = inject(RosConnection);
@@ -39,11 +45,36 @@ export class ArmCommandPublisher {
     () => this.rosConnection.isConnected() && this.controlMode.isArmActive(),
   );
 
-  /** Publishes one remapped Arm Joy command when Arm control is active. */
-  publish(snapshot: GamepadSnapshot): boolean {
+  /** Builds a Joy command from mode-specific axes and shared gamepad fields. */
+  createCommand(
+    snapshot: GamepadSnapshot,
+    axes: readonly number[],
+    options: ArmJoyCommandOptions = {},
+  ): ArmJoyCommand {
+    const rawButtons = snapshot.buttons;
+    const commandAxes = new Array(ARM_AXES_COUNT).fill(0);
+
+    axes.slice(0, ARM_AXES_COUNT).forEach((value, index) => {
+      commandAxes[index] = value;
+    });
+    if (options.includeTriggers !== false) {
+      commandAxes[8] = rawButtons[RIGHT_TRIGGER_BUTTON_INDEX] ?? 0;
+      commandAxes[9] = rawButtons[LEFT_TRIGGER_BUTTON_INDEX] ?? 0;
+    }
+
+    const buttons = [...this.toButtons(snapshot)];
+    if (options.suppressClearFaultButton) {
+      buttons[CLEAR_FAULTS_BUTTON_INDEX] = 0;
+    }
+
+    return { axes: commandAxes, buttons };
+  }
+
+  /** Publishes one validated Arm Joy command when Arm control is active. */
+  publish(command: ArmJoyCommand): boolean {
     if (!this.canPublish()) return false;
 
-    return this.publishCommand(this.toArmJoyCommand(snapshot));
+    return this.publishCommand(command);
   }
 
   /** Sends a zeroed Arm Joy command. */
@@ -90,38 +121,23 @@ export class ArmCommandPublisher {
     return this.joyTopic;
   }
 
-  private toArmJoyCommand(snapshot: GamepadSnapshot): ArmJoyCommand {
-    const rawAxes = snapshot.axes;
+  private toButtons(snapshot: GamepadSnapshot): readonly number[] {
     const rawButtons = snapshot.buttons;
-    const dpadX = (rawButtons[14] ?? 0) - (rawButtons[15] ?? 0);
-    const dpadY = (rawButtons[13] ?? 0) - (rawButtons[12] ?? 0);
 
-    return {
-      axes: [
-        -(rawAxes[0] ?? 0),
-        -(rawAxes[1] ?? 0),
-        0,
-        -(rawAxes[2] ?? 0),
-        -(rawAxes[3] ?? 0),
-        0,
-        dpadX,
-        dpadY,
-      ],
-      buttons: [
-        rawButtons[0] ?? 0,
-        rawButtons[1] ?? 0,
-        rawButtons[3] ?? 0,
-        rawButtons[2] ?? 0,
-        rawButtons[4] ?? 0,
-        rawButtons[5] ?? 0,
-        rawButtons[6] ?? 0,
-        rawButtons[7] ?? 0,
-        rawButtons[8] ?? 0,
-        rawButtons[9] ?? 0,
-        rawButtons[16] ?? rawButtons[10] ?? 0,
-        rawButtons[11] ?? 0,
-      ],
-    };
+    return [
+      rawButtons[0] ?? 0,
+      rawButtons[1] ?? 0,
+      rawButtons[3] ?? 0,
+      rawButtons[2] ?? 0,
+      rawButtons[LEFT_BUMPER_BUTTON_INDEX] ?? 0,
+      rawButtons[5] ?? 0,
+      0,
+      0,
+      rawButtons[8] ?? 0,
+      rawButtons[9] ?? 0,
+      rawButtons[16] ?? rawButtons[10] ?? 0,
+      rawButtons[11] ?? 0,
+    ];
   }
 
   private isValidCommand(command: ArmJoyCommand): boolean {

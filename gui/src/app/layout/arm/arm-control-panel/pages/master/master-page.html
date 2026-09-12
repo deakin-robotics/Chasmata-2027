@@ -32,6 +32,8 @@
     label="Law Override"
     actionLabel="Override"
     [disabled]="!rosConnected()"
+    (activated)="activateLawOverride()"
+    (deactivated)="deactivateLawOverride()"
   />
 
   <app-two-step-action-button
@@ -41,6 +43,15 @@
     actionLabel="Clear"
     [disabled]="!rosConnected()"
     (activated)="clearArmFaults(clearFaultsButton)"
+  />
+
+  <app-control-mode-selector
+    class="arm-mode-selector"
+    label="Arm control mode"
+    [options]="armModeOptions"
+    [value]="armMode()"
+    [disabled]="!rosConnected()"
+    (valueChange)="selectArmMode($event)"
   />
 
   @if (readinessError(); as error) {

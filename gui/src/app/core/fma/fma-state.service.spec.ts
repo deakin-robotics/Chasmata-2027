@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 
-import { ArmMode, DriveMode, FmaStateService } from './fma-state.service';
+import { ArmMode, DriveMode, FmaStateService, LawMode, LawRequest } from './fma-state.service';
 
 describe('FmaStateService', () => {
   let service: FmaStateService;
@@ -19,12 +19,12 @@ describe('FmaStateService', () => {
     );
   });
 
-  it('starts telemetry-backed LAW, SYSTEM, and LINK states as unknown', () => {
+  it('starts telemetry-backed LAW, GIMBAL, and SYSTEM states as unknown', () => {
     expect(service.columns()).toEqual(
       expect.arrayContaining([
         { label: 'LAW', confirmed: null, commanded: null },
+        { label: 'GIMBAL', confirmed: null, commanded: null },
         { label: 'SYSTEM', confirmed: null, commanded: null },
-        { label: 'LINK', confirmed: null, commanded: null },
       ]),
     );
   });
@@ -57,12 +57,38 @@ describe('FmaStateService', () => {
 
   it('starts gimbal priority unknown and formats authoritative owners', () => {
     expect(service.gimbalPriorityOwner()).toBeNull();
-    expect(service.gimbalPriorityDisplay()).toBe('GIMBAL PRIORITY UNKNOWN');
+    expect(service.gimbalPriorityDisplay()).toBe('PRIORITY UNK');
 
     service.setGimbalPriorityOwner('DRIVER');
     expect(service.gimbalPriorityDisplay()).toBe('← DRIVER');
 
     service.setGimbalPriorityOwner('ARM OPS');
     expect(service.gimbalPriorityDisplay()).toBe('ARM OPS →');
+  });
+
+  it('keeps the confirmed Gimbal arrow while exposing a pending takeover', () => {
+    service.setGimbalPriorityTelemetry('DRIVER', 'ARM OPS');
+
+    expect(service.gimbalPriorityOwner()).toBe('DRIVER');
+    expect(service.gimbalPriorityDisplay()).toBe('← DRIVER');
+    expect(service.gimbalPriorityPending()).toBe('ARM OPS');
+    expect(service.gimbalPriorityPendingDisplay()).toBe('ARM OPS');
+  });
+
+  it('derives the override indicator from authoritative LAW telemetry', () => {
+    expect(service.lawOverrideActive()).toBe(false);
+    expect(service.lawOverridePending()).toBe(false);
+
+    service.setLawTelemetry(LawMode.Alternate, LawRequest.EnableOverride);
+    expect(service.lawOverrideActive()).toBe(false);
+    expect(service.lawOverridePending()).toBe(true);
+
+    service.setLawTelemetry(LawMode.Direct, LawRequest.Restore);
+    expect(service.lawOverrideActive()).toBe(true);
+    expect(service.lawOverridePending()).toBe(false);
+
+    service.setLawTelemetry(LawMode.Alternate, null);
+    expect(service.lawOverrideActive()).toBe(false);
+    expect(service.lawOverridePending()).toBe(false);
   });
 });
