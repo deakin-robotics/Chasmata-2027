@@ -18,10 +18,6 @@ describe('DriverMasterPage', () => {
     fixture.detectChanges();
   });
 
-  it('should create', () => {
-    expect(component).toBeTruthy();
-  });
-
   it('should render the Driver master controls', () => {
     expect(fixture.nativeElement.textContent).toContain('Master Drive');
     expect(fixture.nativeElement.textContent).toContain('ROS Link');

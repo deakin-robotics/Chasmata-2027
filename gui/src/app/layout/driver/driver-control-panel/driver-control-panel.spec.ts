@@ -3,7 +3,6 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DriverControlPanel } from './driver-control-panel';
 
 describe('DriverControlPanel', () => {
-  let component: DriverControlPanel;
   let fixture: ComponentFixture<DriverControlPanel>;
 
   beforeEach(async () => {
@@ -12,12 +11,7 @@ describe('DriverControlPanel', () => {
     }).compileComponents();
 
     fixture = TestBed.createComponent(DriverControlPanel);
-    component = fixture.componentInstance;
     fixture.detectChanges();
-  });
-
-  it('should create', () => {
-    expect(component).toBeTruthy();
   });
 
   it('should render the Master Drive switch', () => {

@@ -3,7 +3,6 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ArmDashboard } from './arm-dashboard';
 
 describe('ArmDashboard', () => {
-  let component: ArmDashboard;
   let fixture: ComponentFixture<ArmDashboard>;
 
   beforeEach(async () => {
@@ -12,12 +11,7 @@ describe('ArmDashboard', () => {
     }).compileComponents();
 
     fixture = TestBed.createComponent(ArmDashboard);
-    component = fixture.componentInstance;
     fixture.detectChanges();
-  });
-
-  it('should create', () => {
-    expect(component).toBeTruthy();
   });
 
   it('should render the Arm dashboard', () => {

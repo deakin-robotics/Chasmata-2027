@@ -14,10 +14,6 @@ describe('ArmModelViewer', () => {
     fixture.detectChanges();
   });
 
-  it('should create', () => {
-    expect(fixture.componentInstance).toBeTruthy();
-  });
-
   it('should render the model viewer shell', () => {
     expect(fixture.nativeElement.querySelector('[aria-label="Arm 3D model viewer"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('.scene-host')).toBeTruthy();

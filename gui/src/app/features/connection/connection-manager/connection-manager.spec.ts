@@ -19,10 +19,6 @@ describe('ConnectionManager', () => {
     await fixture.whenStable();
   });
 
-  it('should create', () => {
-    expect(component).toBeTruthy();
-  });
-
   it('should render the initial disconnected state', () => {
     const element = fixture.nativeElement as HTMLElement;
     const endpointInput = element.querySelector('input') as HTMLInputElement;

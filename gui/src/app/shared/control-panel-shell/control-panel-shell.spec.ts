@@ -24,10 +24,6 @@ describe('ControlPanelShell', () => {
     component = fixture.componentInstance;
   });
 
-  it('should create', () => {
-    expect(component).toBeTruthy();
-  });
-
   it('should render and switch tabs', () => {
     const tabElements = fixture.nativeElement.querySelectorAll(
       '.tab-button',

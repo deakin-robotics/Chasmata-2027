@@ -10,10 +10,6 @@ describe('RosConnection', () => {
     service = TestBed.inject(RosConnection);
   });
 
-  it('should be created', () => {
-    expect(service).toBeTruthy();
-  });
-
   it('should start disconnected', () => {
     expect(service.status()).toBe('disconnected');
     expect(service.isConnected()).toBe(false);

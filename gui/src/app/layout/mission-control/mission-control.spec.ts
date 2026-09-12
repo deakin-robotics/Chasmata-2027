@@ -4,7 +4,6 @@ import { provideRouter } from '@angular/router';
 import { MissionControl } from './mission-control';
 
 describe('MissionControl', () => {
-  let component: MissionControl;
   let fixture: ComponentFixture<MissionControl>;
 
   beforeEach(async () => {
@@ -14,12 +13,7 @@ describe('MissionControl', () => {
     }).compileComponents();
 
     fixture = TestBed.createComponent(MissionControl);
-    component = fixture.componentInstance;
     await fixture.whenStable();
-  });
-
-  it('should create', () => {
-    expect(component).toBeTruthy();
   });
 
   it('should render shared mission-control chrome', () => {

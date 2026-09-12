@@ -4,7 +4,6 @@ import { ArmMode, DriveMode, FmaStateService } from '../../core/fma/fma-state.se
 import { ControlScheme } from './control-scheme';
 
 describe('ControlScheme', () => {
-  let component: ControlScheme;
   let fixture: ComponentFixture<ControlScheme>;
 
   beforeEach(async () => {
@@ -13,13 +12,8 @@ describe('ControlScheme', () => {
     }).compileComponents();
 
     fixture = TestBed.createComponent(ControlScheme);
-    component = fixture.componentInstance;
     TestBed.inject(FmaStateService).confirmDriveMode(DriveMode.Manual);
     fixture.detectChanges();
-  });
-
-  it('should create', () => {
-    expect(component).toBeTruthy();
   });
 
   it('should provide left, center, and right scheme regions', () => {
