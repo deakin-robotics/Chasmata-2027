@@ -21,11 +21,17 @@ describe('RoverSchematic', () => {
     const element = fixture.nativeElement as HTMLElement;
 
     expect(component).toBeTruthy();
+    expect((element.querySelector('svg') as SVGElement).getAttribute('viewBox')).toBe(
+      '-20 18 360 330',
+    );
     expect(component.commandedGimbalYawDeg()).toBe(90);
     expect(component.actualGimbalYawDeg()).toBe(0);
     expect(component.actualArmYawDeg()).toBeNull();
     expect(component.actualArmLength()).toBeNull();
     expect(element.querySelector('.arm-actual')).toBeFalsy();
+    expect(element.querySelector('.direction-line')).toBeFalsy();
+    expect(element.querySelector('.front-chevron')).toBeFalsy();
+    expect(element.querySelectorAll('.front-wheel-direction')).toHaveLength(4);
   });
 
   it('should render the green arm using telemetry angle and length', () => {

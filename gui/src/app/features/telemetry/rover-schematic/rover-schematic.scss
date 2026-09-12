@@ -17,8 +17,6 @@ svg {
   height: 100%;
 }
 
-.direction-line,
-.front-chevron,
 .gimbal-direction {
   fill: none;
   stroke: var(--dcr-color-info);
@@ -38,6 +36,14 @@ svg {
 
 .gimbal-actual {
   stroke: var(--dcr-color-normal);
+}
+
+.front-wheel-direction {
+  fill: none;
+  stroke: var(--dcr-color-normal);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
 }
 
 .camera {
