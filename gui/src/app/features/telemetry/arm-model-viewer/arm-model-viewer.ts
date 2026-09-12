@@ -33,7 +33,6 @@ const ARM_MODEL_COLOR = '#697482';
 const ARM_TARGET_COLOR = '#62a8e5';
 const ARM_ACTUAL_COLOR = '#62c77a';
 const GRID_SIZE = 1.4;
-const INITIAL_VIEW_DISTANCE_SCALE = 1.5;
 const CAMERA_VIEW_DISTANCE_SCALE = 1.75;
 const LEFT_BUMPER_BUTTON_INDEX = 4;
 const RIGHT_BUMPER_BUTTON_INDEX = 5;
@@ -66,6 +65,7 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
   readonly status = signal<ViewerStatus>('unavailable');
   readonly statusMessage = signal('Unavailable');
   readonly telemetryStale = signal(false);
+  readonly viewModeLabel = computed(() => this.armViewMode.view().toUpperCase());
   readonly viewerStatusLabel = computed(() => {
     switch (this.status()) {
       case 'loading':
@@ -404,17 +404,14 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     robot.updateMatrixWorld(true);
     const bounds = this.getModelBounds(robot);
     const size = bounds.getSize(new three.Vector3());
-    const distance = Math.max(size.x, size.y, size.z, 0.1) * INITIAL_VIEW_DISTANCE_SCALE;
-    const target = this.getBaseVisualPosition(robot);
+    const distance = Math.max(size.x, size.y, size.z, 0.1) * CAMERA_VIEW_DISTANCE_SCALE;
+    const target = this.getJ4PivotPosition(robot);
+    if (!target) return;
 
     camera.near = Math.max(distance / 100, 0.001);
     camera.far = Math.max(distance * 20, 10);
     camera.up.set(0, 1, 0);
-    camera.position.set(
-      target.x - distance * 0.95,
-      target.y + distance * 0.85,
-      target.z + distance * 1.15,
-    );
+    camera.position.set(target.x - distance, target.y + distance * 0.2, target.z);
     camera.lookAt(target);
     controls.target.copy(target);
     controls.update();
@@ -429,7 +426,7 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     const three = this.three;
     if (!robot || !camera || !controls || !three) return;
 
-    const target = this.getEndEffectorPosition(robot);
+    const target = this.getJ4PivotPosition(robot);
     if (!target) return;
 
     const bounds = this.getModelBounds(robot);
@@ -547,13 +544,13 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     return position;
   }
 
-  private getEndEffectorPosition(robot: URDFRobot): Three.Vector3 | null {
-    const endEffector = robot.links['ee_link'];
-    if (!endEffector || !this.three) return null;
+  private getJ4PivotPosition(robot: URDFRobot): Three.Vector3 | null {
+    const j4Pivot = robot.links['j4_pivot_link'];
+    if (!j4Pivot || !this.three) return null;
 
     robot.updateMatrixWorld(true);
     const position = new this.three.Vector3();
-    endEffector.getWorldPosition(position);
+    j4Pivot.getWorldPosition(position);
     return position;
   }
 

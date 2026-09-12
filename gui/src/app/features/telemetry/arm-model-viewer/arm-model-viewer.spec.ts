@@ -52,6 +52,30 @@ describe('ArmModelViewer', () => {
     expect(fixture.nativeElement.querySelector('canvas')).toBeFalsy();
   });
 
+  it('should show the current camera view only when the twin is ready', () => {
+    const viewMode = TestBed.inject(ArmViewModeService);
+    const viewer = fixture.componentInstance;
+
+    expect(fixture.nativeElement.querySelector('.viewer-view-mode')).toBeFalsy();
+
+    viewer.status.set('ready');
+    viewMode.set('top');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.viewer-view-mode')?.textContent.trim()).toBe('TOP');
+
+    viewMode.set('side');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.viewer-view-mode')?.textContent.trim()).toBe('SIDE');
+
+    viewMode.setFree();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.viewer-view-mode')?.textContent.trim()).toBe('FREE');
+
+    viewer.status.set('waiting-telemetry');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.viewer-view-mode')).toBeFalsy();
+  });
+
   it('should hide the target marker when the actual marker reaches it', () => {
     TestBed.inject(ArmIkCoordinator).setPosition([0, 0, 0]);
 
@@ -225,5 +249,65 @@ describe('ArmModelViewer', () => {
       pointerType: 'mouse',
     } as PointerEvent);
     expect(viewMode.view()).toBe('top');
+  });
+
+  it('should center canonical camera views on the J4 pivot', () => {
+    const viewer = fixture.componentInstance as unknown as {
+      three: typeof Three;
+      camera: Three.PerspectiveCamera | null;
+      controls: { target: Three.Vector3; update: () => void; dispose: () => void } | null;
+      robot: Three.Object3D & {
+        links: Record<string, Three.Object3D>;
+        updateMatrixWorld: (force?: boolean) => Three.Object3D;
+      };
+      toggleCameraView: () => void;
+    };
+    const robot = new Three.Object3D() as typeof viewer.robot;
+    const j4Pivot = new Three.Object3D();
+    const eeLink = new Three.Object3D();
+    j4Pivot.position.set(0.2, 0.3, 0.4);
+    eeLink.position.set(1, 1, 1);
+    robot.add(j4Pivot, eeLink);
+    robot.links = { j4_pivot_link: j4Pivot, ee_link: eeLink };
+    robot.updateMatrixWorld(true);
+
+    viewer.three = Three;
+    viewer.camera = new Three.PerspectiveCamera();
+    viewer.controls = { target: new Three.Vector3(), update: vi.fn(), dispose: vi.fn() };
+    viewer.robot = robot;
+
+    const viewMode = TestBed.inject(ArmViewModeService);
+    viewMode.set('side');
+    viewer.toggleCameraView();
+
+    expect(viewer.controls.target.toArray()).toEqual([0.2, 0.3, 0.4]);
+  });
+
+  it('should initialize on the J4-pivot-centered SIDE view', () => {
+    const viewer = fixture.componentInstance as unknown as {
+      three: typeof Three;
+      camera: Three.PerspectiveCamera | null;
+      controls: { target: Three.Vector3; update: () => void; dispose: () => void } | null;
+      frameInitialView: (robot: Three.Object3D) => void;
+    };
+    const robot = new Three.Object3D() as Three.Object3D & {
+      links: Record<string, Three.Object3D>;
+    };
+    const j4Pivot = new Three.Object3D();
+    j4Pivot.position.set(0.2, 0.3, 0.4);
+    robot.add(j4Pivot);
+    robot.links = { j4_pivot_link: j4Pivot };
+    robot.updateMatrixWorld(true);
+
+    viewer.three = Three;
+    viewer.camera = new Three.PerspectiveCamera();
+    viewer.controls = { target: new Three.Vector3(), update: vi.fn(), dispose: vi.fn() };
+    viewer.frameInitialView(robot);
+
+    expect(viewer.controls.target.toArray()).toEqual([0.2, 0.3, 0.4]);
+    expect(viewer.camera.position.x).toBeLessThan(0.2);
+    expect(viewer.camera.position.y).toBeGreaterThan(0.3);
+    expect(viewer.camera.position.z).toBeCloseTo(0.4);
+    expect(TestBed.inject(ArmViewModeService).view()).toBe('side');
   });
 });

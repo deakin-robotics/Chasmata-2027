@@ -42,6 +42,12 @@
   <div class="viewer-frame">
     <div #sceneHost class="scene-host"></div>
 
+    @if (status() === 'ready') {
+      <span class="viewer-view-mode" role="status" aria-label="Current camera view">
+        {{ viewModeLabel() }}
+      </span>
+    }
+
     @if (status() === 'loading' || status() === 'waiting-telemetry') {
       <div class="viewer-waiting" role="status" aria-live="polite">
         <mat-icon class="spinning" aria-hidden="true">sync</mat-icon>

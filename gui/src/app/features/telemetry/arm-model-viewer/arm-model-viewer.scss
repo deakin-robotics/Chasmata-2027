@@ -151,6 +151,18 @@ h2 {
   height: 100%;
 }
 
+.viewer-view-mode {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.75rem;
+  z-index: 1;
+  color: var(--dcr-color-normal);
+  font-size: 0.7rem;
+  font-weight: 700;
+  pointer-events: none;
+  user-select: none;
+}
+
 .viewer-waiting {
   position: absolute;
   inset: 0;
