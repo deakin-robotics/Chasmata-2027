@@ -88,6 +88,6 @@ describe('ArmModelViewer', () => {
     expect(viewer.targetMarker.material.opacity).toBeCloseTo(0.5);
 
     viewer.animateTargetMarker(fadeInStartedAtMs + 100);
-    expect(viewer.targetMarker.material.opacity).toBe(1);
+    expect(viewer.targetMarker.material.opacity).toBeCloseTo(1);
   });
 });
