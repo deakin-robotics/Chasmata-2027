@@ -1,5 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
+import { ArmIkCoordinator } from '../../../core/arm/ik/arm-ik-coordinator';
+import { ArmMode } from '../../../core/fma/fma-state.service';
+import { ArmControlModeService } from '../../../core/control/arm/arm-control-mode';
 import { ArmModelViewer } from './arm-model-viewer';
 
 describe('ArmModelViewer', () => {
@@ -47,6 +50,8 @@ describe('ArmModelViewer', () => {
   });
 
   it('should hide the target marker when the actual marker reaches it', () => {
+    TestBed.inject(ArmIkCoordinator).setPosition([0, 0, 0]);
+
     let distance = 0.01;
     const viewer = fixture.componentInstance as unknown as {
       targetMarker: {
@@ -89,5 +94,37 @@ describe('ArmModelViewer', () => {
 
     viewer.animateTargetMarker(fadeInStartedAtMs + 100);
     expect(viewer.targetMarker.material.opacity).toBeCloseTo(1);
+  });
+
+  it('should fade the target marker out when Manual mode is selected', () => {
+    TestBed.inject(ArmIkCoordinator).setPosition([0, 0, 0]);
+
+    const viewer = fixture.componentInstance as unknown as {
+      targetMarker: {
+        visible: boolean;
+        position: { distanceTo: (other: unknown) => number };
+        material: { opacity: number };
+      } | null;
+      actualMarker: { position: object } | null;
+      updateTargetMarkerVisibility: () => void;
+      animateTargetMarker: (now?: number) => void;
+      targetMarkerFadeStartedAtMs: number | null;
+    };
+    viewer.targetMarker = {
+      visible: true,
+      position: { distanceTo: () => 0.03 },
+      material: { opacity: 1 },
+    };
+    viewer.actualMarker = { position: {} };
+
+    const armControlMode = TestBed.inject(ArmControlModeService);
+    armControlMode.setMode(ArmMode.Manual);
+    viewer.updateTargetMarkerVisibility();
+
+    const fadeStartedAtMs = viewer.targetMarkerFadeStartedAtMs ?? 0;
+    viewer.animateTargetMarker(fadeStartedAtMs + 250);
+
+    expect(viewer.targetMarker.visible).toBe(false);
+    expect(viewer.targetMarker.material.opacity).toBe(0);
   });
 });

@@ -115,6 +115,37 @@ describe('ArmIkCoordinator', () => {
     expect(coordinator.position()).toEqual([0.5, 0.6, 0.7]);
   });
 
+  it('resynchronizes the target from telemetry without submitting a new solve', async () => {
+    seedPivotTelemetry();
+    await coordinator.load();
+    coordinator.setPosition([0.5, 0.6, 0.7]);
+    solveService.solve.mockClear();
+    solveService.poseFromJointAngles.mockReturnValue({
+      position: [0.8, 0.9, 1],
+      orientation: [0, 0, 0, 1],
+    });
+
+    const telemetry = TestBed.inject(ArmTelemetryService);
+    telemetry.setJointState({
+      names: ['base_joint', 'shoulder_joint', 'elbow_joint'],
+      positions: [0.7, 0.8, 0.9],
+    });
+
+    expect(coordinator.resynchronizeTargetFromTelemetry()).toBe(true);
+    expect(coordinator.position()).toEqual([0.8, 0.9, 1]);
+    expect(solveService.solve).not.toHaveBeenCalled();
+  });
+
+  it('clears the target when resynchronization has no valid telemetry', async () => {
+    seedPivotTelemetry();
+    await coordinator.load();
+    coordinator.setPosition([0.5, 0.6, 0.7]);
+    TestBed.inject(ArmTelemetryService).clear();
+
+    expect(coordinator.resynchronizeTargetFromTelemetry()).toBe(false);
+    expect(coordinator.position()).toBeNull();
+  });
+
   it('clears the target on reset and resynchronizes after reconnect', async () => {
     const telemetry = TestBed.inject(ArmTelemetryService);
     seedPivotTelemetry();

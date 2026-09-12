@@ -13,6 +13,7 @@ describe('ArmControlModeService', () => {
   let service: ArmControlModeService;
   let orientationMode: WritableSignal<'locked' | 'unlocked'>;
   let setOrientationMode: ReturnType<typeof vi.fn>;
+  let resynchronizeTargetFromTelemetry: ReturnType<typeof vi.fn>;
   let publishGimbalPriority: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -21,12 +22,18 @@ describe('ArmControlModeService', () => {
       orientationMode.set(mode);
       return true;
     });
+    resynchronizeTargetFromTelemetry = vi.fn();
     publishGimbalPriority = vi.fn();
     TestBed.configureTestingModule({
       providers: [
         {
-          provide: ArmIkCoordinator,
-          useValue: { orientationMode, setOrientationMode, translate: vi.fn() },
+        provide: ArmIkCoordinator,
+          useValue: {
+            orientationMode,
+            setOrientationMode,
+            resynchronizeTargetFromTelemetry,
+            translate: vi.fn(),
+          },
         },
         {
           provide: GimbalPriorityCommandPublisher,
@@ -55,6 +62,7 @@ describe('ArmControlModeService', () => {
     expect(service.mode()).toBe(ArmMode.Position);
     expect(service.isPosition()).toBe(true);
     expect(service.isManual()).toBe(false);
+    expect(resynchronizeTargetFromTelemetry).toHaveBeenCalledOnce();
   });
 
   it('selects the matching control worker', () => {

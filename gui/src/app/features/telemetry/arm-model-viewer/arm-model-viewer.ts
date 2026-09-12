@@ -19,6 +19,7 @@ import { ArmIkCoordinator } from '../../../core/arm/ik/arm-ik-coordinator';
 import { ArmPosition } from '../../../core/arm/ik/arm-ik-types';
 import { ArmTelemetryService } from '../../../core/arm/telemetry/arm-telemetry.service';
 import { ArmViewModeService } from '../../../core/arm/arm-view-mode';
+import { ArmControlModeService } from '../../../core/control/arm/arm-control-mode';
 import { GamepadInput } from '../../../core/gamepad/gamepad-input';
 import { RosConnection } from '../../../core/ros/ros-connection';
 import { UnavailableOverlay } from '../../../shared/unavailable-overlay/unavailable-overlay';
@@ -50,6 +51,7 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
   private readonly armIkCoordinator = inject(ArmIkCoordinator);
   private readonly armTelemetry = inject(ArmTelemetryService);
   private readonly armViewMode = inject(ArmViewModeService);
+  private readonly armControlMode = inject(ArmControlModeService);
   private readonly gamepad = inject(GamepadInput);
   private readonly rosConnection = inject(RosConnection);
 
@@ -135,6 +137,11 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     if (targetPosition) this.updateTargetMarkerPosition(targetPosition);
 
     this.tryRenderPendingRobot();
+  });
+
+  private readonly armModeEffect = effect(() => {
+    this.armControlMode.mode();
+    this.updateTargetMarkerVisibility();
   });
 
   private readonly telemetryEffect = effect(() => {
@@ -570,8 +577,13 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     const actualMarker = this.actualMarker;
     if (!targetMarker || !actualMarker) return;
 
+    const targetPosition = this.armIkCoordinator.position();
     const targetOpacity =
-      targetMarker.position.distanceTo(actualMarker.position) > ARM_TARGET_REACHED_TOLERANCE ? 1 : 0;
+      this.armControlMode.isPosition() &&
+      targetPosition &&
+      targetMarker.position.distanceTo(actualMarker.position) > ARM_TARGET_REACHED_TOLERANCE
+        ? 1
+        : 0;
 
     if (this.targetMarkerFadeTargetOpacity === targetOpacity) return;
 

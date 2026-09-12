@@ -77,6 +77,19 @@ export class ArmIkCoordinator {
     this.setPosition([current[0] + delta[0], current[1] + delta[1], current[2] + delta[2]]);
   }
 
+  /** Resets the Position-mode target to the current telemetry pivot without planning. */
+  resynchronizeTargetFromTelemetry(): boolean {
+    if (this.modelReady) this.armIkSolveService.reset();
+
+    this.ikReady = false;
+    this.positionState.set(null);
+    this.jointAnglesState.set(null);
+    this.statusState.set('idle');
+    this.tryInitializeTargetFromTelemetry();
+
+    return this.positionState() !== null;
+  }
+
   /** Loads the arm model and waits for live telemetry before accepting a target. */
   async load(url?: string): Promise<void> {
     this.armIkSolveService.reset();
