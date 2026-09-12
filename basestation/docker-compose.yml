@@ -1,7 +1,7 @@
 services:
   mock-rover:
     build:
-      context: ../mock_rover
+      context: ../test/mock_rover
     environment:
       ROS_DOMAIN_ID: '0'
       ROS_LOCALHOST_ONLY: '0'
@@ -15,8 +15,8 @@ services:
 
   moveit2:
     build:
-      context: ../..
-      dockerfile: test/moveit2/Dockerfile
+      context: ..
+      dockerfile: basestation/Dockerfile
     depends_on:
       - mock-rover
     environment:

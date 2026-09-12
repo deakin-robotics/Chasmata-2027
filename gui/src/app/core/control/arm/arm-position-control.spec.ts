@@ -97,6 +97,37 @@ describe('ArmPositionControl', () => {
     expect(publish).toHaveBeenCalledOnce();
   });
 
+  it('routes the right stick to the gimbal while LB is held in Position mode', () => {
+    const snapshot: GamepadSnapshot = {
+      axes: [0.1, -0.2, 0.3, 0.4],
+      buttons: Array.from({ length: 16 }, (_, index) => (index === 4 ? 1 : 0)),
+    };
+
+    service.handle(snapshot);
+
+    expect(createCommand).toHaveBeenCalledWith(
+      snapshot,
+      [0, 0, 0, 0.3, -0.4, 0, 0.1, 0.2, 0, 0],
+      { suppressClearFaultButton: true, includeTriggers: true },
+    );
+  });
+
+  it('keeps LB-held gimbal control available while orientation is locked', () => {
+    orientationMode.set('locked');
+    const snapshot: GamepadSnapshot = {
+      axes: [0, 0, -0.3, -0.4],
+      buttons: Array.from({ length: 16 }, (_, index) => (index === 4 ? 1 : 0)),
+    };
+
+    service.handle(snapshot);
+
+    expect(createCommand).toHaveBeenCalledWith(
+      snapshot,
+      [0, 0, 0, -0.3, 0.4, 0, 0, 0, 0, 0],
+      { suppressClearFaultButton: true, includeTriggers: false },
+    );
+  });
+
   it('keeps locked D-pad target movement active', () => {
     orientationMode.set('locked');
 

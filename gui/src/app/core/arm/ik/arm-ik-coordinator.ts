@@ -21,7 +21,7 @@ export class ArmIkCoordinator {
 
   private readonly positionState = signal<ArmPosition | null>(null);
   private readonly orientationState = signal<ArmQuaternion>([0, 0, 0, 1]);
-  private readonly orientationModeState = signal<ArmOrientationMode>('unlocked');
+  private readonly orientationModeState = signal<ArmOrientationMode>('locked');
   private readonly statusState = signal<ArmIkStatus>('idle');
   private readonly jointAnglesState = signal<Readonly<Record<string, number>> | null>(null);
 
@@ -49,6 +49,7 @@ export class ArmIkCoordinator {
 
   private ikReady = false;
   private modelReady = false;
+  private orientationCaptured = false;
 
   private readonly telemetryEffect = effect(() => {
     this.armTelemetry.actualJointAngles();
@@ -77,13 +78,28 @@ export class ArmIkCoordinator {
     this.setPosition([current[0] + delta[0], current[1] + delta[1], current[2] + delta[2]]);
   }
 
+  /** Resets the Position-mode target to the current telemetry pivot without planning. */
+  resynchronizeTargetFromTelemetry(): boolean {
+    if (this.modelReady) this.armIkSolveService.reset();
+
+    this.ikReady = false;
+    this.positionState.set(null);
+    this.orientationCaptured = false;
+    this.jointAnglesState.set(null);
+    this.statusState.set('idle');
+    this.tryInitializeTargetFromTelemetry();
+
+    return this.positionState() !== null;
+  }
+
   /** Loads the arm model and waits for live telemetry before accepting a target. */
   async load(url?: string): Promise<void> {
     this.armIkSolveService.reset();
     this.ikReady = false;
     this.positionState.set(null);
     this.orientationState.set([0, 0, 0, 1]);
-    this.orientationModeState.set('unlocked');
+    this.orientationModeState.set('locked');
+    this.orientationCaptured = false;
     this.jointAnglesState.set(null);
     this.statusState.set('idle');
     this.modelReady = false;
@@ -99,6 +115,8 @@ export class ArmIkCoordinator {
       this.ikReady = false;
       this.positionState.set(null);
       this.orientationState.set([0, 0, 0, 1]);
+      this.orientationModeState.set('locked');
+      this.orientationCaptured = false;
       this.jointAnglesState.set(null);
       this.statusState.set('invalid');
 
@@ -113,14 +131,17 @@ export class ArmIkCoordinator {
     this.modelReady = false;
     this.positionState.set(null);
     this.orientationState.set([0, 0, 0, 1]);
-    this.orientationModeState.set('unlocked');
+    this.orientationModeState.set('locked');
+    this.orientationCaptured = false;
     this.jointAnglesState.set(null);
     this.statusState.set('idle');
   }
 
   /** Switches MoveIt2's ownership of the wrist orientation. */
   setOrientationMode(mode: ArmOrientationMode): boolean {
-    if (mode === this.orientationModeState()) return true;
+    if (mode === this.orientationModeState() && (mode === 'unlocked' || this.orientationCaptured)) {
+      return true;
+    }
     if (mode === 'locked') {
       const actualJointAngles = this.armTelemetry.actualJointAngles();
       if (!actualJointAngles || !this.hasCompleteJointState(actualJointAngles)) return false;
@@ -129,6 +150,9 @@ export class ArmIkCoordinator {
       if (!actualPose) return false;
 
       this.orientationState.set(actualPose.orientation);
+      this.orientationCaptured = true;
+    } else {
+      this.orientationCaptured = false;
     }
 
     this.orientationModeState.set(mode);
@@ -188,16 +212,27 @@ export class ArmIkCoordinator {
   }
 
   private tryInitializeTargetFromTelemetry(): void {
-    if (this.positionState() !== null || !this.modelReady) return;
-
+    if (!this.modelReady) return;
     const actualJointAngles = this.armTelemetry.actualJointAngles();
     if (!actualJointAngles || !this.hasPivotJointState(actualJointAngles)) return;
+
+    const needsTarget = this.positionState() === null;
+    const needsOrientation = this.orientationModeState() === 'locked' && !this.orientationCaptured;
+    if (!needsTarget && !needsOrientation) return;
 
     const actualPose = this.armIkSolveService.poseFromJointAngles(actualJointAngles);
     if (!actualPose) return;
 
-    this.positionState.set(actualPose.position);
-    this.ikReady = true;
+    if (needsTarget) this.positionState.set(actualPose.position);
+
+    if (needsOrientation && this.hasCompleteJointState(actualJointAngles)) {
+      this.orientationState.set(actualPose.orientation);
+      this.orientationCaptured = true;
+    }
+
+    if (needsTarget || (needsOrientation && this.orientationCaptured)) {
+      this.ikReady = this.orientationModeState() === 'unlocked' || this.orientationCaptured;
+    }
   }
 
   private hasPivotJointState(jointAngles: Readonly<Record<string, number>>): boolean {

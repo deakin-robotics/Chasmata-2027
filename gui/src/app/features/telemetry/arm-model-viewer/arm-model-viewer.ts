@@ -19,6 +19,11 @@ import { ArmIkCoordinator } from '../../../core/arm/ik/arm-ik-coordinator';
 import { ArmPosition } from '../../../core/arm/ik/arm-ik-types';
 import { ArmTelemetryService } from '../../../core/arm/telemetry/arm-telemetry.service';
 import { ArmViewModeService } from '../../../core/arm/arm-view-mode';
+import { ArmControlModeService } from '../../../core/control/arm/arm-control-mode';
+import {
+  POSITION_SPEED_METRES_PER_SECOND,
+  POSITION_UPDATE_SECONDS,
+} from '../../../core/control/arm/arm-position-control';
 import { GamepadInput } from '../../../core/gamepad/gamepad-input';
 import { RosConnection } from '../../../core/ros/ros-connection';
 import { UnavailableOverlay } from '../../../shared/unavailable-overlay/unavailable-overlay';
@@ -28,8 +33,8 @@ const ARM_MODEL_COLOR = '#697482';
 const ARM_TARGET_COLOR = '#62a8e5';
 const ARM_ACTUAL_COLOR = '#62c77a';
 const GRID_SIZE = 1.4;
-const INITIAL_VIEW_DISTANCE_SCALE = 1.5;
 const CAMERA_VIEW_DISTANCE_SCALE = 1.75;
+const LEFT_BUMPER_BUTTON_INDEX = 4;
 const RIGHT_BUMPER_BUTTON_INDEX = 5;
 const ARM_TELEMETRY_STALE_AFTER_MS = 500;
 const ARM_TARGET_REACHED_TOLERANCE = 0.01;
@@ -50,6 +55,7 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
   private readonly armIkCoordinator = inject(ArmIkCoordinator);
   private readonly armTelemetry = inject(ArmTelemetryService);
   private readonly armViewMode = inject(ArmViewModeService);
+  private readonly armControlMode = inject(ArmControlModeService);
   private readonly gamepad = inject(GamepadInput);
   private readonly rosConnection = inject(RosConnection);
 
@@ -59,6 +65,7 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
   readonly status = signal<ViewerStatus>('unavailable');
   readonly statusMessage = signal('Unavailable');
   readonly telemetryStale = signal(false);
+  readonly viewModeLabel = computed(() => this.armViewMode.view().toUpperCase());
   readonly viewerStatusLabel = computed(() => {
     switch (this.status()) {
       case 'loading':
@@ -109,6 +116,7 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
   private actualMarker: Three.Mesh | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private telemetryStaleTimer: ReturnType<typeof setTimeout> | null = null;
+  private cameraPanTimer: ReturnType<typeof setInterval> | null = null;
   private animationFrame: number | null = null;
   private rightBumperPressed = false;
   private initializing = false;
@@ -116,6 +124,10 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
   private targetMarkerFadeStartedAtMs: number | null = null;
   private targetMarkerFadeStartOpacity = 1;
   private targetMarkerFadeTargetOpacity = 1;
+
+  private readonly orbitPointerDown = (event: PointerEvent): void => {
+    if (this.isRotatePointer(event)) this.armViewMode.setFree();
+  };
 
   private readonly connectionEffect = effect(() => {
     if (this.rosConnected()) {
@@ -135,6 +147,20 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     if (targetPosition) this.updateTargetMarkerPosition(targetPosition);
 
     this.tryRenderPendingRobot();
+  });
+
+  private readonly armModeEffect = effect(() => {
+    this.armControlMode.mode();
+    this.updateTargetMarkerVisibility();
+  });
+
+  private readonly cameraPanEffect = effect(() => {
+    const snapshot = this.gamepad.snapshot();
+    this.armControlMode.mode();
+    this.armViewMode.view();
+
+    if (this.shouldPanCamera(snapshot)) this.startCameraPanning();
+    else this.stopCameraPanning();
   });
 
   private readonly telemetryEffect = effect(() => {
@@ -266,6 +292,8 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     controls.minDistance = 0.35;
     controls.maxDistance = 5;
 
+    renderer.domElement.addEventListener('pointerdown', this.orbitPointerDown);
+
     scene.add(new three.AmbientLight(0xffffff, 1));
 
     const keyLight = new three.DirectionalLight(0xffffff, 1.4);
@@ -376,17 +404,14 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     robot.updateMatrixWorld(true);
     const bounds = this.getModelBounds(robot);
     const size = bounds.getSize(new three.Vector3());
-    const distance = Math.max(size.x, size.y, size.z, 0.1) * INITIAL_VIEW_DISTANCE_SCALE;
-    const target = this.getBaseVisualPosition(robot);
+    const distance = Math.max(size.x, size.y, size.z, 0.1) * CAMERA_VIEW_DISTANCE_SCALE;
+    const target = this.getJ4PivotPosition(robot);
+    if (!target) return;
 
     camera.near = Math.max(distance / 100, 0.001);
     camera.far = Math.max(distance * 20, 10);
     camera.up.set(0, 1, 0);
-    camera.position.set(
-      target.x - distance * 0.95,
-      target.y + distance * 0.85,
-      target.z + distance * 1.15,
-    );
+    camera.position.set(target.x - distance, target.y + distance * 0.2, target.z);
     camera.lookAt(target);
     controls.target.copy(target);
     controls.update();
@@ -401,7 +426,7 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     const three = this.three;
     if (!robot || !camera || !controls || !three) return;
 
-    const target = this.getEndEffectorPosition(robot);
+    const target = this.getJ4PivotPosition(robot);
     if (!target) return;
 
     const bounds = this.getModelBounds(robot);
@@ -426,6 +451,90 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     camera.updateProjectionMatrix();
   }
 
+  private startCameraPanning(): void {
+    if (this.cameraPanTimer !== null) return;
+
+    this.cameraPanTimer = setInterval(
+      () => this.panCameraFromCurrentInput(),
+      POSITION_UPDATE_SECONDS * 1000,
+    );
+  }
+
+  private stopCameraPanning(): void {
+    if (this.cameraPanTimer === null) return;
+
+    clearInterval(this.cameraPanTimer);
+    this.cameraPanTimer = null;
+  }
+
+  private panCameraFromCurrentInput(): void {
+    const snapshot = this.gamepad.snapshot();
+    if (!snapshot || !this.shouldPanCamera(snapshot)) {
+      this.stopCameraPanning();
+      return;
+    }
+
+    const camera = this.camera;
+    const controls = this.controls;
+    const robot = this.robot;
+    const three = this.three;
+    if (!camera || !controls || !robot || !three) return;
+
+    const rightStickX = this.finiteGamepadInput(snapshot.axes[2]);
+    const rightStickY = -this.finiteGamepadInput(snapshot.axes[3]);
+    if (rightStickX === 0 && rightStickY === 0) return;
+
+    this.panCamera(rightStickX, rightStickY);
+  }
+
+  private panCamera(rightStickX: number, rightStickY: number): void {
+    const camera = this.camera;
+    const controls = this.controls;
+    const robot = this.robot;
+    const three = this.three;
+    if (!camera || !controls || !robot || !three) return;
+
+    const amount = POSITION_SPEED_METRES_PER_SECOND * POSITION_UPDATE_SECONDS;
+    const localDelta =
+      this.armViewMode.view() === 'top'
+        ? new three.Vector3(rightStickX * amount, rightStickY * amount, 0)
+        : new three.Vector3(0, -rightStickX * amount, rightStickY * amount);
+    localDelta.applyQuaternion(robot.getWorldQuaternion(new three.Quaternion()));
+
+    camera.position.add(localDelta);
+    controls.target.add(localDelta);
+    controls.update();
+  }
+
+  private shouldPanCamera(snapshot: ReturnType<GamepadInput['snapshot']>): boolean {
+    if (
+      !snapshot ||
+      !this.armControlMode.isPosition() ||
+      this.armViewMode.view() === 'free' ||
+      (snapshot.buttons[LEFT_BUMPER_BUTTON_INDEX] ?? 0) > 0.5 ||
+      !this.robot ||
+      !this.camera ||
+      !this.controls
+    ) {
+      return false;
+    }
+
+    return (
+      this.finiteGamepadInput(snapshot.axes[2]) !== 0 ||
+      this.finiteGamepadInput(snapshot.axes[3]) !== 0
+    );
+  }
+
+  private finiteGamepadInput(value: number | undefined): number {
+    return value !== undefined && Number.isFinite(value) ? value : 0;
+  }
+
+  private isRotatePointer(event: PointerEvent): boolean {
+    if (event.pointerType === 'touch') return event.isPrimary;
+
+    return event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey;
+  }
+
   private getBaseVisualPosition(robot: URDFRobot): Three.Vector3 {
     const three = this.three;
     const baseLink = robot.links['base_link'] ?? robot;
@@ -435,13 +544,13 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     return position;
   }
 
-  private getEndEffectorPosition(robot: URDFRobot): Three.Vector3 | null {
-    const endEffector = robot.links['ee_link'];
-    if (!endEffector || !this.three) return null;
+  private getJ4PivotPosition(robot: URDFRobot): Three.Vector3 | null {
+    const j4Pivot = robot.links['j4_pivot_link'];
+    if (!j4Pivot || !this.three) return null;
 
     robot.updateMatrixWorld(true);
     const position = new this.three.Vector3();
-    endEffector.getWorldPosition(position);
+    j4Pivot.getWorldPosition(position);
     return position;
   }
 
@@ -570,8 +679,13 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     const actualMarker = this.actualMarker;
     if (!targetMarker || !actualMarker) return;
 
+    const targetPosition = this.armIkCoordinator.position();
     const targetOpacity =
-      targetMarker.position.distanceTo(actualMarker.position) > ARM_TARGET_REACHED_TOLERANCE ? 1 : 0;
+      this.armControlMode.isPosition() &&
+      targetPosition &&
+      targetMarker.position.distanceTo(actualMarker.position) > ARM_TARGET_REACHED_TOLERANCE
+        ? 1
+        : 0;
 
     if (this.targetMarkerFadeTargetOpacity === targetOpacity) return;
 
@@ -636,6 +750,7 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
   private disposeViewer(): void {
     this.armIkCoordinator.reset();
     this.clearTelemetryWatchdog();
+    this.stopCameraPanning();
     this.telemetryStale.set(false);
     this.armViewMode.reset();
     this.rightBumperPressed = false;
@@ -649,6 +764,7 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     this.resizeObserver = null;
     if (typeof window !== 'undefined') window.removeEventListener('resize', this.resizeScene);
 
+    this.renderer?.domElement.removeEventListener('pointerdown', this.orbitPointerDown);
     this.controls?.dispose();
     this.controls = null;
     this.disposeRobot(this.robot);

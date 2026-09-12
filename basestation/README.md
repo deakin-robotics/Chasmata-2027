@@ -1,6 +1,6 @@
-# MoveIt 2 arm planning test stack
+# MoveIt 2 base station arm planning stack
 
-This folder is an isolated MoveIt 2 experiment for the current six-joint arm.
+This folder contains the MoveIt 2 base station stack for the current six-joint arm.
 It runs MoveIt 2 in a base-station-style container and sends either partial or
 complete, time-parameterized planned trajectories to the mock rover through
 the standard `FollowJointTrajectory` action.

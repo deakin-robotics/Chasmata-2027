@@ -111,6 +111,7 @@ export class ArmControlModeService {
     if (this.enabledState() && this.isManual()) this.armManualControl.stop();
     if (mode === ArmMode.Manual) this.armIkCoordinator.setOrientationMode('unlocked');
     this.modeState.set(mode);
+    if (mode === ArmMode.Position) this.armIkCoordinator.resynchronizeTargetFromTelemetry();
   }
 
   /** Routes one validated gamepad snapshot to the currently selected handler. */

@@ -2,7 +2,7 @@ import { Component, input, output } from '@angular/core';
 
 export type ControlSwitchTone = 'info' | 'normal' | 'caution' | 'critical' | 'neutral';
 
-/** A labelled two-state control for deliberate operator actions. */
+/** A labelled two-state control. */
 @Component({
   selector: 'app-control-switch',
   templateUrl: './control-switch.html',

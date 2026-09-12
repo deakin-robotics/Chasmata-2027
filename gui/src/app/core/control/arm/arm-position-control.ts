@@ -6,8 +6,8 @@ import { ArmPosition } from '../../arm/ik/arm-ik-types';
 import { GamepadSnapshot } from '../../gamepad/gamepad-input';
 import { ArmCommandPublisher } from './arm-command-publisher';
 
-const POSITION_UPDATE_SECONDS = 0.02;
-const POSITION_SPEED_METRES_PER_SECOND = 0.2;
+export const POSITION_UPDATE_SECONDS = 0.02;
+export const POSITION_SPEED_METRES_PER_SECOND = 0.2;
 
 /** Handles Position-mode gamepad input for the MoveIt2 pivot and unlocked wrist. */
 @Service()
@@ -27,9 +27,11 @@ export class ArmPositionControl {
     }
 
     const locked = this.armIkCoordinator.orientationMode() === 'locked';
+    const axes: number[] = locked ? new Array(10).fill(0) : [...this.toWristAxes(snapshot)];
+    this.applyGimbalAxes(snapshot, axes);
     const command = this.armCommandPublisher.createCommand(
       snapshot,
-      locked ? new Array(10).fill(0) : this.toWristAxes(snapshot),
+      axes,
       {
         suppressClearFaultButton: snapshot.buttons[16] === undefined,
         includeTriggers: !locked,
@@ -55,6 +57,14 @@ export class ArmPositionControl {
       0,
       0,
     ];
+  }
+
+  private applyGimbalAxes(snapshot: GamepadSnapshot, axes: number[]): void {
+    const gimbalHeld = (snapshot.buttons[4] ?? 0) > 0.5;
+    if (!gimbalHeld) return;
+
+    axes[3] = snapshot.axes[2] ?? 0;
+    axes[4] = -(snapshot.axes[3] ?? 0);
   }
 
   private targetDelta(leftStickX: number, leftStickY: number): ArmPosition {

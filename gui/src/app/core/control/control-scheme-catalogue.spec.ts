@@ -64,12 +64,20 @@ describe('CONTROL_SCHEME_CATALOGUE', () => {
         { input: 'd-pad-y', label: 'D-pad Y', action: 'Move J4 pivot X/Y' },
         { input: 'left-trigger', label: 'LT', action: 'J6 roll (UNLOCKED)' },
         { input: 'right-trigger', label: 'RT', action: 'J6 roll (UNLOCKED)' },
+        { input: 'right-stick', label: 'Right joystick', action: 'Pan model viewer' },
+        { input: 'left-bumper', label: 'LB', action: 'Gimbal control (Hold)' },
         { input: 'button-a', label: 'A', action: 'Laser' },
         { input: 'button-b', label: 'B', action: 'Open end-effector' },
         { input: 'button-x', label: 'X', action: 'Close end-effector' },
         { input: 'right-bumper', label: 'RB', action: 'Center EE / switch view' },
         { input: 'left-stick-click', label: 'Left joystick click', action: 'Toggle orientation lock' },
         { input: 'right-stick-click', label: 'Right joystick click', action: 'Gimbal Priority' },
+      ]),
+    );
+    expect(CONTROL_SCHEME_CATALOGUE.arm[ArmMode.Position].modifiers?.['left-bumper']?.controls).toEqual(
+      expect.arrayContaining([
+        { input: 'right-stick', label: 'Right joystick', action: 'Gimbal' },
+        { input: 'left-bumper', label: 'LB', action: 'Gimbal control active' },
       ]),
     );
   });

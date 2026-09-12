@@ -76,7 +76,6 @@ export class RosConnection implements OnDestroy {
     this.reconnectAttempts = 0;
     this.reconnectAttemptState.set(0);
     this.disposeClient();
-    this.urlState.set(null);
     this.errorState.set(null);
     this.statusState.set('disconnected');
   }
