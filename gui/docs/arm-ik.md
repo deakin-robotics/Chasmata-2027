@@ -65,8 +65,8 @@ constraints compatible with the configured MoveIt2 kinematics solver.
 ## Model source of truth
 
 The GUI model is [`public/assets/kinematics/arm.urdf`](../public/assets/kinematics/arm.urdf).
-The MoveIt2 test stack uses the matching copy in
-`test/moveit2/arm_moveit_config/config/arm.urdf`.
+The MoveIt2 base station uses the matching copy in
+`basestation/arm_moveit_config/config/arm.urdf`.
 
 `j4_pivot_link` is a fixed frame at the `yaw_joint` origin. The terminal link
 is `ee_link`. The six movable joints are:
