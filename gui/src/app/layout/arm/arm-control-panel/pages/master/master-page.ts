@@ -14,10 +14,6 @@ import { RosConnection } from '../../../../../core/ros/ros-connection';
 import { ConnectionManager } from '../../../../../features/connection/connection-manager/connection-manager';
 import { ActionButton, ActionButtonTone } from '../../../../../shared/action-button/action-button';
 import {
-  ControlConfirmationDialog,
-  ControlConfirmationDialogData,
-} from '../../../../../shared/confirmation-dialog/control-confirmation-dialog';
-import {
   ControlFlowConnector,
   ControlFlowConnectorTone,
 } from '../../../../../shared/control-flow-connector/control-flow-connector';
@@ -128,28 +124,8 @@ export class ArmMasterPage {
 
   /** Enables the input worker selected by ArmControlModeService. */
   toggleMasterDriveControl(nextState: boolean): void {
-    if (!nextState) {
-      this.armControlMode.disable();
-      return;
-    }
-
-    const data: ControlConfirmationDialogData = {
-      title: 'Enable Arm Control?',
-      confirmLabel: 'Enable control',
-    };
-
-    this.dialog
-      .open(ControlConfirmationDialog, {
-        data,
-        disableClose: true,
-        width: 'min(100% - 2rem, 28rem)',
-      })
-      .afterClosed()
-      .subscribe((confirmed) => {
-        if (confirmed !== true) return;
-
-        this.armControlMode.enable();
-      });
+    if (nextState) this.armControlMode.enable();
+    else this.armControlMode.disable();
   }
 
   /** Sends the explicit two-step motor-driver fault reset command. */
