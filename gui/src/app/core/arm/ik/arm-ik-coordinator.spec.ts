@@ -38,7 +38,7 @@ describe('ArmIkCoordinator', () => {
   it('starts without a target until live telemetry is available', () => {
     expect(coordinator.position()).toBeNull();
     expect(coordinator.targetFrame()).toBe('j4_pivot_link');
-    expect(coordinator.orientationMode()).toBe('unlocked');
+    expect(coordinator.orientationMode()).toBe('locked');
     expect(coordinator.status()).toBe('idle');
   });
 
@@ -186,7 +186,7 @@ describe('ArmIkCoordinator', () => {
     expect(solveService.solve).toHaveBeenCalledWith({
       position: [0.2, 0.3, 0.4],
       orientation: [0, 0, 0, 1],
-      orientationMode: 'unlocked',
+      orientationMode: 'locked',
     });
     expect(coordinator.status()).toBe('valid');
   });
@@ -240,6 +240,7 @@ describe('ArmIkCoordinator', () => {
     });
 
     await coordinator.load();
+    coordinator.setOrientationMode('unlocked');
 
     expect(coordinator.setOrientationMode('locked')).toBe(true);
     expect(coordinator.orientationMode()).toBe('locked');
@@ -288,8 +289,15 @@ describe('ArmIkCoordinator', () => {
   function seedPivotTelemetry(): void {
     const telemetry = TestBed.inject(ArmTelemetryService);
     telemetry.setJointState({
-      names: ['base_joint', 'shoulder_joint', 'elbow_joint'],
-      positions: [0, 0, 0],
+      names: [
+        'base_joint',
+        'shoulder_joint',
+        'elbow_joint',
+        'yaw_joint',
+        'pitch_joint',
+        'roll_joint',
+      ],
+      positions: [0, 0, 0, 0, 0, 0],
     });
   }
 });

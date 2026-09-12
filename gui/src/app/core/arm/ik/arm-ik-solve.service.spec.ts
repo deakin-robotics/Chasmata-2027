@@ -105,7 +105,7 @@ describe('ArmIkSolveService', () => {
     );
 
     await expect(service.load('/test-arm.urdf')).resolves.toBe(true);
-    expect(moveItProvider.synchronizeOrientationLock).toHaveBeenCalledWith(false);
+    expect(moveItProvider.synchronizeOrientationLock).toHaveBeenCalledWith(true);
     expect(moveItProvider.solve).not.toHaveBeenCalled();
   });
 
