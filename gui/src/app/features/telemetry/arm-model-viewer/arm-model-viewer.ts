@@ -20,6 +20,10 @@ import { ArmPosition } from '../../../core/arm/ik/arm-ik-types';
 import { ArmTelemetryService } from '../../../core/arm/telemetry/arm-telemetry.service';
 import { ArmViewModeService } from '../../../core/arm/arm-view-mode';
 import { ArmControlModeService } from '../../../core/control/arm/arm-control-mode';
+import {
+  POSITION_SPEED_METRES_PER_SECOND,
+  POSITION_UPDATE_SECONDS,
+} from '../../../core/control/arm/arm-position-control';
 import { GamepadInput } from '../../../core/gamepad/gamepad-input';
 import { RosConnection } from '../../../core/ros/ros-connection';
 import { UnavailableOverlay } from '../../../shared/unavailable-overlay/unavailable-overlay';
@@ -31,6 +35,7 @@ const ARM_ACTUAL_COLOR = '#62c77a';
 const GRID_SIZE = 1.4;
 const INITIAL_VIEW_DISTANCE_SCALE = 1.5;
 const CAMERA_VIEW_DISTANCE_SCALE = 1.75;
+const LEFT_BUMPER_BUTTON_INDEX = 4;
 const RIGHT_BUMPER_BUTTON_INDEX = 5;
 const ARM_TELEMETRY_STALE_AFTER_MS = 500;
 const ARM_TARGET_REACHED_TOLERANCE = 0.01;
@@ -111,6 +116,7 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
   private actualMarker: Three.Mesh | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private telemetryStaleTimer: ReturnType<typeof setTimeout> | null = null;
+  private cameraPanTimer: ReturnType<typeof setInterval> | null = null;
   private animationFrame: number | null = null;
   private rightBumperPressed = false;
   private initializing = false;
@@ -118,6 +124,10 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
   private targetMarkerFadeStartedAtMs: number | null = null;
   private targetMarkerFadeStartOpacity = 1;
   private targetMarkerFadeTargetOpacity = 1;
+
+  private readonly orbitPointerDown = (event: PointerEvent): void => {
+    if (this.isRotatePointer(event)) this.armViewMode.setFree();
+  };
 
   private readonly connectionEffect = effect(() => {
     if (this.rosConnected()) {
@@ -142,6 +152,15 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
   private readonly armModeEffect = effect(() => {
     this.armControlMode.mode();
     this.updateTargetMarkerVisibility();
+  });
+
+  private readonly cameraPanEffect = effect(() => {
+    const snapshot = this.gamepad.snapshot();
+    this.armControlMode.mode();
+    this.armViewMode.view();
+
+    if (this.shouldPanCamera(snapshot)) this.startCameraPanning();
+    else this.stopCameraPanning();
   });
 
   private readonly telemetryEffect = effect(() => {
@@ -272,6 +291,8 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     controls.screenSpacePanning = true;
     controls.minDistance = 0.35;
     controls.maxDistance = 5;
+
+    renderer.domElement.addEventListener('pointerdown', this.orbitPointerDown);
 
     scene.add(new three.AmbientLight(0xffffff, 1));
 
@@ -431,6 +452,90 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     controls.target.copy(target);
     controls.update();
     camera.updateProjectionMatrix();
+  }
+
+  private startCameraPanning(): void {
+    if (this.cameraPanTimer !== null) return;
+
+    this.cameraPanTimer = setInterval(
+      () => this.panCameraFromCurrentInput(),
+      POSITION_UPDATE_SECONDS * 1000,
+    );
+  }
+
+  private stopCameraPanning(): void {
+    if (this.cameraPanTimer === null) return;
+
+    clearInterval(this.cameraPanTimer);
+    this.cameraPanTimer = null;
+  }
+
+  private panCameraFromCurrentInput(): void {
+    const snapshot = this.gamepad.snapshot();
+    if (!snapshot || !this.shouldPanCamera(snapshot)) {
+      this.stopCameraPanning();
+      return;
+    }
+
+    const camera = this.camera;
+    const controls = this.controls;
+    const robot = this.robot;
+    const three = this.three;
+    if (!camera || !controls || !robot || !three) return;
+
+    const rightStickX = this.finiteGamepadInput(snapshot.axes[2]);
+    const rightStickY = -this.finiteGamepadInput(snapshot.axes[3]);
+    if (rightStickX === 0 && rightStickY === 0) return;
+
+    this.panCamera(rightStickX, rightStickY);
+  }
+
+  private panCamera(rightStickX: number, rightStickY: number): void {
+    const camera = this.camera;
+    const controls = this.controls;
+    const robot = this.robot;
+    const three = this.three;
+    if (!camera || !controls || !robot || !three) return;
+
+    const amount = POSITION_SPEED_METRES_PER_SECOND * POSITION_UPDATE_SECONDS;
+    const localDelta =
+      this.armViewMode.view() === 'top'
+        ? new three.Vector3(rightStickX * amount, rightStickY * amount, 0)
+        : new three.Vector3(0, -rightStickX * amount, rightStickY * amount);
+    localDelta.applyQuaternion(robot.getWorldQuaternion(new three.Quaternion()));
+
+    camera.position.add(localDelta);
+    controls.target.add(localDelta);
+    controls.update();
+  }
+
+  private shouldPanCamera(snapshot: ReturnType<GamepadInput['snapshot']>): boolean {
+    if (
+      !snapshot ||
+      !this.armControlMode.isPosition() ||
+      this.armViewMode.view() === 'free' ||
+      (snapshot.buttons[LEFT_BUMPER_BUTTON_INDEX] ?? 0) > 0.5 ||
+      !this.robot ||
+      !this.camera ||
+      !this.controls
+    ) {
+      return false;
+    }
+
+    return (
+      this.finiteGamepadInput(snapshot.axes[2]) !== 0 ||
+      this.finiteGamepadInput(snapshot.axes[3]) !== 0
+    );
+  }
+
+  private finiteGamepadInput(value: number | undefined): number {
+    return value !== undefined && Number.isFinite(value) ? value : 0;
+  }
+
+  private isRotatePointer(event: PointerEvent): boolean {
+    if (event.pointerType === 'touch') return event.isPrimary;
+
+    return event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey;
   }
 
   private getBaseVisualPosition(robot: URDFRobot): Three.Vector3 {
@@ -648,6 +753,7 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
   private disposeViewer(): void {
     this.armIkCoordinator.reset();
     this.clearTelemetryWatchdog();
+    this.stopCameraPanning();
     this.telemetryStale.set(false);
     this.armViewMode.reset();
     this.rightBumperPressed = false;
@@ -661,6 +767,7 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
     this.resizeObserver = null;
     if (typeof window !== 'undefined') window.removeEventListener('resize', this.resizeScene);
 
+    this.renderer?.domElement.removeEventListener('pointerdown', this.orbitPointerDown);
     this.controls?.dispose();
     this.controls = null;
     this.disposeRobot(this.robot);

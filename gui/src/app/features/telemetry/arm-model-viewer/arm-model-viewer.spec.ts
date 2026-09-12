@@ -1,6 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import * as Three from 'three';
 
 import { ArmIkCoordinator } from '../../../core/arm/ik/arm-ik-coordinator';
+import { ArmViewModeService } from '../../../core/arm/arm-view-mode';
+import { GamepadSnapshot } from '../../../core/gamepad/gamepad-input';
 import { ArmMode } from '../../../core/fma/fma-state.service';
 import { ArmControlModeService } from '../../../core/control/arm/arm-control-mode';
 import { ArmModelViewer } from './arm-model-viewer';
@@ -126,5 +129,101 @@ describe('ArmModelViewer', () => {
 
     expect(viewer.targetMarker.visible).toBe(false);
     expect(viewer.targetMarker.material.opacity).toBe(0);
+  });
+
+  it('should pan the camera and target across the selected viewer plane', () => {
+    const viewer = fixture.componentInstance as unknown as {
+      three: typeof Three;
+      camera: Three.PerspectiveCamera | null;
+      controls: { target: Three.Vector3; update: () => void; dispose: () => void } | null;
+      robot: Three.Object3D | null;
+      panCamera: (rightStickX: number, rightStickY: number) => void;
+    };
+    const camera = new Three.PerspectiveCamera();
+    camera.position.set(1, 2, 3);
+    const controls = { target: new Three.Vector3(4, 5, 6), update: vi.fn(), dispose: vi.fn() };
+    const robot = new Three.Object3D();
+    robot.rotation.x = -Math.PI / 2;
+    robot.updateMatrixWorld(true);
+    viewer.three = Three;
+    viewer.camera = camera;
+    viewer.controls = controls;
+    viewer.robot = robot;
+
+    const viewMode = TestBed.inject(ArmViewModeService);
+    viewMode.set('top');
+    viewer.panCamera(1, 1);
+
+    expect(camera.position.toArray()).toEqual([1.004, 2, 2.996]);
+    expect(controls.target.toArray()).toEqual([4.004, 5, 5.996]);
+    expect(controls.update).toHaveBeenCalledOnce();
+
+    viewMode.set('side');
+    viewer.panCamera(1, 1);
+
+    expect(camera.position.toArray()).toEqual([1.004, 2.004, 3]);
+    expect(controls.target.toArray()).toEqual([4.004, 5.004, 6]);
+  });
+
+  it('should ignore viewer panning in FREE view, Manual mode, and while LB is held', () => {
+    const viewer = fixture.componentInstance as unknown as {
+      camera: Three.PerspectiveCamera | null;
+      controls: { target: Three.Vector3; update: () => void; dispose: () => void } | null;
+      robot: Three.Object3D | null;
+      shouldPanCamera: (snapshot: GamepadSnapshot | null) => boolean;
+    };
+    viewer.camera = new Three.PerspectiveCamera();
+    viewer.controls = { target: new Three.Vector3(), update: vi.fn(), dispose: vi.fn() };
+    viewer.robot = new Three.Object3D();
+
+    const armControlMode = TestBed.inject(ArmControlModeService);
+    const viewMode = TestBed.inject(ArmViewModeService);
+    const buttons = Array.from({ length: 16 }, () => 0);
+    const snapshot: GamepadSnapshot = {
+      axes: [0, 0, 0.5, -0.5],
+      buttons,
+    };
+
+    armControlMode.setMode(ArmMode.Position);
+    viewMode.set('side');
+    expect(viewer.shouldPanCamera(snapshot)).toBe(true);
+
+    viewMode.setFree();
+    expect(viewer.shouldPanCamera(snapshot)).toBe(false);
+
+    viewMode.set('side');
+    buttons[4] = 1;
+    expect(viewer.shouldPanCamera(snapshot)).toBe(false);
+
+    buttons[4] = 0;
+    armControlMode.setMode(ArmMode.Manual);
+    expect(viewer.shouldPanCamera(snapshot)).toBe(false);
+  });
+
+  it('should enter FREE only for an unmodified orbit gesture', () => {
+    const viewer = fixture.componentInstance as unknown as {
+      orbitPointerDown: (event: PointerEvent) => void;
+    };
+    const viewMode = TestBed.inject(ArmViewModeService);
+
+    viewMode.set('top');
+    viewer.orbitPointerDown({
+      button: 0,
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      pointerType: 'mouse',
+    } as PointerEvent);
+    expect(viewMode.view()).toBe('free');
+
+    viewMode.set('top');
+    viewer.orbitPointerDown({
+      button: 2,
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      pointerType: 'mouse',
+    } as PointerEvent);
+    expect(viewMode.view()).toBe('top');
   });
 });
