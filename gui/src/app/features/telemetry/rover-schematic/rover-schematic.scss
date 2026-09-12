@@ -90,13 +90,6 @@ svg {
   stroke-width: 3;
 }
 
-.arm-commanded {
-  .arm-direction,
-  .arm-clamp {
-    stroke: var(--dcr-color-info);
-  }
-}
-
 .arm-actual {
   .arm-direction,
   .arm-clamp {

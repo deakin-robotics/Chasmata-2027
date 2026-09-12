@@ -2,8 +2,8 @@
   <svg viewBox="-20 -20 360 400" role="img" aria-labelledby="rover-title rover-description">
     <title id="rover-title">Top-down rover schematic</title>
     <desc id="rover-description">
-      A static symbolic rover with four wheels, a front camera marker, commanded and actual
-      20-degree gimbal arcs, and commanded and actual arms with clamps.
+      A symbolic rover with four wheels, a front camera marker, commanded and actual 20-degree
+      gimbal arcs, and a telemetry-driven actual arm with a static clamp.
     </desc>
 
     <path class="direction-line" d="M160 48V5M150 15l10-10 10 10" />
@@ -32,20 +32,21 @@
     <path class="centre-line" d="M160 113V283" />
     <path class="front-chevron" d="M143 120l17-13 17 13" />
 
-    <circle class="arm-pivot" cx="160" cy="165" r="5" />
+    @if (actualArmYawDeg() !== null && actualArmLength() !== null) {
+      <circle class="arm-pivot" cx="160" cy="165" r="5" />
 
-    @if (commandedArmYawDeg() !== actualArmYawDeg()) {
-      <g
-        class="arm arm-commanded"
-        [attr.transform]="'rotate(' + commandedArmYawDeg() + ' 160 165)'"
-      >
-        <line class="arm-direction" x1="160" y1="165" x2="160" y2="80" />
-        <path class="arm-clamp" d="M151 67L160 80L169 67" />
+      <g class="arm arm-actual" [attr.transform]="'rotate(' + actualArmYawDeg() + ' 160 165)'">
+        <line
+          class="arm-direction"
+          x1="160"
+          y1="165"
+          x2="160"
+          [attr.y2]="165 - actualArmLength()!"
+        />
+        <g [attr.transform]="'translate(0 ' + (85 - actualArmLength()!) + ')'">
+          <path class="arm-clamp" d="M151 67L160 80L169 67" />
+        </g>
       </g>
     }
-    <g class="arm arm-actual" [attr.transform]="'rotate(' + actualArmYawDeg() + ' 160 165)'">
-      <line class="arm-direction" x1="160" y1="165" x2="160" y2="80" />
-      <path class="arm-clamp" d="M151 67L160 80L169 67" />
-    </g>
   </svg>
 </section>
