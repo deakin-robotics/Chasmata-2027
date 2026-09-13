@@ -77,15 +77,25 @@ class ArmHardwareInterface : public hardware_interface::SystemInterface {
   std::unique_ptr<Motor> motor_driver_;
   std::string can_interface_;
 
+  // Node that lives inside the hardware interface so we can talk to the
+  // socketcan_bridge (and expose arm_interfaces telemetry on the ROS graph).
   rclcpp::Node::SharedPtr node_;
+
+  // CAN bridge topics: publish outgoing frames on .../tx, receive on .../rx
   rclcpp::Publisher<can_msgs::msg::Frame>::SharedPtr can_pub_;
   rclcpp::Subscription<can_msgs::msg::Frame>::SharedPtr can_sub_;
 
-  // Publishers for the arm_inter
+  // Telemetry exposed from arm_interfaces (everything except the end effector)
+  rclcpp::Publisher<arm_interfaces::msg::MotorStat1>::SharedPtr stat1_pub_;
+  rclcpp::Publisher<arm_interfaces::msg::MotorStat2>::SharedPtr stat2_pub_;
 
+  // Optional command input (MotorMove) - mirrors the old motor_node behaviour
+  rclcpp::Subscription<arm_interfaces::msg::MotorMove>::SharedPtr move_sub_;
   std::vector<JointInfo> joints_;
 
+  JointInfo* find_joint(uint32_t can_id);
   void can_frame_callback(const can_msgs::msg::Frame& msg);
+  void motor_move_callback(const arm_interfaces::msg::MotorMove& msg);
 };
 
 }  // namespace dcr_arm_driver

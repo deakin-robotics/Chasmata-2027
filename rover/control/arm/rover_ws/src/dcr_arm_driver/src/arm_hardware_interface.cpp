@@ -81,15 +81,32 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_activate(
     const rclcpp_lifecycle::State& /*previous_state*/) {
   RCLCPP_INFO(rclcpp::get_logger("ArmHardwareInterface"), "Activating...");
 
-  auto node = rclcpp::Node::make_shared("arm_hardware_node");
+  auto node = rclcpp::Node::make_shared("arm_hardware_interface");
+  node_ = node;
 
+  // Talk to nobleo_socketcan_bridge. Its node is named "socketcan_bridge"
+  // and it publishes received frames on "~/rx" (-> /socketcan_bridge/rx) and
+  // sends frames arriving on "~/tx" (-> /socketcan_bridge/tx).
   can_pub_ = node->create_publisher<can_msgs::msg::Frame>(
-      "sent_messages", rclcpp::QoS(100));
+      "/socketcan_bridge/tx", rclcpp::QoS(100));
 
   can_sub_ = node->create_subscription<can_msgs::msg::Frame>(
-      "received_messages", rclcpp::QoS(100),
+      "/socketcan_bridge/rx", rclcpp::QoS(100),
       [this](const can_msgs::msg::Frame& msg) {
         this->can_frame_callback(msg);
+      });
+
+  // Telemetry exposed from arm_interfaces (topic names match old motor_node)
+  stat1_pub_ = node->create_publisher<arm_interfaces::msg::MotorStat1>(
+      "/motor_stat_1", rclcpp::QoS(100));
+  stat2_pub_ = node->create_publisher<arm_interfaces::msg::MotorStat2>(
+      "/motor_stat_2", rclcpp::QoS(100));
+
+  // Optional command input (mirrors the old motor_node "/motor_move" topic)
+  move_sub_ = node->create_subscription<arm_interfaces::msg::MotorMove>(
+      "/motor_move", rclcpp::QoS(100),
+      [this](const arm_interfaces::msg::MotorMove& msg) {
+        this->motor_move_callback(msg);
       });
 
   auto clear_fault_msg = motor_driver_->clr_faults();
@@ -168,11 +185,16 @@ ArmHardwareInterface::export_command_interfaces() {
 hardware_interface::return_type ArmHardwareInterface::read(
     const rclcpp::Time& /*time*/, const rclcpp::Duration& /*period*/) {
   for (auto& joint : joints_) {
-    auto status_req = motor_driver_->send_status_1();
-    status_req.id = joint.can_id;
-    if (can_pub_) {
-      can_pub_->publish(status_req);
+    if (!can_pub_) {
+      continue;
     }
+    auto status1_req = motor_driver_->send_status_1();
+    status1_req.id = joint.can_id;
+    can_pub_->publish(status1_req);
+
+    auto status2_req = motor_driver_->send_status_2();
+    status2_req.id = joint.can_id;
+    can_pub_->publish(status2_req);
   }
 
   return hardware_interface::return_type::OK;
@@ -191,19 +213,67 @@ hardware_interface::return_type ArmHardwareInterface::write(
   return hardware_interface::return_type::OK;
 }
 
-void ArmHardwareInterface::can_frame_callback(
-    const can_msgs::msg::Frame& msg) {
+JointInfo* ArmHardwareInterface::find_joint(uint32_t can_id) {
   for (auto& joint : joints_) {
-    if (joint.can_id == msg.id) {
-      if (msg.dlc >= 8 && msg.data[0] == 0xA4) {
-        auto stat = motor_driver_->read_status_1(msg);
-        joint.position = stat.angle;
-        joint.velocity = stat.speed;
-        joint.effort = stat.current;
-      }
-      break;
+    if (joint.can_id == can_id) {
+      return &joint;
     }
   }
+  return nullptr;
+}
+
+void ArmHardwareInterface::can_frame_callback(
+    const can_msgs::msg::Frame& msg) {
+  if (msg.dlc < 8) {
+    return;
+  }
+
+  JointInfo* joint = find_joint(msg.id);
+  if (joint == nullptr) {
+    return;
+  }
+
+  if (msg.data[0] == 0xA4) {
+    // Status 1: temperature, current, speed, angle
+    auto stat = motor_driver_->read_status_1(msg);
+    joint->position = stat.angle;
+    joint->velocity = stat.speed;
+    joint->effort = stat.current;
+    joint->temperature = stat.temp;
+    if (stat1_pub_) {
+      stat1_pub_->publish(stat);
+    }
+  } else if (msg.data[0] == 0xAE) {
+    // Status 2: bus voltage, bus current, mode, faults
+    auto stat = motor_driver_->read_status_2(msg);
+    joint->bus_voltage = stat.busv;
+    joint->bus_current = stat.busc;
+    joint->mode = stat.mode;
+    joint->fault = stat.fault;
+    if (stat2_pub_) {
+      stat2_pub_->publish(stat);
+    }
+  }
+}
+
+void ArmHardwareInterface::motor_move_callback(
+    const arm_interfaces::msg::MotorMove& msg) {
+  // Optional external command path (kept for parity with old motor_node).
+  // mode == true -> position control (angle in degrees), else speed control.
+  JointInfo* joint = find_joint(static_cast<uint32_t>(msg.id));
+  if (joint == nullptr || !can_pub_) {
+    return;
+  }
+
+  can_msgs::msg::Frame cmd;
+  if (msg.mode) {
+    cmd = motor_driver_->position_control(joint->can_id,
+                                          static_cast<float>(msg.angle));
+  } else {
+    cmd = motor_driver_->speed_control(joint->can_id,
+                                       static_cast<float>(msg.angle));
+  }
+  can_pub_->publish(cmd);
 }
 
 }  // namespace dcr_arm_driver
