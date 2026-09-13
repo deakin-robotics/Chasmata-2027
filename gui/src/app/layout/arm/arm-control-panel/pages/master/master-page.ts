@@ -7,9 +7,9 @@ import {
 } from '../../../../../core/control/arm/arm-control-mode';
 import { ArmCommandPublisher } from '../../../../../core/control/arm/arm-command-publisher';
 import { ControlModeCoordinator } from '../../../../../core/control/control-mode-coordinator';
-import { ControlModeCommandPublisher } from '../../../../../core/control/control-mode-command-publisher';
+import { ControlCommandPublisher } from '../../../../../core/control/control-command-publisher';
 import { GamepadInput } from '../../../../../core/gamepad/gamepad-input';
-import { ArmMode, LawRequest } from '../../../../../core/fma/fma-state.service';
+import { ArmMode } from '../../../../../core/fma/fma-state.service';
 import { RosConnection } from '../../../../../core/ros/ros-connection';
 import { ConnectionManager } from '../../../../../features/connection/connection-manager/connection-manager';
 import { ActionButton, ActionButtonTone } from '../../../../../shared/action-button/action-button';
@@ -48,7 +48,7 @@ export class ArmMasterPage {
   private readonly armControlMode = inject(ArmControlModeService);
   private readonly armCommandPublisher = inject(ArmCommandPublisher);
   private readonly controlModeCoordinator = inject(ControlModeCoordinator);
-  private readonly controlModeCommandPublisher = inject(ControlModeCommandPublisher);
+  private readonly controlCommandPublisher = inject(ControlCommandPublisher);
   private readonly gamepad = inject(GamepadInput);
   private readonly rosConnection = inject(RosConnection);
   private readonly dialog = inject(MatDialog);
@@ -140,10 +140,10 @@ export class ArmMasterPage {
   }
 
   activateLawOverride(): void {
-    this.controlModeCommandPublisher.publishLawRequest(LawRequest.EnableOverride);
+    this.controlCommandPublisher.enableArmOverride();
   }
 
   deactivateLawOverride(): void {
-    this.controlModeCommandPublisher.publishLawRequest(LawRequest.Restore);
+    this.controlCommandPublisher.disableArmOverride();
   }
 }

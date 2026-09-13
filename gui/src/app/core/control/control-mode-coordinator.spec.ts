@@ -2,10 +2,10 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { ArmControlModeService } from './arm/arm-control-mode';
-import { ControlModeCommandPublisher } from './control-mode-command-publisher';
+import { ControlCommandPublisher } from './control-command-publisher';
 import { ControlModeCoordinator } from './control-mode-coordinator';
 import { DriverControlModeService } from './drive/drive-control-mode';
-import { ArmMode, DriveMode, FmaStateService } from '../fma/fma-state.service';
+import { ArmMode, DriveMode, FmaColumn, FmaStateService } from '../fma/fma-state.service';
 import { RosConnection } from '../ros/ros-connection';
 
 describe('ControlModeCoordinator', () => {
@@ -29,7 +29,7 @@ describe('ControlModeCoordinator', () => {
           },
         },
         {
-          provide: ControlModeCommandPublisher,
+          provide: ControlCommandPublisher,
           useValue: { publishDriveMode, publishArmMode },
         },
       ],
@@ -156,6 +156,11 @@ describe('ControlModeCoordinator', () => {
   });
 });
 
-function getColumn(fmaState: FmaStateService, label: 'DRIVE' | 'ARM') {
-  return fmaState.columns().find((column) => column.label === label);
+function getColumn<T extends 'DRIVE' | 'ARM'>(
+  fmaState: FmaStateService,
+  label: T,
+): Extract<FmaColumn, { label: T }> | undefined {
+  return fmaState.columns().find(
+    (column): column is Extract<FmaColumn, { label: T }> => column.label === label,
+  );
 }
