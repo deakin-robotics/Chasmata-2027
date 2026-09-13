@@ -28,8 +28,9 @@ ament_target_dependencies(
   arm_interfaces
 )
 
-# Build hardware interface plugin
-add_library(arm_hardware_interface src/arm_hardware_interface.cpp)
+# Build hardware interface plugin.
+# Must be a SHARED library - pluginlib loads plugins via dlopen at runtime.
+add_library(arm_hardware_interface SHARED src/arm_hardware_interface.cpp)
 target_include_directories(arm_hardware_interface PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
@@ -67,6 +68,12 @@ install(
 install(
   FILES plugins.xml
   DESTINATION share/${PROJECT_NAME})
+
+# Register the plugin description with pluginlib so controller_manager can
+# discover "dcr_arm_driver/ArmHardwareInterface". Without this the class is
+# not exported and hardware loading fails with a LibraryLoadException.
+pluginlib_export_plugin_description_file(
+  hardware_interface plugins.xml)
 
 # Export targets and dependencies
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
