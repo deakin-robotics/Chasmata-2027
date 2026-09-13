@@ -12,6 +12,9 @@
 #include <hardware_interface/types/hardware_interface_return_values.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <can_msgs/msg/frame.hpp>
+#include <arm_interfaces/msg/motor_stat1.hpp>
+#include <arm_interfaces/msg/motor_stat2.hpp>
+#include <arm_interfaces/msg/motor_move.hpp>
 
 #include "dcr_arm_driver/motor.hpp"
 
@@ -23,6 +26,11 @@ struct JointInfo {
   double position = 0.0;
   double velocity = 0.0;
   double effort = 0.0;
+  double temperature = 0.0;        // NEW (from MotorStat1.temp)
+  double bus_voltage = 0.0;        // NEW (from MotorStat2.busv)
+  double bus_current = 0.0;        // NEW (from MotorStat2.busc)
+  std::string mode = "No Mode";    // NEW (from MotorStat2.mode)
+  std::string fault = "";          // NEW (from MotorStat2.fault)
   double position_command = 0.0;
 };
 
@@ -68,8 +76,12 @@ class ArmHardwareInterface : public hardware_interface::SystemInterface {
  private:
   std::unique_ptr<Motor> motor_driver_;
   std::string can_interface_;
+
+  rclcpp::Node::SharedPtr node_;
   rclcpp::Publisher<can_msgs::msg::Frame>::SharedPtr can_pub_;
   rclcpp::Subscription<can_msgs::msg::Frame>::SharedPtr can_sub_;
+
+  // Publishers for the arm_inter
 
   std::vector<JointInfo> joints_;
 
