@@ -30,6 +30,8 @@ For GUI installation, development commands, architecture, and ROS integration de
 - [GUI documentation](gui/README.md)
 - [Control documentation](rover/control/README.md)
 - [Autonomy documentation](rover/autonomous/README.md)
+- [Operator SOP (v0.1)](docs/operations/sop.md)
+- [Operator QRH (v0.1)](docs/operations/qrh.md)
 
 ## 🚧 Status
 
