@@ -14,11 +14,6 @@ class Motor {
   Motor() = default;
   ~Motor() = default;
 
-  // End effector control
-  can_msgs::msg::Frame ee_set_spd(uint8_t spd);
-  can_msgs::msg::Frame ee_set_pos(uint8_t pos);
-  can_msgs::msg::Frame ee_laser();
-
   // Fault management
   can_msgs::msg::Frame clr_faults();
 

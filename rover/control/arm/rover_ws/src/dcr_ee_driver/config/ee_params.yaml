@@ -1,0 +1,8 @@
+ee_driver_node:
+  ros__parameters:
+    # Topic used to send outgoing CAN frames (nobleo_socketcan_bridge tx)
+    can_tx_topic: "/socketcan_bridge/tx"
+    # Topic the driver listens for EeCommand messages on
+    command_topic: "/ee_command"
+    # CAN ID of the end effector controller
+    ee_can_id: 0x07

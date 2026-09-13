@@ -5,36 +5,6 @@
 
 namespace dcr_arm_driver {
 
-// End effector speed control
-can_msgs::msg::Frame Motor::ee_set_spd(uint8_t spd) {
-  can_msgs::msg::Frame msg;
-  msg.id = 0x07;
-  msg.dlc = 0x02;
-  msg.data[0] = 0xA0;
-  msg.data[1] = spd;
-  return msg;
-}
-
-// End effector position control
-can_msgs::msg::Frame Motor::ee_set_pos(uint8_t pos) {
-  can_msgs::msg::Frame msg;
-  msg.id = 0x07;
-  msg.dlc = 0x02;
-  msg.data[0] = 0xA1;
-  msg.data[1] = pos;
-  return msg;
-}
-
-// End effector laser control
-can_msgs::msg::Frame Motor::ee_laser() {
-  can_msgs::msg::Frame msg;
-  msg.id = 0x07;
-  msg.dlc = 0x02;
-  msg.data[0] = 0xA2;
-  msg.data[1] = 0x00;
-  return msg;
-}
-
 // Clear all faults
 can_msgs::msg::Frame Motor::clr_faults() {
   can_msgs::msg::Frame msg;
