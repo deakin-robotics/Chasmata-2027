@@ -1,0 +1,27 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: ""
+    relative_path: /test/ws/urdf/arm.urdf.xacro
+  srdf:
+    relative_path: config/robot_arm.srdf
+  package_settings:
+    author_name: Forrest Nguyen
+    author_email: forrest.nguyen272gmail.com
+    generated_timestamp: 1789260881
+  control_xacro:
+    command:
+      - position
+      - velocity
+    state:
+      - position
+      - velocity
+  modified_urdf:
+    xacros:
+      - control_xacro
+  control_xacro:
+    command:
+      - position
+      - velocity
+    state:
+      - position
+      - velocity
