@@ -3,11 +3,11 @@ import { Ros, Topic } from 'roslib';
 
 import { ArmTelemetryService } from '../arm/telemetry/arm-telemetry.service';
 import { ArmJointState } from '../arm/ik/arm-ik-types';
+import { ArmOverrideCommand, ArmOverrideState } from '../control/arm/arm-override';
 import {
   ArmMode,
   DriveMode,
   FmaStateService,
-  LawRequest,
   LawMode,
   SystemMode,
   GimbalPriorityOwner,
@@ -39,6 +39,7 @@ interface FmaTelemetryMessage {
   drive?: FmaModeState;
   arm?: FmaModeState;
   law?: unknown;
+  arm_override?: { state?: unknown; pending?: unknown };
   system?: unknown;
   gimbal_priority?: unknown;
 }
@@ -104,6 +105,7 @@ export class RosTelemetryBridge {
     const system = this.enumValue(telemetry.system, Object.values(SystemMode));
 
     this.applyLawTelemetry(telemetry.law);
+    this.applyArmOverrideTelemetry(telemetry.arm_override);
     if (system !== undefined) this.fmaState.setSystemMode(system);
     this.applyGimbalPriorityTelemetry(telemetry.gimbal_priority);
   }
@@ -136,25 +138,22 @@ export class RosTelemetryBridge {
     }
   }
 
-  private applyLawTelemetry(value: unknown): void {
-    if (value === null || typeof value === 'string') {
-      const confirmed = this.enumValue(value, Object.values(LawMode));
-      if (confirmed !== undefined) this.fmaState.setLawMode(confirmed);
-      return;
-    }
+  private applyLawTelemetry(value: FmaTelemetryMessage['law']): void {
+    const law = this.enumValue(value, Object.values(LawMode));
+    if (law !== undefined) this.fmaState.setLawTelemetry(law);
+  }
 
+  private applyArmOverrideTelemetry(value: FmaTelemetryMessage['arm_override']): void {
     if (!value || typeof value !== 'object') return;
 
-    const state = value as FmaModeState;
-    const confirmed = this.enumValue(state.confirmed, Object.values(LawMode));
-    const pending = this.enumValue(state.pending, Object.values(LawRequest));
+    const overrideState = this.enumValue(value.state, Object.values(ArmOverrideState));
+    const pending = this.enumValue(value.pending, Object.values(ArmOverrideCommand));
 
-    if (confirmed !== undefined && pending !== undefined) {
-      this.fmaState.setLawTelemetry(confirmed, pending);
-    } else if (confirmed !== undefined) {
-      this.fmaState.setLawTelemetry(confirmed, null);
-    } else if (pending !== undefined) {
-      this.fmaState.setLawTelemetry(null, pending);
+    if (overrideState !== undefined || pending !== undefined) {
+      this.fmaState.setArmOverrideTelemetry(
+        overrideState === undefined ? null : overrideState,
+        pending === undefined ? null : pending,
+      );
     }
   }
 

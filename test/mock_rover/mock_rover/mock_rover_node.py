@@ -46,7 +46,7 @@ ARM_JOY_TOPIC = '/arm/joy'
 ORIENTATION_LOCK_TOPIC = '/arm/orientation_lock'
 DRIVE_MODE_REQUEST_TOPIC = '/fma/drive/request'
 ARM_MODE_REQUEST_TOPIC = '/fma/arm/request'
-LAW_MODE_REQUEST_TOPIC = '/fma/law/request'
+ARM_OVERRIDE_REQUEST_TOPIC = '/arm/override/request'
 GIMBAL_PRIORITY_REQUEST_TOPIC = '/fma/gimbal/request'
 FMA_STATE_TOPIC = '/fma/state'
 
@@ -61,7 +61,8 @@ MANUAL_JOINT_SPEED_RAD_S = 0.5
 DRIVE_MODES = {'MANUAL', 'VELOCITY', 'MANAGED'}
 ARM_MODES = {'MANUAL', 'POSITION', 'MANAGED', 'STOWED'}
 LAW_MODES = {'NORMAL', 'ALTERNATE', 'DIRECT'}
-LAW_REQUESTS = {'DIRECT', 'RESTORE'}
+ARM_OVERRIDE_COMMANDS = {'ENABLE', 'DISABLE'}
+ARM_OVERRIDE_STATES = {'INACTIVE', 'ACTIVE'}
 GIMBAL_PRIORITY_OWNERS = {'DRIVER', 'ARM OPS'}
 
 
@@ -89,8 +90,10 @@ class MockRoverNode(Node):
         self.arm_mode: Optional[str] = None
         self.orientation_locked = False
         self.law_mode = 'NORMAL'
-        self.law_before_override: Optional[str] = None
-        self.pending_law: Optional[Tuple[str, float]] = None
+        self.arm_override_state = 'INACTIVE'
+        self.pending_arm_override: Optional[Tuple[str, float]] = None
+        self.gui_protection_available = True
+        self.rover_protection_available = True
         self.gimbal_priority: Optional[str] = None
         self.pending_gimbal_priority: Optional[Tuple[str, float]] = None
         self.pending_modes: Dict[str, Optional[Tuple[str, float]]] = {
@@ -162,8 +165,8 @@ class MockRoverNode(Node):
         )
         self.create_subscription(
             String,
-            LAW_MODE_REQUEST_TOPIC,
-            self.law_mode_request_callback,
+            ARM_OVERRIDE_REQUEST_TOPIC,
+            self.arm_override_request_callback,
             10,
         )
         self.create_subscription(
@@ -383,18 +386,18 @@ class MockRoverNode(Node):
         self.publish_fma()
         self.get_logger().info(f'Pending Gimbal priority request: {owner}')
 
-    def law_mode_request_callback(self, message: String) -> None:
-        request = message.data.strip().upper()
-        if request not in LAW_REQUESTS:
-            self.get_logger().warn(f'Rejected LAW request: {request}')
+    def arm_override_request_callback(self, message: String) -> None:
+        command = message.data.strip().upper()
+        if command not in ARM_OVERRIDE_COMMANDS:
+            self.get_logger().warn(f'Rejected Arm Override command: {command}')
             return
 
-        self.pending_law = (
-            request,
+        self.pending_arm_override = (
+            command,
             time.monotonic() + self.mode_ack_delay_seconds,
         )
         self.publish_fma()
-        self.get_logger().info(f'Pending LAW request: {request}')
+        self.get_logger().info(f'Pending Arm Override command: {command}')
 
     def joy_callback(self, subsystem: str, message: Joy, trigger_axes: Tuple[int, int]) -> None:
         if len(message.axes) <= trigger_axes[1]:
@@ -493,7 +496,7 @@ class MockRoverNode(Node):
         now = time.monotonic()
 
         self.process_mode_requests(now)
-        self.process_law_request(now)
+        self.process_arm_override_request(now)
         self.process_gimbal_priority_request(now)
         self.clear_expired_rejections(now)
         self.publish_joint_state()
@@ -516,21 +519,32 @@ class MockRoverNode(Node):
             self.publish_fma()
             self.get_logger().info(f'Confirmed {subsystem} mode: {mode}')
 
-    def process_law_request(self, now: float) -> None:
-        if self.pending_law is None or self.pending_law[1] > now:
+    def process_arm_override_request(self, now: float) -> None:
+        if self.pending_arm_override is None or self.pending_arm_override[1] > now:
             return
 
-        request = self.pending_law[0]
-        if request == 'DIRECT' and self.law_mode != 'DIRECT':
-            self.law_before_override = self.law_mode
-            self.law_mode = 'DIRECT'
-        elif request == 'RESTORE' and self.law_mode == 'DIRECT':
-            self.law_mode = self.law_before_override or 'NORMAL'
-            self.law_before_override = None
+        command = self.pending_arm_override[0]
+        if command == 'ENABLE':
+            self.arm_override_state = 'ACTIVE'
+            self.rover_protection_available = False
+        elif command == 'DISABLE':
+            self.arm_override_state = 'INACTIVE'
+            self.rover_protection_available = True
 
-        self.pending_law = None
+        self.pending_arm_override = None
+        self.update_law_mode()
         self.publish_fma()
-        self.get_logger().info(f'Confirmed LAW state: {self.law_mode}')
+        self.get_logger().info(
+            f'Confirmed Arm Override state: {self.arm_override_state}; LAW: {self.law_mode}'
+        )
+
+    def update_law_mode(self) -> None:
+        if self.gui_protection_available and self.rover_protection_available:
+            self.law_mode = 'NORMAL'
+        elif self.rover_protection_available:
+            self.law_mode = 'ALTERNATE'
+        else:
+            self.law_mode = 'DIRECT'
 
     def process_gimbal_priority_request(self, now: float) -> None:
         if self.pending_gimbal_priority is None or self.pending_gimbal_priority[1] > now:
@@ -559,10 +573,14 @@ class MockRoverNode(Node):
             'sequence': self.sequence,
             'drive': self.mode_state('drive', self.drive_mode),
             'arm': self.mode_state('arm', self.arm_mode),
-            'law': {
-                'confirmed': self.law_mode,
-                'pending': self.pending_law[0] if self.pending_law is not None else None,
-                'rejected': None,
+            'law': self.law_mode,
+            'arm_override': {
+                'state': self.arm_override_state,
+                'pending': (
+                    self.pending_arm_override[0]
+                    if self.pending_arm_override is not None
+                    else None
+                ),
             },
             'system': 'GOOD',
             'gimbal_priority': {

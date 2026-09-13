@@ -1,5 +1,7 @@
 import { Service, computed, signal } from '@angular/core';
 
+import { ArmOverrideCommand, ArmOverrideState } from '../control/arm/arm-override';
+
 export enum DriveMode {
   Manual = 'MANUAL',
   Velocity = 'VELOCITY',
@@ -19,10 +21,10 @@ export enum LawMode {
   Direct = 'DIRECT',
 }
 
-export enum LawRequest {
-  EnableOverride = 'DIRECT',
-  Restore = 'RESTORE',
-}
+type ArmOverrideTelemetry = {
+  state: ArmOverrideState | null;
+  pending: ArmOverrideCommand | null;
+};
 
 export enum SystemMode {
   Good = 'GOOD',
@@ -36,7 +38,7 @@ export type GimbalPriorityOwner = 'DRIVER' | 'ARM OPS';
 export type FmaColumn =
   | { label: 'DRIVE'; confirmed: DriveMode | null; commanded: DriveMode | null }
   | { label: 'ARM'; confirmed: ArmMode | null; commanded: ArmMode | null }
-  | { label: 'LAW'; confirmed: LawMode | null; commanded: LawRequest | null }
+  | { label: 'LAW'; confirmed: LawMode | null }
   | {
       label: 'GIMBAL';
       confirmed: GimbalPriorityOwner | null;
@@ -50,21 +52,23 @@ export class FmaStateService {
   private readonly columnsState = signal<FmaColumn[]>([
     { label: 'DRIVE', confirmed: null, commanded: null },
     { label: 'ARM', confirmed: null, commanded: null },
-    { label: 'LAW', confirmed: null, commanded: null },
+    { label: 'LAW', confirmed: null },
     { label: 'GIMBAL', confirmed: null, commanded: null },
     { label: 'SYSTEM', confirmed: null, commanded: null },
   ]);
+  private readonly armOverrideTelemetryState = signal<ArmOverrideTelemetry>({
+    state: null,
+    pending: null,
+  });
 
   readonly columns = this.columnsState.asReadonly();
-  readonly lawOverrideActive = computed(() =>
-    this.columnsState().some(
-      (column) => column.label === 'LAW' && column.confirmed === LawMode.Direct,
-    ),
-  );
-  readonly lawOverridePending = computed(() =>
-    this.columnsState().some(
-      (column) => column.label === 'LAW' && column.commanded === LawRequest.EnableOverride,
-    ),
+  readonly armOverrideState = computed(() => this.armOverrideTelemetryState().state);
+  readonly armOverridePendingCommand = computed(() => this.armOverrideTelemetryState().pending);
+  readonly armOverrideActive = computed(() => this.armOverrideState() === ArmOverrideState.Active);
+  readonly armOverridePending = computed(
+    () =>
+      this.armOverridePendingCommand() === ArmOverrideCommand.Enable &&
+      this.armOverrideState() !== ArmOverrideState.Active,
   );
 
   readonly gimbalPriorityOwner = computed(() => {
@@ -158,12 +162,20 @@ export class FmaStateService {
 
   /** Applies authoritative LAW telemetry, or clears it when unknown. */
   setLawMode(mode: LawMode | null): void {
-    this.setLawTelemetry(mode, null);
+    this.setLawTelemetry(mode);
   }
 
-  /** Applies authoritative LAW telemetry, including a pending override request. */
-  setLawTelemetry(confirmed: LawMode | null, commanded: LawRequest | null): void {
-    this.updateColumn('LAW', (column) => ({ ...column, confirmed, commanded }));
+  /** Applies the authoritative LAW state reported by the rover. */
+  setLawTelemetry(state: LawMode | null): void {
+    this.updateColumn('LAW', (column) => ({ ...column, confirmed: state }));
+  }
+
+  /** Applies independent Arm Override telemetry reported inside the FMA bundle. */
+  setArmOverrideTelemetry(
+    state: ArmOverrideState | null,
+    pending: ArmOverrideCommand | null,
+  ): void {
+    this.armOverrideTelemetryState.set({ state, pending });
   }
 
   /** Applies authoritative SYSTEM telemetry, or clears it when unknown. */

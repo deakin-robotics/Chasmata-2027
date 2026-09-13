@@ -29,12 +29,12 @@ When an operator selects a mode from the GUI, the request is sent to the rover.
 The rover broadcasts the pending requested mode, which is shown in **blue** by
 every GUI while the command is waiting for acknowledgement.
 
-The same rule applies to the Arm protection override. A requested `DIRECT`
-override is shown as blue `OVERRIDE` on the LAW column's third row while the
-confirmed LAW remains its underlying `NORMAL` or `ALTERNATE` value. It changes to red `OVERRIDE` only after the
-rover broadcasts confirmed `DIRECT`. If the rover cannot enable the override
-yet, it keeps broadcasting the pending request so every GUI shows the same
-blue `OVERRIDE`.
+The same rule applies to Arm Override. When Arm Ops selects Override, the
+request is shown as blue `OVERRIDE` on the LAW column's third row while the
+confirmed LAW remains its underlying `NORMAL` or `ALTERNATE` value. It changes
+to red `OVERRIDE` only after the rover broadcasts confirmed `DIRECT`. If the
+rover cannot enable the override yet, it keeps broadcasting the pending request
+so every GUI shows the same blue `OVERRIDE`.
 
 At GUI startup, Driver defaults to `VELOCITY` and Arm defaults to `POSITION`.
 While the rover connection is unavailable, these remain local selections and
@@ -155,19 +155,37 @@ The **rover-side low-level soft end-stop protection remains active**, so the arm
 
 ### `DIRECT`
 
-Protection override deliberately selected.
+Neither soft-protection layer can be relied on.
 
-Normal soft-limit protection is bypassed to give Arm Ops direct authority when required. The physical/system safety mechanisms, including E-STOP, still remain available.
+`DIRECT` may be confirmed after Arm Ops selects Override, or reported directly
+by the rover when GUI-side and rover-side protection are both unavailable.
+Normal soft-limit protection is therefore unavailable or bypassed. The
+physical/system safety mechanisms, including E-STOP, still remain available.
 
-If Arm Ops selects the override:
+Arm Ops selects **Override**, not `DIRECT`:
 
-`LAW: NORMAL → DIRECT`
+`ARM OVERRIDE: SELECT → LAW: OVERRIDE PENDING → LAW: DIRECT CONFIRMED`
 
 The LAW column's third row displays `OVERRIDE` in blue while `DIRECT` is
 pending, then red once the rover confirms `DIRECT`. The confirmed LAW value
 stays at the underlying `NORMAL` or `ALTERNATE` law during the pending period.
-When Arm Ops releases the override, the GUI sends `RESTORE`; the rover returns
-to the law that was active before `DIRECT`.
+When Arm Ops releases an Override-originated `DIRECT`, the GUI sends the
+independent `DISABLE` command on `/arm/override/request`; the rover returns to
+the law that its protection evaluator determines. For an automatically
+reported `DIRECT`, the rover reports recovery to `NORMAL` or `ALTERNATE` when
+protection becomes available again.
+
+The FMA report bundles both independent results in one telemetry message:
+
+```json
+{
+  "law": "DIRECT",
+  "arm_override": {"state": "ACTIVE", "pending": null}
+}
+```
+
+`DIRECT` with an inactive Override is therefore a valid report when the LAW
+evaluator detects that both protection layers are unavailable.
 
 ---
 
@@ -323,6 +341,7 @@ Emergency stop is active. Actuation is disabled and a deliberate reset/re-arm ac
 |---|---|---|
 | **DRIVE** | Current drivetrain control method | `MANUAL`, `VELOCITY`, `MANAGED •` |
 | **ARM** | Current arm control/configuration | `MANUAL`, `POSITION`, `MANAGED •`, `STOWED` |
-| **LAW** | Arm protection level and override request | `NORMAL`, `ALTERNATE`, `DIRECT`; blue/red `OVERRIDE` |
+| **LAW** | Rover-reported arm protection state | `NORMAL`, `ALTERNATE`, `DIRECT` |
+| **ARM OVERRIDE** | Independent Arm Override status reported in the FMA bundle | `INACTIVE`, `ACTIVE`; pending `ENABLE`/`DISABLE` |
 | **GIMBAL** | Existing Gimbal Priority owner indicator | `← DRIVER`, `ARM OPS →`, `PRIORITY UNK` |
 | **SYSTEM** | Overall rover/control-stack health | `GOOD`, `DEGRADED`, `FAULT`, `E-STOP` |

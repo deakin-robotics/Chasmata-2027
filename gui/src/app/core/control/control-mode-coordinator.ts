@@ -1,7 +1,7 @@
 import { Service, effect, inject, untracked } from '@angular/core';
 
 import { ArmControlMode, ArmControlModeService } from './arm/arm-control-mode';
-import { ControlModeCommandPublisher } from './control-mode-command-publisher';
+import { ControlCommandPublisher } from './control-command-publisher';
 import { DriverControlMode, DriverControlModeService } from './drive/drive-control-mode';
 import { FmaStateService } from '../fma/fma-state.service';
 import { RosConnection } from '../ros/ros-connection';
@@ -13,7 +13,7 @@ export class ControlModeCoordinator {
   private readonly armControlMode = inject(ArmControlModeService);
   private readonly fmaState = inject(FmaStateService);
   private readonly rosConnection = inject(RosConnection);
-  private readonly commandPublisher = inject(ControlModeCommandPublisher);
+  private readonly commandPublisher = inject(ControlCommandPublisher);
 
   private readonly connectionEffect = effect(() => {
     const connected = this.rosConnection.isConnected();
