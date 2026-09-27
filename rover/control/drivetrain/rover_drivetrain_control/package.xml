@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<?xml-model
+  href="http://download.ros.org/schema/package_format3.xsd"
+  schematypens="http://www.w3.org/2001/XMLSchema"?>
+
+<package format="3">
+  <name>rover_drivetrain_control</name>
+  <version>0.0.1</version>
+
+  <description>
+    BLD-305S Modbus RTU driver and ros2_control hardware interface
+    for the four-wheel rover drivetrain.
+  </description>
+
+  <!-- Replace with the actual package maintainer before release/submission. -->
+  <maintainer email="maintainer@example.com">Rover Team</maintainer>
+
+  <!-- Change this if the project uses a different license. -->
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- Required by find_package(PkgConfig REQUIRED) in CMakeLists.txt. -->
+  <buildtool_depend>pkg-config</buildtool_depend>
+
+  <depend>hardware_interface</depend>
+  <depend>pluginlib</depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_lifecycle</depend>
+
+  <!--
+    System dependency providing libmodbus headers and library.
+
+    VERIFY ON TARGET:
+    Confirm that libmodbus-dev is the correct rosdep key for the installed
+    ROS 2 Jazzy / Ubuntu environment before treating this dependency as final.
+  -->
+  <depend>libmodbus-dev</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
