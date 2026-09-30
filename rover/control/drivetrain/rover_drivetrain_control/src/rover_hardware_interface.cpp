@@ -495,6 +495,17 @@ bool RoverHardwareInterface::parseConfiguration()
     return false;
   }
 
+  if (
+    bus_configs_[busIndex(BusId::LEFT)].device ==
+    bus_configs_[busIndex(BusId::RIGHT)].device)
+  {
+    RCLCPP_ERROR(
+      logger(),
+      "The left and right RS485 buses must use different serial devices.");
+
+    return false;
+  }
+
   for (std::size_t wheel = 0; wheel < WHEEL_COUNT; ++wheel) {
     const auto & joint = hardware_info_.joints[wheel];
 
