@@ -210,13 +210,10 @@ RoverHardwareInterface::on_deactivate(
   (void)previous_state;
 
   if (active_) {
-    active_ = false;
-
     RCLCPP_ERROR(
       logger(),
-      "Deactivation reached from ACTIVE state, but a verified motor-stop "
-      "sequence is not implemented. Refusing to report successful "
-      "deactivation.");
+      "Cannot deactivate safely because the verified motor-stop sequence "
+      "is not implemented.");
 
     return hardware_interface::CallbackReturn::ERROR;
   }
