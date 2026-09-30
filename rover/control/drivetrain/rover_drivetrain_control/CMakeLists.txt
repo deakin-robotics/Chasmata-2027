@@ -73,7 +73,7 @@ ament_target_dependencies(
 
 target_link_libraries(
   ${PROJECT_NAME}
-  PkgConfig::LIBMODBUS
+  PRIVATE PkgConfig::LIBMODBUS
 )
 
 # ---------------------------------------------------------------------------
