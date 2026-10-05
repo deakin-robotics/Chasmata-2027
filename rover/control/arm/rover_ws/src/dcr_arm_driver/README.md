@@ -40,3 +40,23 @@ git clone <repository-url>/dcr_arm_driver
 cd 
 colcon build --packages-select dcr_arm_driver
 source install/setup.bash
+```
+### Testing
+
+Start the driver:
+```bash
+ros2 run dcr_arm_driver arm_controller_node
+```
+
+Send a command:
+'''bash
+ros2 topic pub /joint_commands sensor_msgs/JointState \
+  '{header: {frame_id: "base"}, 
+    name: ["j1", "j2", "j3", "j4", "j5", "j6"], 
+    position: [0.1, 0.1, 0.1, 0, 0, 0]}'
+'''
+
+Monitor respond:
+```bash
+ros2 topic echo /motor_stat_1
+```
