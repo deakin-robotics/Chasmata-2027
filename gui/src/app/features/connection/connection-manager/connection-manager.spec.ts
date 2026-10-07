@@ -16,7 +16,7 @@ describe('ConnectionManager', () => {
     fixture = TestBed.createComponent(ConnectionManager);
     component = fixture.componentInstance;
     rosConnection = TestBed.inject(RosConnection);
-    await fixture.whenStable();
+    fixture.detectChanges();
   });
 
   it('should render the initial disconnected state', () => {
