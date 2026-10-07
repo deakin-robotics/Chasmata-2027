@@ -1,3 +1,5 @@
+import { environment } from '../../../environments/environment';
+
 export type CameraId = 'front' | 'gimbal' | 'arm';
 
 export interface CameraSource {
@@ -6,11 +8,7 @@ export interface CameraSource {
   readonly whepUrl: string;
 }
 
-/**
- * The local development gateway. Deployment configuration can replace this
- * value when the GUI is pointed at the rover media gateway.
- */
-export const CAMERA_GATEWAY_URL = 'http://localhost:8889';
+export const CAMERA_GATEWAY_URL = environment.cameraGatewayUrl;
 
 export const CAMERA_SOURCES: Readonly<Record<CameraId, CameraSource>> = {
   front: {

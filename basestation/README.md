@@ -19,7 +19,9 @@ The stack starts:
   planning groups;
 - an `arm_moveit_bridge` node that owns MoveIt2 planning and rover action
   execution;
-- an identity `world` to `base_link` transform and robot state publisher.
+- an identity `world` to `base_link` transform and robot state publisher;
+- a MediaMTX gateway receiving rover RTSP streams on `8554` and serving WHEP
+  playback on `8889` with WebRTC ICE on UDP `8189`.
 
 This stack does not run a mock rover or ROSbridge. For local testing, start
 `test/mock_rover` first, then start this stack. The GUI always connects to the
@@ -29,9 +31,15 @@ mock rover at:
 ws://localhost:9090
 ```
 
+The mock rover's synthetic camera publishers send RTSP to this stack through
+`host.docker.internal:8554`. The GUI reads the resulting WHEP feeds from
+`http://localhost:8889`.
+
 For production, Command copies `.env.example` to `.env` and starts the normal
 Compose file with `docker compose -f docker-compose.yml up --build`. The rover must expose UDP port
-`11811` at `rover.local`; the base station joins the rover automatically.
+`11811` at `rover.local`; the base station joins the rover automatically. The
+rover camera pipeline must also be able to publish RTSP to the base station's
+TCP `8554` listener.
 `docker-compose.local.yml` is local-test-only.
 
 The MoveIt container stays running after launch. In another terminal, run the

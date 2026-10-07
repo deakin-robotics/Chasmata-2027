@@ -10,6 +10,7 @@ import {
   RosConnection,
   RosConnectionStatus,
 } from '../../../core/ros/ros-connection';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-connection-manager',
@@ -28,10 +29,12 @@ export class ConnectionManager {
   readonly rosConnection = inject(RosConnection);
   private readonly dialogRef = inject(MatDialogRef<ConnectionManager>, { optional: true });
 
-  readonly endpoint = new FormControl(this.rosConnection.url() ?? 'rover.local:9090', {
+  readonly endpoint = new FormControl(this.rosConnection.url() ?? environment.rosbridgeUrl, {
     nonNullable: true,
     validators: [Validators.required],
   });
+
+  readonly defaultEndpoint = environment.rosbridgeUrl;
 
   readonly canDisconnect = computed(() => {
     const status = this.rosConnection.status();

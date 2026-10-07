@@ -127,8 +127,9 @@ The mock rover owns ROSbridge. The base-station stack joins it for MoveIt2
 planning and does not expose another GUI endpoint.
 
 For local WebRTC camera development and validation, see
-[WebRTC camera stream](docs/webrtc-camera-stream.md). It covers the mock-rover
-Compose stack, WHEP endpoints, video configuration, and smoke testing.
+[WebRTC camera stream](docs/webrtc-camera-stream.md). It covers the
+base-station MediaMTX gateway, mock-rover RTSP publishers, WHEP endpoints,
+video configuration, and smoke testing.
 
 ## 🏗️ Architecture
 

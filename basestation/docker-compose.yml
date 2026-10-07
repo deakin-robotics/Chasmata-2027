@@ -1,4 +1,15 @@
 services:
+  media-gateway:
+    image: bluenviron/mediamtx:1.21.1
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml:ro
+    ports:
+      - '${MEDIA_RTSP_PORT:-8554}:8554'
+      - '${MEDIA_WEBRTC_PORT:-8889}:8889'
+      - '${MEDIA_WEBRTC_UDP_PORT:-8189}:8189/udp'
+      - '${MEDIA_API_PORT:-9997}:9997'
+    restart: unless-stopped
+
   moveit2:
     build:
       context: ..

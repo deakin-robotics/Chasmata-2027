@@ -1,4 +1,9 @@
 services:
+  media-gateway:
+    extends:
+      file: docker-compose.yml
+      service: media-gateway
+
   moveit2:
     extends:
       file: docker-compose.yml

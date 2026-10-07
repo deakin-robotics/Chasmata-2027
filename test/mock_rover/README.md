@@ -13,18 +13,18 @@ docker compose up --build
 ```
 
 The Compose stack runs the mock node and ROSbridge on port `9090`, a rover-side
-discovery service on UDP port `11811`, a MediaMTX WebRTC gateway on port
-`8889`, and three synthetic H.264 camera publishers. Connect the GUI normally
-to:
+discovery service on UDP port `11811`, and three synthetic H.264 RTSP
+publishers. The MediaMTX gateway runs in the base-station stack. Connect the
+GUI normally to:
 
 ```text
 ws://localhost:9090
 ```
 
-Start this stack before the base station. Once both are running, MoveIt2 joins
-the mock rover graph; the GUI still uses only `ws://localhost:9090`. Start the
-base station with its local Compose command in a separate terminal when IK
-testing is needed.
+Start this stack before the base station. The synthetic publishers target the
+base-station gateway at `host.docker.internal:8554` by default and retry while
+that gateway is unavailable. Once both stacks are running, MoveIt2 joins the
+mock rover graph and the GUI still uses only `ws://localhost:9090`.
 
 The GUI dashboards use these WHEP camera feeds automatically:
 
@@ -36,7 +36,8 @@ Gimbal camera: http://localhost:8889/gimbal/whep
 
 The default synthetic profile is 1280×720 at 30 FPS using H.264. Override it
 with `MEDIA_WIDTH`, `MEDIA_HEIGHT`, `MEDIA_FPS`, `MEDIA_BITRATE_KBPS`,
-`MEDIA_BUFFER_KBPS`, and `MEDIA_KEYFRAME_INTERVAL`.
+`MEDIA_BUFFER_KBPS`, `MEDIA_KEYFRAME_INTERVAL`, `MEDIA_GATEWAY_HOST`, and
+`MEDIA_GATEWAY_RTSP_PORT`.
 
 ## Simulated behaviour
 
@@ -67,8 +68,8 @@ with `MEDIA_WIDTH`, `MEDIA_HEIGHT`, `MEDIA_FPS`, `MEDIA_BITRATE_KBPS`,
   it applies only the J4-J6 wrist input. Partial trajectory execution
   preserves the other joints.
 - Publishes actual arm state on `/joint_states` at 10 Hz.
-- Publishes distinct synthetic H.264 feeds to the MediaMTX `front`, `gimbal`,
-  and `arm` paths for browser WHEP testing.
+- Publishes distinct synthetic H.264 RTSP feeds to the base-station MediaMTX
+  `front`, `gimbal`, and `arm` paths for browser WHEP testing.
 
 The default joint names match the current GUI URDF:
 

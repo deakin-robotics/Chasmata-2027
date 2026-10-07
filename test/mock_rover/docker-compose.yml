@@ -24,20 +24,12 @@ services:
       - discovery
     restart: unless-stopped
 
-  media-gateway:
-    image: bluenviron/mediamtx:1.21.1
-    volumes:
-      - ./mediamtx.yml:/mediamtx.yml:ro
-    ports:
-      - '${MEDIA_WEBRTC_PORT:-8889}:8889'
-      - '${MEDIA_WEBRTC_UDP_PORT:-8189}:8189/udp'
-      - '${MEDIA_API_PORT:-9997}:9997'
-    restart: unless-stopped
-
   media-source:
     image: bluenviron/mediamtx:1.21.1-ffmpeg
     entrypoint: ['/bin/sh', '/run-test-sources.sh']
     environment:
+      MEDIA_GATEWAY_HOST: '${MEDIA_GATEWAY_HOST:-host.docker.internal}'
+      MEDIA_GATEWAY_RTSP_PORT: '${MEDIA_GATEWAY_RTSP_PORT:-8554}'
       MEDIA_WIDTH: '${MEDIA_WIDTH:-1280}'
       MEDIA_HEIGHT: '${MEDIA_HEIGHT:-720}'
       MEDIA_FPS: '${MEDIA_FPS:-30}'
@@ -46,8 +38,8 @@ services:
       MEDIA_KEYFRAME_INTERVAL: '${MEDIA_KEYFRAME_INTERVAL:-30}'
     volumes:
       - ./run-test-sources.sh:/run-test-sources.sh:ro
-    depends_on:
-      - media-gateway
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     restart: unless-stopped
 
 networks:

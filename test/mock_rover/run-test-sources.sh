@@ -7,6 +7,8 @@ set -eu
 : "${MEDIA_BITRATE_KBPS:=2500}"
 : "${MEDIA_BUFFER_KBPS:=5000}"
 : "${MEDIA_KEYFRAME_INTERVAL:=30}"
+: "${MEDIA_GATEWAY_HOST:=host.docker.internal}"
+: "${MEDIA_GATEWAY_RTSP_PORT:=8554}"
 
 pids=""
 
@@ -44,7 +46,7 @@ publish_stream() {
     -bf 0 \
     -f rtsp \
     -rtsp_transport tcp \
-    "rtsp://media-gateway:8554/${name}" &
+    "rtsp://${MEDIA_GATEWAY_HOST}:${MEDIA_GATEWAY_RTSP_PORT}/${name}" &
 
   pids="$pids $!"
 }

@@ -1,8 +1,8 @@
 # WebRTC camera stream
 
-The GUI reads rover cameras through WebRTC. MediaMTX is the rover-side media
-gateway: it receives H.264 camera feeds over RTSP and presents each feed to a
-browser through a WHEP playback endpoint.
+The GUI reads rover cameras through WebRTC. MediaMTX runs on the base station:
+it receives H.264 camera feeds over RTSP from the rover-side camera pipeline
+and presents each feed to operator browsers through a WHEP playback endpoint.
 
 This document defines the camera contract and the local stack used to develop
 and validate it. It does not define camera hardware, radio settings, or rover
@@ -12,18 +12,21 @@ control/telemetry behavior.
 
 ```mermaid
 flowchart LR
-    subgraph rover["Rover or local Docker network"]
+    subgraph rover["Rover or mock-rover Docker network"]
         front["Front source\nH.264"]
         gimbal["Gimbal source\nH.264"]
         arm["Arm source\nH.264"]
+    end
+
+    subgraph base["Base station"]
         gateway["MediaMTX\nRTSP ingest :8554"]
         paths["Named paths\nfront · gimbal · arm"]
-
-        front -->|"RTSP over TCP"| gateway
-        gimbal -->|"RTSP over TCP"| gateway
-        arm -->|"RTSP over TCP"| gateway
         gateway --> paths
     end
+
+    front -->|"RTSP over TCP :8554"| gateway
+    gimbal -->|"RTSP over TCP :8554"| gateway
+    arm -->|"RTSP over TCP :8554"| gateway
 
     subgraph browser["Operator browser"]
         viewer["CameraStream\n(Camera Session Coordinator)"]
@@ -39,8 +42,9 @@ flowchart LR
 ```
 
 The synthetic development sources use FFmpeg to publish visually distinct
-H.264 RTSP feeds. A production camera pipeline must likewise provide H.264 or
-RTSP input to MediaMTX; it is not coupled to the browser implementation.
+H.264 RTSP feeds to the base-station gateway. A production camera pipeline
+must likewise provide H.264 or RTSP input to MediaMTX; it is not coupled to
+the browser implementation.
 
 ## Camera contract
 
@@ -51,6 +55,21 @@ RTSP input to MediaMTX; it is not coupled to the browser implementation.
 | `front` | Front camera | `http://localhost:8889/front/whep` |
 | `gimbal` | Gimbal camera | `http://localhost:8889/gimbal/whep` |
 | `arm` | Arm camera | `http://localhost:8889/arm/whep` |
+
+The gateway host is configured at build time through the Angular environment
+files:
+
+```ts
+// src/environments/environment.ts
+export const environment = {
+  cameraGatewayUrl: 'http://localhost:8889',
+};
+```
+
+The production build replaces this file with
+`src/environments/environment.production.ts`. Set its value to the base-station
+address, such as `http://basestation.local:8889`, before building the GUI. The
+WHEP paths remain unchanged.
 
 Each `CameraStream` creates its own reader and WebRTC session. Two operators
 can therefore view the Gimbal simultaneously without sharing a browser video
@@ -88,16 +107,25 @@ Recovery ownership is deliberately split:
 
 ## Local development runbook
 
-Start the complete mock rover and media stack from `test/mock_rover`:
+Start the mock rover first from `test/mock_rover`:
 
 ```bash
 docker compose up --build
 ```
 
-This starts ROSbridge on `9090`, MediaMTX WHEP/HTTP on `8889`, WebRTC UDP/ICE
-on `8189`, the development-only MediaMTX API on `9997`, and the three
-synthetic publishers. The RTSP ingest listener on `8554` stays inside the
-Docker network.
+Then start the base-station stack from `basestation`:
+
+```bash
+docker compose -f docker-compose.local.yml up --build
+```
+
+The mock rover starts ROSbridge on `9090`, discovery on UDP `11811`, and the
+three synthetic RTSP publishers. The base station exposes MediaMTX RTSP ingest
+on TCP `8554`, WHEP/HTTP on `8889`, WebRTC UDP/ICE on `8189`, and its
+development-only API on `9997`.
+
+On Windows, the mock publishers reach the base gateway through
+`host.docker.internal:8554`.
 
 Then start the GUI from `gui` with `npm start` and open
 <http://localhost:4200>. The Front, Gimbal, and Arm views should become
@@ -114,6 +142,8 @@ The synthetic source profile can be configured before `docker compose up`:
 | `MEDIA_BITRATE_KBPS` | `2500` | H.264 target and maximum bitrate. |
 | `MEDIA_BUFFER_KBPS` | `5000` | H.264 encoder buffer size. |
 | `MEDIA_KEYFRAME_INTERVAL` | `30` | H.264 GOP/keyframe interval in frames. |
+| `MEDIA_GATEWAY_HOST` | `host.docker.internal` | Hostname receiving the synthetic RTSP feeds. |
+| `MEDIA_GATEWAY_RTSP_PORT` | `8554` | RTSP ingest port on the base station. |
 
 For example, start a lower-bandwidth profile with:
 
@@ -130,7 +160,8 @@ docker compose up --build
 | --- | --- |
 | `unavailable` immediately | Confirm the browser supports `RTCPeerConnection` and `public/mediamtx/reader.js` is served by the GUI. |
 | A camera remains `connecting` or retries | Check MediaMTX logs and verify the expected path is receiving its publisher. |
-| Browser cannot reach WHEP | Confirm port `8889` is published and the GUI origin is allowed by `webrtcAllowOrigins`. |
+| Browser cannot reach WHEP | Confirm base-station port `8889` is published, the Angular environment points to the base station, and the GUI origin is allowed by `webrtcAllowOrigins`. Rebuild after changing it. |
+| Synthetic source cannot publish | Confirm the base station is running and port `8554` is reachable from the mock publisher; override `MEDIA_GATEWAY_HOST` if needed. |
 | A remote rover works locally but not over the radio | Ensure the rover advertises a reachable media host and UDP `8189` is permitted end-to-end; ICE and firewall/radio configuration are deployment work. |
 | Compose cannot start | Start Docker Desktop's Linux engine, then rerun `docker compose up --build`. |
 
