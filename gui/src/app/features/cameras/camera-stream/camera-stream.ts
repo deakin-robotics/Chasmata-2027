@@ -1,84 +1,62 @@
 import {
+  AfterViewInit,
   Component,
   ElementRef,
-  EventEmitter,
   HostListener,
   Input,
-  inject,
   OnChanges,
-  Output,
   OnDestroy,
   SimpleChanges,
   ViewChild,
   computed,
-  effect,
   signal,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
-import { RosConnection } from '../../../core/ros/ros-connection';
 import { UnavailableOverlay } from '../../../shared/unavailable-overlay/unavailable-overlay';
-import { CameraStreamSettingsDialog } from './camera-stream-settings-dialog/camera-stream-settings-dialog';
+import { CameraSource } from '../camera-sources';
+import { WhepClient, WhepReaderState } from './whep-client';
 
 export type CameraStreamStatus =
-  'not-configured' | 'loading' | 'streaming' | 'reconnecting' | 'error' | 'unavailable';
+  | 'not-configured'
+  | 'connecting'
+  | 'streaming'
+  | 'reconnecting'
+  | 'error'
+  | 'unavailable';
 
 const RETRY_DELAY_MS = 5_000;
-const MAX_RETRY_ATTEMPTS = 10; // Max attempts before giving up
-const LOAD_TIMEOUT_MS = 10_000; // Max wait for stream to load before giving up
+const MAX_RETRY_ATTEMPTS = 10;
 
-/**
- * Displays and recovers one HTTP/MJPEG camera stream.
- *
- * The parent dashboard supplies the camera identity and URL. This component is
- * deliberately unaware of whether it represents a front, rear, side, or arm
- * camera so it can be reused in both operator views.
- */
+/** Displays and recovers one receive-only WHEP camera session. */
 @Component({
   selector: 'app-camera-stream',
   imports: [MatButtonModule, MatIconModule, UnavailableOverlay],
   templateUrl: './camera-stream.html',
   styleUrl: './camera-stream.scss',
 })
-export class CameraStream implements OnChanges, OnDestroy {
+export class CameraStream implements AfterViewInit, OnChanges, OnDestroy {
   @Input() label = 'Camera';
-  @Input() url = '';
-  @Input() initialRotation = 0; // The initial rotation of the camera in degree. In case the camera is mounted upside down
-  @Output() readonly urlChange = new EventEmitter<string>();
+  @Input() source: CameraSource | null = null;
+  @Input() initialRotation = 0;
 
   @ViewChild('streamFrame') private streamFrame?: ElementRef<HTMLElement>;
+  @ViewChild('streamVideo') private streamVideo?: ElementRef<HTMLVideoElement>;
 
-  private loadTimer: ReturnType<typeof setTimeout> | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
-  private readonly dialog = inject(MatDialog);
-  private readonly rosConnection = inject(RosConnection);
+  private session: WhepClient | null = null;
+  private connectionGeneration = 0;
+  private viewReady = false;
 
   readonly status = signal<CameraStreamStatus>('not-configured');
   readonly retryAttempt = signal(0);
   readonly rotation = signal(0);
-  readonly streamUrl = signal<string | null>(null);
   readonly isFullscreen = signal(false);
-  private readonly configuredUrl = signal('');
-  readonly rosConnected = this.rosConnection.isConnected;
-
-  private readonly connectionEffect = effect(() => {
-    const connected = this.rosConnected();
-    const url = this.configuredUrl();
-
-    if (connected && url.trim()) {
-      this.beginLoading();
-    } else if (connected) {
-      this.setNotConfigured();
-    } else {
-      this.setUnavailable();
-    }
-  });
 
   readonly statusLabel = computed(() => {
     switch (this.status()) {
-      case 'loading':
-        return 'Loading';
+      case 'connecting':
+        return 'Connecting';
       case 'streaming':
         return 'Live';
       case 'reconnecting':
@@ -94,14 +72,11 @@ export class CameraStream implements OnChanges, OnDestroy {
 
   readonly statusIcon = computed(() => {
     switch (this.status()) {
-      case 'loading':
+      case 'connecting':
       case 'reconnecting':
         return 'sync';
       case 'streaming':
         return 'videocam';
-      case 'unavailable':
-      case 'error':
-        return 'videocam_off';
       default:
         return 'videocam_off';
     }
@@ -109,45 +84,34 @@ export class CameraStream implements OnChanges, OnDestroy {
 
   readonly isConnecting = computed(() => {
     const status = this.status();
-    return status === 'loading' || status === 'reconnecting';
+    return status === 'connecting' || status === 'reconnecting';
   });
+
+  ngAfterViewInit(): void {
+    this.viewReady = true;
+    this.updateConfiguration();
+  }
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['initialRotation']) {
       this.rotation.set(this.normalizeRotation(this.initialRotation));
     }
 
-    if (changes['url']) {
-      this.configuredUrl.set(this.url);
-      this.retryAttempt.set(0);
-    }
+    if (changes['source'] && this.viewReady) this.updateConfiguration();
   }
 
   ngOnDestroy(): void {
-    this.clearTimers();
-  }
-
-  onImageLoad(): void {
-    if (!this.rosConnected()) return;
-
-    this.clearLoadTimer();
-    this.retryAttempt.set(0);
-    this.status.set('streaming');
-  }
-
-  onImageError(): void {
-    if (!this.rosConnected()) return;
-
-    this.clearLoadTimer();
-    this.scheduleRetry();
+    this.viewReady = false;
+    this.clearRetryTimer();
+    void this.disposeSession();
   }
 
   retry(): void {
-    if (!this.rosConnected()) return;
+    if (!this.source) return;
 
-    this.clearTimers();
+    this.clearRetryTimer();
     this.retryAttempt.set(0);
-    this.beginLoading();
+    void this.connect();
   }
 
   rotateClockwise(): void {
@@ -156,21 +120,6 @@ export class CameraStream implements OnChanges, OnDestroy {
 
   rotateCounterClockwise(): void {
     this.rotation.update((rotation) => this.normalizeRotation(rotation - 90));
-  }
-
-  openSettings(): void {
-    this.dialog
-      .open(CameraStreamSettingsDialog, {
-        data: { label: this.label, url: this.configuredUrl() },
-      })
-      .afterClosed()
-      .subscribe((url: string | undefined) => {
-        if (url === undefined || url === this.configuredUrl()) return;
-
-        this.configuredUrl.set(url);
-        this.urlChange.emit(url);
-        this.retryAttempt.set(0);
-      });
   }
 
   async toggleFullscreen(): Promise<void> {
@@ -182,9 +131,7 @@ export class CameraStream implements OnChanges, OnDestroy {
       return;
     }
 
-    if (frame.requestFullscreen) {
-      await frame.requestFullscreen();
-    }
+    await frame.requestFullscreen?.();
   }
 
   @HostListener('document:fullscreenchange')
@@ -192,95 +139,107 @@ export class CameraStream implements OnChanges, OnDestroy {
     this.isFullscreen.set(document.fullscreenElement === this.streamFrame?.nativeElement);
   }
 
-  /** Starts a fresh stream request and its load-timeout watchdog. */
-  private beginLoading(): void {
-    const url = this.configuredUrl().trim();
-    this.clearTimers();
+  private updateConfiguration(): void {
+    this.clearRetryTimer();
+    this.retryAttempt.set(0);
 
-    if (!this.rosConnected()) {
-      this.setUnavailable();
+    if (!this.source) {
+      this.status.set('not-configured');
+      void this.disposeSession();
       return;
     }
 
-    if (!url) {
-      this.setNotConfigured();
-      return;
-    }
-
-    this.status.set('loading');
-    this.streamUrl.set(this.withCacheBuster(url));
-    this.loadTimer = setTimeout(() => this.onLoadTimeout(), LOAD_TIMEOUT_MS);
+    void this.connect();
   }
 
-  private onLoadTimeout(): void {
-    if (this.status() !== 'loading') return;
+  private async connect(): Promise<void> {
+    const source = this.source;
+    const video = this.streamVideo?.nativeElement;
+    if (!source || !video || !this.viewReady) {
+      this.status.set(source ? 'unavailable' : 'not-configured');
+      return;
+    }
 
+    if (typeof RTCPeerConnection === 'undefined' || typeof window.MediaMTXWebRTCReader !== 'function') {
+      this.status.set('unavailable');
+      return;
+    }
+
+    const generation = ++this.connectionGeneration;
+    await this.disposeSession();
+    if (generation !== this.connectionGeneration || !this.viewReady) return;
+
+    this.status.set(this.retryAttempt() > 0 ? 'reconnecting' : 'connecting');
+    video.srcObject = null;
+
+    const session = new WhepClient({
+      onStateChange: (state) => this.onReaderStateChange(generation, state),
+    });
+    this.session = session;
+
+    try {
+      session.connect(source.whepUrl, video);
+      if (generation !== this.connectionGeneration || this.session !== session) {
+        session.close();
+        return;
+      }
+    } catch {
+      if (generation === this.connectionGeneration && this.session === session) {
+        this.disposeSession();
+        this.scheduleRetry();
+      }
+    }
+  }
+
+  private onReaderStateChange(generation: number, state: WhepReaderState): void {
+    if (generation !== this.connectionGeneration || !this.session) return;
+
+    if (state === 'streaming') {
+      this.retryAttempt.set(0);
+      this.status.set('streaming');
+      return;
+    }
+
+    if (state === 'reconnecting') {
+      this.status.set('reconnecting');
+      return;
+    }
+
+    this.disposeSession();
     this.scheduleRetry();
   }
 
-  /** Schedules the next stream load attempt after a fixed delay. */
   private scheduleRetry(): void {
-    if (!this.rosConnected()) {
-      this.setUnavailable();
-      return;
-    }
+    if (!this.source || !this.viewReady || this.retryTimer) return;
 
-    if (!this.configuredUrl().trim()) {
-      this.setNotConfigured();
-      return;
-    }
-
-    const previousAttempt = this.retryAttempt();
-    if (previousAttempt >= MAX_RETRY_ATTEMPTS) {
-      this.streamUrl.set(null);
+    const attempt = this.retryAttempt() + 1;
+    if (attempt > MAX_RETRY_ATTEMPTS) {
       this.status.set('error');
       return;
     }
 
-    this.clearTimers();
-    this.retryAttempt.set(previousAttempt + 1);
+    this.retryAttempt.set(attempt);
     this.status.set('reconnecting');
-    this.retryTimer = setTimeout(() => this.beginLoading(), RETRY_DELAY_MS);
-  }
-
-  /** Cancels any pending stream-load timeout and reconnect retry. */
-  private clearTimers(): void {
-    this.clearLoadTimer();
-
-    if (this.retryTimer) {
-      clearTimeout(this.retryTimer);
+    this.retryTimer = setTimeout(() => {
       this.retryTimer = null;
-    }
+      void this.connect();
+    }, RETRY_DELAY_MS);
   }
 
-  /** Cancels only the timeout that detects a stream which never loads. */
-  private clearLoadTimer(): void {
-    if (this.loadTimer) {
-      clearTimeout(this.loadTimer);
-      this.loadTimer = null;
-    }
+  private async disposeSession(): Promise<void> {
+    const session = this.session;
+    this.session = null;
+    if (session) await session.close();
   }
 
-  private setNotConfigured(): void {
-    this.clearTimers();
-    this.streamUrl.set(null);
-    this.status.set('not-configured');
+  private clearRetryTimer(): void {
+    if (!this.retryTimer) return;
+
+    clearTimeout(this.retryTimer);
+    this.retryTimer = null;
   }
 
-  private setUnavailable(): void {
-    this.clearTimers();
-    this.streamUrl.set(null);
-    this.status.set('unavailable');
-  }
-
-  /** Adds a changing query value so browsers request a fresh stream URL. */
-  private withCacheBuster(url: string): string {
-    const separator = url.includes('?') ? '&' : '?';
-    return `${url}${separator}_retry=${Date.now()}_${this.retryAttempt()}`;
-  }
-
-  /** Keeps a rotation value within the standard 0–359 degree range. */
-  private normalizeRotation(rotation: number): number {
-    return ((rotation % 360) + 360) % 360;
+  private normalizeRotation(value: number): number {
+    return ((value % 360) + 360) % 360;
   }
 }

@@ -16,6 +16,10 @@ docker compose up --build
 The stack starts:
 
 - an isolated mock rover and ROSbridge on `ws://localhost:19090`;
+- a MediaMTX WebRTC gateway on `http://localhost:8889` with Front, Gimbal, and
+  Arm WHEP camera feeds;
+- three configurable 720p30 H.264 synthetic camera sources for integration
+  testing;
 - a headless MoveIt 2 `move_group` node with the `position_arm` and `arm`
   planning groups;
 - an `arm_moveit_bridge` node that owns MoveIt2 planning and rover action
@@ -24,8 +28,10 @@ The stack starts:
 
 If the GUI should connect to this isolated rover, use `localhost:19090` as its
 ROSbridge endpoint. The port defaults can be overridden with
-`MOVEIT2_ROSBRIDGE_PORT`, `MOVEIT2_FRONT_CAMERA_PORT`,
-`MOVEIT2_GIMBAL_CAMERA_PORT`, and `MOVEIT2_ARM_CAMERA_PORT`.
+`MOVEIT2_ROSBRIDGE_PORT`, `MOVEIT2_WEBRTC_PORT`, `MOVEIT2_WEBRTC_UDP_PORT`, and
+`MOVEIT2_MEDIA_API_PORT`. The synthetic camera profile can be changed with
+`MEDIA_WIDTH`, `MEDIA_HEIGHT`, `MEDIA_FPS`, `MEDIA_BITRATE_KBPS`,
+`MEDIA_BUFFER_KBPS`, and `MEDIA_KEYFRAME_INTERVAL`.
 
 The MoveIt container stays running after launch. In another terminal, run the
 planning demo:

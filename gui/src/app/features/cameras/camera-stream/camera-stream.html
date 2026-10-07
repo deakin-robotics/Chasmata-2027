@@ -8,23 +8,21 @@
   </header>
 
   <div #streamFrame class="stream-frame" [class.fullscreen]="isFullscreen()">
-    @if (rosConnected()) {
-      @if (streamUrl(); as activeUrl) {
-        <img
-          class="stream-image"
-          [src]="activeUrl"
-          [style.transform]="'rotate(' + rotation() + 'deg)'"
-          (load)="onImageLoad()"
-          (error)="onImageError()"
-        />
-      } @else {
-        <div class="empty-state">
-          <mat-icon aria-hidden="true">videocam_off</mat-icon>
-          <p>
-            {{ status() === 'error' ? 'Camera stream unavailable' : 'No stream URL configured' }}
-          </p>
-        </div>
-      }
+    @if (source) {
+      <video
+        #streamVideo
+        class="stream-video"
+        autoplay
+        muted
+        playsinline
+        [attr.aria-label]="label + ' live feed'"
+        [style.transform]="'rotate(' + rotation() + 'deg)'"
+      ></video>
+    } @else {
+      <div class="empty-state">
+        <mat-icon aria-hidden="true">videocam_off</mat-icon>
+        <p>No camera source configured</p>
+      </div>
     }
 
     @if (isConnecting()) {
@@ -34,7 +32,7 @@
           @if (status() === 'reconnecting') {
             Reconnecting — attempt {{ retryAttempt() }}
           } @else {
-            Connecting to stream…
+            Connecting to camera…
           }
         </span>
       </div>
@@ -60,14 +58,6 @@
       <button
         matIconButton
         type="button"
-        aria-label="Camera stream settings"
-        (click)="openSettings()"
-      >
-        <mat-icon>settings</mat-icon>
-      </button>
-      <button
-        matIconButton
-        type="button"
         [attr.aria-label]="isFullscreen() ? 'Exit fullscreen' : 'View camera fullscreen'"
         (click)="toggleFullscreen()"
       >
@@ -75,7 +65,7 @@
       </button>
     </div>
 
-    @if (!rosConnected()) {
+    @if (status() === 'unavailable') {
       <app-unavailable-overlay label="Camera stream unavailable" />
     }
   </div>

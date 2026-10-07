@@ -4,8 +4,7 @@
 
     <app-camera-stream
       label="Front camera"
-      [url]="frontCameraUrl()"
-      (urlChange)="frontCameraUrl.set($event)"
+      [source]="frontCamera"
     />
   </section>
 
@@ -13,15 +12,13 @@
     <app-camera-stream
       class="arm-camera"
       label="Arm camera"
-      [url]="armCameraUrl()"
-      (urlChange)="armCameraUrl.set($event)"
+      [source]="armCamera"
     />
 
     <app-camera-stream
       class="gimbal-camera"
       label="Gimbal camera"
-      [url]="gimbalCameraUrl()"
-      (urlChange)="gimbalCameraUrl.set($event)"
+      [source]="gimbalCamera"
     />
   </section>
 

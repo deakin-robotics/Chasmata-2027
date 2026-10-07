@@ -1,0 +1,26 @@
+logLevel: info
+
+rtsp: true
+rtspTransports: [tcp]
+rtspAddress: :8554
+
+webrtc: true
+webrtcEncryption: false
+webrtcAddress: :8889
+webrtcLocalUDPAddress: :8189
+webrtcLocalTCPAddress: ''
+webrtcAllowOrigins: ['http://localhost:4200', 'http://127.0.0.1:4200']
+webrtcIPsFromInterfaces: false
+webrtcAdditionalHosts: ['localhost', '127.0.0.1']
+
+# Development-only readiness inspection for the local smoke test.
+api: true
+apiAddress: :9997
+
+paths:
+  front:
+    source: publisher
+  gimbal:
+    source: publisher
+  arm:
+    source: publisher

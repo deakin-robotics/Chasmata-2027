@@ -3,7 +3,30 @@ services:
     build: .
     ports:
       - '9090:9090'
-      - '8080:8080'
-      - '8090:8090'
-      - '8091:8091'
+    restart: unless-stopped
+
+  media-gateway:
+    image: bluenviron/mediamtx:1.21.1
+    volumes:
+      - ../media_gateway/mediamtx.yml:/mediamtx.yml:ro
+    ports:
+      - '${MEDIA_WEBRTC_PORT:-8889}:8889'
+      - '${MEDIA_WEBRTC_UDP_PORT:-8189}:8189/udp'
+      - '${MEDIA_API_PORT:-9997}:9997'
+    restart: unless-stopped
+
+  media-source:
+    image: bluenviron/mediamtx:1.21.1-ffmpeg
+    entrypoint: ['/bin/sh', '/run-test-sources.sh']
+    environment:
+      MEDIA_WIDTH: '${MEDIA_WIDTH:-1280}'
+      MEDIA_HEIGHT: '${MEDIA_HEIGHT:-720}'
+      MEDIA_FPS: '${MEDIA_FPS:-30}'
+      MEDIA_BITRATE_KBPS: '${MEDIA_BITRATE_KBPS:-2500}'
+      MEDIA_BUFFER_KBPS: '${MEDIA_BUFFER_KBPS:-5000}'
+      MEDIA_KEYFRAME_INTERVAL: '${MEDIA_KEYFRAME_INTERVAL:-30}'
+    volumes:
+      - ../media_gateway/run-test-sources.sh:/run-test-sources.sh:ro
+    depends_on:
+      - media-gateway
     restart: unless-stopped

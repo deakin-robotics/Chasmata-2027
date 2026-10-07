@@ -12,20 +12,30 @@ From this directory:
 docker compose up --build
 ```
 
-The container runs the mock node and ROSbridge on port `9090`, plus three canned
-camera endpoints on ports `8080`, `8090`, and `8091`. Connect the GUI normally
-to:
+The Compose stack runs the mock node and ROSbridge on port `9090`, a MediaMTX
+WebRTC gateway on port `8889`, and three synthetic H.264 camera publishers.
+Connect the GUI normally to:
 
 ```text
 ws://localhost:9090
 ```
 
-The GUI dashboards use these legacy-shaped camera feeds automatically:
+The GUI dashboards use these WHEP camera feeds automatically:
 
 ```text
-Front camera:  http://localhost:8080/?action=stream
-Arm camera:    http://localhost:8091/?action=stream
-Gimbal camera: http://localhost:8090/?action=stream
+Front camera:  http://localhost:8889/front/whep
+Arm camera:    http://localhost:8889/arm/whep
+Gimbal camera: http://localhost:8889/gimbal/whep
+```
+
+The default synthetic profile is 1280×720 at 30 FPS using H.264. Override it
+with `MEDIA_WIDTH`, `MEDIA_HEIGHT`, `MEDIA_FPS`, `MEDIA_BITRATE_KBPS`,
+`MEDIA_BUFFER_KBPS`, and `MEDIA_KEYFRAME_INTERVAL`.
+
+With the stack running, verify source readiness from this directory:
+
+```powershell
+pwsh ./../media_gateway/smoke_test.ps1
 ```
 
 ## Simulated behaviour
@@ -57,7 +67,8 @@ Gimbal camera: http://localhost:8090/?action=stream
   it applies only the J4-J6 wrist input. Partial trajectory execution
   preserves the other joints.
 - Publishes actual arm state on `/joint_states` at 10 Hz.
-- Serves canned GIF feeds through the legacy HTTP camera endpoint shape.
+- Publishes distinct synthetic H.264 feeds to the MediaMTX `front`, `gimbal`,
+  and `arm` paths for browser WHEP testing.
 
 The default joint names match the current GUI URDF:
 

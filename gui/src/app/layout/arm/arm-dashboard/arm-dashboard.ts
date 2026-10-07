@@ -1,6 +1,7 @@
-import { Component, signal } from '@angular/core';
+import { Component } from '@angular/core';
 
 import { CameraStream } from '../../../features/cameras/camera-stream/camera-stream';
+import { CAMERA_SOURCES } from '../../../features/cameras/camera-sources';
 import { GamepadControlPanel } from '../../../features/gamepad/gamepad-control-panel/gamepad-control-panel';
 import { ArmModelViewer } from '../../../features/telemetry/arm-model-viewer/arm-model-viewer';
 import { RoverSchematic } from '../../../features/telemetry/rover-schematic/rover-schematic';
@@ -27,7 +28,7 @@ import { ArmControlPanel } from '../arm-control-panel/arm-control-panel';
   styleUrl: './arm-dashboard.scss',
 })
 export class ArmDashboard {
-  readonly frontCameraUrl = signal('http://localhost:8080/?action=stream');
-  readonly armCameraUrl = signal('http://localhost:8091/?action=stream');
-  readonly gimbalCameraUrl = signal('http://localhost:8090/?action=stream');
+  readonly frontCamera = CAMERA_SOURCES.front;
+  readonly armCamera = CAMERA_SOURCES.arm;
+  readonly gimbalCamera = CAMERA_SOURCES.gimbal;
 }
