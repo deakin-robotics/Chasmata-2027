@@ -1,27 +1,10 @@
 services:
-  mock-rover:
-    build:
-      context: ../test/mock_rover
-    environment:
-      ROS_DOMAIN_ID: '0'
-      ROS_LOCALHOST_ONLY: '0'
-    ports:
-      - '${MOVEIT2_ROSBRIDGE_PORT:-19090}:9090'
-    networks:
-      - rover-test
-
   moveit2:
     build:
       context: ..
       dockerfile: basestation/Dockerfile
-    depends_on:
-      - mock-rover
     environment:
-      ROS_DOMAIN_ID: '0'
+      ROS_DOMAIN_ID: '${ROS_DOMAIN_ID:-0}'
       ROS_LOCALHOST_ONLY: '0'
-    networks:
-      - rover-test
-
-networks:
-  rover-test:
-    driver: bridge
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
+      ROS_DISCOVERY_SERVER: '${ROVER_DISCOVERY_SERVER:-rover.local:11811}'

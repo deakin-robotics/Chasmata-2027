@@ -1,0 +1,14 @@
+services:
+  moveit2:
+    extends:
+      file: docker-compose.yml
+      service: moveit2
+    environment:
+      ROS_DISCOVERY_SERVER: discovery:11811
+    networks:
+      - local-ros
+
+networks:
+  local-ros:
+    external: true
+    name: chasmata-local-ros

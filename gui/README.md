@@ -104,18 +104,27 @@ Open <http://localhost:4200>.
 
 ## 🔌 Local ROS testing
 
-Start ROSbridge from the `deakin_rover` base-station Dev Container:
+For the local mock rover and MoveIt2 stack, use two terminals. Start the mock
+rover first:
 
 ```bash
-source install/setup.bash
-ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+# Terminal 1
+cd ../test/mock_rover
+docker compose up --build
+
+# Terminal 2
+cd ../../basestation
+docker compose -f docker-compose.local.yml up --build
 ```
 
 Use this endpoint from the Angular GUI:
 
 ```text
-ws://rover.local:9090
+ws://localhost:9090
 ```
+
+The mock rover owns ROSbridge. The base-station stack joins it for MoveIt2
+planning and does not expose another GUI endpoint.
 
 For local WebRTC camera development and validation, see
 [WebRTC camera stream](docs/webrtc-camera-stream.md). It covers the mock-rover

@@ -1,29 +1,38 @@
 # MoveIt 2 base station arm planning stack
 
-This folder contains the MoveIt 2 base station stack for the current six-joint arm.
-It runs MoveIt 2 in a base-station-style container and sends either partial or
-complete, time-parameterized planned trajectories to the mock rover through
-the standard `FollowJointTrajectory` action.
+This folder contains the MoveIt 2 base station stack for the current six-joint
+arm. It runs MoveIt 2 in a base-station-style container and sends either
+partial or complete, time-parameterized planned trajectories to the rover
+through the standard `FollowJointTrajectory` action.
 
 ## Start
 
 From this directory:
 
 ```bash
-docker compose up --build
+docker compose -f docker-compose.local.yml up --build
 ```
 
 The stack starts:
 
-- an isolated mock rover and ROSbridge on `ws://localhost:19090`;
 - a headless MoveIt 2 `move_group` node with the `position_arm` and `arm`
   planning groups;
 - an `arm_moveit_bridge` node that owns MoveIt2 planning and rover action
   execution;
 - an identity `world` to `base_link` transform and robot state publisher.
 
-If the GUI should connect to this isolated rover, use `localhost:19090` as its
-ROSbridge endpoint. The port can be overridden with `MOVEIT2_ROSBRIDGE_PORT`.
+This stack does not run a mock rover or ROSbridge. For local testing, start
+`test/mock_rover` first, then start this stack. The GUI always connects to the
+mock rover at:
+
+```text
+ws://localhost:9090
+```
+
+For production, Command copies `.env.example` to `.env` and starts the normal
+Compose file with `docker compose -f docker-compose.yml up --build`. The rover must expose UDP port
+`11811` at `rover.local`; the base station joins the rover automatically.
+`docker-compose.local.yml` is local-test-only.
 
 The MoveIt container stays running after launch. In another terminal, run the
 planning demo:

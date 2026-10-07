@@ -12,13 +12,19 @@ From this directory:
 docker compose up --build
 ```
 
-The Compose stack runs the mock node and ROSbridge on port `9090`, a MediaMTX
-WebRTC gateway on port `8889`, and three synthetic H.264 camera publishers.
-Connect the GUI normally to:
+The Compose stack runs the mock node and ROSbridge on port `9090`, a rover-side
+discovery service on UDP port `11811`, a MediaMTX WebRTC gateway on port
+`8889`, and three synthetic H.264 camera publishers. Connect the GUI normally
+to:
 
 ```text
 ws://localhost:9090
 ```
+
+Start this stack before the base station. Once both are running, MoveIt2 joins
+the mock rover graph; the GUI still uses only `ws://localhost:9090`. Start the
+base station with its local Compose command in a separate terminal when IK
+testing is needed.
 
 The GUI dashboards use these WHEP camera feeds automatically:
 
