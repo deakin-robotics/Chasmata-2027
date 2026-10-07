@@ -3,13 +3,19 @@ services:
     extends:
       file: docker-compose.yml
       service: media-gateway
+    environment:
+      MTX_WEBRTCADDITIONALHOSTS: 'localhost,127.0.0.1'
+      MTX_WEBRTCALLOWORIGINS: 'http://localhost:4200,http://127.0.0.1:4200'
 
   moveit2:
-    extends:
-      file: docker-compose.yml
-      service: moveit2
+    build:
+      context: ..
+      dockerfile: basestation/Dockerfile
     environment:
       ROS_DISCOVERY_SERVER: discovery:11811
+      ROS_DOMAIN_ID: '${ROS_DOMAIN_ID:-0}'
+      ROS_LOCALHOST_ONLY: '0'
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
     networks:
       - local-ros
 

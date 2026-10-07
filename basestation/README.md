@@ -7,10 +7,24 @@ through the standard `FollowJointTrajectory` action.
 
 ## Start
 
-From this directory:
+For the production-shaped stack, enable Docker Desktop host networking on the
+base-station PC (`Settings > Resources > Network > Enable host networking`).
+This lets the MoveIt container use the PC's normal LAN connection to reach the
+rover's ROS discovery service.
+
+For local Windows testing, the override uses the shared mock-rover Docker ROS
+network so the containers can reach the local discovery server:
 
 ```bash
 docker compose -f docker-compose.local.yml up --build
+```
+
+For the production-shaped stack:
+
+```bash
+copy .env.example .env
+# Edit .env with the rover and base-station static LAN IPs.
+docker compose -f docker-compose.yml up --build
 ```
 
 The stack starts:
@@ -35,11 +49,13 @@ The mock rover's synthetic camera publishers send RTSP to this stack through
 `host.docker.internal:8554`. The GUI reads the resulting WHEP feeds from
 `http://localhost:8889`.
 
-For production, Command copies `.env.example` to `.env` and starts the normal
-Compose file with `docker compose -f docker-compose.yml up --build`. The rover must expose UDP port
-`11811` at `rover.local`; the base station joins the rover automatically. The
-rover camera pipeline must also be able to publish RTSP to the base station's
-TCP `8554` listener.
+For production, Command copies `.env.example` to `.env`, replaces the example
+static IPs, and starts the normal Compose file. `ROVER_DISCOVERY_SERVER` points
+MoveIt at the rover's UDP `11811` discovery service. The rover camera pipeline
+must also be able to publish RTSP to the base station's TCP `8554` listener.
+`MEDIA_WEBRTC_ADDITIONAL_HOSTS` is the base station LAN IP that MediaMTX gives
+to remote browsers for WebRTC ICE. `MEDIA_WEBRTC_ALLOW_ORIGINS` only needs to
+change if the GUI is served from a non-localhost origin.
 `docker-compose.local.yml` is local-test-only.
 
 The MoveIt container stays running after launch. In another terminal, run the

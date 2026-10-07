@@ -1,6 +1,9 @@
 services:
   media-gateway:
     image: bluenviron/mediamtx:1.21.1
+    environment:
+      MTX_WEBRTCADDITIONALHOSTS: '${MEDIA_WEBRTC_ADDITIONAL_HOSTS:-localhost,127.0.0.1}'
+      MTX_WEBRTCALLOWORIGINS: '${MEDIA_WEBRTC_ALLOW_ORIGINS:-http://localhost:4200,http://127.0.0.1:4200}'
     volumes:
       - ./mediamtx.yml:/mediamtx.yml:ro
     ports:
@@ -14,6 +17,7 @@ services:
     build:
       context: ..
       dockerfile: basestation/Dockerfile
+    network_mode: host
     environment:
       ROS_DOMAIN_ID: '${ROS_DOMAIN_ID:-0}'
       ROS_LOCALHOST_ONLY: '0'

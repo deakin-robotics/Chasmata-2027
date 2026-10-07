@@ -64,13 +64,13 @@ flowchart LR
     gamepad[Gamepad API] --> gui[Angular mission control]
     gui -->|JSON/WebSocket| rosbridge[ROSbridge :9090]
     rosbridge --> ros[ROS 2 nodes]
-    camera[Camera video elements] -->|WHEP/WebRTC| streams[Media gateway]
+    camera[Camera video elements] -->|WHEP/WebRTC| streams[MediaMTX on base station]
 ```
 
 The GUI communicates directly with the rover on its private operator network:
 
 - Controls and telemetry use ROSLIB through ROSbridge.
-- Camera video uses WHEP playback sessions from the rover MediaMTX gateway.
+- Camera video uses WHEP playback sessions from the base-station MediaMTX gateway.
 - Driver control publishes `sensor_msgs/Joy` on `/joy`.
 - Arm control publishes remapped `sensor_msgs/Joy` on `/arm/joy`.
 - Driver and Arm Operator GUIs may both view and control the shared Gimbal camera.

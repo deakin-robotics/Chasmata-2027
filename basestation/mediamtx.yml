@@ -9,6 +9,7 @@ webrtcEncryption: false
 webrtcAddress: :8889
 webrtcLocalUDPAddress: :8189
 webrtcLocalTCPAddress: ''
+# These development defaults can be overridden through the Compose environment.
 webrtcAllowOrigins: ['http://localhost:4200', 'http://127.0.0.1:4200']
 webrtcIPsFromInterfaces: false
 webrtcAdditionalHosts: ['localhost', '127.0.0.1']

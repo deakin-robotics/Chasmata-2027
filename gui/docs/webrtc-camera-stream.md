@@ -3,6 +3,8 @@
 The GUI reads rover cameras through WebRTC. MediaMTX runs on the base station:
 it receives H.264 camera feeds over RTSP from the rover-side camera pipeline
 and presents each feed to operator browsers through a WHEP playback endpoint.
+The base station advertises its static LAN address for WebRTC ICE; the browser
+does not connect to a Docker-private address.
 
 This document defines the camera contract and the local stack used to develop
 and validate it. It does not define camera hardware, radio settings, or rover
@@ -119,6 +121,12 @@ Then start the base-station stack from `basestation`:
 docker compose -f docker-compose.local.yml up --build
 ```
 
+For production, Docker Desktop host networking must be enabled on the
+base-station PC so MoveIt can use the PC's normal LAN connection for ROS2
+discovery. The Windows local override keeps MoveIt and the mock rover on their
+shared test Docker network; MediaMTX keeps its published TCP/UDP ports for
+camera traffic.
+
 The mock rover starts ROSbridge on `9090`, discovery on UDP `11811`, and the
 three synthetic RTSP publishers. The base station exposes MediaMTX RTSP ingest
 on TCP `8554`, WHEP/HTTP on `8889`, WebRTC UDP/ICE on `8189`, and its
@@ -160,9 +168,9 @@ docker compose up --build
 | --- | --- |
 | `unavailable` immediately | Confirm the browser supports `RTCPeerConnection` and `public/mediamtx/reader.js` is served by the GUI. |
 | A camera remains `connecting` or retries | Check MediaMTX logs and verify the expected path is receiving its publisher. |
-| Browser cannot reach WHEP | Confirm base-station port `8889` is published, the Angular environment points to the base station, and the GUI origin is allowed by `webrtcAllowOrigins`. Rebuild after changing it. |
+| Browser cannot reach WHEP | Confirm base-station port `8889` is published, the Angular environment points to the base station, and the GUI origin is included in `MEDIA_WEBRTC_ALLOW_ORIGINS`. Restart MediaMTX after changing it. |
 | Synthetic source cannot publish | Confirm the base station is running and port `8554` is reachable from the mock publisher; override `MEDIA_GATEWAY_HOST` if needed. |
-| A remote rover works locally but not over the radio | Ensure the rover advertises a reachable media host and UDP `8189` is permitted end-to-end; ICE and firewall/radio configuration are deployment work. |
+| A remote rover works locally but not over the radio | Set `MEDIA_WEBRTC_ADDITIONAL_HOSTS` to the base station's static LAN IP and permit UDP `8189` end-to-end. |
 | Compose cannot start | Start Docker Desktop's Linux engine, then rerun `docker compose up --build`. |
 
 ## Boundaries
