@@ -99,12 +99,6 @@ on `8189`, the development-only MediaMTX API on `9997`, and the three
 synthetic publishers. The RTSP ingest listener on `8554` stays inside the
 Docker network.
 
-Verify that MediaMTX sees all three publishers:
-
-```powershell
-pwsh ./../media_gateway/smoke_test.ps1
-```
-
 Then start the GUI from `gui` with `npm start` and open
 <http://localhost:4200>. The Front, Gimbal, and Arm views should become
 `live`. Open a second dashboard or browser window to confirm that the Gimbal
@@ -135,7 +129,7 @@ docker compose up --build
 | Symptom | Check |
 | --- | --- |
 | `unavailable` immediately | Confirm the browser supports `RTCPeerConnection` and `public/mediamtx/reader.js` is served by the GUI. |
-| A camera remains `connecting` or retries | Run the smoke test and verify the expected MediaMTX path is `ready`. |
+| A camera remains `connecting` or retries | Check MediaMTX logs and verify the expected path is receiving its publisher. |
 | Browser cannot reach WHEP | Confirm port `8889` is published and the GUI origin is allowed by `webrtcAllowOrigins`. |
 | A remote rover works locally but not over the radio | Ensure the rover advertises a reachable media host and UDP `8189` is permitted end-to-end; ICE and firewall/radio configuration are deployment work. |
 | Compose cannot start | Start Docker Desktop's Linux engine, then rerun `docker compose up --build`. |

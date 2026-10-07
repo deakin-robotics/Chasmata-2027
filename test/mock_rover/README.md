@@ -32,12 +32,6 @@ The default synthetic profile is 1280×720 at 30 FPS using H.264. Override it
 with `MEDIA_WIDTH`, `MEDIA_HEIGHT`, `MEDIA_FPS`, `MEDIA_BITRATE_KBPS`,
 `MEDIA_BUFFER_KBPS`, and `MEDIA_KEYFRAME_INTERVAL`.
 
-With the stack running, verify source readiness from this directory:
-
-```powershell
-pwsh ./../media_gateway/smoke_test.ps1
-```
-
 ## Simulated behaviour
 
 - Starts with LAW `NORMAL`, SYSTEM `GOOD`, and unknown Gimbal priority.

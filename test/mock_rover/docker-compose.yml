@@ -8,7 +8,7 @@ services:
   media-gateway:
     image: bluenviron/mediamtx:1.21.1
     volumes:
-      - ../media_gateway/mediamtx.yml:/mediamtx.yml:ro
+      - ./mediamtx.yml:/mediamtx.yml:ro
     ports:
       - '${MEDIA_WEBRTC_PORT:-8889}:8889'
       - '${MEDIA_WEBRTC_UDP_PORT:-8189}:8189/udp'
@@ -26,7 +26,7 @@ services:
       MEDIA_BUFFER_KBPS: '${MEDIA_BUFFER_KBPS:-5000}'
       MEDIA_KEYFRAME_INTERVAL: '${MEDIA_KEYFRAME_INTERVAL:-30}'
     volumes:
-      - ../media_gateway/run-test-sources.sh:/run-test-sources.sh:ro
+      - ./run-test-sources.sh:/run-test-sources.sh:ro
     depends_on:
       - media-gateway
     restart: unless-stopped

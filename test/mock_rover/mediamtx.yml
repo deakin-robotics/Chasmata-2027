@@ -13,7 +13,7 @@ webrtcAllowOrigins: ['http://localhost:4200', 'http://127.0.0.1:4200']
 webrtcIPsFromInterfaces: false
 webrtcAdditionalHosts: ['localhost', '127.0.0.1']
 
-# Development-only readiness inspection for the local smoke test.
+# Development-only API for inspecting path readiness.
 api: true
 apiAddress: :9997
 

@@ -13,7 +13,7 @@ services:
   media-gateway:
     image: bluenviron/mediamtx:1.21.1
     volumes:
-      - ../test/media_gateway/mediamtx.yml:/mediamtx.yml:ro
+      - ../test/mock_rover/mediamtx.yml:/mediamtx.yml:ro
     ports:
       - '${MOVEIT2_WEBRTC_PORT:-8889}:8889'
       - '${MOVEIT2_WEBRTC_UDP_PORT:-8189}:8189/udp'
@@ -32,7 +32,7 @@ services:
       MEDIA_BUFFER_KBPS: '${MEDIA_BUFFER_KBPS:-5000}'
       MEDIA_KEYFRAME_INTERVAL: '${MEDIA_KEYFRAME_INTERVAL:-30}'
     volumes:
-      - ../test/media_gateway/run-test-sources.sh:/run-test-sources.sh:ro
+      - ../test/mock_rover/run-test-sources.sh:/run-test-sources.sh:ro
     depends_on:
       - media-gateway
     networks:
