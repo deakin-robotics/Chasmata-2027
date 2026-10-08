@@ -50,11 +50,18 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    cameras["Rover cameras\nH.264 / RTSP"] -->|"RTSP :8554"| media["MediaMTX\nBase-station PC"]
-    media -->|"WHEP :8889 + video UDP :8189"| driver["Driver GUI"]
-    media -->|"WHEP :8889 + video UDP :8189"| arm["Arm GUI"]
+    cameras["Rover cameras"] -->|"RTSP publish :8554"| roverMedia["MediaMTX\nRover PC"]
+    roverMedia -->|"RTSP media :8554\n(base gateway pulls)"| baseMedia["MediaMTX\nBase-station PC"]
+    baseMedia -->|"Primary WHEP :8889\nvideo UDP :8189"| driver["Driver GUI"]
+    baseMedia -->|"Primary WHEP :8889\nvideo UDP :8189"| arm["Arm GUI"]
+    roverMedia -->|"Fallback WHEP :8889\nvideo UDP :8189"| driver
+    roverMedia -->|"Fallback WHEP :8889\nvideo UDP :8189"| arm
+    driver -->|"Read-only status :9998"| health["Camera readiness\nBase station"]
+    arm -->|"Read-only status :9998"| health
+    health -->|"Private path check :9997"| api["MediaMTX API"]
 ```
 
 The Driver and Arm GUIs connect directly to the rover for controls and
-telemetry. MediaMTX provides camera playback, while MoveIt handles Arm
-Position/IK planning.
+telemetry. Camera video normally comes through base-station MediaMTX; eligible
+tiles can switch directly to rover MediaMTX if the base gateway is unavailable.
+MoveIt handles Arm Position/IK planning.

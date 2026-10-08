@@ -2,10 +2,7 @@
   <section class="arm-camera-column" aria-label="Arm rover and model workspace">
     <app-arm-model-viewer />
 
-    <app-camera-stream
-      label="Front camera"
-      [source]="frontCamera"
-    />
+    <app-camera-stream label="Front camera" [source]="frontCamera" [allowRoverFallback]="false" />
   </section>
 
   <section class="arm-operator-column" aria-label="Arm operator workspace">
@@ -13,12 +10,14 @@
       class="arm-camera"
       label="Arm camera"
       [source]="armCamera"
+      [allowRoverFallback]="true"
     />
 
     <app-camera-stream
       class="gimbal-camera"
       label="Gimbal camera"
       [source]="gimbalCamera"
+      [allowRoverFallback]="true"
     />
   </section>
 

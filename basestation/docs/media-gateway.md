@@ -1,29 +1,37 @@
 # Media gateway
 
-MediaMTX runs on the base station. It receives one RTSP stream per rover camera
-and provides WebRTC playback to operator browsers. It does not carry rover
-controls, telemetry, or MoveIt traffic.
+The base station runs MediaMTX as the normal browser gateway. It pulls one RTSP
+stream per camera from rover-side MediaMTX and provides WHEP/WebRTC playback to
+operator browsers. The rover gateway is also the GUI's direct video fallback.
+Neither gateway carries rover controls, telemetry, or MoveIt traffic.
 
 ## Ports and paths
 
-| Purpose | Port | Direction |
-| --- | --- | --- |
-| RTSP ingest | TCP `8554` | Rover camera pipeline -> MediaMTX |
-| WHEP signalling | TCP `8889` | Operator browser -> MediaMTX |
-| WebRTC media and ICE | UDP `8189` | Operator browser <-> MediaMTX |
-| Development API | TCP `9997` | Development inspection only |
+| Purpose                   | Port                                                      | Direction                                          |
+| ------------------------- | --------------------------------------------------------- | -------------------------------------------------- |
+| Rover RTSP                | TCP `8554` production; local mock host port `8555`        | Base MediaMTX pulls rover paths over TCP           |
+| Base WHEP signalling      | TCP `8889`                                                | Operator browser -> base MediaMTX                  |
+| Base WebRTC media and ICE | UDP `8189`                                                | Operator browser <-> base MediaMTX                 |
+| Rover fallback WHEP / ICE | TCP `8889` / UDP `8189` production; local `8890` / `8190` | Eligible GUI tiles -> rover MediaMTX               |
+| Camera readiness          | TCP `9998`                                                | Operator browser -> read-only base health endpoint |
+| MediaMTX path API         | TCP `9997` inside Docker only                             | Read by the camera-health service                   |
 
 MediaMTX exposes three named camera paths:
 
 | Camera | RTSP path | WHEP playback endpoint |
-| --- | --- | --- |
-| Front | `front` | `/front/whep` |
-| Gimbal | `gimbal` | `/gimbal/whep` |
-| Arm | `arm` | `/arm/whep` |
+| ------ | --------- | ---------------------- |
+| Front  | `front`   | `/front/whep`          |
+| Gimbal | `gimbal`  | `/gimbal/whep`         |
+| Arm    | `arm`     | `/arm/whep`            |
 
 For example, a browser accessing the base station at
-`http://basestation.local:8889` plays the Front camera through
-`http://basestation.local:8889/front/whep`.
+`http://basestation.local:8889` plays Front through
+`http://basestation.local:8889/front/whep`. Its rover fallback is
+`http://rover.local:8889/front/whep`.
+
+The GUI polls `GET http://basestation.local:9998/cameras/status` while in
+fallback mode. That endpoint filters MediaMTX's internal path API to the three
+camera readiness booleans; operator browsers do not need the full control API.
 
 The full browser-side contract, reader lifecycle, viewer recovery behaviour,
 and local camera runbook live in the GUI guide:
@@ -31,17 +39,22 @@ and local camera runbook live in the GUI guide:
 
 ## Configuration
 
-The Compose service loads `mediamtx.yml`. Its port defaults can be overridden
-with `MEDIA_RTSP_PORT`, `MEDIA_WEBRTC_PORT`, `MEDIA_WEBRTC_UDP_PORT`, and
-`MEDIA_API_PORT`.
+The Compose service loads `mediamtx.yml`. Its browser ports can be overridden
+with `MEDIA_WEBRTC_PORT` and `MEDIA_WEBRTC_UDP_PORT`.
+`CAMERA_HEALTH_PORT` changes the public read-only readiness port.
 
 Two base-station `.env` values matter for a real LAN:
 
-| Variable | Plain meaning |
-| --- | --- |
-| `MEDIA_WEBRTC_ADDITIONAL_HOSTS` | The base station's static LAN IP. MediaMTX gives this address to browsers for their UDP video connection. |
-| `MEDIA_WEBRTC_ALLOW_ORIGINS` | Browser page origins permitted to request WHEP. The default covers a GUI served locally on each operator PC at `localhost:4200`. |
+| Variable                              | Plain meaning                                                                                                                    |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `MEDIA_WEBRTC_ADDITIONAL_HOSTS`       | The base station's static LAN IP. MediaMTX gives this address to browsers for their UDP video connection.                        |
+| `MEDIA_WEBRTC_ALLOW_ORIGINS`          | Browser page origins permitted to request WHEP. The default covers a GUI served locally on each operator PC at `localhost:4200`. |
+| `ROVER_RTSP_HOST` / `ROVER_RTSP_PORT` | The rover gateway address the base-station MediaMTX pulls from; set the rover's static LAN IP and port `8554`.                   |
 
-For local Windows testing, the synthetic publishers inside `test/mock_rover`
-send RTSP to `host.docker.internal:8554`. On the real rover network, the rover
-camera pipeline must reach the base station's TCP `8554` listener.
+For local Windows testing, mock sources publish inside their Compose network to
+rover MediaMTX. The base-station gateway pulls from
+`host.docker.internal:8555`. In production, it pulls from the rover's TCP
+`8554` listener. Configure `ROVER_RTSP_HOST` with the rover's static IP so
+the base-station Docker container does not depend on mDNS resolution. The rover
+MediaMTX must advertise the rover's own LAN IP for direct fallback, while the
+base gateway advertises the base station's LAN IP.

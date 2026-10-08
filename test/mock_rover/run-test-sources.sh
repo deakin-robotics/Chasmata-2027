@@ -7,7 +7,7 @@ set -eu
 : "${MEDIA_BITRATE_KBPS:=2500}"
 : "${MEDIA_BUFFER_KBPS:=5000}"
 : "${MEDIA_KEYFRAME_INTERVAL:=30}"
-: "${MEDIA_GATEWAY_HOST:=host.docker.internal}"
+: "${MEDIA_GATEWAY_HOST:=media-gateway}"
 : "${MEDIA_GATEWAY_RTSP_PORT:=8554}"
 
 pids=""

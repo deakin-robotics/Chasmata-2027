@@ -10,12 +10,25 @@
   <div #streamFrame class="stream-frame" [class.fullscreen]="isFullscreen()">
     @if (source) {
       <video
-        #streamVideo
+        #baseVideo
         class="stream-video"
+        [class.active]="activeGateway() === 'base'"
+        [attr.aria-hidden]="activeGateway() === 'base' ? null : 'true'"
         autoplay
         muted
         playsinline
-        [attr.aria-label]="label + ' live feed'"
+        [attr.aria-label]="activeGateway() === 'base' ? label + ' live feed' : null"
+        [style.transform]="'rotate(' + rotation() + 'deg)'"
+      ></video>
+      <video
+        #roverVideo
+        class="stream-video"
+        [class.active]="activeGateway() === 'rover'"
+        [attr.aria-hidden]="activeGateway() === 'rover' ? null : 'true'"
+        autoplay
+        muted
+        playsinline
+        [attr.aria-label]="activeGateway() === 'rover' ? label + ' live feed' : null"
         [style.transform]="'rotate(' + rotation() + 'deg)'"
       ></video>
     } @else {

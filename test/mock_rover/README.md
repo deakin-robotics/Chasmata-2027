@@ -13,9 +13,8 @@ docker compose up --build
 ```
 
 The Compose stack runs the mock node and ROSbridge on port `9090`, a rover-side
-discovery service on UDP port `11811`, and three synthetic H.264 RTSP
-publishers. The MediaMTX gateway runs in the base-station stack. Connect the
-GUI normally to:
+discovery service on UDP port `11811`, rover MediaMTX, and three synthetic
+H.264 RTSP publishers. Connect the GUI normally to:
 
 ```text
 ws://localhost:9090
@@ -28,13 +27,29 @@ On Windows, enable Docker Desktop host networking (Docker Desktop 4.34 or
 newer) to run this local setup. The GUI still uses `ws://localhost:9090` for
 local testing.
 
-The synthetic publishers target the base-station gateway at
-`host.docker.internal:8554` by default on Windows and retry while it is
-unavailable. When running the mock rover on a separate Linux PC, set
-`MEDIA_GATEWAY_HOST` to the base station's LAN address, for example:
+The synthetic publishers target the rover MediaMTX Compose service at
+`media-gateway:8554`. The base-station MediaMTX pulls those feeds over RTSP;
+on local Windows testing it reaches the rover gateway through
+`host.docker.internal:8555`. When running the mock rover stack on a separate
+PC, the base-station RTSP source must use that PC's address.
+
+The mock rover's local gateway ports are:
+
+| Purpose                             | Host port  |
+| ----------------------------------- | ---------- |
+| RTSP publishing / base-station pull | TCP `8555` |
+| Fallback WHEP playback              | TCP `8890` |
+| Fallback WebRTC media               | UDP `8190` |
+
+The production rover gateway uses RTSP `8554`, WHEP `8889`, and ICE UDP `8189`.
+Set its WebRTC advertised host to the rover's LAN IP and permit the operator
+GUI origins before using direct fallback on the real rover.
+
+To publish synthetic feeds to a differently named rover-gateway service, set
+`MEDIA_GATEWAY_HOST` and `MEDIA_GATEWAY_RTSP_PORT`:
 
 ```bash
-MEDIA_GATEWAY_HOST=192.168.1.10 docker compose up --build
+MEDIA_GATEWAY_HOST=media-gateway MEDIA_GATEWAY_RTSP_PORT=8554 docker compose up --build
 ```
 
 The GUI dashboards use these WHEP camera feeds automatically:
@@ -44,6 +59,9 @@ Front camera:  http://localhost:8889/front/whep
 Arm camera:    http://localhost:8889/arm/whep
 Gimbal camera: http://localhost:8889/gimbal/whep
 ```
+
+These are the primary base-station endpoints. The local rover fallback
+endpoints use `http://localhost:8890/{front,gimbal,arm}/whep`.
 
 The default synthetic profile is 1280×720 at 30 FPS using H.264. Override it
 with `MEDIA_WIDTH`, `MEDIA_HEIGHT`, `MEDIA_FPS`, `MEDIA_BITRATE_KBPS`,
@@ -79,8 +97,9 @@ with `MEDIA_WIDTH`, `MEDIA_HEIGHT`, `MEDIA_FPS`, `MEDIA_BITRATE_KBPS`,
   it applies only the J4-J6 wrist input. Partial trajectory execution
   preserves the other joints.
 - Publishes actual arm state on `/joint_states` at 10 Hz.
-- Publishes distinct synthetic H.264 RTSP feeds to the base-station MediaMTX
-  `front`, `gimbal`, and `arm` paths for browser WHEP testing.
+- Publishes distinct synthetic H.264 RTSP feeds to rover MediaMTX's `front`,
+  `gimbal`, and `arm` paths. Base-station MediaMTX pulls the same paths for
+  normal browser playback.
 
 The default joint names match the current GUI URDF:
 
@@ -90,19 +109,19 @@ base_joint, shoulder_joint, elbow_joint, yaw_joint, pitch_joint, roll_joint
 
 ## Topics
 
-| Direction | Topic | Type | Purpose |
-| --- | --- | --- | --- |
-| GUI → mock rover | `/joy` | `sensor_msgs/msg/Joy` | Driver gamepad input; LT/RT are analogue `axes[4]`/`axes[5]` values in the range `0..1`. |
-| GUI → mock rover | `/arm/joy` | `sensor_msgs/msg/Joy` | Manual Arm gamepad input; LT/RT are analogue `axes[8]`/`axes[9]` values in the range `0..1`. |
-| GUI → mock rover | `/joint_commands` | `sensor_msgs/msg/JointState` | Target joint positions in radians. |
-| GUI → mock rover | `/arm/orientation_lock` | `std_msgs/msg/Bool` | Selects Position-mode UNLOCKED (`false`) or LOCKED (`true`) execution. |
+| Direction            | Topic                                     | Type                                        | Purpose                                                                                      |
+| -------------------- | ----------------------------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| GUI → mock rover     | `/joy`                                    | `sensor_msgs/msg/Joy`                       | Driver gamepad input; LT/RT are analogue `axes[4]`/`axes[5]` values in the range `0..1`.     |
+| GUI → mock rover     | `/arm/joy`                                | `sensor_msgs/msg/Joy`                       | Manual Arm gamepad input; LT/RT are analogue `axes[8]`/`axes[9]` values in the range `0..1`. |
+| GUI → mock rover     | `/joint_commands`                         | `sensor_msgs/msg/JointState`                | Target joint positions in radians.                                                           |
+| GUI → mock rover     | `/arm/orientation_lock`                   | `std_msgs/msg/Bool`                         | Selects Position-mode UNLOCKED (`false`) or LOCKED (`true`) execution.                       |
 | MoveIt2 → mock rover | `/arm_controller/follow_joint_trajectory` | `control_msgs/action/FollowJointTrajectory` | Timed J1-J3 partial trajectory in UNLOCKED mode or complete J1-J6 trajectory in LOCKED mode. |
-| Mock rover → GUI | `/joint_states` | `sensor_msgs/msg/JointState` | Simulated actual joint positions and velocities. |
-| GUI → mock rover | `/fma/drive/request` | `std_msgs/msg/String` | Driver mode value, such as `VELOCITY`. |
-| GUI → mock rover | `/fma/arm/request` | `std_msgs/msg/String` | Arm mode value, such as `POSITION`. |
-| GUI → mock rover | `/arm/override/request` | `std_msgs/msg/String` | Arm Override command: `ENABLE` or `DISABLE`. |
-| GUI → mock rover | `/fma/gimbal/request` | `std_msgs/msg/String` | Temporary Gimbal priority request: `DRIVER` or `ARM OPS`. |
-| Mock rover → GUI | `/fma/state` | `std_msgs/msg/String` | JSON FMA telemetry broadcast. |
+| Mock rover → GUI     | `/joint_states`                           | `sensor_msgs/msg/JointState`                | Simulated actual joint positions and velocities.                                             |
+| GUI → mock rover     | `/fma/drive/request`                      | `std_msgs/msg/String`                       | Driver mode value, such as `VELOCITY`.                                                       |
+| GUI → mock rover     | `/fma/arm/request`                        | `std_msgs/msg/String`                       | Arm mode value, such as `POSITION`.                                                          |
+| GUI → mock rover     | `/arm/override/request`                   | `std_msgs/msg/String`                       | Arm Override command: `ENABLE` or `DISABLE`.                                                 |
+| GUI → mock rover     | `/fma/gimbal/request`                     | `std_msgs/msg/String`                       | Temporary Gimbal priority request: `DRIVER` or `ARM OPS`.                                    |
+| Mock rover → GUI     | `/fma/state`                              | `std_msgs/msg/String`                       | JSON FMA telemetry broadcast.                                                                |
 
 For both Joy topics, `buttons[]` contains only digital button values (`0` or
 `1`). LT and RT are not read from `buttons[]`; their browser analogue values
@@ -127,12 +146,12 @@ The provisional `/fma/state` JSON shape is:
 {
   "schema": "dcr/fma-state/v1",
   "sequence": 12,
-  "drive": {"confirmed": "VELOCITY", "pending": null, "rejected": null},
-  "arm": {"confirmed": "POSITION", "pending": null, "rejected": null},
+  "drive": { "confirmed": "VELOCITY", "pending": null, "rejected": null },
+  "arm": { "confirmed": "POSITION", "pending": null, "rejected": null },
   "law": "NORMAL",
-  "arm_override": {"state": "INACTIVE", "pending": null},
+  "arm_override": { "state": "INACTIVE", "pending": null },
   "system": "GOOD",
-  "gimbal_priority": {"confirmed": null, "pending": null, "rejected": null}
+  "gimbal_priority": { "confirmed": null, "pending": null, "rejected": null }
 }
 ```
 
