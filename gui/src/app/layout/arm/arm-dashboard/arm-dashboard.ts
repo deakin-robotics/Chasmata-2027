@@ -1,5 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 
+import { CameraFeedControl } from '../../../features/cameras/camera-feed-control';
 import { CameraStream } from '../../../features/cameras/camera-stream/camera-stream';
 import { CAMERA_SOURCES } from '../../../features/cameras/camera-sources';
 import { GamepadControlPanel } from '../../../features/gamepad/gamepad-control-panel/gamepad-control-panel';
@@ -24,10 +25,12 @@ import { ArmControlPanel } from '../arm-control-panel/arm-control-panel';
     GamepadControlPanel,
     RoverSchematic,
   ],
+  providers: [CameraFeedControl],
   templateUrl: './arm-dashboard.html',
   styleUrl: './arm-dashboard.scss',
 })
 export class ArmDashboard {
+  readonly cameraFeedControl = inject(CameraFeedControl);
   readonly frontCamera = CAMERA_SOURCES.front;
   readonly armCamera = CAMERA_SOURCES.arm;
   readonly gimbalCamera = CAMERA_SOURCES.gimbal;

@@ -7,13 +7,14 @@
 }
 
 .master-page {
+  position: relative;
   display: grid;
   align-content: start;
   grid-template-areas:
-    '. gamepad ros .'
-    '. gamepad-stem ros-flow .'
-    '. gamepad-flow master clear-faults'
-    '. arm-mode arm-mode law-override'
+    'gamepad ros camera clear-faults'
+    'gamepad-stem ros-flow . law-override'
+    'gamepad-flow master . .'
+    'arm-mode arm-mode . .'
     '. error error error';
   grid-template-columns: repeat(4, 1fr);
   column-gap: 0.5rem;
@@ -21,6 +22,16 @@
   box-sizing: border-box;
   height: 100%;
   padding: 0.75rem;
+}
+
+.master-page::after {
+  position: absolute;
+  top: 0.75rem;
+  bottom: 0.75rem;
+  left: calc(50% - 0.25rem);
+  border-right: 1px solid #303844;
+  content: '';
+  pointer-events: none;
 }
 
 app-status-indicator,
@@ -37,6 +48,10 @@ app-status-indicator {
 
 app-action-button {
   grid-area: ros;
+}
+
+.camera-feed {
+  grid-area: camera;
 }
 
 .law-override {

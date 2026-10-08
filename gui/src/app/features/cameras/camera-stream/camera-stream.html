@@ -78,8 +78,10 @@
       </button>
     </div>
 
-    @if (status() === 'unavailable') {
-      <app-unavailable-overlay label="Camera stream unavailable" />
+    @if (status() === 'unavailable' || status() === 'off') {
+      <app-unavailable-overlay
+        [label]="status() === 'off' ? label + ' feed off' : label + ' stream unavailable'"
+      />
     }
   </div>
 

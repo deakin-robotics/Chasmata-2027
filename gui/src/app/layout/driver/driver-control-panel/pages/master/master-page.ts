@@ -8,6 +8,7 @@ import {
 } from '../../../../../core/control/drive/drive-control-mode';
 import { ControlModeCoordinator } from '../../../../../core/control/control-mode-coordinator';
 import { GamepadInput } from '../../../../../core/gamepad/gamepad-input';
+import { CameraFeedControl } from '../../../../../features/cameras/camera-feed-control';
 import { DriveMode } from '../../../../../core/fma/fma-state.service';
 import { RosConnection } from '../../../../../core/ros/ros-connection';
 import { ConnectionManager } from '../../../../../features/connection/connection-manager/connection-manager';
@@ -47,6 +48,7 @@ export class DriverMasterPage {
   private readonly controlModeCoordinator = inject(ControlModeCoordinator);
   private readonly gamepad = inject(GamepadInput);
   private readonly rosConnection = inject(RosConnection);
+  private readonly cameraFeedControl = inject(CameraFeedControl);
   private readonly dialog = inject(MatDialog);
 
   readonly masterDriveEnabled = this.driverControl.enabled;
@@ -59,6 +61,7 @@ export class DriverMasterPage {
   readonly readinessError = this.driverControl.readinessError;
   readonly rosConnected = this.rosConnection.isConnected;
   readonly gamepadConnected = this.gamepad.connected;
+  readonly cameraFeedEnabled = this.cameraFeedControl.enabled;
   readonly gamepadStatusLabel = computed(() =>
     this.gamepadConnected() ? 'Connected' : 'Not detected',
   );
@@ -116,6 +119,11 @@ export class DriverMasterPage {
       ariaLabel: 'ROS connection settings',
       width: 'min(100% - 2rem, 32rem)',
     });
+  }
+
+  /** Starts or closes WHEP playback for every camera on this dashboard. */
+  setCameraFeedEnabled(enabled: boolean): void {
+    this.cameraFeedControl.setEnabled(enabled);
   }
 
   /** Requests enabled drivetrain publishing or immediately stops active publishing. */

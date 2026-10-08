@@ -99,6 +99,42 @@ describe('CameraStream', () => {
     expect(fixture.nativeElement.querySelector('img')).toBeFalsy();
   });
 
+  it('closes both gateways while off and reconnects to the base gateway when switched on', async () => {
+    vi.useFakeTimers();
+    await reachFailover();
+    FakeReader.instances[2].emitTrack();
+    fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const readinessChecks = vi.mocked(fetch).mock.calls.length;
+    fixture.componentRef.setInput('enabled', false);
+    fixture.detectChanges();
+    await Promise.resolve();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.status()).toBe('off');
+    expect(fixture.componentInstance.activeGateway()).toBeNull();
+    expect(FakeReader.instances[0].close).toHaveBeenCalledOnce();
+    expect(FakeReader.instances[1].close).toHaveBeenCalledOnce();
+    expect(FakeReader.instances[2].close).toHaveBeenCalledOnce();
+    expect(fixture.nativeElement.querySelector('app-unavailable-overlay')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.status').textContent).toContain('Off');
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    await Promise.resolve();
+    expect(FakeReader.instances).toHaveLength(3);
+    expect(fetch).toHaveBeenCalledTimes(readinessChecks);
+
+    fixture.componentRef.setInput('enabled', true);
+    fixture.detectChanges();
+    await Promise.resolve();
+
+    expect(fixture.componentInstance.status()).toBe('connecting');
+    expect(FakeReader.instances).toHaveLength(4);
+    expect(FakeReader.instances[3].options.url).toBe(CAMERA_SOURCES.front.whepUrl);
+  });
+
   it('fails over after ten seconds and keeps the rover feed while checking recovery in background', async () => {
     vi.useFakeTimers();
     await reachFailover();

@@ -4,12 +4,27 @@
       <span>Reserved</span>
     </section>
 
-    <app-camera-stream label="Arm camera" [source]="armCamera" [allowRoverFallback]="false" />
+    <app-camera-stream
+      label="Arm camera"
+      [source]="armCamera"
+      [allowRoverFallback]="false"
+      [enabled]="cameraFeedControl.enabled()"
+    />
   </section>
 
   <section class="rover-camera-column" aria-label="Driver rover camera workspace">
-    <app-camera-stream label="Front camera" [source]="frontCamera" [allowRoverFallback]="true" />
-    <app-camera-stream label="Gimbal camera" [source]="gimbalCamera" [allowRoverFallback]="true" />
+    <app-camera-stream
+      label="Front camera"
+      [source]="frontCamera"
+      [allowRoverFallback]="true"
+      [enabled]="cameraFeedControl.enabled()"
+    />
+    <app-camera-stream
+      label="Gimbal camera"
+      [source]="gimbalCamera"
+      [allowRoverFallback]="true"
+      [enabled]="cameraFeedControl.enabled()"
+    />
   </section>
 
   <aside class="driver-control-column" aria-label="Driver control panels">

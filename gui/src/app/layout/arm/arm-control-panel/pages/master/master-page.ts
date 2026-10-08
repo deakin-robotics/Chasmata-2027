@@ -9,6 +9,7 @@ import { ArmCommandPublisher } from '../../../../../core/control/arm/arm-command
 import { ControlModeCoordinator } from '../../../../../core/control/control-mode-coordinator';
 import { ControlCommandPublisher } from '../../../../../core/control/control-command-publisher';
 import { GamepadInput } from '../../../../../core/gamepad/gamepad-input';
+import { CameraFeedControl } from '../../../../../features/cameras/camera-feed-control';
 import { ArmMode } from '../../../../../core/fma/fma-state.service';
 import { RosConnection } from '../../../../../core/ros/ros-connection';
 import { ConnectionManager } from '../../../../../features/connection/connection-manager/connection-manager';
@@ -51,6 +52,7 @@ export class ArmMasterPage {
   private readonly controlCommandPublisher = inject(ControlCommandPublisher);
   private readonly gamepad = inject(GamepadInput);
   private readonly rosConnection = inject(RosConnection);
+  private readonly cameraFeedControl = inject(CameraFeedControl);
   private readonly dialog = inject(MatDialog);
 
   readonly masterDriveEnabled = this.armControlMode.enabled;
@@ -63,6 +65,7 @@ export class ArmMasterPage {
   readonly readinessError = this.armControlMode.readinessError;
   readonly rosConnected = this.rosConnection.isConnected;
   readonly gamepadConnected = this.gamepad.connected;
+  readonly cameraFeedEnabled = this.cameraFeedControl.enabled;
   readonly gamepadStatusLabel = computed(() =>
     this.gamepadConnected() ? 'Connected' : 'Not detected',
   );
@@ -120,6 +123,11 @@ export class ArmMasterPage {
       ariaLabel: 'ROS connection settings',
       width: 'min(100% - 2rem, 32rem)',
     });
+  }
+
+  /** Starts or closes WHEP playback for every camera on this dashboard. */
+  setCameraFeedEnabled(enabled: boolean): void {
+    this.cameraFeedControl.setEnabled(enabled);
   }
 
   /** Enables the input worker selected by ArmControlModeService. */

@@ -21,15 +21,30 @@ describe('DriverMasterPage', () => {
   it('should render the Driver master controls', () => {
     expect(fixture.nativeElement.textContent).toContain('Master Drive');
     expect(fixture.nativeElement.textContent).toContain('ROS Link');
+    expect(fixture.nativeElement.textContent).toContain('Camera Link');
+    expect(fixture.nativeElement.querySelector('.camera-feed button').getAttribute('aria-checked')).toBe('false');
     expect(fixture.nativeElement.querySelector('app-control-mode-selector.drive-mode-selector'))
       .toBeTruthy();
   });
 
   it('should default to Velocity mode', () => {
     expect(component.driveMode()).toBe(DriveMode.Velocity);
-    expect(fixture.nativeElement.querySelector('button.active')?.textContent.trim()).toBe(
-      DriveMode.Velocity,
-    );
+    expect(
+      fixture.nativeElement
+        .querySelector('app-control-mode-selector button.active')
+        ?.textContent.trim(),
+    ).toBe(DriveMode.Velocity);
+  });
+
+  it('should enable the camera feed when switched on', () => {
+    const button = fixture.nativeElement.querySelector(
+      '.camera-feed button',
+    ) as HTMLButtonElement;
+    button.click();
+    fixture.detectChanges();
+
+    expect(component.cameraFeedEnabled()).toBe(true);
+    expect(button.getAttribute('aria-checked')).toBe('true');
   });
 
   it('should disable mode selection without ROS connection', () => {

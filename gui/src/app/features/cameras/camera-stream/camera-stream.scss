@@ -30,7 +30,8 @@
     --status-color: #e05b65;
   }
 
-  &[data-status='unavailable'] {
+  &[data-status='unavailable'],
+  &[data-status='off'] {
     --status-color: #e05b65;
   }
 }

@@ -40,6 +40,33 @@ describe('DriverDashboard', () => {
     ]);
   });
 
+  it('uses the Camera Link switch to toggle all three dashboard tiles together', () => {
+    const cameras = fixture.debugElement.queryAll(By.directive(CameraStream));
+    const toggle = fixture.nativeElement.querySelector('.camera-feed button') as HTMLButtonElement;
+
+    expect(cameras.map(({ componentInstance }) => (componentInstance as CameraStream).enabled)).toEqual([
+      false,
+      false,
+      false,
+    ]);
+
+    toggle.click();
+    fixture.detectChanges();
+    expect(cameras.map(({ componentInstance }) => (componentInstance as CameraStream).enabled)).toEqual([
+      true,
+      true,
+      true,
+    ]);
+
+    toggle.click();
+    fixture.detectChanges();
+    expect(cameras.map(({ componentInstance }) => (componentInstance as CameraStream).enabled)).toEqual([
+      false,
+      false,
+      false,
+    ]);
+  });
+
   it('should place the rover schematic and control scheme with the Driver panel', () => {
     expect(fixture.nativeElement.querySelector('app-rover-schematic')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('app-control-scheme')).toBeTruthy();

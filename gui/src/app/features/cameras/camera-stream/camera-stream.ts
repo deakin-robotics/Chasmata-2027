@@ -18,7 +18,13 @@ import { CAMERA_HEALTH_URL, CameraSource } from '../camera-sources';
 import { WhepClient, WhepReaderState } from './whep-client';
 
 export type CameraStreamStatus =
-  'not-configured' | 'connecting' | 'streaming' | 'reconnecting' | 'error' | 'unavailable';
+  | 'not-configured'
+  | 'connecting'
+  | 'streaming'
+  | 'reconnecting'
+  | 'error'
+  | 'unavailable'
+  | 'off';
 
 export type CameraGateway = 'base' | 'rover' | null;
 type BaseAttemptMode = 'normal' | 'recovery';
@@ -47,6 +53,7 @@ export class CameraStream implements AfterViewInit, OnChanges, OnDestroy {
   @Input() source: CameraSource | null = null;
   @Input() initialRotation = 0;
   @Input() allowRoverFallback = false;
+  @Input() enabled = true;
 
   @ViewChild('streamFrame') private streamFrame?: ElementRef<HTMLElement>;
   @ViewChild('baseVideo') private baseVideo?: ElementRef<HTMLVideoElement>;
@@ -61,6 +68,7 @@ export class CameraStream implements AfterViewInit, OnChanges, OnDestroy {
   private roverGeneration = 0;
   private recoveryGeneration = 0;
   private recoveryRequestInFlight = false;
+  private recoveryRequestController: AbortController | null = null;
   private recoveryAttemptInFlight = false;
   private baseAttemptMode: BaseAttemptMode = 'normal';
   private fallbackMode = false;
@@ -88,6 +96,8 @@ export class CameraStream implements AfterViewInit, OnChanges, OnDestroy {
         return 'Offline';
       case 'unavailable':
         return 'Unavailable';
+      case 'off':
+        return 'Off';
       default:
         return 'Not configured';
     }
@@ -120,7 +130,7 @@ export class CameraStream implements AfterViewInit, OnChanges, OnDestroy {
       this.rotation.set(this.normalizeRotation(this.initialRotation));
     }
 
-    if ((changes['source'] || changes['allowRoverFallback']) && this.viewReady) {
+    if ((changes['source'] || changes['allowRoverFallback'] || changes['enabled']) && this.viewReady) {
       const generation = ++this.configurationGeneration;
       queueMicrotask(() => {
         if (generation === this.configurationGeneration && this.viewReady) {
@@ -140,7 +150,7 @@ export class CameraStream implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   retry(): void {
-    if (!this.source) return;
+    if (!this.source || !this.enabled) return;
 
     this.updateConfiguration();
   }
@@ -188,6 +198,11 @@ export class CameraStream implements AfterViewInit, OnChanges, OnDestroy {
       return;
     }
 
+    if (!this.enabled) {
+      this.status.set('off');
+      return;
+    }
+
     if (!this.canStartWebRtc()) {
       this.status.set('unavailable');
       return;
@@ -207,7 +222,7 @@ export class CameraStream implements AfterViewInit, OnChanges, OnDestroy {
   private connectBase(mode: BaseAttemptMode): void {
     const source = this.source;
     const video = this.baseVideo?.nativeElement;
-    if (!source || !video || !this.viewReady || !this.canStartWebRtc()) return;
+    if (!source || !video || !this.viewReady || !this.enabled || !this.canStartWebRtc()) return;
 
     this.closeBaseSession();
     const generation = ++this.baseGeneration;
@@ -266,7 +281,7 @@ export class CameraStream implements AfterViewInit, OnChanges, OnDestroy {
   private connectRover(): void {
     const source = this.source;
     const video = this.roverVideo?.nativeElement;
-    if (!source || !video || !this.viewReady || !this.canStartWebRtc()) {
+    if (!source || !video || !this.viewReady || !this.enabled || !this.canStartWebRtc()) {
       this.status.set('unavailable');
       return;
     }
@@ -307,7 +322,7 @@ export class CameraStream implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   private armFailoverTimer(): void {
-    if (this.failoverTimer || this.fallbackMode || !this.source) return;
+    if (this.failoverTimer || this.fallbackMode || !this.source || !this.enabled) return;
 
     this.failoverTimer = setTimeout(() => {
       this.failoverTimer = null;
@@ -318,7 +333,7 @@ export class CameraStream implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   private enterFallbackMode(): void {
-    if (this.fallbackMode || !this.source) return;
+    if (this.fallbackMode || !this.source || !this.enabled) return;
 
     this.fallbackMode = true;
     this.clearRetryTimer();
@@ -332,7 +347,7 @@ export class CameraStream implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   private schedulePrimaryRetry(): void {
-    if (this.retryTimer || this.fallbackMode || !this.viewReady) return;
+    if (this.retryTimer || this.fallbackMode || !this.viewReady || !this.enabled) return;
 
     if (this.retryCount >= MAX_RETRY_ATTEMPTS) {
       this.status.set('error');
@@ -349,7 +364,7 @@ export class CameraStream implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   private scheduleRoverRetry(): void {
-    if (this.retryTimer || !this.fallbackMode || !this.viewReady) return;
+    if (this.retryTimer || !this.fallbackMode || !this.viewReady || !this.enabled) return;
 
     if (this.roverRetryCount >= MAX_RETRY_ATTEMPTS) {
       this.status.set('error');
@@ -366,12 +381,12 @@ export class CameraStream implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   private startRecoveryPolling(): void {
-    if (!this.fallbackMode || !this.viewReady || this.recoveryPollTimer) return;
+    if (!this.enabled || !this.fallbackMode || !this.viewReady || this.recoveryPollTimer) return;
     void this.pollBaseReadiness(this.recoveryGeneration);
   }
 
   private scheduleRecoveryPoll(delay: number): void {
-    if (!this.fallbackMode || !this.viewReady || this.recoveryPollTimer) return;
+    if (!this.enabled || !this.fallbackMode || !this.viewReady || this.recoveryPollTimer) return;
 
     const generation = this.recoveryGeneration;
     this.recoveryPollTimer = setTimeout(() => {
@@ -384,6 +399,7 @@ export class CameraStream implements AfterViewInit, OnChanges, OnDestroy {
     if (
       generation !== this.recoveryGeneration ||
       !this.fallbackMode ||
+      !this.enabled ||
       this.recoveryRequestInFlight ||
       this.recoveryAttemptInFlight
     ) {
@@ -426,6 +442,7 @@ export class CameraStream implements AfterViewInit, OnChanges, OnDestroy {
     if (!source || typeof fetch !== 'function') return false;
 
     const controller = new AbortController();
+    this.recoveryRequestController = controller;
     const timeout = setTimeout(() => controller.abort(), HEALTH_REQUEST_TIMEOUT_MS);
 
     try {
@@ -441,11 +458,16 @@ export class CameraStream implements AfterViewInit, OnChanges, OnDestroy {
       return false;
     } finally {
       clearTimeout(timeout);
+      if (this.recoveryRequestController === controller) {
+        this.recoveryRequestController = null;
+      }
     }
   }
 
   private stopRecoveryPolling(): void {
     this.recoveryGeneration += 1;
+    this.recoveryRequestController?.abort();
+    this.recoveryRequestController = null;
     if (this.recoveryPollTimer) clearTimeout(this.recoveryPollTimer);
     this.recoveryPollTimer = null;
     this.recoveryRequestInFlight = false;
