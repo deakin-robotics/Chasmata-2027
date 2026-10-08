@@ -16,9 +16,12 @@ services:
     environment:
       MTX_WEBRTCADDITIONALHOSTS: "localhost,127.0.0.1"
       MTX_WEBRTCALLOWORIGINS: "http://localhost:4200,http://127.0.0.1:4200"
-      MTX_PATHS_FRONT_SOURCE: rtsp://host.docker.internal:8555/front
-      MTX_PATHS_GIMBAL_SOURCE: rtsp://host.docker.internal:8555/gimbal
-      MTX_PATHS_ARM_SOURCE: rtsp://host.docker.internal:8555/arm
+      MTX_PATHS_FRONT_SOURCE: rtsp://rover-media-gateway:8554/front
+      MTX_PATHS_GIMBAL_SOURCE: rtsp://rover-media-gateway:8554/gimbal
+      MTX_PATHS_ARM_SOURCE: rtsp://rover-media-gateway:8554/arm
+    networks:
+      default: {}
+      local-media: {}
 
   moveit2:
     build:
@@ -30,3 +33,9 @@ services:
       ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
       ROS_LOCALHOST_ONLY: "0"
       RMW_IMPLEMENTATION: rmw_fastrtps_cpp
+
+networks:
+  default: {}
+  local-media:
+    name: chasmata-local-media
+    external: true

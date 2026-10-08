@@ -9,7 +9,7 @@ Neither gateway carries rover controls, telemetry, or MoveIt traffic.
 
 | Purpose                   | Port                                                      | Direction                                          |
 | ------------------------- | --------------------------------------------------------- | -------------------------------------------------- |
-| Rover RTSP                | TCP `8554` production; local mock host port `8555`        | Base MediaMTX pulls rover paths over TCP           |
+| Rover RTSP                | TCP `8554`; local mock host port `8555`                   | Base MediaMTX pulls rover paths over TCP           |
 | Base WHEP signalling      | TCP `8889`                                                | Operator browser -> base MediaMTX                  |
 | Base WebRTC media and ICE | UDP `8189`                                                | Operator browser <-> base MediaMTX                 |
 | Rover fallback WHEP / ICE | TCP `8889` / UDP `8189` production; local `8890` / `8190` | Eligible GUI tiles -> rover MediaMTX               |
@@ -51,10 +51,12 @@ Two base-station `.env` values matter for a real LAN:
 | `MEDIA_WEBRTC_ALLOW_ORIGINS`          | Browser page origins permitted to request WHEP. The default covers a GUI served locally on each operator PC at `localhost:4200`. |
 | `ROVER_RTSP_HOST` / `ROVER_RTSP_PORT` | The rover gateway address the base-station MediaMTX pulls from; set the rover's static LAN IP and port `8554`.                   |
 
-For local Windows testing, mock sources publish inside their Compose network to
-rover MediaMTX. The base-station gateway pulls from
-`host.docker.internal:8555`. In production, it pulls from the rover's TCP
-`8554` listener. Configure `ROVER_RTSP_HOST` with the rover's static IP so
-the base-station Docker container does not depend on mDNS resolution. The rover
-MediaMTX must advertise the rover's own LAN IP for direct fallback, while the
-base gateway advertises the base station's LAN IP.
+For local Windows testing, create the shared Docker network once with
+`docker network create chasmata-local-media`. The mock publishes inside its
+Compose network to rover MediaMTX; the base-station gateway pulls over the
+shared network from `rover-media-gateway:8554`. The mock also publishes host
+port `8555` for other local RTSP testing. In production, the base gateway pulls
+from the rover's TCP `8554` listener. Configure `ROVER_RTSP_HOST` with the
+rover's static IP so the base-station Docker container does not depend on mDNS
+resolution. The rover MediaMTX must advertise the rover's own LAN IP for
+direct fallback, while the base gateway advertises the base station's LAN IP.

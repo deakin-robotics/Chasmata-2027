@@ -129,7 +129,14 @@ Recovery ownership is deliberately split:
 
 On Windows, enable Docker Desktop host networking (Docker Desktop 4.34 or
 newer). Start the mock rover from `test/mock_rover` and the base-station stack
-in either order:
+in either order. Before the first start, create the shared local camera network
+once:
+
+```bash
+docker network create chasmata-local-media
+```
+
+Then start the mock rover:
 
 ```bash
 docker compose up --build
@@ -153,8 +160,8 @@ provides primary WHEP on `8889` and ICE UDP `8189`; its read-only camera status
 endpoint is TCP `9998` (the internal MediaMTX API is `9997`).
 
 The synthetic publishers send RTSP to the rover gateway using the Compose
-service name. The base-station container pulls the rover feeds through
-`host.docker.internal:8555` on local Windows testing.
+service name. The base-station gateway pulls the rover feeds from
+`rover-media-gateway:8554` over the shared local Docker network.
 
 Then start the GUI from `gui` with `npm start` and open
 <http://localhost:4200>. The Front, Gimbal, and Arm views should become

@@ -12,7 +12,13 @@ stacks can be started independently.
 
 For local Windows development, enable Docker Desktop host networking in
 `Settings > Resources > Network > Enable host networking` (Docker Desktop 4.34
-or newer). Then start this stack and the mock-rover stack in either order:
+or newer). Create the shared local camera network once:
+
+```bash
+docker network create chasmata-local-media
+```
+
+Then start this stack and the mock-rover stack in either order:
 
 ```bash
 docker compose -f docker-compose.local.yml up --build

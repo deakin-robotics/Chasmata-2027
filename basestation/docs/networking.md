@@ -86,7 +86,13 @@ video session. Camera traffic does not pass through MoveIt.
 
 On Windows, enable Docker Desktop host networking in
 `Settings > Resources > Network > Enable host networking` (Docker Desktop 4.34
-or newer). Start the mock rover and base-station stacks in either order:
+or newer). Create the shared local camera network once:
+
+```bash
+docker network create chasmata-local-media
+```
+
+Then start the mock rover and base-station stacks in either order:
 
 ```bash
 cd test/mock_rover
@@ -102,9 +108,11 @@ docker compose -f docker-compose.local.yml up --build
 
 The mock rover runs ROSbridge at `ws://localhost:9090` and the Fast DDS
 discovery server on UDP `11811`. Its ROS services and local MoveIt use host
-networking and connect through `127.0.0.1:11811`; they do not need a shared
-Docker network. Rover MediaMTX exposes local fallback playback on WHEP `8890`
-and ICE UDP `8190`; base MediaMTX pulls rover RTSP through host port `8555`.
+networking and connect through `127.0.0.1:11811`; they do not use the shared
+camera network. Only the rover and base-station MediaMTX gateways share
+`chasmata-local-media`; the base gateway pulls the mock feeds from
+`rover-media-gateway:8554`. Rover MediaMTX also exposes local fallback playback
+on WHEP `8890` and ICE UDP `8190`.
 
 ## Real rover LAN
 

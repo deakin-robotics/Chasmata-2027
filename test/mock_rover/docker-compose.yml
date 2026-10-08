@@ -11,6 +11,11 @@ services:
       - "8555:8554"
       - "8890:8889"
       - "8190:8190/udp"
+    networks:
+      default: {}
+      local-media:
+        aliases:
+          - rover-media-gateway
     restart: unless-stopped
 
   discovery:
@@ -49,3 +54,9 @@ services:
     depends_on:
       - media-gateway
     restart: unless-stopped
+
+networks:
+  default: {}
+  local-media:
+    name: chasmata-local-media
+    external: true

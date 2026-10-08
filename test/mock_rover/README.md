@@ -27,17 +27,25 @@ On Windows, enable Docker Desktop host networking (Docker Desktop 4.34 or
 newer) to run this local setup. The GUI still uses `ws://localhost:9090` for
 local testing.
 
+For camera RTSP between the two local Compose stacks, create their shared
+Docker network once before starting either stack:
+
+```bash
+docker network create chasmata-local-media
+```
+
 The synthetic publishers target the rover MediaMTX Compose service at
 `media-gateway:8554`. The base-station MediaMTX pulls those feeds over RTSP;
-on local Windows testing it reaches the rover gateway through
-`host.docker.internal:8555`. When running the mock rover stack on a separate
-PC, the base-station RTSP source must use that PC's address.
+the local base-station gateway reaches the rover gateway at
+`rover-media-gateway:8554` over the shared Docker network. When running the
+mock rover stack on a separate PC, the base-station RTSP source must use that
+PC's address.
 
 The mock rover's local gateway ports are:
 
 | Purpose                             | Host port  |
 | ----------------------------------- | ---------- |
-| RTSP publishing / base-station pull | TCP `8555` |
+| RTSP published host port for local testing | TCP `8555` |
 | Fallback WHEP playback              | TCP `8890` |
 | Fallback WebRTC media               | UDP `8190` |
 
