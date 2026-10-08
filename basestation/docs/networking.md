@@ -2,9 +2,9 @@
 
 ## Real rover network at a glance
 
-The rover, base station, and operator PCs connect to the same private LAN,
-which can be a switch or the rover radio network. The Arm GUI can run on the
-base-station PC or another PC on the LAN. Internet access is not required.
+The rover, base station, Driver PC, and Arm operator PC connect to the same
+private LAN, which can be a switch or the rover radio network. Internet access
+is not required.
 
 ### ROS controls and arm planning
 
@@ -25,7 +25,7 @@ flowchart LR
             driver["Driver GUI in browser"]
         end
 
-        subgraph armPC["Arm operator PC\n(or base-station PC)"]
+        subgraph armPC["Arm operator PC"]
             arm["Arm GUI in browser"]
         end
 
@@ -57,7 +57,7 @@ flowchart LR
             driver["Driver GUI in browser"]
         end
 
-        subgraph armPC["Arm operator PC\n(or base-station PC)"]
+        subgraph armPC["Arm operator PC"]
             arm["Arm GUI in browser"]
         end
 
@@ -123,8 +123,7 @@ Operator PCs use names instead of numeric addresses:
 | `basestation.local` | Camera gateway, such as `http://basestation.local:8889`. |
 
 Windows resolves these names through the rover network's DNS or hosts-file
-configuration. The Driver GUI and Arm GUI use the same names, even when they
-run on separate PCs.
+configuration. The Driver GUI and Arm GUI use the same names.
 
 ## Responsibility boundary
 

@@ -56,6 +56,5 @@ flowchart LR
 ```
 
 The Driver and Arm GUIs connect directly to the rover for controls and
-telemetry. MediaMTX only provides camera playback, while MoveIt handles Arm
-Position/IK planning. The Arm GUI normally runs on the base-station PC, but it
-can run elsewhere when it can resolve the same rover and base-station names.
+telemetry. MediaMTX provides camera playback, while MoveIt handles Arm
+Position/IK planning.
