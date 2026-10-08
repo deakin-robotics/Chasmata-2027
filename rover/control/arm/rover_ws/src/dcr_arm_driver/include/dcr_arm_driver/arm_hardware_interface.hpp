@@ -77,8 +77,10 @@ class ArmHardwareInterface : public hardware_interface::SystemInterface {
   std::unique_ptr<Motor> motor_driver_;
   std::string can_interface_;
 
-  // Node that lives inside the hardware interface so we can talk to the
-  // socketcan_bridge (and expose arm_interfaces telemetry on the ROS graph).
+  // Non-owning handle to the node owned by controller_manager (returned by
+  // get_node()). We create all publishers/subscriptions on this node so their
+  // callbacks are actually executed - a privately created node would never be
+  // added to an executor and would never be spun.
   rclcpp::Node::SharedPtr node_;
 
   // CAN bridge topics: publish outgoing frames on .../tx, receive on .../rx

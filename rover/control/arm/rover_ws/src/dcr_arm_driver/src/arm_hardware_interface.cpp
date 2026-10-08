@@ -81,7 +81,11 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_activate(
     const rclcpp_lifecycle::State& /*previous_state*/) {
   RCLCPP_INFO(rclcpp::get_logger("ArmHardwareInterface"), "Activating...");
 
-  auto node = rclcpp::Node::make_shared("arm_hardware_interface");
+  // IMPORTANT: do NOT create a private node here. A node created inside a
+  // ros2_control plugin is never added to any executor, so its subscription
+  // callbacks (from /socketcan_bridge/rx and /motor_move) would never fire.
+  // Instead, use the node that controller_manager already owns and spins.
+  auto node = this->get_node();
   node_ = node;
 
   // Talk to nobleo_socketcan_bridge. Its node is named "socketcan_bridge"
@@ -204,7 +208,7 @@ hardware_interface::return_type ArmHardwareInterface::write(
     const rclcpp::Time& /*time*/, const rclcpp::Duration& /*period*/) {
   for (auto& joint : joints_) {
     auto cmd_msg = motor_driver_->position_control(joint.can_id,
-                                                    joint.position_command);
+                                                    joint.position_command*180/3.14159265);
     if (can_pub_) {
       can_pub_->publish(cmd_msg);
     }
