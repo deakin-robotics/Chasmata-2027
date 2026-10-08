@@ -109,7 +109,9 @@ Recovery ownership is deliberately split:
 
 ## Local development runbook
 
-Start the mock rover first from `test/mock_rover`:
+On Windows, enable Docker Desktop host networking (Docker Desktop 4.34 or
+newer). Start the mock rover from `test/mock_rover` and the base-station stack
+in either order:
 
 ```bash
 docker compose up --build
@@ -121,11 +123,10 @@ Then start the base-station stack from `basestation`:
 docker compose -f docker-compose.local.yml up --build
 ```
 
-For production, Docker Desktop host networking must be enabled on the
-base-station PC so MoveIt can use the PC's normal LAN connection for ROS2
-discovery. The Windows local override keeps MoveIt and the mock rover on their
-shared test Docker network; MediaMTX keeps its published TCP/UDP ports for
-camera traffic.
+MoveIt and the mock rover ROS services use host networking to connect through
+the rover-side discovery server. MediaMTX remains on Docker's regular network
+with its TCP/UDP ports published for camera traffic. On Linux, host networking
+is native.
 
 The mock rover starts ROSbridge on `9090`, discovery on UDP `11811`, and the
 three synthetic RTSP publishers. The base station exposes MediaMTX RTSP ingest

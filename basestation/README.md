@@ -5,20 +5,20 @@ The base station provides two independent services for rover operators:
 - MoveIt 2 planning for Arm Position/IK mode.
 - MediaMTX camera playback for Driver and Arm browsers.
 
-It does not run the rover, ROSbridge, or the GUI. Start the rover (or local
-mock rover) first.
+It does not run the rover, ROSbridge, or the GUI. The rover and base-station
+stacks can be started independently.
 
 ## Start
 
-For local Windows development:
+For local Windows development, enable Docker Desktop host networking in
+`Settings > Resources > Network > Enable host networking` (Docker Desktop 4.34
+or newer). Then start this stack and the mock-rover stack in either order:
 
 ```bash
 docker compose -f docker-compose.local.yml up --build
 ```
 
-For the production-shaped stack, enable Docker Desktop host networking on the
-base-station PC (`Settings > Resources > Network > Enable host networking`),
-then configure the static LAN addresses:
+For the production-shaped stack, configure the static LAN addresses:
 
 ```bash
 copy .env.example .env

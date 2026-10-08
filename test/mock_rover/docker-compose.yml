@@ -1,25 +1,19 @@
 services:
   discovery:
     build: .
+    network_mode: host
     command:
       - source /opt/ros/jazzy/setup.bash && exec fastdds discovery -i 0 -l 0.0.0.0 -p 11811
-    ports:
-      - '${ROS_DISCOVERY_PORT:-11811}:11811/udp'
-    networks:
-      - local-ros
     restart: unless-stopped
 
   mock-rover:
     build: .
+    network_mode: host
     environment:
       ROS_DOMAIN_ID: '${ROS_DOMAIN_ID:-0}'
       ROS_LOCALHOST_ONLY: '0'
       RMW_IMPLEMENTATION: rmw_fastrtps_cpp
-      ROS_DISCOVERY_SERVER: 'discovery:11811'
-    ports:
-      - '9090:9090'
-    networks:
-      - local-ros
+      ROS_DISCOVERY_SERVER: '127.0.0.1:11811'
     depends_on:
       - discovery
     restart: unless-stopped
@@ -41,7 +35,3 @@ services:
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     restart: unless-stopped
-
-networks:
-  local-ros:
-    name: chasmata-local-ros

@@ -1,8 +1,80 @@
 # Networking
 
+## Real rover network at a glance
+
+The rover, base station, and operator PCs connect to the same private LAN,
+which can be a switch or the rover radio network. The Arm GUI can run on the
+base-station PC or another PC on the LAN. Internet access is not required.
+
+### ROS controls and arm planning
+
+```mermaid
+flowchart LR
+    subgraph lan["Rover LAN"]
+        subgraph roverPC["Rover PC"]
+            ros["Rover ROS 2 nodes"]
+            bridge["ROSbridge :9090"]
+            discovery["Fast DDS discovery :11811/UDP"]
+        end
+
+        subgraph basePC["Base-station PC"]
+            moveit["MoveIt 2\n(host network)"]
+        end
+
+        subgraph driverPC["Driver PC"]
+            driver["Driver GUI in browser"]
+        end
+
+        subgraph armPC["Arm operator PC\n(or base-station PC)"]
+            arm["Arm GUI in browser"]
+        end
+
+        driver <-->|"controls and telemetry\nWebSocket :9090"| bridge
+        arm <-->|"Arm manual mode and telemetry\nWebSocket :9090"| bridge
+        moveit <-->|"ROS 2 discovery via :11811\nthen topics and actions"| ros
+        arm -->|"Position target\n/arm/target_pose"| moveit
+    end
+
+```
+
+The Driver and Arm GUIs connect to the rover for controls and telemetry.
+MoveIt exchanges planning and trajectory data with the rover over ROS 2.
+
+### Camera video
+
+```mermaid
+flowchart LR
+    subgraph lan["Rover LAN"]
+        subgraph roverPC["Rover PC"]
+            cameras["Camera sources"]
+        end
+
+        subgraph basePC["Base-station PC"]
+            media["MediaMTX\n(Docker, published ports)"]
+        end
+
+        subgraph driverPC["Driver PC"]
+            driver["Driver GUI in browser"]
+        end
+
+        subgraph armPC["Arm operator PC\n(or base-station PC)"]
+            arm["Arm GUI in browser"]
+        end
+
+        cameras -->|"RTSP :8554"| media
+        media <-->|"WHEP :8889\nWebRTC video UDP :8189"| driver
+        media <-->|"WHEP :8889\nWebRTC video UDP :8189"| arm
+    end
+```
+
+Camera video goes from the rover to MediaMTX, then from MediaMTX to the
+operator browsers. It does not pass through MoveIt.
+
 ## Local mock setup
 
-Start the mock rover first:
+On Windows, enable Docker Desktop host networking in
+`Settings > Resources > Network > Enable host networking` (Docker Desktop 4.34
+or newer). Start the mock rover and base-station stacks in either order:
 
 ```bash
 cd test/mock_rover
@@ -16,15 +88,15 @@ cd basestation
 docker compose -f docker-compose.local.yml up --build
 ```
 
-The local mock provides ROSbridge at `ws://localhost:9090`, Fast DDS discovery
-inside the shared Docker test network, and synthetic camera publishers. The
-local base-station override joins that Docker network for MoveIt and publishes
-MediaMTX ports to Windows for the GUI.
+The mock rover runs ROSbridge at `ws://localhost:9090` and the Fast DDS
+discovery server on UDP `11811`. Its ROS services and local MoveIt use host
+networking and connect through `127.0.0.1:11811`; they do not need a shared
+Docker network. MediaMTX publishes its camera ports to Windows for the GUI.
 
 ## Real rover LAN
 
-On the base-station PC, enable Docker Desktop host networking, copy
-`.env.example` to `.env`, set the static IP values, and start the normal stack:
+On the base-station PC, copy `.env.example` to `.env`, set the static IP
+values, and start the normal stack:
 
 ```bash
 copy .env.example .env

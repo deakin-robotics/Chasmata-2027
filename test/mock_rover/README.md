@@ -21,10 +21,21 @@ GUI normally to:
 ws://localhost:9090
 ```
 
-Start this stack before the base station. The synthetic publishers target the
-base-station gateway at `host.docker.internal:8554` by default and retry while
-that gateway is unavailable. Once both stacks are running, MoveIt2 joins the
-mock rover graph and the GUI still uses only `ws://localhost:9090`.
+The mock rover and base-station stacks can start in either order. The mock
+rover ROS services use host networking, so the base station can reach the
+rover-side discovery server at UDP `11811` without a shared Docker network.
+On Windows, enable Docker Desktop host networking (Docker Desktop 4.34 or
+newer) to run this local setup. The GUI still uses `ws://localhost:9090` for
+local testing.
+
+The synthetic publishers target the base-station gateway at
+`host.docker.internal:8554` by default on Windows and retry while it is
+unavailable. When running the mock rover on a separate Linux PC, set
+`MEDIA_GATEWAY_HOST` to the base station's LAN address, for example:
+
+```bash
+MEDIA_GATEWAY_HOST=192.168.1.10 docker compose up --build
+```
 
 The GUI dashboards use these WHEP camera feeds automatically:
 

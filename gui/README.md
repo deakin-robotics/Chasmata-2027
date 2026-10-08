@@ -104,8 +104,9 @@ Open <http://localhost:4200>.
 
 ## 🔌 Local ROS testing
 
-For the local mock rover and MoveIt2 stack, use two terminals. Start the mock
-rover first:
+For the local mock rover and MoveIt2 stack, enable Docker Desktop host
+networking (Docker Desktop 4.34 or newer), then use two terminals. The stacks
+can start in either order:
 
 ```bash
 # Terminal 1
