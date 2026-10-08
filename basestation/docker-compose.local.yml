@@ -24,6 +24,7 @@ services:
     build:
       context: ..
       dockerfile: basestation/Dockerfile
+    network_mode: host
     environment:
       ROS_DISCOVERY_SERVER: 127.0.0.1:11811
       ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
