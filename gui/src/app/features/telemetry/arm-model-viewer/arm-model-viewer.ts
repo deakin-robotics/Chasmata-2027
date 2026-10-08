@@ -713,6 +713,7 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
 
     if (progress < 1) return;
 
+    material.opacity = this.targetMarkerFadeTargetOpacity;
     this.targetMarkerFadeStartedAtMs = null;
     marker.visible = this.targetMarkerFadeTargetOpacity > 0;
   }
