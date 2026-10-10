@@ -40,6 +40,7 @@ const ARM_TELEMETRY_STALE_AFTER_MS = 500;
 const ARM_TARGET_REACHED_TOLERANCE = 0.01;
 const ARM_TARGET_MARKER_FADE_IN_MS = 100;
 const ARM_TARGET_MARKER_FADE_OUT_MS = 250;
+const ARM_TARGET_MARKER_FADE_COMPLETION_TOLERANCE_MS = 0.001;
 
 type ViewerStatus = 'unavailable' | 'loading' | 'waiting-telemetry' | 'ready' | 'error';
 type ThreeModule = typeof import('three');
@@ -706,13 +707,16 @@ export class ArmModelViewer implements AfterViewInit, OnDestroy {
       this.targetMarkerFadeTargetOpacity > this.targetMarkerFadeStartOpacity
         ? ARM_TARGET_MARKER_FADE_IN_MS
         : ARM_TARGET_MARKER_FADE_OUT_MS;
-    const progress = Math.min((now - fadeStartedAtMs) / fadeDurationMs, 1);
+    const elapsedMs = now - fadeStartedAtMs;
+    const completed = elapsedMs >= fadeDurationMs - ARM_TARGET_MARKER_FADE_COMPLETION_TOLERANCE_MS;
+    const progress = completed ? 1 : Math.max(elapsedMs / fadeDurationMs, 0);
     material.opacity =
       this.targetMarkerFadeStartOpacity +
       (this.targetMarkerFadeTargetOpacity - this.targetMarkerFadeStartOpacity) * progress;
 
-    if (progress < 1) return;
+    if (!completed) return;
 
+    material.opacity = this.targetMarkerFadeTargetOpacity;
     this.targetMarkerFadeStartedAtMs = null;
     marker.visible = this.targetMarkerFadeTargetOpacity > 0;
   }

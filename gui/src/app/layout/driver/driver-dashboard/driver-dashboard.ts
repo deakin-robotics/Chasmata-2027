@@ -1,6 +1,8 @@
-import { Component, signal } from '@angular/core';
+import { Component, inject } from '@angular/core';
 
+import { CameraFeedControl } from '../../../features/cameras/camera-feed-control';
 import { CameraStream } from '../../../features/cameras/camera-stream/camera-stream';
+import { CAMERA_SOURCES } from '../../../features/cameras/camera-sources';
 import { GamepadControlPanel } from '../../../features/gamepad/gamepad-control-panel/gamepad-control-panel';
 import { RoverSchematic } from '../../../features/telemetry/rover-schematic/rover-schematic';
 import { ControlScheme } from '../../../shared/control-scheme/control-scheme';
@@ -14,11 +16,13 @@ import { DriverControlPanel } from '../driver-control-panel/driver-control-panel
 @Component({
   selector: 'app-driver-dashboard',
   imports: [CameraStream, ControlScheme, DriverControlPanel, GamepadControlPanel, RoverSchematic],
+  providers: [CameraFeedControl],
   templateUrl: './driver-dashboard.html',
   styleUrl: './driver-dashboard.scss',
 })
 export class DriverDashboard {
-  readonly armCameraUrl = signal('http://localhost:8091/?action=stream');
-  readonly frontCameraUrl = signal('http://localhost:8080/?action=stream');
-  readonly gimbalCameraUrl = signal('http://localhost:8090/?action=stream');
+  readonly cameraFeedControl = inject(CameraFeedControl);
+  readonly armCamera = CAMERA_SOURCES.arm;
+  readonly frontCamera = CAMERA_SOURCES.front;
+  readonly gimbalCamera = CAMERA_SOURCES.gimbal;
 }

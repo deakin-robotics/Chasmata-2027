@@ -16,7 +16,7 @@ describe('ConnectionManager', () => {
     fixture = TestBed.createComponent(ConnectionManager);
     component = fixture.componentInstance;
     rosConnection = TestBed.inject(RosConnection);
-    await fixture.whenStable();
+    fixture.detectChanges();
   });
 
   it('should render the initial disconnected state', () => {
@@ -24,16 +24,16 @@ describe('ConnectionManager', () => {
     const endpointInput = element.querySelector('input') as HTMLInputElement;
 
     expect(element.textContent).toContain('Disconnected');
-    expect(endpointInput.value).toBe('rover.local:9090');
+    expect(endpointInput.value).toBe('localhost:9090');
   });
 
   it('should pass the entered endpoint to the connection service', () => {
     const connectSpy = vi.spyOn(rosConnection, 'connect');
-    component.endpoint.setValue('rover.local:9090');
+    component.endpoint.setValue('localhost:9090');
 
     component.connect();
 
-    expect(connectSpy).toHaveBeenCalledWith('rover.local:9090');
+    expect(connectSpy).toHaveBeenCalledWith('localhost:9090');
   });
 
   it('should disconnect through the connection service', () => {

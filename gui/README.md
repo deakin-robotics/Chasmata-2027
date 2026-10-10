@@ -2,7 +2,9 @@
 
 The browser-based mission-control interface for the Deakin Competitive Robotics Club rover.
 
-This project is an Angular replacement for the previous Next.js GUI. The migration will preserve the rover's existing ROS topics, services, gamepad mappings, and camera interfaces while introducing a more structured and maintainable frontend architecture.
+This project is an Angular replacement for the previous Next.js GUI. The new
+frontend preserves the rover's ROS topics, services, and gamepad mappings while
+using a native WebRTC/WHEP camera transport.
 
 > This project is currently in its migration stage. The existing Next.js GUI remains the working reference until this application reaches feature parity and passes rover testing.
 
@@ -15,7 +17,7 @@ This project is an Angular replacement for the previous Next.js GUI. The migrati
 - ROSLIB.js for browser-to-ROS communication
 - ROSbridge using JSON over WebSocket
 - Browser Gamepad API for operator controls
-- HTTP MJPEG camera streams
+- WebRTC camera streams read through WHEP
 - Vitest for unit testing
 
 ## 🎨 Design language
@@ -34,6 +36,7 @@ The mission-control interface is inspired by the Airbus glass cockpit philosophy
 - [ECAM Code Dictionary](docs/ecam-code-dictionary.md) — stable alert codes, severities, display text, and meanings.
 - [Telemetry requirements](docs/telemetry-requirements.md) — FMA, ECAM, and System Display (SD) telemetry, update rates, and recovery behaviour.
 - [Arm inverse kinematics](docs/arm-ik.md) — URDF model, browser-side IK solver, and the future joint-angle command handoff.
+- [WebRTC camera stream](docs/webrtc-camera-stream.md) — MediaMTX/WHEP architecture, camera contract, and local media-stack runbook.
 - [Mock rover](../test/mock_rover/README.md) — ROS 2 feedback simulator for GUI integration testing.
 
 ## 🖥️ Current Angular implementation
@@ -61,13 +64,13 @@ flowchart LR
     gamepad[Gamepad API] --> gui[Angular mission control]
     gui -->|JSON/WebSocket| rosbridge[ROSbridge :9090]
     rosbridge --> ros[ROS 2 nodes]
-    camera[Camera img elements] -->|HTTP/MJPEG| streams[Camera stream servers]
+    camera[Camera video elements] -->|WHEP/WebRTC| streams[MediaMTX on base station]
 ```
 
 The GUI communicates directly with the rover on its private operator network:
 
 - Controls and telemetry use ROSLIB through ROSbridge.
-- Camera video uses separate HTTP MJPEG streams.
+- Camera video uses WHEP playback sessions from the base-station MediaMTX gateway.
 - Driver control publishes `sensor_msgs/Joy` on `/joy`.
 - Arm control publishes remapped `sensor_msgs/Joy` on `/arm/joy`.
 - Driver and Arm Operator GUIs may both view and control the shared Gimbal camera.
@@ -101,33 +104,33 @@ Open <http://localhost:4200>.
 
 ## 🔌 Local ROS testing
 
-Start ROSbridge from the `deakin_rover` base-station Dev Container:
+For the local mock rover and MoveIt2 stack, enable Docker Desktop host
+networking (Docker Desktop 4.34 or newer), then use two terminals. The stacks
+can start in either order:
 
 ```bash
-source install/setup.bash
-ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+# Terminal 1
+cd ../test/mock_rover
+docker compose up --build
+
+# Terminal 2
+cd ../../basestation
+docker compose -f docker-compose.local.yml up --build
 ```
 
 Use this endpoint from the Angular GUI:
 
 ```text
-ws://rover.local:9090
+ws://localhost:9090
 ```
 
-Only ROSbridge is required for initial connection testing. The full rover bring-up starts hardware-dependent nodes and is not required for ordinary GUI development.
+The mock rover owns ROSbridge. The base-station stack joins it for MoveIt2
+planning and does not expose another GUI endpoint.
 
-Current legacy rover camera defaults (reference only):
-
-```text
-Front camera: http://dcr-rover.local:8080/?action=stream
-Rear camera:  http://dcr-rover.local:8090/?action=stream
-Arm camera:   http://dcr-rover.local:8091/?action=stream
-```
-
-These endpoints support the existing rover code. The current proposed new camera
-inventory is Front, Arm, and a controllable downward-facing Gimbal camera that
-provides a top-like/bird's-eye view. The final hardware and stream interfaces
-remain under development and will be updated once finalised.
+For local WebRTC camera development and validation, see
+[WebRTC camera stream](docs/webrtc-camera-stream.md). It covers the
+base-station MediaMTX gateway, mock-rover RTSP publishers, WHEP endpoints,
+video configuration, and smoke testing.
 
 ## 🏗️ Architecture
 

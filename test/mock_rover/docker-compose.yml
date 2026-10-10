@@ -1,9 +1,62 @@
 services:
+  media-gateway:
+    image: bluenviron/mediamtx:1.21.1
+    environment:
+      MTX_WEBRTCADDITIONALHOSTS: "${ROVER_MEDIA_WEBRTC_ADDITIONAL_HOSTS:-localhost,127.0.0.1}"
+      MTX_WEBRTCALLOWORIGINS: "${MEDIA_WEBRTC_ALLOW_ORIGINS:-http://localhost:4200,http://127.0.0.1:4200}"
+      MTX_WEBRTCLOCALUDPADDRESS: :8190
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml:ro
+    ports:
+      - "8555:8554"
+      - "8890:8889"
+      - "8190:8190/udp"
+    networks:
+      default: {}
+      local-media:
+        aliases:
+          - rover-media-gateway
+    restart: unless-stopped
+
+  discovery:
+    build: .
+    network_mode: host
+    command:
+      - source /opt/ros/jazzy/setup.bash && exec fastdds discovery -i 0 -l 0.0.0.0 -p 11811
+    restart: unless-stopped
+
   mock-rover:
     build: .
-    ports:
-      - '9090:9090'
-      - '8080:8080'
-      - '8090:8090'
-      - '8091:8091'
+    network_mode: host
+    environment:
+      ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
+      ROS_LOCALHOST_ONLY: "0"
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
+      ROS_DISCOVERY_SERVER: "127.0.0.1:11811"
+    depends_on:
+      - discovery
     restart: unless-stopped
+
+  media-source:
+    image: bluenviron/mediamtx:1.21.1-ffmpeg
+    entrypoint: ["/bin/sh", "/run-test-sources.sh"]
+    environment:
+      MEDIA_GATEWAY_HOST: "${MEDIA_GATEWAY_HOST:-media-gateway}"
+      MEDIA_GATEWAY_RTSP_PORT: "${MEDIA_GATEWAY_RTSP_PORT:-8554}"
+      MEDIA_WIDTH: "${MEDIA_WIDTH:-1280}"
+      MEDIA_HEIGHT: "${MEDIA_HEIGHT:-720}"
+      MEDIA_FPS: "${MEDIA_FPS:-30}"
+      MEDIA_BITRATE_KBPS: "${MEDIA_BITRATE_KBPS:-2500}"
+      MEDIA_BUFFER_KBPS: "${MEDIA_BUFFER_KBPS:-5000}"
+      MEDIA_KEYFRAME_INTERVAL: "${MEDIA_KEYFRAME_INTERVAL:-30}"
+    volumes:
+      - ./run-test-sources.sh:/run-test-sources.sh:ro
+    depends_on:
+      - media-gateway
+    restart: unless-stopped
+
+networks:
+  default: {}
+  local-media:
+    name: chasmata-local-media
+    external: true

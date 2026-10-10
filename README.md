@@ -4,6 +4,37 @@ Software and operator-interface development for the Deakin Competitive Robotics 
 
 The project is under active development. The current focus is a browser-based Mission Control interface alongside rover-side software and documentation.
 
+## Local full-stack test
+
+Create the shared camera network once:
+
+```powershell
+docker network create chasmata-local-media
+```
+
+Then run each stack in its own PowerShell terminal:
+
+**Mock rover**
+
+```powershell
+cd test/mock_rover
+docker compose up --build
+```
+
+**Base station**
+
+```powershell
+cd basestation
+docker compose -f docker-compose.local.yml up --build
+```
+
+**GUI**
+
+```powershell
+cd gui
+npm start
+```
+
 ## 🗂️ Repository layout
 
 ```text

@@ -8,6 +8,15 @@ import { RosConnection } from './ros-connection';
 import { RosTelemetryBridge } from './ros-telemetry-bridge';
 
 vi.mock('roslib', () => ({
+  Ros: class {
+    isConnected = false;
+    on(): void {}
+    removeAllListeners(): void {}
+    close(): void {}
+    connect(): Promise<void> {
+      return Promise.resolve();
+    }
+  },
   Topic: class {
     subscribe(): void {}
     unsubscribe(): void {}

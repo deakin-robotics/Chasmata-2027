@@ -1,0 +1,30 @@
+logLevel: info
+
+rtsp: true
+rtspTransports: [tcp]
+rtspAddress: :8554
+
+webrtc: true
+webrtcEncryption: false
+webrtcAddress: :8889
+webrtcLocalUDPAddress: :8189
+webrtcLocalTCPAddress: ""
+# These development defaults can be overridden through the Compose environment.
+webrtcAllowOrigins: ["http://localhost:4200", "http://127.0.0.1:4200"]
+webrtcIPsFromInterfaces: false
+webrtcAdditionalHosts: ["localhost", "127.0.0.1"]
+
+# Internal API used by the read-only camera-health service.
+api: true
+apiAddress: :9997
+
+paths:
+  front:
+    source: publisher
+    rtspTransport: tcp
+  gimbal:
+    source: publisher
+    rtspTransport: tcp
+  arm:
+    source: publisher
+    rtspTransport: tcp

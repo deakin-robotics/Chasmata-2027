@@ -7,20 +7,31 @@
 }
 
 .master-page {
+  position: relative;
   display: grid;
   align-content: start;
   grid-template-areas:
-    '. gamepad ros .'
-    '. gamepad-stem ros-flow .'
-    '. gamepad-flow master .'
-    '. drive-mode drive-mode .'
-    '. error error .';
-  grid-template-columns: repeat(4, 1fr);
+    'gamepad ros . camera .'
+    'gamepad-stem ros-flow . . .'
+    'gamepad-flow master . . .'
+    'drive-mode drive-mode . . .'
+    '. error error error error';
+  grid-template-columns: repeat(2, minmax(0, 1fr)) 0.4rem repeat(2, minmax(0, 1fr));
   column-gap: 0.5rem;
   row-gap: 0.6rem;
   box-sizing: border-box;
   height: 100%;
   padding: 0.75rem;
+}
+
+.master-page::after {
+  grid-column: 3;
+  grid-row: 1 / 5;
+  justify-self: end;
+  width: 0;
+  border-right: 1px solid #303844;
+  content: '';
+  pointer-events: none;
 }
 
 app-status-indicator,
@@ -33,6 +44,10 @@ app-control-mode-selector {
 
 app-action-button {
   grid-area: ros;
+}
+
+.camera-feed {
+  grid-area: camera;
 }
 
 .gamepad-flow {

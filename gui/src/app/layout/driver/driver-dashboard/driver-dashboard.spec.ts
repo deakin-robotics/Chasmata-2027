@@ -1,5 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 
+import { CameraStream } from '../../../features/cameras/camera-stream/camera-stream';
 import { DriverDashboard } from './driver-dashboard';
 
 describe('DriverDashboard', () => {
@@ -23,12 +25,58 @@ describe('DriverDashboard', () => {
     expect(fixture.nativeElement.textContent).toContain('Gimbal camera');
   });
 
+  it('allows rover fallback for Front and Gimbal, but not Arm', () => {
+    const policies = fixture.debugElement
+      .queryAll(By.directive(CameraStream))
+      .map(({ componentInstance }) => {
+        const camera = componentInstance as CameraStream;
+        return [camera.label, camera.allowRoverFallback];
+      });
+
+    expect(policies).toEqual([
+      ['Arm camera', false],
+      ['Front camera', true],
+      ['Gimbal camera', true],
+    ]);
+  });
+
+  it('uses the Camera Link switch to toggle all three dashboard tiles together', () => {
+    const cameras = fixture.debugElement.queryAll(By.directive(CameraStream));
+    const toggle = fixture.nativeElement.querySelector('.camera-feed button') as HTMLButtonElement;
+
+    expect(cameras.map(({ componentInstance }) => (componentInstance as CameraStream).enabled)).toEqual([
+      false,
+      false,
+      false,
+    ]);
+
+    toggle.click();
+    fixture.detectChanges();
+    expect(cameras.map(({ componentInstance }) => (componentInstance as CameraStream).enabled)).toEqual([
+      true,
+      true,
+      true,
+    ]);
+
+    toggle.click();
+    fixture.detectChanges();
+    expect(cameras.map(({ componentInstance }) => (componentInstance as CameraStream).enabled)).toEqual([
+      false,
+      false,
+      false,
+    ]);
+  });
+
   it('should place the rover schematic and control scheme with the Driver panel', () => {
     expect(fixture.nativeElement.querySelector('app-rover-schematic')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('app-control-scheme')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('app-driver-control-panel')).toBeTruthy();
-    expect(fixture.nativeElement.querySelector('.arm-camera-column app-rover-schematic')).toBeFalsy();
-    expect(fixture.nativeElement.querySelector('.arm-camera-column app-control-scheme')).toBeFalsy();
+    expect(
+      fixture.nativeElement.querySelector('.arm-camera-column app-rover-schematic'),
+    ).toBeFalsy();
+    expect(
+      fixture.nativeElement.querySelector('.arm-camera-column app-control-scheme'),
+    ).toBeFalsy();
     expect(
       fixture.nativeElement.querySelector('.driver-control-column app-rover-schematic'),
     ).toBeTruthy();
