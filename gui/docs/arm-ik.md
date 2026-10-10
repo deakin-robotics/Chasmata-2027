@@ -19,6 +19,7 @@ flowchart TB
     partial[5a. Partial trajectory<br/>J1-J3]
     full[5b. Complete trajectory<br/>J1-J6]
     wrist[5c. /arm/joy<br/>J4-J6 operator wrist input]
+    override[5d. LAW Override<br/>manual joint control<br/>J1-J6]
     action[6. FollowJointTrajectory action]
     rover[7. Rover<br/>validate limits, execute/reject]
     telemetry[8. /joint_states + MoveIt2 status]
@@ -28,6 +29,8 @@ flowchart TB
     moveit --> locked --> full --> action
     coordinator -. UNLOCKED .-> wrist
     wrist --> rover
+    coordinator -. LAW Override .-> override
+    override -->|/arm/joy| rover
     action --> rover --> telemetry --> coordinator
 ```
 
