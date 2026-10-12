@@ -81,6 +81,16 @@ behavior:
 purpose: Driver gamepad input. LT/RT are analogue axes[4]/axes[5] values in the range 0..1.
 ```
 
+Example message:
+
+```yaml
+header:
+  stamp: {sec: 0, nanosec: 0}
+  frame_id: ""
+axes: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+buttons: [0, 0, 0, 0, 0, 0, 0, 0]
+```
+
 The GUI currently appends triggers after every browser gamepad axis. The
 indices above match its output when the gamepad exposes four raw axes.
 
@@ -145,6 +155,16 @@ behavior:
 purpose: Manual Arm gamepad input. LT/RT are analogue axes[8]/axes[9] values in the range 0..1.
 ```
 
+Example message:
+
+```yaml
+header:
+  stamp: {sec: 0, nanosec: 0}
+  frame_id: ""
+axes: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+buttons: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+```
+
 The mock integrates each nonzero Arm axis using a 0.02 second step and
 0.5 rad/s per unit. That is simulator motion behavior.
 
@@ -180,6 +200,18 @@ behavior:
 purpose: Target joint positions in radians.
 ```
 
+Example message:
+
+```yaml
+header:
+  stamp: {sec: 0, nanosec: 0}
+  frame_id: ""
+name: [base_joint]
+position: [0.1]
+velocity: []
+effort: []
+```
+
 The current GUI has no publisher for /arm/joint_commands.
 The mock clamps known joints to its configured limits and immediately mirrors
 accepted targets into /arm/joint_states.
@@ -199,6 +231,12 @@ behavior:
   unlocked_trajectory_joints: nonempty_subset_of_J1_to_J3_or_all_J1_to_J6
   locked_trajectory_joints: all_J1_to_J6
 purpose: Selects Position-mode UNLOCKED (false) or LOCKED (true) execution.
+```
+
+Example message:
+
+```yaml
+data: true
 ```
 
 ### MoveIt target pose
@@ -227,6 +265,17 @@ behavior:
   orientation_mode_source: /arm/orientation_lock
   new_target_effect: supersede_previous_planning_and_trajectory
 purpose: Requests arm positioning through base-station MoveIt.
+```
+
+Example message:
+
+```yaml
+header:
+  stamp: {sec: 0, nanosec: 1}
+  frame_id: base_link
+pose:
+  position: {x: 0.30, y: 0.0, z: 0.40}
+  orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
 ```
 
 ### MoveIt execution status
@@ -283,6 +332,18 @@ behavior:
 purpose: Actual Arm joint positions and velocities.
 ```
 
+Example message:
+
+```yaml
+header:
+  stamp: {sec: 123, nanosec: 456}
+  frame_id: ""
+name: [base_joint, shoulder_joint, elbow_joint, yaw_joint, pitch_joint, roll_joint]
+position: [0.0, 0.25, 0.5, 0.0, 0.0, 0.0]
+velocity: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+effort: []
+```
+
 ### Drive mode request
 
 ```yaml
@@ -305,6 +366,12 @@ behavior:
 purpose: Driver mode value, such as VELOCITY.
 ```
 
+Example message:
+
+```yaml
+data: VELOCITY
+```
+
 ### Arm mode request
 
 ```yaml
@@ -325,6 +392,12 @@ behavior:
   invalid_value:
     reported_in: /fma/state.arm.rejected
 purpose: Arm mode value, such as POSITION.
+```
+
+Example message:
+
+```yaml
+data: POSITION
 ```
 
 ### Arm Override request
@@ -350,6 +423,12 @@ behavior:
 purpose: Arm Override command: ENABLE or DISABLE.
 ```
 
+Example message:
+
+```yaml
+data: ENABLE
+```
+
 ### Gimbal priority request
 
 ```yaml
@@ -369,6 +448,12 @@ behavior:
   pending_request_policy: latest_wins
   invalid_value: ignore
 purpose: Temporary Gimbal priority request: DRIVER or ARM OPS.
+```
+
+Example message:
+
+```yaml
+data: "ARM OPS"
 ```
 
 The mock uses mode_ack_delay_ms with a 150 ms default for these four requests.
@@ -457,6 +542,36 @@ behavior:
 purpose: Requests joint-space motion plans from MoveIt.
 ```
 
+Example unlocked goal fields. The bridge fills the current start state and
+leaves other message fields at their ROS defaults.
+
+```yaml
+planning_options:
+  plan_only: true
+  replan: false
+request:
+  group_name: position_arm
+  pipeline_id: ompl
+  num_planning_attempts: 5
+  allowed_planning_time: 5.0
+  max_velocity_scaling_factor: 0.5
+  max_acceleration_scaling_factor: 0.5
+  goal_constraints:
+    - position_constraints:
+        - header:
+            stamp: {sec: 0, nanosec: 0}
+            frame_id: base_link
+          link_name: j4_pivot_link
+          constraint_region:
+            primitives:
+              - type: 1
+                dimensions: [0.01, 0.01, 0.01]
+            primitive_poses:
+              - position: {x: 0.30, y: 0.0, z: 0.40}
+                orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+          weight: 1.0
+```
+
 This action is internal to the base station's MoveIt stack.
 
 ### Arm trajectory
@@ -506,6 +621,27 @@ behavior:
     actual_order: joint_names
   cancel_response: ACCEPT
 purpose: Timed J1-J3 partial trajectory in UNLOCKED mode or complete J1-J6 trajectory in LOCKED mode.
+```
+
+Example goal for an UNLOCKED J1-J3 trajectory:
+
+```yaml
+trajectory:
+  header:
+    stamp: {sec: 123, nanosec: 456}
+    frame_id: ""
+  joint_names: [base_joint, shoulder_joint, elbow_joint]
+  points:
+    - positions: [0.0, 0.2, 0.4]
+      velocities: []
+      accelerations: []
+      effort: []
+      time_from_start: {sec: 0, nanosec: 0}
+    - positions: [0.1, 0.25, 0.35]
+      velocities: []
+      accelerations: []
+      effort: []
+      time_from_start: {sec: 1, nanosec: 0}
 ```
 
 The Control scaffold currently rejects every trajectory goal. The mock rover
