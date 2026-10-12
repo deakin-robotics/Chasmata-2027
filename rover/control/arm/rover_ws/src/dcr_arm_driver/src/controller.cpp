@@ -29,11 +29,11 @@ Controller::Controller() : Node("arm_controller") {
   stat2_pub_ = this->create_publisher<arm_interfaces::msg::MotorStat2>(
       "/motor_stat_2", 15);
   viz_pub_ =
-      this->create_publisher<sensor_msgs::msg::JointState>("/joint_states", 15);
+      this->create_publisher<sensor_msgs::msg::JointState>("/arm/joint_states", 15);
 
   // Subscribers
   joint_cmd_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
-      "/joint_commands", 10,
+      "/arm/joint_commands", 10,
       std::bind(&Controller::joint_command_callback, this,
                 std::placeholders::_1));
   can_rx_sub_ = this->create_subscription<can_msgs::msg::Frame>(

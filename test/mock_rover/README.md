@@ -35,7 +35,7 @@ docker network create chasmata-local-media
 ```
 
 The synthetic publishers target the rover MediaMTX Compose service at
-`media-gateway:8554`. The base-station MediaMTX pulls those feeds over RTSP;
+`media-gateway:8554`. The base-station MediaMTX pulls those feeds over RTSP.
 the local base-station gateway reaches the rover gateway at
 `rover-media-gateway:8554` over the shared Docker network. When running the
 mock rover stack on a separate PC, the base-station RTSP source must use that
@@ -78,6 +78,8 @@ with `MEDIA_WIDTH`, `MEDIA_HEIGHT`, `MEDIA_FPS`, `MEDIA_BITRATE_KBPS`,
 
 ## Simulated behaviour
 
+- Publishes `/rover/heartbeat` after setting up its ROS interfaces, then once
+  per second. The GUI waits for this before enabling rover controls.
 - Starts with LAW `NORMAL`, SYSTEM `GOOD`, and unknown Gimbal priority.
 - Accepts valid Driver and Arm mode requests, publishes them as pending, then
   confirms them after 150 ms.
@@ -87,7 +89,7 @@ with `MEDIA_WIDTH`, `MEDIA_HEIGHT`, `MEDIA_FPS`, `MEDIA_BITRATE_KBPS`,
   protection availability.
 - Accepts temporary Gimbal priority requests on `/fma/gimbal/request`,
   broadcasts them as pending, then confirms them after 150 ms. The confirmed
-  owner keeps the directional arrow; a pending owner is shown separately in
+  owner keeps the directional arrow. A pending owner is shown separately in
   blue. The latest valid request wins.
 - Publishes a complete FMA state immediately and once per second for late
   subscribers/recovery.
@@ -96,15 +98,15 @@ with `MEDIA_WIDTH`, `MEDIA_HEIGHT`, `MEDIA_FPS`, `MEDIA_BITRATE_KBPS`,
   Position mode itself uses MoveIt2 trajectories for proximal joints.
 - Accepts `FollowJointTrajectory` goals on
   `/arm_controller/follow_joint_trajectory`. In UNLOCKED mode it accepts a
-  partial J1-J3 goal; in LOCKED mode it requires all six joints. It validates
+  partial J1-J3 goal. In LOCKED mode it requires all six joints. It validates
   every point against the rover joint limits, interpolates the points over
   their timestamps, and publishes the simulated actual positions and
   velocities while executing. New goals can cancel an active trajectory.
 - Accepts `/arm/orientation_lock` and simulates Arm `/arm/joy` input. In
-  MANUAL mode it applies the direct J1-J6 command; in Position-mode UNLOCKED
+  MANUAL mode it applies the direct J1-J6 command. In Position-mode UNLOCKED
   it applies only the J4-J6 wrist input. Partial trajectory execution
   preserves the other joints.
-- Publishes actual arm state on `/joint_states` at 10 Hz.
+- Publishes actual arm state on `/arm/joint_states` at 10 Hz.
 - Publishes distinct synthetic H.264 RTSP feeds to rover MediaMTX's `front`,
   `gimbal`, and `arm` paths. Base-station MediaMTX pulls the same paths for
   normal browser playback.
@@ -115,24 +117,15 @@ The default joint names match the current GUI URDF:
 base_joint, shoulder_joint, elbow_joint, yaw_joint, pitch_joint, roll_joint
 ```
 
-## Topics
+## ROS interface behavior
 
-| Direction            | Topic                                     | Type                                        | Purpose                                                                                      |
-| -------------------- | ----------------------------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| GUI → mock rover     | `/joy`                                    | `sensor_msgs/msg/Joy`                       | Driver gamepad input; LT/RT are analogue `axes[4]`/`axes[5]` values in the range `0..1`.     |
-| GUI → mock rover     | `/arm/joy`                                | `sensor_msgs/msg/Joy`                       | Manual Arm gamepad input; LT/RT are analogue `axes[8]`/`axes[9]` values in the range `0..1`. |
-| GUI → mock rover     | `/joint_commands`                         | `sensor_msgs/msg/JointState`                | Target joint positions in radians.                                                           |
-| GUI → mock rover     | `/arm/orientation_lock`                   | `std_msgs/msg/Bool`                         | Selects Position-mode UNLOCKED (`false`) or LOCKED (`true`) execution.                       |
-| MoveIt2 → mock rover | `/arm_controller/follow_joint_trajectory` | `control_msgs/action/FollowJointTrajectory` | Timed J1-J3 partial trajectory in UNLOCKED mode or complete J1-J6 trajectory in LOCKED mode. |
-| Mock rover → GUI     | `/joint_states`                           | `sensor_msgs/msg/JointState`                | Simulated actual joint positions and velocities.                                             |
-| GUI → mock rover     | `/fma/drive/request`                      | `std_msgs/msg/String`                       | Driver mode value, such as `VELOCITY`.                                                       |
-| GUI → mock rover     | `/fma/arm/request`                        | `std_msgs/msg/String`                       | Arm mode value, such as `POSITION`.                                                          |
-| GUI → mock rover     | `/arm/override/request`                   | `std_msgs/msg/String`                       | Arm Override command: `ENABLE` or `DISABLE`.                                                 |
-| GUI → mock rover     | `/fma/gimbal/request`                     | `std_msgs/msg/String`                       | Temporary Gimbal priority request: `DRIVER` or `ARM OPS`.                                    |
-| Mock rover → GUI     | `/fma/state`                              | `std_msgs/msg/String`                       | JSON FMA telemetry broadcast.                                                                |
+The shared interface names and starting definitions are documented in the
+[ROS interface catalog](../../docs/ros-interface-contract.md). This section
+describes mock-specific behavior and mappings. It does not make those details
+the final production contract.
 
 For both Joy topics, `buttons[]` contains only digital button values (`0` or
-`1`). LT and RT are not read from `buttons[]`; their browser analogue values
+`1`). LT and RT are not read from `buttons[]`. Their browser analogue values
 are sent through the dedicated axes listed above.
 
 In Arm MANUAL mode, `/arm/joy` uses `axes[0]`/`axes[1]` for J1/J2,
@@ -144,30 +137,28 @@ The left-stick wrist and trigger controls remain active.
 In Position-mode UNLOCKED operation, `/arm/joy` uses `axes[6]` for J4 yaw,
 `axes[7]` for J5 pitch, and `axes[8]`/`axes[9]` for J6 roll. The GUI places
 the Position-mode left-stick yaw/pitch values into those wrist axes. In
-LOCKED operation the GUI sends zero wrist axes; joystick and trigger input is
+LOCKED operation the GUI sends zero wrist axes. Joystick and trigger input is
 ignored and the captured EE orientation remains fixed. Digital buttons remain
 available.
 
-The provisional `/fma/state` JSON shape is:
+The mock publishes `/fma/state` as `telemetry_interfaces/msg/FmaState`. Its
+nested mode and override fields use `FmaModeState` and `ArmOverrideState`.
+String fields that were `null` in the prior payload are published as empty
+strings. For example:
 
-```json
-{
-  "schema": "dcr/fma-state/v1",
-  "sequence": 12,
-  "drive": { "confirmed": "VELOCITY", "pending": null, "rejected": null },
-  "arm": { "confirmed": "POSITION", "pending": null, "rejected": null },
-  "law": "NORMAL",
-  "arm_override": { "state": "INACTIVE", "pending": null },
-  "system": "GOOD",
-  "gimbal_priority": { "confirmed": null, "pending": null, "rejected": null }
-}
+```yaml
+schema: dcr/fma-state/v1
+sequence: 12
+drive: { confirmed: VELOCITY, pending: "", rejected: "" }
+arm: { confirmed: POSITION, pending: "", rejected: "" }
+law: NORMAL
+arm_override: { state: INACTIVE, pending: "" }
+system: GOOD
+gimbal_priority: { confirmed: "", pending: "", rejected: "" }
 ```
 
-This JSON and the `/arm/override/request` and `/fma/gimbal/request` topics are
-deliberately provisional. They keep the mock usable before the Control team
-finalises the production FMA message definitions. The GUI should replace this
-adapter with the final message types when those contracts are agreed; the
-mock's feedback responsibilities stay the same.
+The `/arm/override/request` and `/fma/gimbal/request` topics remain separate
+command interfaces. The mock's feedback behavior is unchanged.
 
 ## Parameters
 

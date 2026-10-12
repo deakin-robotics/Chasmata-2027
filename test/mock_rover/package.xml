@@ -16,6 +16,7 @@
   <exec_depend>rosbridge_server</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>std_msgs</exec_depend>
+  <exec_depend>telemetry_interfaces</exec_depend>
 
   <test_depend>python3-pytest</test_depend>
 

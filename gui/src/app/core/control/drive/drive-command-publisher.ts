@@ -9,7 +9,7 @@ export interface JoyCommand {
   buttons: readonly number[];
 }
 
-const JOY_TOPIC = '/joy';
+const JOY_TOPIC = '/drive/joy';
 const JOY_MESSAGE_TYPE = 'sensor_msgs/Joy';
 const MINIMUM_DRIVE_AXES = 4;
 const LEFT_TRIGGER_BUTTON_INDEX = 6;

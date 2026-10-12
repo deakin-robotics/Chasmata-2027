@@ -1,6 +1,5 @@
 """ROS 2 mock rover used for GUI integration testing."""
 
-import json
 import math
 import time
 import threading
@@ -14,7 +13,8 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import JointState, Joy
-from std_msgs.msg import Bool, String
+from std_msgs.msg import Bool, Empty, String
+from telemetry_interfaces.msg import ArmOverrideState, FmaModeState, FmaState
 
 from .simulation import JointSimulator
 
@@ -38,10 +38,10 @@ JOINT_LIMITS: Dict[str, Tuple[float, float]] = {
     'roll_joint': (math.radians(-185.0), math.radians(185.0)),
 }
 
-JOINT_COMMAND_TOPIC = '/joint_commands'
+JOINT_COMMAND_TOPIC = '/arm/joint_commands'
 ARM_TRAJECTORY_ACTION = '/arm_controller/follow_joint_trajectory'
-JOINT_STATE_TOPIC = '/joint_states'
-DRIVE_JOY_TOPIC = '/joy'
+JOINT_STATE_TOPIC = '/arm/joint_states'
+DRIVE_JOY_TOPIC = '/drive/joy'
 ARM_JOY_TOPIC = '/arm/joy'
 ORIENTATION_LOCK_TOPIC = '/arm/orientation_lock'
 DRIVE_MODE_REQUEST_TOPIC = '/fma/drive/request'
@@ -49,6 +49,7 @@ ARM_MODE_REQUEST_TOPIC = '/fma/arm/request'
 ARM_OVERRIDE_REQUEST_TOPIC = '/arm/override/request'
 GIMBAL_PRIORITY_REQUEST_TOPIC = '/fma/gimbal/request'
 FMA_STATE_TOPIC = '/fma/state'
+HEARTBEAT_TOPIC = '/rover/heartbeat'
 
 DRIVE_TRIGGER_AXES = (4, 5)
 ARM_TRIGGER_AXES = (8, 9)
@@ -115,8 +116,14 @@ class MockRoverNode(Node):
         fma_qos.reliability = ReliabilityPolicy.RELIABLE
         fma_qos.durability = DurabilityPolicy.TRANSIENT_LOCAL
 
-        self.fma_publisher = self.create_publisher(String, FMA_STATE_TOPIC, fma_qos)
+        self.fma_publisher = self.create_publisher(FmaState, FMA_STATE_TOPIC, fma_qos)
         self.joint_state_publisher = self.create_publisher(JointState, JOINT_STATE_TOPIC, 10)
+        heartbeat_qos = QoSProfile(depth=1)
+        heartbeat_qos.reliability = ReliabilityPolicy.RELIABLE
+        heartbeat_qos.durability = DurabilityPolicy.VOLATILE
+        self.heartbeat_publisher = self.create_publisher(
+            Empty, HEARTBEAT_TOPIC, heartbeat_qos
+        )
         self.trajectory_action_server = ActionServer(
             self,
             FollowJointTrajectory,
@@ -177,8 +184,10 @@ class MockRoverNode(Node):
         )
 
         self.create_timer(1.0 / publish_rate, self.tick)
+        self.create_timer(1.0, self.publish_heartbeat)
         self.publish_fma()
         self.publish_joint_state()
+        self.publish_heartbeat()
 
         self.get_logger().info('Mock rover ready')
         self.get_logger().info('ROSbridge should expose ws://localhost:9090')
@@ -492,6 +501,9 @@ class MockRoverNode(Node):
         if accepted:
             self.publish_joint_state()
 
+    def publish_heartbeat(self) -> None:
+        self.heartbeat_publisher.publish(Empty())
+
     def tick(self) -> None:
         now = time.monotonic()
 
@@ -568,43 +580,40 @@ class MockRoverNode(Node):
 
     def publish_fma(self) -> None:
         self.sequence += 1
-        payload = {
-            'schema': 'dcr/fma-state/v1',
-            'sequence': self.sequence,
-            'drive': self.mode_state('drive', self.drive_mode),
-            'arm': self.mode_state('arm', self.arm_mode),
-            'law': self.law_mode,
-            'arm_override': {
-                'state': self.arm_override_state,
-                'pending': (
-                    self.pending_arm_override[0]
-                    if self.pending_arm_override is not None
-                    else None
-                ),
-            },
-            'system': 'GOOD',
-            'gimbal_priority': {
-                'confirmed': self.gimbal_priority,
-                'pending': (
-                    self.pending_gimbal_priority[0]
-                    if self.pending_gimbal_priority is not None
-                    else None
-                ),
-                'rejected': None,
-            },
-        }
-        message = String()
-        message.data = json.dumps(payload, separators=(',', ':'))
+        message = FmaState()
+        message.schema = 'dcr/fma-state/v1'
+        message.sequence = self.sequence
+        message.drive = self.mode_state('drive', self.drive_mode)
+        message.arm = self.mode_state('arm', self.arm_mode)
+        message.law = self.law_mode
+
+        arm_override = ArmOverrideState()
+        arm_override.state = self.arm_override_state
+        arm_override.pending = (
+            self.pending_arm_override[0]
+            if self.pending_arm_override is not None
+            else ''
+        )
+        message.arm_override = arm_override
+        message.system = 'GOOD'
+        message.gimbal_priority = FmaModeState()
+        message.gimbal_priority.confirmed = self.gimbal_priority or ''
+        message.gimbal_priority.pending = (
+            self.pending_gimbal_priority[0]
+            if self.pending_gimbal_priority is not None
+            else ''
+        )
+        message.gimbal_priority.rejected = ''
         self.fma_publisher.publish(message)
         self.last_fma_publish = time.monotonic()
 
-    def mode_state(self, subsystem: str, confirmed: Optional[str]) -> Dict[str, Optional[str]]:
+    def mode_state(self, subsystem: str, confirmed: Optional[str]) -> FmaModeState:
         pending = self.pending_modes[subsystem]
-        return {
-            'confirmed': confirmed,
-            'pending': pending[0] if pending is not None else None,
-            'rejected': self.rejected_modes[subsystem],
-        }
+        state = FmaModeState()
+        state.confirmed = confirmed or ''
+        state.pending = pending[0] if pending is not None else ''
+        state.rejected = self.rejected_modes[subsystem] or ''
+        return state
 
     def publish_joint_state(self) -> None:
         message = JointState()

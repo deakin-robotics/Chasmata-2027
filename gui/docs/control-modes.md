@@ -97,7 +97,7 @@ Joy message is published, the GUI puts those values into `axes[]` and keeps
 
 | Topic | LT axis | RT axis | Trigger range |
 | --- | ---: | ---: | --- |
-| `/joy` | `axes[4]` | `axes[5]` | `0..1` |
+| `/drive/joy` | `axes[4]` | `axes[5]` | `0..1` |
 | `/arm/joy` | `axes[8]` | `axes[9]` | `0..1` |
 
 The corresponding trigger positions in `buttons[]` remain reserved as `0` so

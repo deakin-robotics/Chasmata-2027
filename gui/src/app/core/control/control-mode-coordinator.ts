@@ -3,7 +3,7 @@ import { Service, effect, inject, untracked } from '@angular/core';
 import { ArmControlMode, ArmControlModeService } from './arm/arm-control-mode';
 import { ControlCommandPublisher } from './control-command-publisher';
 import { DriverControlMode, DriverControlModeService } from './drive/drive-control-mode';
-import { FmaStateService } from '../fma/fma-state.service';
+import { ArmMode, DriveMode, FmaColumn, FmaStateService } from '../fma/fma-state.service';
 import { RosConnection } from '../ros/ros-connection';
 
 /** Coordinates local mode selection, connection state, and FMA mode requests. */
@@ -24,9 +24,52 @@ export class ControlModeCoordinator {
         return;
       }
 
-      this.requestCurrentModes();
     });
   });
+
+  /** Prepares the Driver request topic before this dashboard receives rover readiness. */
+  prepareDriveModeRequest(): void {
+    this.commandPublisher.prepareDriveModeRequest();
+  }
+
+  /** Prepares the Arm request topic before this dashboard receives rover readiness. */
+  prepareArmModeRequest(): void {
+    this.commandPublisher.prepareArmModeRequest();
+  }
+
+  /** Syncs the Driver selector from the first rover FMA state, or initializes it. */
+  synchronizeDriveModeFromRover(): void {
+    if (!this.rosConnection.isConnected()) return;
+
+    const roverMode = this.currentDriveModeFromRover();
+    if (roverMode) {
+      if (roverMode === DriveMode.Manual || roverMode === DriveMode.Velocity) {
+        this.driverControlMode.setMode(roverMode);
+      }
+      return;
+    }
+
+    const mode = this.driverControlMode.mode();
+    this.fmaState.requestDriveMode(mode);
+    this.commandPublisher.publishDriveMode(mode);
+  }
+
+  /** Syncs the Arm selector from the first rover FMA state, or initializes it. */
+  synchronizeArmModeFromRover(): void {
+    if (!this.rosConnection.isConnected()) return;
+
+    const roverMode = this.currentArmModeFromRover();
+    if (roverMode) {
+      if (roverMode === ArmMode.Manual || roverMode === ArmMode.Position) {
+        this.armControlMode.setMode(roverMode);
+      }
+      return;
+    }
+
+    const mode = this.armControlMode.mode();
+    this.fmaState.requestArmMode(mode);
+    this.commandPublisher.publishArmMode(mode);
+  }
 
   /** Selects the Driver mode and requests it from the rover when connected. */
   selectDriveMode(mode: DriverControlMode): void {
@@ -52,13 +95,19 @@ export class ControlModeCoordinator {
     this.commandPublisher.publishArmMode(mode);
   }
 
-  private requestCurrentModes(): void {
-    const driveMode = this.driverControlMode.mode();
-    const armMode = this.armControlMode.mode();
+  private currentDriveModeFromRover(): DriveMode | null {
+    const column = this.fmaState.columns().find(
+      (candidate): candidate is Extract<FmaColumn, { label: 'DRIVE' }> =>
+        candidate.label === 'DRIVE',
+    );
+    return column ? (column.confirmed ?? column.commanded) : null;
+  }
 
-    this.fmaState.requestDriveMode(driveMode);
-    this.fmaState.requestArmMode(armMode);
-    this.commandPublisher.publishDriveMode(driveMode);
-    this.commandPublisher.publishArmMode(armMode);
+  private currentArmModeFromRover(): ArmMode | null {
+    const column = this.fmaState.columns().find(
+      (candidate): candidate is Extract<FmaColumn, { label: 'ARM' }> =>
+        candidate.label === 'ARM',
+    );
+    return column ? (column.confirmed ?? column.commanded) : null;
   }
 }

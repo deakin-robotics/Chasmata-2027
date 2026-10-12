@@ -22,7 +22,7 @@ flowchart TB
     override[5d. LAW Override<br/>manual joint control<br/>J1-J6]
     action[6. FollowJointTrajectory action]
     rover[7. Rover<br/>validate limits, execute/reject]
-    telemetry[8. /joint_states + MoveIt2 status]
+    telemetry[8. /arm/joint_states + MoveIt2 status]
 
     target --> coordinator --> solveService --> moveit
     moveit --> unlocked --> partial --> action

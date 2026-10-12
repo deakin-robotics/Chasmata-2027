@@ -71,7 +71,7 @@ The GUI communicates directly with the rover on its private operator network:
 
 - Controls and telemetry use ROSLIB through ROSbridge.
 - Camera video uses WHEP playback sessions from the base-station MediaMTX gateway.
-- Driver control publishes `sensor_msgs/Joy` on `/joy`.
+- Driver control publishes `sensor_msgs/Joy` on `/drive/joy`.
 - Arm control publishes remapped `sensor_msgs/Joy` on `/arm/joy`.
 - Driver and Arm Operator GUIs may both view and control the shared Gimbal camera.
   Gimbal ownership is requested through the controller's **GIMBAL PRIORITY**

@@ -28,7 +28,7 @@ describe('ConnectionManager', () => {
   });
 
   it('should pass the entered endpoint to the connection service', () => {
-    const connectSpy = vi.spyOn(rosConnection, 'connect');
+    const connectSpy = vi.spyOn(rosConnection, 'connect').mockImplementation(() => {});
     component.endpoint.setValue('localhost:9090');
 
     component.connect();

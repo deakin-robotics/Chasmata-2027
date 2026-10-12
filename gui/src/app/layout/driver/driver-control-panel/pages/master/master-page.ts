@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, effect, inject, untracked } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 
 import { DriverControl } from '../../../../../core/control/drive/driver-control';
@@ -9,7 +9,7 @@ import {
 import { ControlModeCoordinator } from '../../../../../core/control/control-mode-coordinator';
 import { GamepadInput } from '../../../../../core/gamepad/gamepad-input';
 import { CameraFeedControl } from '../../../../../features/cameras/camera-feed-control';
-import { DriveMode } from '../../../../../core/fma/fma-state.service';
+import { DriveMode, FmaStateService } from '../../../../../core/fma/fma-state.service';
 import { RosConnection } from '../../../../../core/ros/ros-connection';
 import { ConnectionManager } from '../../../../../features/connection/connection-manager/connection-manager';
 import { ActionButton, ActionButtonTone } from '../../../../../shared/action-button/action-button';
@@ -46,10 +46,32 @@ export class DriverMasterPage {
   private readonly driverControl = inject(DriverControl);
   private readonly driverControlMode = inject(DriverControlModeService);
   private readonly controlModeCoordinator = inject(ControlModeCoordinator);
+  private readonly fmaState = inject(FmaStateService);
   private readonly gamepad = inject(GamepadInput);
   private readonly rosConnection = inject(RosConnection);
   private readonly cameraFeedControl = inject(CameraFeedControl);
   private readonly dialog = inject(MatDialog);
+  private driveModeSynchronized = false;
+
+  private readonly modeHandshakeEffect = effect(() => {
+    const client = this.rosConnection.client();
+    const connected = this.rosConnection.isConnected();
+    const hasFmaTelemetry = this.fmaState.hasFmaTelemetry();
+
+    untracked(() => {
+      if (client) this.controlModeCoordinator.prepareDriveModeRequest();
+
+      if (!connected) {
+        this.driveModeSynchronized = false;
+        return;
+      }
+
+      if (!hasFmaTelemetry || this.driveModeSynchronized) return;
+
+      this.driveModeSynchronized = true;
+      this.controlModeCoordinator.synchronizeDriveModeFromRover();
+    });
+  });
 
   readonly masterDriveEnabled = this.driverControl.enabled;
   readonly driveMode = this.driverControlMode.mode;
@@ -75,6 +97,8 @@ export class DriverMasterPage {
     switch (this.rosConnection.status()) {
       case 'connecting':
         return 'Connecting';
+      case 'waiting-for-rover':
+        return 'Standby';
       case 'connected':
         return 'Connected';
       case 'reconnecting':
@@ -92,6 +116,7 @@ export class DriverMasterPage {
       case 'error':
         return 'caution';
       case 'connecting':
+      case 'waiting-for-rover':
       case 'reconnecting':
       case 'disconnected':
         return 'info';
