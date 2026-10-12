@@ -7,6 +7,8 @@
 
 #include <array>
 #include <chrono>
+#include <cmath>
+#include <cstdlib>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -46,14 +48,29 @@ bool parseInteger(
   }
 }
 
+bool parsePositiveDouble(const std::string & text, double & value)
+{
+  try {
+    std::size_t parsed = 0;
+    double candidate = std::stod(text, &parsed);
+    if (parsed != text.size() || !std::isfinite(candidate) || candidate <= 0.0) {
+      return false;
+    }
+    value = candidate;
+    return true;
+  } catch (const std::exception &) {
+    return false;
+  }
+}
+
 }  // namespace
 
 hardware_interface::CallbackReturn
 RoverHardwareInterface::on_init(
-  const hardware_interface::HardwareInfo & info)
+  const hardware_interface::HardwareComponentInterfaceParams & params)
 {
   const auto base_result =
-    hardware_interface::SystemInterface::on_init(info);
+    hardware_interface::SystemInterface::on_init(params);
 
   if (base_result != hardware_interface::CallbackReturn::SUCCESS) {
     RCLCPP_ERROR(
@@ -63,9 +80,11 @@ RoverHardwareInterface::on_init(
     return hardware_interface::CallbackReturn::ERROR;
   }
 
-  hardware_info_ = info;
+  hardware_info_ = params.hardware_info;
 
   configuration_valid_ = false;
+  previous_read_tick_ns_ = 0;
+  late_trigger_detected_ = false;
   transports_open_ = false;
   operationally_ready_ = false;
   active_ = false;
@@ -210,10 +229,12 @@ RoverHardwareInterface::on_deactivate(
   (void)previous_state;
 
   if (active_) {
+    // A failed transition must NOT falsely change local lifecycle state.
+    // Motion remains unverified; do not assert that the motor has stopped.
     RCLCPP_ERROR(
       logger(),
       "Cannot deactivate safely because the verified motor-stop sequence "
-      "is not implemented.");
+      "is not implemented. Active state remains unchanged.");
 
     return hardware_interface::CallbackReturn::ERROR;
   }
@@ -242,6 +263,10 @@ std::vector<hardware_interface::StateInterface>
 RoverHardwareInterface::export_state_interfaces()
 {
   std::vector<hardware_interface::StateInterface> interfaces;
+  if (!configuration_valid_) {
+    RCLCPP_ERROR(logger(), "Refusing to export state interfaces: on_init() has not succeeded.");
+    return interfaces;
+  }
   interfaces.reserve(WHEEL_COUNT);
 
   for (std::size_t wheel = 0; wheel < WHEEL_COUNT; ++wheel) {
@@ -258,6 +283,10 @@ std::vector<hardware_interface::CommandInterface>
 RoverHardwareInterface::export_command_interfaces()
 {
   std::vector<hardware_interface::CommandInterface> interfaces;
+  if (!configuration_valid_) {
+    RCLCPP_ERROR(logger(), "Refusing to export command interfaces: on_init() has not succeeded.");
+    return interfaces;
+  }
   interfaces.reserve(WHEEL_COUNT);
 
   for (std::size_t wheel = 0; wheel < WHEEL_COUNT; ++wheel) {
@@ -278,9 +307,14 @@ RoverHardwareInterface::read(
   (void)time;
   (void)period;
 
+  const auto now = steadyNowNs();
+  if (core::lateTrigger(previous_read_tick_ns_, now, timing_.late_trigger_ms)) {
+    late_trigger_detected_ = true;
+  }
+  previous_read_tick_ns_ = now;
   updateIoHeartbeat();
 
-  if (!active_ || !operationally_ready_) {
+  if (!active_ || !operationally_ready_ || late_trigger_detected_) {
     bool expected = false;
 
     if (
@@ -360,18 +394,21 @@ bool RoverHardwareInterface::parseConfiguration()
       Bld305sDriver::RtuConfig & config) -> bool
     {
       const std::string device_key = prefix + "_serial_device";
+      const std::string baud_key = prefix + "_baud_rate";
       const std::string parity_key = prefix + "_parity";
       const std::string data_bits_key = prefix + "_data_bits";
       const std::string stop_bits_key = prefix + "_stop_bits";
       const std::string timeout_key = prefix + "_response_timeout_ms";
 
       const auto device_it = parameters.find(device_key);
+      const auto baud_it = parameters.find(baud_key);
       const auto parity_it = parameters.find(parity_key);
       const auto data_bits_it = parameters.find(data_bits_key);
       const auto stop_bits_it = parameters.find(stop_bits_key);
 
       if (
         device_it == parameters.end() ||
+        baud_it == parameters.end() ||
         parity_it == parameters.end() ||
         data_bits_it == parameters.end() ||
         stop_bits_it == parameters.end())
@@ -405,6 +442,13 @@ bool RoverHardwareInterface::parseConfiguration()
           "%s must be exactly one of N, E or O.",
           parity_key.c_str());
 
+        return false;
+      }
+
+      long long baud = 0;
+      if (!parseInteger(baud_it->second, baud) || baud != 38400) {
+        RCLCPP_ERROR(logger(), "%s must be 38400 for the v0.4 operating point. "
+          "Provision ALL controllers with the vendor tool first.", baud_key.c_str());
         return false;
       }
 
@@ -467,6 +511,7 @@ bool RoverHardwareInterface::parseConfiguration()
       }
 
       config.device = device_it->second;
+      config.baud_rate = static_cast<int>(baud);
       config.parity = parity_it->second[0];
       config.data_bits = static_cast<int>(data_bits);
       config.stop_bits = static_cast<int>(stop_bits);
@@ -492,16 +537,44 @@ bool RoverHardwareInterface::parseConfiguration()
     return false;
   }
 
-  if (
-    bus_configs_[busIndex(BusId::LEFT)].device ==
-    bus_configs_[busIndex(BusId::RIGHT)].device)
-  {
-    RCLCPP_ERROR(
-      logger(),
-      "The left and right RS485 buses must use different serial devices.");
-
+  // Two contexts pointing at the same device do not represent two buses.
+  if (bus_configs_[busIndex(BusId::LEFT)].device ==
+      bus_configs_[busIndex(BusId::RIGHT)].device) {
+    RCLCPP_ERROR(logger(), "Left and right RS485 devices must be different.");
     return false;
   }
+
+  // AD-12: there are NO silent defaults for safety-relevant timing.
+  auto required_timing = [&parameters](const char * key, double & dst) -> bool {
+    auto it = parameters.find(key);
+    if (it == parameters.end() || !parsePositiveDouble(it->second, dst)) {
+      RCLCPP_ERROR(logger(), "Missing or invalid positive timing parameter: %s", key);
+      return false;
+    }
+    return true;
+  };
+  if (!required_timing("update_hz", timing_.update_hz) ||
+      !required_timing("upstream_timeout_ms", timing_.upstream_timeout_ms) ||
+      !required_timing("stop_deadline_ms", timing_.stop_deadline_ms) ||
+      !required_timing("measured_stop_wire_budget_ms", timing_.stop_wire_budget_ms) ||
+      !required_timing("measured_worst_bus_cycle_ms", timing_.worst_bus_cycle_ms) ||
+      !required_timing("late_trigger_ms", timing_.late_trigger_ms)) {
+    return false;
+  }
+  if (timing_.stop_deadline_ms > 250.0) {
+    RCLCPP_ERROR(logger(), "Stop deadline must not exceed the 250 ms team target.");
+    return false;
+  }
+  if (std::abs(timing_.update_hz - 15.0) > 0.01) {
+    RCLCPP_ERROR(logger(), "Version 0.4 requires a 15 Hz drivetrain component rate.");
+    return false;
+  }
+  const auto timing_check = core::validateTiming(timing_);
+  if (!timing_check.ok) {
+    RCLCPP_ERROR(logger(), "Timing refusal: %s", timing_check.reason.c_str());
+    return false;
+  }
+  RCLCPP_WARN(logger(), "Timing budget passes arithmetic only; bench stop ACK and adapter delays unverified.");
 
   for (std::size_t wheel = 0; wheel < WHEEL_COUNT; ++wheel) {
     const auto & joint = hardware_info_.joints[wheel];
@@ -596,6 +669,29 @@ bool RoverHardwareInterface::parseWheelConfiguration(
 
     return false;
   }
+
+  const auto gear_it = joint.parameters.find("gear_ratio");
+  const auto mirror_it = joint.parameters.find("mirrored");
+  const auto rpm_it = joint.parameters.find("motor_rpm_limit");
+  double gear = 0.0, rpm = 0.0;
+  if (gear_it == joint.parameters.end() ||
+      rpm_it == joint.parameters.end() ||
+      mirror_it == joint.parameters.end() ||
+      !parsePositiveDouble(gear_it->second, gear) ||
+      !parsePositiveDouble(rpm_it->second, rpm) ||
+      (mirror_it->second != "true" && mirror_it->second != "false")) {
+    RCLCPP_ERROR(logger(), "Joint '%s' requires valid gear_ratio, motor_rpm_limit and mirrored flag.",
+      joint.name.c_str());
+    return false;
+  }
+  if ((bus == BusId::RIGHT) != (mirror_it->second == "true")) {
+    RCLCPP_ERROR(logger(), "Joint '%s' mirror flag must match right-side bus topology.",
+      joint.name.c_str());
+    return false;
+  }
+  wheels_[wheel_index].gear_ratio = gear;
+  wheels_[wheel_index].motor_rpm_limit = rpm;
+  wheels_[wheel_index].mirrored = mirror_it->second == "true";
 
   wheels_[wheel_index].joint_name = joint.name;
   wheels_[wheel_index].bus = bus;

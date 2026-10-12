@@ -35,7 +35,7 @@ Bld305sDriver::Result Bld305sDriver::open()
 
   context_ = modbus_new_rtu(
     config_.device.c_str(),
-    BAUD_RATE,
+    config_.baud_rate,
     config_.parity,
     config_.data_bits,
     config_.stop_bits);
@@ -121,6 +121,13 @@ Bld305sDriver::Result Bld305sDriver::writeControlRaw(
   return writeSingleRegister(slave_id, CONTROL_REGISTER, raw_control);
 }
 
+Bld305sDriver::Result Bld305sDriver::readActualSpeedRaw(
+  std::uint8_t slave_id, std::uint16_t & raw_speed)
+{
+  // UNVERIFIED — 0x005F is an actual-speed candidate, NOT validated on hardware.
+  return readHoldingRegister(slave_id, ACTUAL_SPEED_REGISTER, raw_speed);
+}
+
 Bld305sDriver::Result Bld305sDriver::readTemperatureRaw(
   std::uint8_t slave_id,
   std::uint16_t & raw_temperature)
@@ -191,6 +198,23 @@ std::uint32_t Bld305sDriver::consecutiveFailures(
   return slave_states_[slave_id].consecutive_failures;
 }
 
+bool Bld305sDriver::telemetryValid(std::uint8_t slave_id) const
+{
+  if (!isValidSlaveId(slave_id)) return false;
+  std::lock_guard<std::mutex> lock(transaction_mutex_);
+  return slave_states_[slave_id].telemetry_valid;
+}
+
+bool Bld305sDriver::bothSlavesLost(std::uint8_t first_id, std::uint8_t second_id) const
+{
+  if (!isValidSlaveId(first_id) || !isValidSlaveId(second_id) || first_id == second_id) {
+    return false;
+  }
+  std::lock_guard<std::mutex> lock(transaction_mutex_);
+  return slave_states_[first_id].communication == CommunicationState::LOST &&
+         slave_states_[second_id].communication == CommunicationState::LOST;
+}
+
 const std::string & Bld305sDriver::device() const noexcept
 {
   return config_.device;
@@ -198,6 +222,10 @@ const std::string & Bld305sDriver::device() const noexcept
 
 Bld305sDriver::Result Bld305sDriver::validateConfig() const
 {
+  if (config_.baud_rate <= 0) {
+    return {ErrorCode::INVALID_CONFIG, 0, 0};
+  }
+
   if (config_.device.empty()) {
     return {ErrorCode::INVALID_CONFIG, 0, 0};
   }
@@ -250,6 +278,11 @@ Bld305sDriver::Result Bld305sDriver::selectSlaveUnlocked(
     return {ErrorCode::INVALID_SLAVE_ID, 0, 0};
   }
 
+  if (cycle_active_ && isExpectedCycleSlave(slave_id) &&
+      slave_states_[slave_id].skip_remaining_cycle) {
+    return {ErrorCode::SKIPPED_THIS_CYCLE, 0, 0};
+  }
+
   if (
     context_ == nullptr ||
     !connected_.load(std::memory_order_acquire))
@@ -279,6 +312,11 @@ Bld305sDriver::Result Bld305sDriver::readHoldingRegister(
 
   if (!isValidSlaveId(slave_id)) {
     return {ErrorCode::INVALID_SLAVE_ID, 0, 0};
+  }
+
+  if (cycle_active_ && isExpectedCycleSlave(slave_id) &&
+      slave_states_[slave_id].skip_remaining_cycle) {
+    return {ErrorCode::SKIPPED_THIS_CYCLE, 0, 0};
   }
 
   if (
@@ -332,6 +370,11 @@ Bld305sDriver::Result Bld305sDriver::writeSingleRegister(
     return {ErrorCode::INVALID_SLAVE_ID, 0, 0};
   }
 
+  if (cycle_active_ && isExpectedCycleSlave(slave_id) &&
+      slave_states_[slave_id].skip_remaining_cycle) {
+    return {ErrorCode::SKIPPED_THIS_CYCLE, 0, 0};
+  }
+
   if (
     context_ == nullptr ||
     !connected_.load(std::memory_order_acquire))
@@ -368,42 +411,87 @@ Bld305sDriver::Result Bld305sDriver::writeSingleRegister(
   return {ErrorCode::OK, rc, 0};
 }
 
+bool Bld305sDriver::isExpectedCycleSlave(std::uint8_t id) const noexcept
+{
+  return id == cycle_slaves_[0] || id == cycle_slaves_[1];
+}
+
+Bld305sDriver::Result Bld305sDriver::beginCycle(
+  std::uint8_t first_id, std::uint8_t second_id)
+{
+  std::lock_guard<std::mutex> lock(transaction_mutex_);
+  if (cycle_active_ || !isValidSlaveId(first_id) || !isValidSlaveId(second_id) ||
+      first_id == second_id) {
+    return {ErrorCode::INVALID_CYCLE_STATE, 0, 0};
+  }
+  cycle_slaves_ = {{first_id, second_id}};
+  cycle_active_ = true;
+  for (auto id : cycle_slaves_) {
+    auto & state = slave_states_[id];
+    state.skip_remaining_cycle = false;
+    state.exchange_failed_cycle = false;
+    state.saw_success_cycle = false;
+    state.success_count_cycle = 0;
+  }
+  return {ErrorCode::OK, 0, 0};
+}
+
+Bld305sDriver::Result Bld305sDriver::endCycle()
+{
+  std::lock_guard<std::mutex> lock(transaction_mutex_);
+  if (!cycle_active_) {
+    return {ErrorCode::INVALID_CYCLE_STATE, 0, 0};
+  }
+  for (auto id : cycle_slaves_) {
+    auto & state = slave_states_[id];
+    // V0.4 minimum mandatory cycle: speed setpoint, actual-speed read, fault read.
+    // Diagnostics are additional rotating reads and do not relax these.
+    const bool good = state.success_count_cycle >= 3 && !state.exchange_failed_cycle;
+    if (good) {
+      state.consecutive_failures = 0;
+      state.communication = CommunicationState::HEALTHY;
+      state.telemetry_valid = true;
+      // A good communication cycle does NOT restore controller initialization.
+    } else {
+      if (state.consecutive_failures < std::numeric_limits<std::uint32_t>::max()) {
+        ++state.consecutive_failures;
+      }
+      state.telemetry_valid = state.telemetry_valid && state.consecutive_failures < 2;
+      state.communication = state.consecutive_failures >= COMM_FAILURE_LIMIT ?
+        CommunicationState::LOST : CommunicationState::DEGRADED;
+      if (state.communication == CommunicationState::LOST) {
+        state.controller = ControllerState::UNKNOWN;
+      }
+    }
+    state.skip_remaining_cycle = false;
+    state.exchange_failed_cycle = false;
+    state.saw_success_cycle = false;
+    state.success_count_cycle = 0;
+  }
+  cycle_active_ = false;
+  cycle_slaves_ = {{0, 0}};
+  return {ErrorCode::OK, 0, 0};
+}
+
 void Bld305sDriver::recordTransactionSuccessUnlocked(
   std::uint8_t slave_id) noexcept
 {
-  if (!isValidSlaveId(slave_id)) {
-    return;
+  if (cycle_active_ && isExpectedCycleSlave(slave_id)) {
+    auto & state = slave_states_[slave_id];
+    state.saw_success_cycle = true;
+    if (state.success_count_cycle < 255) ++state.success_count_cycle;
   }
-
-  SlaveRuntimeState & state = slave_states_[slave_id];
-
-  state.consecutive_failures = 0;
-  state.communication = CommunicationState::HEALTHY;
+  // Outside a cycle, raw reads/writes never masquerade as 15 Hz health.
 }
 
 void Bld305sDriver::recordTransactionFailureUnlocked(
   std::uint8_t slave_id) noexcept
 {
-  if (!isValidSlaveId(slave_id)) {
-    return;
+  if (cycle_active_ && isExpectedCycleSlave(slave_id)) {
+    auto & state = slave_states_[slave_id];
+    state.exchange_failed_cycle = true;
+    state.skip_remaining_cycle = true;  // AD-14: one wait per failed slave/cycle
   }
-
-  SlaveRuntimeState & state = slave_states_[slave_id];
-
-  if (
-    state.consecutive_failures <
-    std::numeric_limits<std::uint32_t>::max())
-  {
-    ++state.consecutive_failures;
-  }
-
-  if (state.consecutive_failures >= COMM_FAILURE_LIMIT) {
-    state.communication = CommunicationState::LOST;
-    state.controller = ControllerState::UNKNOWN;
-    return;
-  }
-
-  state.communication = CommunicationState::DEGRADED;
 }
 
 void Bld305sDriver::markTransportOpenedUnlocked() noexcept
@@ -418,6 +506,11 @@ void Bld305sDriver::markTransportOpenedUnlocked() noexcept
     state.communication = CommunicationState::UNKNOWN;
     state.controller = ControllerState::UNINITIALIZED;
     state.consecutive_failures = 0;
+    state.telemetry_valid = false;
+    state.skip_remaining_cycle = false;
+    state.exchange_failed_cycle = false;
+    state.saw_success_cycle = false;
+    state.success_count_cycle = 0;
   }
 }
 
@@ -433,6 +526,11 @@ void Bld305sDriver::markTransportClosedUnlocked() noexcept
     state.communication = CommunicationState::UNKNOWN;
     state.controller = ControllerState::UNKNOWN;
     state.consecutive_failures = 0;
+    state.telemetry_valid = false;
+    state.skip_remaining_cycle = false;
+    state.exchange_failed_cycle = false;
+    state.saw_success_cycle = false;
+    state.success_count_cycle = 0;
   }
 }
 
@@ -448,7 +546,8 @@ void Bld305sDriver::closeUnlocked() noexcept
   }
 
   connected_.store(false, std::memory_order_release);
-
+  cycle_active_ = false;
+  cycle_slaves_ = {{0, 0}};
   markTransportClosedUnlocked();
 }
 

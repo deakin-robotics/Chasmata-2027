@@ -2,9 +2,11 @@
 #define ROVER_DRIVETRAIN_CONTROL__ROVER_HARDWARE_INTERFACE_HPP_
 
 #include "rover_drivetrain_control/bld305s_driver.hpp"
+#include "rover_drivetrain_control/drivetrain_core.hpp"
 
 #include <hardware_interface/hardware_info.hpp>
 #include <hardware_interface/system_interface.hpp>
+#include <hardware_interface/types/hardware_component_interface_params.hpp>
 #include <hardware_interface/types/hardware_interface_return_values.hpp>
 
 #include <rclcpp/duration.hpp>
@@ -39,6 +41,9 @@ public:
     std::string joint_name;
     BusId bus{BusId::LEFT};
     std::uint8_t slave_id{0};
+    double gear_ratio{0.0};    // must be configured; currently 50:1 per v0.4
+    double motor_rpm_limit{0.0};
+    bool mirrored{false};
   };
 
   RoverHardwareInterface() = default;
@@ -50,7 +55,7 @@ public:
   RoverHardwareInterface & operator=(RoverHardwareInterface &&) = delete;
 
   hardware_interface::CallbackReturn on_init(
-    const hardware_interface::HardwareInfo & info) override;
+    const hardware_interface::HardwareComponentInterfaceParams & params) override;
 
   hardware_interface::CallbackReturn on_configure(
     const rclcpp_lifecycle::State & previous_state) override;
@@ -133,6 +138,11 @@ private:
   bool transports_open_{false};
   bool operationally_ready_{false};
   bool active_{false};
+
+  // Required safety settings: defaults would silently settle open decisions.
+  core::TimingConfig timing_{};
+  std::int64_t previous_read_tick_ns_{0};
+  bool late_trigger_detected_{false};
 };
 
 }  // namespace rover_drivetrain_control

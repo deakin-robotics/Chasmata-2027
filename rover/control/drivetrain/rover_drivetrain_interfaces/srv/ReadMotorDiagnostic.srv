@@ -1,0 +1,9 @@
+# Read-only raw Modbus probing for workshop bring-up.
+string bus
+uint8 address
+uint8 register_selector    # 1 temp (0x0096), 2 current (0x00B6), 3 voltage (0x00C6)
+---
+bool success
+uint16 raw_value
+uint8 result_code
+string detail

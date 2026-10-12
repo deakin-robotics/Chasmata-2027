@@ -27,6 +27,9 @@
   <depend>pluginlib</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_lifecycle</depend>
+  <depend>rover_drivetrain_interfaces</depend>
+  <exec_depend>launch_ros</exec_depend>
+  <test_depend>ament_cmake_test</test_depend>
 
   <!--
     System dependency providing libmodbus headers and library.
