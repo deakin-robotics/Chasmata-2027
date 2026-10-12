@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 
 import type { Ros } from 'roslib';
 
+import { ArmMode } from '../fma/fma-state.service';
 import { RosConnection } from '../ros/ros-connection';
 import { ControlCommandPublisher } from './control-command-publisher';
 
@@ -59,5 +60,25 @@ describe('ControlCommandPublisher', () => {
       }),
     ]);
     expect(sentMessages.some(({ topic }) => topic === '/fma/law/request')).toBe(false);
+  });
+
+  it('retains the latest Arm mode request for ROS 2 subscribers that join late', () => {
+    const publisher = TestBed.inject(ControlCommandPublisher);
+
+    expect(publisher.publishArmMode(ArmMode.Position)).toBe(true);
+
+    expect(sentMessages).toEqual([
+      expect.objectContaining({
+        op: 'advertise',
+        topic: '/fma/arm/request',
+        type: 'std_msgs/String',
+        latch: true,
+      }),
+      expect.objectContaining({
+        op: 'publish',
+        topic: '/fma/arm/request',
+        msg: { data: 'POSITION' },
+      }),
+    ]);
   });
 });

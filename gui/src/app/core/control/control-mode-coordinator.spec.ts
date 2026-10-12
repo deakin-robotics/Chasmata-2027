@@ -52,7 +52,7 @@ describe('ControlModeCoordinator', () => {
     });
   });
 
-  it('creates one pending request for the local defaults when connected', () => {
+  it('requests and publishes the local default modes when connected', () => {
     TestBed.inject(ControlModeCoordinator);
     const fmaState = TestBed.inject(FmaStateService);
 
@@ -70,6 +70,11 @@ describe('ControlModeCoordinator', () => {
       confirmed: null,
       commanded: ArmMode.Position,
     });
+
+    expect(publishDriveMode).toHaveBeenCalledTimes(1);
+    expect(publishDriveMode).toHaveBeenCalledWith(DriveMode.Velocity);
+    expect(publishArmMode).toHaveBeenCalledTimes(1);
+    expect(publishArmMode).toHaveBeenCalledWith(ArmMode.Position);
 
     TestBed.flushEffects();
 

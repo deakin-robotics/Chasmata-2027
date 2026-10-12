@@ -4,6 +4,11 @@ from moveit_configs_utils import MoveItConfigsBuilder
 
 
 def generate_launch_description():
+    joint_state_remappings = [
+        ('joint_states', '/arm/joint_states'),
+        ('/joint_states', '/arm/joint_states'),
+    ]
+
     moveit_config = (
         MoveItConfigsBuilder('arm', package_name='arm_moveit_config')
         .robot_description(file_path='config/arm.urdf')
@@ -33,6 +38,7 @@ def generate_launch_description():
                 executable='robot_state_publisher',
                 name='robot_state_publisher',
                 parameters=[moveit_config.robot_description],
+                remappings=joint_state_remappings,
                 output='screen',
             ),
             Node(
@@ -43,6 +49,7 @@ def generate_launch_description():
                     moveit_config.to_dict(),
                     {'moveit_manage_controllers': False},
                 ],
+                remappings=joint_state_remappings,
                 output='screen',
             ),
             Node(
@@ -50,6 +57,7 @@ def generate_launch_description():
                 executable='arm_moveit_bridge',
                 name='arm_moveit_bridge',
                 parameters=[moveit_config.to_dict()],
+                remappings=joint_state_remappings,
                 output='screen',
             ),
         ]

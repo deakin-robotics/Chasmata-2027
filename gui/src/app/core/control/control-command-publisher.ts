@@ -78,6 +78,7 @@ export class ControlCommandPublisher {
         ros: client,
         name: ARM_MODE_REQUEST_TOPIC,
         messageType: STRING_MESSAGE_TYPE,
+        latch: true,
       });
       return this.armTopic;
     }
