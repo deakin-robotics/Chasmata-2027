@@ -22,7 +22,7 @@ GUI target pose
   -> MoveIt planning and time parameterization
   -> /arm_controller/follow_joint_trajectory
   -> rover controller
-  -> /joint_states
+  -> /arm/joint_states
   -> GUI model viewer
 ```
 

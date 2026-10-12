@@ -15,7 +15,7 @@ import {
 import { RosConnection } from './ros-connection';
 
 const FMA_STATE_TOPIC = '/fma/state';
-const JOINT_STATE_TOPIC = '/joint_states';
+const JOINT_STATE_TOPIC = '/arm/joint_states';
 const STRING_MESSAGE_TYPE = 'std_msgs/String';
 const JOINT_STATE_MESSAGE_TYPE = 'sensor_msgs/JointState';
 

@@ -38,9 +38,9 @@ JOINT_LIMITS: Dict[str, Tuple[float, float]] = {
     'roll_joint': (math.radians(-185.0), math.radians(185.0)),
 }
 
-JOINT_COMMAND_TOPIC = '/joint_commands'
+JOINT_COMMAND_TOPIC = '/arm/joint_commands'
 ARM_TRAJECTORY_ACTION = '/arm_controller/follow_joint_trajectory'
-JOINT_STATE_TOPIC = '/joint_states'
+JOINT_STATE_TOPIC = '/arm/joint_states'
 DRIVE_JOY_TOPIC = '/joy'
 ARM_JOY_TOPIC = '/arm/joy'
 ORIENTATION_LOCK_TOPIC = '/arm/orientation_lock'
