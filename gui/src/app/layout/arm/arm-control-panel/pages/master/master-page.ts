@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, effect, inject, untracked } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 
 import {
@@ -10,7 +10,7 @@ import { ControlModeCoordinator } from '../../../../../core/control/control-mode
 import { ControlCommandPublisher } from '../../../../../core/control/control-command-publisher';
 import { GamepadInput } from '../../../../../core/gamepad/gamepad-input';
 import { CameraFeedControl } from '../../../../../features/cameras/camera-feed-control';
-import { ArmMode } from '../../../../../core/fma/fma-state.service';
+import { ArmMode, FmaStateService } from '../../../../../core/fma/fma-state.service';
 import { RosConnection } from '../../../../../core/ros/ros-connection';
 import { ConnectionManager } from '../../../../../features/connection/connection-manager/connection-manager';
 import { ActionButton, ActionButtonTone } from '../../../../../shared/action-button/action-button';
@@ -49,11 +49,33 @@ export class ArmMasterPage {
   private readonly armControlMode = inject(ArmControlModeService);
   private readonly armCommandPublisher = inject(ArmCommandPublisher);
   private readonly controlModeCoordinator = inject(ControlModeCoordinator);
+  private readonly fmaState = inject(FmaStateService);
   private readonly controlCommandPublisher = inject(ControlCommandPublisher);
   private readonly gamepad = inject(GamepadInput);
   private readonly rosConnection = inject(RosConnection);
   private readonly cameraFeedControl = inject(CameraFeedControl);
   private readonly dialog = inject(MatDialog);
+  private armModeSynchronized = false;
+
+  private readonly modeHandshakeEffect = effect(() => {
+    const client = this.rosConnection.client();
+    const connected = this.rosConnection.isConnected();
+    const hasFmaTelemetry = this.fmaState.hasFmaTelemetry();
+
+    untracked(() => {
+      if (client) this.controlModeCoordinator.prepareArmModeRequest();
+
+      if (!connected) {
+        this.armModeSynchronized = false;
+        return;
+      }
+
+      if (!hasFmaTelemetry || this.armModeSynchronized) return;
+
+      this.armModeSynchronized = true;
+      this.controlModeCoordinator.synchronizeArmModeFromRover();
+    });
+  });
 
   readonly masterDriveEnabled = this.armControlMode.enabled;
   readonly armMode = this.armControlMode.mode;
@@ -79,6 +101,8 @@ export class ArmMasterPage {
     switch (this.rosConnection.status()) {
       case 'connecting':
         return 'Connecting';
+      case 'waiting-for-rover':
+        return 'Standby';
       case 'connected':
         return 'Connected';
       case 'reconnecting':
@@ -96,6 +120,7 @@ export class ArmMasterPage {
       case 'error':
         return 'caution';
       case 'connecting':
+      case 'waiting-for-rover':
       case 'reconnecting':
       case 'disconnected':
         return 'info';

@@ -100,6 +100,7 @@ export class RosTelemetryBridge {
     this.applyArmOverrideTelemetry(telemetry.arm_override);
     if (system !== undefined) this.fmaState.setSystemMode(system);
     this.applyGimbalPriorityTelemetry(telemetry.gimbal_priority);
+    this.fmaState.markFmaTelemetryReceived();
   }
 
   private applyModeTelemetry(state: FmaModeState | undefined, subsystem: 'drive' | 'arm'): void {

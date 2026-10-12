@@ -44,6 +44,32 @@ purpose: Tells a client whether the example node is ready or busy.
 
 ## Topics
 
+### Rover heartbeat
+
+```yaml
+topic: /rover/heartbeat
+type: std_msgs/msg/Empty
+publisher: Rover Control (mock now, real rover later)
+subscriber: GUI
+contract: {}
+behavior:
+  publish_after_interfaces_ready: true
+  publish_rate_hz: 1
+  qos: {reliability: reliable, durability: volatile, depth: 1}
+  gui_ready_on_first_message: true
+  gui_timeout_seconds: 3
+purpose: Tells the GUI that the rover-side ROS interfaces are running.
+```
+
+Example message:
+
+```yaml
+{}
+```
+
+This heartbeat covers the rover-side node, not the entire base-station stack.
+The real rover must publish it before the GUI can mark the rover ready.
+
 ### Driver input
 
 ```yaml

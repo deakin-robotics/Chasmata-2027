@@ -13,7 +13,7 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import JointState, Joy
-from std_msgs.msg import Bool, String
+from std_msgs.msg import Bool, Empty, String
 from telemetry_interfaces.msg import ArmOverrideState, FmaModeState, FmaState
 
 from .simulation import JointSimulator
@@ -41,7 +41,7 @@ JOINT_LIMITS: Dict[str, Tuple[float, float]] = {
 JOINT_COMMAND_TOPIC = '/arm/joint_commands'
 ARM_TRAJECTORY_ACTION = '/arm_controller/follow_joint_trajectory'
 JOINT_STATE_TOPIC = '/arm/joint_states'
-DRIVE_JOY_TOPIC = '/joy'
+DRIVE_JOY_TOPIC = '/drive/joy'
 ARM_JOY_TOPIC = '/arm/joy'
 ORIENTATION_LOCK_TOPIC = '/arm/orientation_lock'
 DRIVE_MODE_REQUEST_TOPIC = '/fma/drive/request'
@@ -49,6 +49,7 @@ ARM_MODE_REQUEST_TOPIC = '/fma/arm/request'
 ARM_OVERRIDE_REQUEST_TOPIC = '/arm/override/request'
 GIMBAL_PRIORITY_REQUEST_TOPIC = '/fma/gimbal/request'
 FMA_STATE_TOPIC = '/fma/state'
+HEARTBEAT_TOPIC = '/rover/heartbeat'
 
 DRIVE_TRIGGER_AXES = (4, 5)
 ARM_TRIGGER_AXES = (8, 9)
@@ -117,6 +118,12 @@ class MockRoverNode(Node):
 
         self.fma_publisher = self.create_publisher(FmaState, FMA_STATE_TOPIC, fma_qos)
         self.joint_state_publisher = self.create_publisher(JointState, JOINT_STATE_TOPIC, 10)
+        heartbeat_qos = QoSProfile(depth=1)
+        heartbeat_qos.reliability = ReliabilityPolicy.RELIABLE
+        heartbeat_qos.durability = DurabilityPolicy.VOLATILE
+        self.heartbeat_publisher = self.create_publisher(
+            Empty, HEARTBEAT_TOPIC, heartbeat_qos
+        )
         self.trajectory_action_server = ActionServer(
             self,
             FollowJointTrajectory,
@@ -177,8 +184,10 @@ class MockRoverNode(Node):
         )
 
         self.create_timer(1.0 / publish_rate, self.tick)
+        self.create_timer(1.0, self.publish_heartbeat)
         self.publish_fma()
         self.publish_joint_state()
+        self.publish_heartbeat()
 
         self.get_logger().info('Mock rover ready')
         self.get_logger().info('ROSbridge should expose ws://localhost:9090')
@@ -491,6 +500,9 @@ class MockRoverNode(Node):
         accepted = self.joints.set_target_immediately(targets)
         if accepted:
             self.publish_joint_state()
+
+    def publish_heartbeat(self) -> None:
+        self.heartbeat_publisher.publish(Empty())
 
     def tick(self) -> None:
         now = time.monotonic()

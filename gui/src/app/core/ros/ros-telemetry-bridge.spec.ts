@@ -7,22 +7,6 @@ import { ArmMode, DriveMode, FmaStateService, LawMode } from '../fma/fma-state.s
 import { RosConnection } from './ros-connection';
 import { RosTelemetryBridge } from './ros-telemetry-bridge';
 
-vi.mock('roslib', () => ({
-  Ros: class {
-    isConnected = false;
-    on(): void {}
-    removeAllListeners(): void {}
-    close(): void {}
-    connect(): Promise<void> {
-      return Promise.resolve();
-    }
-  },
-  Topic: class {
-    subscribe(): void {}
-    unsubscribe(): void {}
-  },
-}));
-
 describe('RosTelemetryBridge', () => {
   it('keeps LAW and Arm Override telemetry independent', () => {
     const connected = signal(false);

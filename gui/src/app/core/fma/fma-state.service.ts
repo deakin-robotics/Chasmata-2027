@@ -60,8 +60,10 @@ export class FmaStateService {
     state: null,
     pending: null,
   });
+  private readonly fmaTelemetryReceivedState = signal(false);
 
   readonly columns = this.columnsState.asReadonly();
+  readonly hasFmaTelemetry = this.fmaTelemetryReceivedState.asReadonly();
   readonly armOverrideState = computed(() => this.armOverrideTelemetryState().state);
   readonly armOverridePendingCommand = computed(() => this.armOverrideTelemetryState().pending);
   readonly armOverrideActive = computed(() => this.armOverrideState() === ArmOverrideState.Active);
@@ -196,8 +198,14 @@ export class FmaStateService {
     this.updateColumn('GIMBAL', (column) => ({ ...column, confirmed, commanded }));
   }
 
+  /** Marks that the current rover connection has supplied an FMA state. */
+  markFmaTelemetryReceived(): void {
+    this.fmaTelemetryReceivedState.set(true);
+  }
+
   /** Clears DRIVE and ARM state when the rover connection is unavailable. */
   resetControlModes(): void {
+    this.fmaTelemetryReceivedState.set(false);
     this.columnsState.update((columns) =>
       columns.map((column) => {
         if (column.label === 'DRIVE' || column.label === 'ARM') {

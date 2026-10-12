@@ -78,6 +78,8 @@ with `MEDIA_WIDTH`, `MEDIA_HEIGHT`, `MEDIA_FPS`, `MEDIA_BITRATE_KBPS`,
 
 ## Simulated behaviour
 
+- Publishes `/rover/heartbeat` after setting up its ROS interfaces, then once
+  per second. The GUI waits for this before enabling rover controls.
 - Starts with LAW `NORMAL`, SYSTEM `GOOD`, and unknown Gimbal priority.
 - Accepts valid Driver and Arm mode requests, publishes them as pending, then
   confirms them after 150 ms.

@@ -1,9 +1,10 @@
 import { OnDestroy, Service, computed, signal } from '@angular/core';
-import { Ros } from 'roslib';
+import { Ros, Topic } from 'roslib';
 
 export type RosConnectionStatus =
   | 'disconnected'
   | 'connecting'
+  | 'waiting-for-rover'
   | 'connected'
   | 'reconnecting'
   | 'error';
@@ -11,6 +12,7 @@ export type RosConnectionStatus =
 const INITIAL_RECONNECT_DELAY_MS = 1_000;
 const MAX_RECONNECT_DELAY_MS = 30_000;
 const MAX_RECONNECT_ATTEMPTS = 5;
+const HEARTBEAT_TIMEOUT_MS = 3_000;
 
 /**
  * Owns the application's single ROSLIB connection to rosbridge.
@@ -23,6 +25,8 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 export class RosConnection implements OnDestroy {
   private rosClient: Ros | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
+  private heartbeatTopic: Topic | null = null;
   private reconnectAttempts = 0;
   private allowReconnect = false;
 
@@ -41,7 +45,11 @@ export class RosConnection implements OnDestroy {
   readonly isConnected = computed(() => this.statusState() === 'connected');
   readonly isConnecting = computed(() => {
     const status = this.statusState();
-    return status === 'connecting' || status === 'reconnecting';
+    return (
+      status === 'connecting' ||
+      status === 'reconnecting' ||
+      status === 'waiting-for-rover'
+    );
   });
 
   /** Connect to a rosbridge WebSocket endpoint. */
@@ -117,12 +125,14 @@ export class RosConnection implements OnDestroy {
       this.reconnectAttempts = 0;
       this.reconnectAttemptState.set(0);
       this.errorState.set(null);
-      this.statusState.set('connected');
+      this.statusState.set('waiting-for-rover');
+      this.subscribeToHeartbeat(client);
     });
 
     client.on('error', (error) => {
       if (this.rosClient !== client) return;
 
+      this.disposeHeartbeat();
       this.errorState.set(this.toErrorMessage(error));
       this.scheduleReconnect();
     });
@@ -130,6 +140,7 @@ export class RosConnection implements OnDestroy {
     client.on('close', () => {
       if (this.rosClient !== client) return;
 
+      this.disposeHeartbeat();
       this.clientState.set(null);
 
       if (this.allowReconnect) {
@@ -142,6 +153,7 @@ export class RosConnection implements OnDestroy {
     void client.connect(url).catch((error: unknown) => {
       if (this.rosClient !== client) return;
 
+      this.disposeHeartbeat();
       this.errorState.set(this.toErrorMessage(error));
       this.scheduleReconnect();
     });
@@ -178,6 +190,7 @@ export class RosConnection implements OnDestroy {
   }
 
   private disposeClient(): void {
+    this.disposeHeartbeat();
     const client = this.rosClient;
     this.rosClient = null;
     this.clientState.set(null);
@@ -186,6 +199,35 @@ export class RosConnection implements OnDestroy {
 
     client.removeAllListeners();
     client.close();
+  }
+
+  private subscribeToHeartbeat(client: Ros): void {
+    this.disposeHeartbeat();
+    const topic = new Topic({
+      ros: client,
+      name: '/rover/heartbeat',
+      messageType: 'std_msgs/msg/Empty',
+    });
+    this.heartbeatTopic = topic;
+    topic.subscribe(() => {
+      if (this.rosClient !== client || this.heartbeatTopic !== topic) return;
+
+      if (this.heartbeatTimer) clearTimeout(this.heartbeatTimer);
+      this.heartbeatTimer = setTimeout(() => {
+        if (this.rosClient !== client || this.heartbeatTopic !== topic) return;
+        this.heartbeatTimer = null;
+        this.statusState.set('waiting-for-rover');
+      }, HEARTBEAT_TIMEOUT_MS);
+
+      if (this.statusState() !== 'connected') this.statusState.set('connected');
+    });
+  }
+
+  private disposeHeartbeat(): void {
+    if (this.heartbeatTimer) clearTimeout(this.heartbeatTimer);
+    this.heartbeatTimer = null;
+    this.heartbeatTopic?.unsubscribe();
+    this.heartbeatTopic = null;
   }
 
   private clearReconnectTimer(): void {

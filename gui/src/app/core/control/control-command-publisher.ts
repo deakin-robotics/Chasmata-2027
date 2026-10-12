@@ -21,7 +21,19 @@ export class ControlCommandPublisher {
   private armOverrideTopic: Topic | null = null;
   private topicClient: Ros | null = null;
 
+  /** Advertises the Driver mode-request topic before rover readiness is confirmed. */
+  prepareDriveModeRequest(): void {
+    this.getTopic('drive')?.advertise();
+  }
+
+  /** Advertises the Arm mode-request topic before rover readiness is confirmed. */
+  prepareArmModeRequest(): void {
+    this.getTopic('arm')?.advertise();
+  }
+
   publishDriveMode(mode: DriverControlMode): boolean {
+    if (!this.rosConnection.isConnected()) return false;
+
     const topic = this.getTopic('drive');
     if (!topic) return false;
 
@@ -30,6 +42,8 @@ export class ControlCommandPublisher {
   }
 
   publishArmMode(mode: ArmControlMode): boolean {
+    if (!this.rosConnection.isConnected()) return false;
+
     const topic = this.getTopic('arm');
     if (!topic) return false;
 
@@ -46,6 +60,8 @@ export class ControlCommandPublisher {
   }
 
   private publishArmOverrideCommand(command: ArmOverrideCommand): boolean {
+    if (!this.rosConnection.isConnected()) return false;
+
     const topic = this.getTopic('armOverride');
     if (!topic) return false;
 
@@ -55,7 +71,7 @@ export class ControlCommandPublisher {
 
   private getTopic(kind: 'drive' | 'arm' | 'armOverride'): Topic | null {
     const client = this.rosConnection.client();
-    if (!client || !this.rosConnection.isConnected()) return null;
+    if (!client) return null;
 
     if (client !== this.topicClient) {
       this.topicClient = client;

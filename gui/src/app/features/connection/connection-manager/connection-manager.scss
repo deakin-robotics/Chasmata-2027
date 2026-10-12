@@ -17,6 +17,7 @@
   }
 
   &[data-status='connecting'],
+  &[data-status='waiting-for-rover'],
   &[data-status='reconnecting'] {
     --status-color: var(--dcr-color-info);
   }

@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 
 import type { Ros } from 'roslib';
 
-import { ArmMode } from '../fma/fma-state.service';
+import { ArmMode, DriveMode } from '../fma/fma-state.service';
 import { RosConnection } from '../ros/ros-connection';
 import { ControlCommandPublisher } from './control-command-publisher';
 
@@ -12,10 +12,12 @@ const { sentMessages } = vi.hoisted(() => ({
 }));
 
 describe('ControlCommandPublisher', () => {
+  let connected: ReturnType<typeof signal<boolean>>;
+
   beforeEach(() => {
     sentMessages.length = 0;
 
-    const connected = signal(true);
+    connected = signal(true);
     const client = {
       callOnConnection: vi.fn((message: Record<string, unknown>) => {
         sentMessages.push(message);
@@ -80,5 +82,32 @@ describe('ControlCommandPublisher', () => {
         msg: { data: 'POSITION' },
       }),
     ]);
+  });
+
+  it('advertises only the active dashboard mode topic before rover readiness', () => {
+    connected.set(false);
+    const publisher = TestBed.inject(ControlCommandPublisher);
+
+    publisher.prepareDriveModeRequest();
+
+    expect(sentMessages).toEqual([
+      expect.objectContaining({
+        op: 'advertise',
+        topic: '/fma/drive/request',
+        type: 'std_msgs/String',
+      }),
+    ]);
+    expect(publisher.publishDriveMode(DriveMode.Velocity)).toBe(false);
+    expect(publisher.publishArmMode(ArmMode.Position)).toBe(false);
+
+    publisher.prepareArmModeRequest();
+    expect(sentMessages).toContainEqual(
+      expect.objectContaining({
+        op: 'advertise',
+        topic: '/fma/arm/request',
+        type: 'std_msgs/String',
+        latch: true,
+      }),
+    );
   });
 });
