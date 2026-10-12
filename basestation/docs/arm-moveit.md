@@ -79,10 +79,13 @@ docker compose exec moveit2 bash -lc \
 
 ## Status events
 
-The bridge publishes JSON strings on `/arm/moveit/status`:
+The bridge publishes `telemetry_interfaces/msg/ArmMoveItStatus` messages on
+`/arm/moveit/status`:
 
-```json
-{"request_id":1,"state":"EXECUTING","message":""}
+```yaml
+request_id: 1
+state: EXECUTING
+message: ""
 ```
 
 `state` is `PLANNING`, `EXECUTING`, `SUCCEEDED`, `CANCELED`, or `FAILED`.

@@ -28,10 +28,10 @@ function createRosClient(): Ros {
   } as unknown as Ros;
 }
 
-function publishStatus(data: string): void {
+function publishStatus(msg: Record<string, unknown>): void {
   rosMocks.handlers.get('/arm/moveit/status')?.({
     op: 'publish',
-    msg: { data },
+    msg,
   });
 }
 
@@ -90,11 +90,11 @@ describe('ArmMoveItIkProvider', () => {
       msg: { data: false },
     }));
 
-    publishStatus('{"request_id":1,"state":"PLANNING"}');
+    publishStatus({ request_id: 1, state: 'PLANNING', message: '' });
     expect(provider.executionStatus()).toBe('planning');
-    publishStatus('{"request_id":1,"state":"EXECUTING"}');
+    publishStatus({ request_id: 1, state: 'EXECUTING', message: '' });
     expect(provider.executionStatus()).toBe('executing');
-    publishStatus('{"request_id":1,"state":"SUCCEEDED"}');
+    publishStatus({ request_id: 1, state: 'SUCCEEDED', message: '' });
 
     await expect(request).resolves.toEqual({
       status: 'converged',
@@ -123,7 +123,7 @@ describe('ArmMoveItIkProvider', () => {
 
     await expect(firstRequest).resolves.toBeNull();
 
-    publishStatus('{"request_id":2,"state":"SUCCEEDED"}');
+    publishStatus({ request_id: 2, state: 'SUCCEEDED', message: '' });
 
     await expect(secondRequest).resolves.toEqual({
       status: 'converged',
@@ -134,7 +134,7 @@ describe('ArmMoveItIkProvider', () => {
   it('propagates a failed execution event', async () => {
     const request = provider.solve(target);
 
-    publishStatus('{"request_id":1,"state":"FAILED","message":"path incomplete"}');
+    publishStatus({ request_id: 1, state: 'FAILED', message: 'path incomplete' });
 
     await expect(request).rejects.toThrow('path incomplete');
     expect(provider.executionStatus()).toBe('failed');

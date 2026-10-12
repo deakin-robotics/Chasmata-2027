@@ -139,26 +139,24 @@ LOCKED operation the GUI sends zero wrist axes. Joystick and trigger input is
 ignored and the captured EE orientation remains fixed. Digital buttons remain
 available.
 
-The provisional `/fma/state` JSON shape is:
+The mock publishes `/fma/state` as `telemetry_interfaces/msg/FmaState`. Its
+nested mode and override fields use `FmaModeState` and `ArmOverrideState`.
+String fields that were `null` in the prior payload are published as empty
+strings. For example:
 
-```json
-{
-  "schema": "dcr/fma-state/v1",
-  "sequence": 12,
-  "drive": { "confirmed": "VELOCITY", "pending": null, "rejected": null },
-  "arm": { "confirmed": "POSITION", "pending": null, "rejected": null },
-  "law": "NORMAL",
-  "arm_override": { "state": "INACTIVE", "pending": null },
-  "system": "GOOD",
-  "gimbal_priority": { "confirmed": null, "pending": null, "rejected": null }
-}
+```yaml
+schema: dcr/fma-state/v1
+sequence: 12
+drive: { confirmed: VELOCITY, pending: "", rejected: "" }
+arm: { confirmed: POSITION, pending: "", rejected: "" }
+law: NORMAL
+arm_override: { state: INACTIVE, pending: "" }
+system: GOOD
+gimbal_priority: { confirmed: "", pending: "", rejected: "" }
 ```
 
-This JSON and the `/arm/override/request` and `/fma/gimbal/request` topics are
-deliberately provisional. They keep the mock usable before the Control team
-finalises the production FMA message definitions. The GUI should replace this
-adapter with the final message types when those contracts are agreed. The
-mock's feedback responsibilities stay the same.
+The `/arm/override/request` and `/fma/gimbal/request` topics remain separate
+command interfaces. The mock's feedback behavior is unchanged.
 
 ## Parameters
 

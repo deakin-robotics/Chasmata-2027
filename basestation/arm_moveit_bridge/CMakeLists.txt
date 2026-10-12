@@ -11,6 +11,7 @@ find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(shape_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(telemetry_interfaces REQUIRED)
 
 add_executable(arm_moveit_bridge src/arm_moveit_bridge.cpp)
 ament_target_dependencies(arm_moveit_bridge
@@ -23,6 +24,7 @@ ament_target_dependencies(arm_moveit_bridge
   rclcpp_action
   shape_msgs
   std_msgs
+  telemetry_interfaces
 )
 
 install(TARGETS arm_moveit_bridge

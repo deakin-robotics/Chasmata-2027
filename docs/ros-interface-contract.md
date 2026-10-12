@@ -233,18 +233,15 @@ purpose: Requests arm positioning through base-station MoveIt.
 
 ```yaml
 topic: /arm/moveit/status
-type: std_msgs/msg/String
+type: telemetry_interfaces/msg/ArmMoveItStatus
 publisher: Base-station MoveIt bridge
 subscriber: GUI Arm MoveIt provider
 contract:
-  data:
-    encoding: JSON
-    fields:
-      request_id: {type: integer}
-      state:
-        type: string
-        enum: [PLANNING, EXECUTING, SUCCEEDED, CANCELED, FAILED]
-      message: {type: string}
+  request_id: {type: uint64}
+  state:
+    type: string
+    enum: [PLANNING, EXECUTING, SUCCEEDED, CANCELED, FAILED]
+  message: {type: string}
 behavior:
   request_id_source: /arm/target_pose.header.stamp
   gui_correlation: request_id_must_match_active_request
@@ -252,10 +249,12 @@ behavior:
 purpose: Reports the progress and result of a MoveIt arm request.
 ```
 
-Example String.data value:
+Example message:
 
-```json
-{"request_id":1,"state":"PLANNING","message":""}
+```yaml
+request_id: 1
+state: PLANNING
+message: ""
 ```
 
 ### Arm joint telemetry
@@ -380,48 +379,55 @@ publishes pending and confirmed states as its Control package processes them.
 
 ```yaml
 topic: /fma/state
-type: std_msgs/msg/String
+type: telemetry_interfaces/msg/FmaState
 publisher: Rover Control
 subscriber: GUI
 contract:
-  data:
-    encoding: JSON
-    fields:
-      schema: {type: string, const: dcr/fma-state/v1}
-      sequence: {type: integer}
-      drive:
-        confirmed: {type: string|null, enum: [MANUAL, VELOCITY, MANAGED, null]}
-        pending: {type: string|null, enum: [MANUAL, VELOCITY, MANAGED, null]}
-        rejected: {type: string|null}
-      arm:
-        confirmed: {type: string|null, enum: [MANUAL, POSITION, MANAGED, STOWED, null]}
-        pending: {type: string|null, enum: [MANUAL, POSITION, MANAGED, STOWED, null]}
-        rejected: {type: string|null}
-      law: {type: string, enum: [NORMAL, ALTERNATE, DIRECT]}
-      arm_override:
-        state: {type: string, enum: [INACTIVE, ACTIVE]}
-        pending: {type: string|null, enum: [ENABLE, DISABLE, null]}
-      system: {type: string, enum: [GOOD, DEGRADED, FAULT, "E-STOP"]}
-      gimbal_priority:
-        confirmed: {type: string|null, enum: [DRIVER, "ARM OPS", null]}
-        pending: {type: string|null, enum: [DRIVER, "ARM OPS", null]}
-        rejected: {type: string|null}
+  schema: {type: string, const: dcr/fma-state/v1}
+  sequence: {type: uint64}
+  drive:
+    type: telemetry_interfaces/msg/FmaModeState
+    confirmed: {type: string, enum: [MANUAL, VELOCITY, MANAGED], absent: ""}
+    pending: {type: string, enum: [MANUAL, VELOCITY, MANAGED], absent: ""}
+    rejected: {type: string, absent: ""}
+  arm:
+    type: telemetry_interfaces/msg/FmaModeState
+    confirmed: {type: string, enum: [MANUAL, POSITION, MANAGED, STOWED], absent: ""}
+    pending: {type: string, enum: [MANUAL, POSITION, MANAGED, STOWED], absent: ""}
+    rejected: {type: string, absent: ""}
+  law: {type: string, enum: [NORMAL, ALTERNATE, DIRECT]}
+  arm_override:
+    type: telemetry_interfaces/msg/ArmOverrideState
+    state: {type: string, enum: [INACTIVE, ACTIVE]}
+    pending: {type: string, enum: [ENABLE, DISABLE], absent: ""}
+  system: {type: string, enum: [GOOD, DEGRADED, FAULT, "E-STOP"]}
+  gimbal_priority:
+    type: telemetry_interfaces/msg/FmaModeState
+    confirmed: {type: string, enum: [DRIVER, "ARM OPS"], absent: ""}
+    pending: {type: string, enum: [DRIVER, "ARM OPS"], absent: ""}
+    rejected: {type: string, absent: ""}
 behavior:
   sequence: {min: 1, monotonic: true}
   publish: {at_startup: true, on_state_change: true, refresh_rate_hz: 1}
   qos: {reliability: reliable, durability: transient_local, depth: 1}
-purpose: JSON FMA telemetry broadcast.
+purpose: FMA telemetry broadcast.
 ```
 
-Example initial String.data value from the mock:
+Example initial message from the mock:
 
-```json
-{"schema":"dcr/fma-state/v1","sequence":1,"drive":{"confirmed":null,"pending":null,"rejected":null},"arm":{"confirmed":null,"pending":null,"rejected":null},"law":"NORMAL","arm_override":{"state":"INACTIVE","pending":null},"system":"GOOD","gimbal_priority":{"confirmed":null,"pending":null,"rejected":null}}
+```yaml
+schema: dcr/fma-state/v1
+sequence: 1
+drive: {confirmed: "", pending: "", rejected: ""}
+arm: {confirmed: "", pending: "", rejected: ""}
+law: NORMAL
+arm_override: {state: INACTIVE, pending: ""}
+system: GOOD
+gimbal_priority: {confirmed: "", pending: "", rejected: ""}
 ```
 
-The Control scaffold currently declares /arm/joint_states and /fma/state
-publishers but does not emit messages. The mock rover emits both and currently
-reports system GOOD and null for gimbal_priority.rejected.
+The mock reports `system: GOOD` and an empty string for
+`gimbal_priority.rejected` when no rejection is active.
 
 ## Actions
 

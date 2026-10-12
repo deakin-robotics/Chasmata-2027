@@ -13,7 +13,7 @@ const MOVEIT_ORIENTATION_LOCK_TOPIC = '/arm/orientation_lock';
 const MOVEIT_STATUS_TOPIC = '/arm/moveit/status';
 const POSE_STAMPED_MESSAGE_TYPE = 'geometry_msgs/PoseStamped';
 const BOOL_MESSAGE_TYPE = 'std_msgs/Bool';
-const STRING_MESSAGE_TYPE = 'std_msgs/String';
+const MOVEIT_STATUS_MESSAGE_TYPE = 'telemetry_interfaces/msg/ArmMoveItStatus';
 const MOVEIT_RESPONSE_TIMEOUT_MS = 15_000;
 const MOVEIT_LOG_PREFIX = '[MoveIt2]';
 
@@ -228,7 +228,7 @@ export class ArmMoveItIkProvider {
     this.statusTopic = new Topic({
       ros: client,
       name: MOVEIT_STATUS_TOPIC,
-      messageType: STRING_MESSAGE_TYPE,
+      messageType: MOVEIT_STATUS_MESSAGE_TYPE,
     });
     this.statusTopic.subscribe((message) => this.handleStatusMessage(message));
 
@@ -240,16 +240,8 @@ export class ArmMoveItIkProvider {
   }
 
   private handleStatusMessage(message: unknown): void {
-    if (!message || typeof message !== 'object' || !('data' in message)) return;
-
-    const data = (message as { data?: unknown }).data;
-    if (typeof data !== 'string') return;
-
-    try {
-      this.handleStatus(JSON.parse(data) as StatusMessage);
-    } catch {
-      console.warn(`${MOVEIT_LOG_PREFIX} ignored malformed status message`);
-    }
+    if (!message || typeof message !== 'object') return;
+    this.handleStatus(message as StatusMessage);
   }
 
   private disposeTopics(): void {

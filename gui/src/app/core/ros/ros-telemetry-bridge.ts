@@ -16,12 +16,8 @@ import { RosConnection } from './ros-connection';
 
 const FMA_STATE_TOPIC = '/fma/state';
 const JOINT_STATE_TOPIC = '/arm/joint_states';
-const STRING_MESSAGE_TYPE = 'std_msgs/String';
+const FMA_STATE_MESSAGE_TYPE = 'telemetry_interfaces/msg/FmaState';
 const JOINT_STATE_MESSAGE_TYPE = 'sensor_msgs/JointState';
-
-interface StringMessage {
-  data?: unknown;
-}
 
 interface JointStateMessage {
   name?: unknown;
@@ -36,12 +32,14 @@ interface FmaModeState {
 }
 
 interface FmaTelemetryMessage {
+  schema?: unknown;
+  sequence?: unknown;
   drive?: FmaModeState;
   arm?: FmaModeState;
   law?: unknown;
   arm_override?: { state?: unknown; pending?: unknown };
   system?: unknown;
-  gimbal_priority?: unknown;
+  gimbal_priority?: FmaModeState;
 }
 
 /** Adapts ROS telemetry messages into the GUI's shared state services. */
@@ -75,7 +73,7 @@ export class RosTelemetryBridge {
     this.fmaTopic = new Topic({
       ros: client,
       name: FMA_STATE_TOPIC,
-      messageType: STRING_MESSAGE_TYPE,
+      messageType: FMA_STATE_MESSAGE_TYPE,
     });
     this.jointStateTopic = new Topic({
       ros: client,
@@ -83,21 +81,15 @@ export class RosTelemetryBridge {
       messageType: JOINT_STATE_MESSAGE_TYPE,
     });
 
-    this.fmaTopic.subscribe((message) => this.handleFmaMessage(message as StringMessage));
+    this.fmaTopic.subscribe((message) => this.handleFmaMessage(message));
     this.jointStateTopic.subscribe((message) =>
       this.handleJointStateMessage(message as JointStateMessage),
     );
   }
 
-  private handleFmaMessage(message: StringMessage): void {
-    if (typeof message.data !== 'string') return;
-
-    let telemetry: FmaTelemetryMessage;
-    try {
-      telemetry = JSON.parse(message.data) as FmaTelemetryMessage;
-    } catch {
-      return;
-    }
+  private handleFmaMessage(message: unknown): void {
+    if (!message || typeof message !== 'object') return;
+    const telemetry = message as FmaTelemetryMessage;
 
     this.applyModeTelemetry(telemetry.drive, 'drive');
     this.applyModeTelemetry(telemetry.arm, 'arm');
@@ -181,7 +173,7 @@ export class RosTelemetryBridge {
   }
 
   private enumValue<T extends string>(value: unknown, values: readonly T[]): T | null | undefined {
-    if (value === null) return null;
+    if (value === null || value === '') return null;
     return typeof value === 'string' && values.includes(value as T) ? (value as T) : undefined;
   }
 
@@ -208,7 +200,7 @@ export class RosTelemetryBridge {
   }
 
   private parseGimbalPriorityOwner(value: unknown): GimbalPriorityOwner | null | undefined {
-    if (value === null || value === 'UNKNOWN') return null;
+    if (value === null || value === '' || value === 'UNKNOWN') return null;
     return value === 'DRIVER' || value === 'ARM OPS' ? value : undefined;
   }
 

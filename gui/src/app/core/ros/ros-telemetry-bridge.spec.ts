@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 
 import { ArmTelemetryService } from '../arm/telemetry/arm-telemetry.service';
 import { ArmOverrideCommand, ArmOverrideState } from '../control/arm/arm-override';
-import { FmaStateService, LawMode } from '../fma/fma-state.service';
+import { ArmMode, DriveMode, FmaStateService, LawMode } from '../fma/fma-state.service';
 import { RosConnection } from './ros-connection';
 import { RosTelemetryBridge } from './ros-telemetry-bridge';
 
@@ -44,28 +44,41 @@ describe('RosTelemetryBridge', () => {
     const bridge = TestBed.inject(RosTelemetryBridge);
     const fmaState = TestBed.inject(FmaStateService);
     const handleFmaMessage = (
-      bridge as unknown as { handleFmaMessage(message: { data: string }): void }
+      bridge as unknown as { handleFmaMessage(message: unknown): void }
     ).handleFmaMessage.bind(bridge);
 
     handleFmaMessage({
-      data: JSON.stringify({
-        law: 'DIRECT',
-        arm_override: { state: 'INACTIVE', pending: 'ENABLE' },
-      }),
+      schema: 'dcr/fma-state/v1',
+      sequence: 1,
+      drive: { confirmed: 'VELOCITY', pending: '', rejected: '' },
+      arm: { confirmed: 'POSITION', pending: '', rejected: '' },
+      law: 'DIRECT',
+      arm_override: { state: 'INACTIVE', pending: 'ENABLE' },
+      system: 'GOOD',
+      gimbal_priority: { confirmed: 'DRIVER', pending: '', rejected: '' },
     });
 
     expect(fmaState.columns()).toEqual(
-      expect.arrayContaining([{ label: 'LAW', confirmed: LawMode.Direct }]),
+      expect.arrayContaining([
+        { label: 'DRIVE', confirmed: DriveMode.Velocity, commanded: null },
+        { label: 'ARM', confirmed: ArmMode.Position, commanded: null },
+        { label: 'LAW', confirmed: LawMode.Direct },
+        { label: 'GIMBAL', confirmed: 'DRIVER', commanded: null },
+      ]),
     );
     expect(fmaState.armOverrideState()).toBe(ArmOverrideState.Inactive);
     expect(fmaState.armOverridePending()).toBe(true);
     expect(fmaState.armOverrideActive()).toBe(false);
 
     handleFmaMessage({
-      data: JSON.stringify({
-        law: 'DIRECT',
-        arm_override: { state: 'ACTIVE', pending: 'DISABLE' },
-      }),
+      schema: 'dcr/fma-state/v1',
+      sequence: 2,
+      drive: { confirmed: 'VELOCITY', pending: '', rejected: '' },
+      arm: { confirmed: 'POSITION', pending: '', rejected: '' },
+      law: 'DIRECT',
+      arm_override: { state: 'ACTIVE', pending: 'DISABLE' },
+      system: 'GOOD',
+      gimbal_priority: { confirmed: 'DRIVER', pending: '', rejected: '' },
     });
 
     expect(fmaState.columns()).toEqual(
