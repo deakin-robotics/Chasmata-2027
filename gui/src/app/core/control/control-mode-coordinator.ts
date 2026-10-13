@@ -4,7 +4,7 @@ import { ArmControlMode, ArmControlModeService } from './arm/arm-control-mode';
 import { ControlCommandPublisher } from './control-command-publisher';
 import { DriverControlMode, DriverControlModeService } from './drive/drive-control-mode';
 import { ArmMode, DriveMode, FmaColumn, FmaStateService } from '../fma/fma-state.service';
-import { RosConnection } from '../ros/ros-connection';
+import { RosHeartbeatMonitor } from '../ros/ros-heartbeat-monitor';
 
 /** Coordinates local mode selection, connection state, and FMA mode requests. */
 @Service()
@@ -12,11 +12,11 @@ export class ControlModeCoordinator {
   private readonly driverControlMode = inject(DriverControlModeService);
   private readonly armControlMode = inject(ArmControlModeService);
   private readonly fmaState = inject(FmaStateService);
-  private readonly rosConnection = inject(RosConnection);
+  private readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
   private readonly commandPublisher = inject(ControlCommandPublisher);
 
   private readonly connectionEffect = effect(() => {
-    const connected = this.rosConnection.isConnected();
+    const connected = this.heartbeatMonitor.roverAvailable();
 
     untracked(() => {
       if (!connected) {
@@ -39,7 +39,7 @@ export class ControlModeCoordinator {
 
   /** Syncs the Driver selector from the first rover FMA state, or initializes it. */
   synchronizeDriveModeFromRover(): void {
-    if (!this.rosConnection.isConnected()) return;
+    if (!this.heartbeatMonitor.roverAvailable()) return;
 
     const roverMode = this.currentDriveModeFromRover();
     if (roverMode) {
@@ -56,7 +56,7 @@ export class ControlModeCoordinator {
 
   /** Syncs the Arm selector from the first rover FMA state, or initializes it. */
   synchronizeArmModeFromRover(): void {
-    if (!this.rosConnection.isConnected()) return;
+    if (!this.heartbeatMonitor.roverAvailable()) return;
 
     const roverMode = this.currentArmModeFromRover();
     if (roverMode) {
@@ -77,7 +77,7 @@ export class ControlModeCoordinator {
 
     this.driverControlMode.setMode(mode);
 
-    if (!this.rosConnection.isConnected()) return;
+    if (!this.heartbeatMonitor.roverAvailable()) return;
 
     this.fmaState.requestDriveMode(mode);
     this.commandPublisher.publishDriveMode(mode);
@@ -89,7 +89,7 @@ export class ControlModeCoordinator {
 
     this.armControlMode.setMode(mode);
 
-    if (!this.rosConnection.isConnected()) return;
+    if (!this.heartbeatMonitor.roverAvailable()) return;
 
     this.fmaState.requestArmMode(mode);
     this.commandPublisher.publishArmMode(mode);

@@ -2,6 +2,7 @@ import { Service, inject } from '@angular/core';
 import { Ros, Topic } from 'roslib';
 
 import { RosConnection } from '../ros/ros-connection';
+import { RosHeartbeatMonitor } from '../ros/ros-heartbeat-monitor';
 import { ArmOverrideCommand } from './arm/arm-override';
 import { ArmControlMode } from './arm/arm-control-mode';
 import { DriverControlMode } from './drive/drive-control-mode';
@@ -15,6 +16,7 @@ const STRING_MESSAGE_TYPE = 'std_msgs/String';
 @Service()
 export class ControlCommandPublisher {
   private readonly rosConnection = inject(RosConnection);
+  private readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
 
   private driveTopic: Topic | null = null;
   private armTopic: Topic | null = null;
@@ -32,7 +34,7 @@ export class ControlCommandPublisher {
   }
 
   publishDriveMode(mode: DriverControlMode): boolean {
-    if (!this.rosConnection.isConnected()) return false;
+    if (!this.heartbeatMonitor.roverAvailable()) return false;
 
     const topic = this.getTopic('drive');
     if (!topic) return false;
@@ -42,7 +44,7 @@ export class ControlCommandPublisher {
   }
 
   publishArmMode(mode: ArmControlMode): boolean {
-    if (!this.rosConnection.isConnected()) return false;
+    if (!this.heartbeatMonitor.roverAvailable()) return false;
 
     const topic = this.getTopic('arm');
     if (!topic) return false;
@@ -60,7 +62,7 @@ export class ControlCommandPublisher {
   }
 
   private publishArmOverrideCommand(command: ArmOverrideCommand): boolean {
-    if (!this.rosConnection.isConnected()) return false;
+    if (!this.heartbeatMonitor.roverAvailable()) return false;
 
     const topic = this.getTopic('armOverride');
     if (!topic) return false;

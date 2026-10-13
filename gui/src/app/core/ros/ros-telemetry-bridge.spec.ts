@@ -5,6 +5,7 @@ import { ArmTelemetryService } from '../arm/telemetry/arm-telemetry.service';
 import { ArmOverrideCommand, ArmOverrideState } from '../control/arm/arm-override';
 import { ArmMode, DriveMode, FmaStateService, LawMode } from '../fma/fma-state.service';
 import { RosConnection } from './ros-connection';
+import { RosHeartbeatMonitor } from './ros-heartbeat-monitor';
 import { RosTelemetryBridge } from './ros-telemetry-bridge';
 
 describe('RosTelemetryBridge', () => {
@@ -17,9 +18,12 @@ describe('RosTelemetryBridge', () => {
         {
           provide: RosConnection,
           useValue: {
-            isConnected: connected.asReadonly(),
             client: client.asReadonly(),
           },
+        },
+        {
+          provide: RosHeartbeatMonitor,
+          useValue: { roverAvailable: connected.asReadonly() },
         },
         ArmTelemetryService,
       ],

@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { WritableSignal, signal } from '@angular/core';
 
 import { GamepadInput, GamepadSnapshot } from '../../gamepad/gamepad-input';
-import { RosConnection } from '../../ros/ros-connection';
+import { RosHeartbeatMonitor } from '../../ros/ros-heartbeat-monitor';
 import { ControlModeService } from '../control-mode';
 import { GimbalPriorityCommandPublisher } from '../gimbal-priority-command-publisher';
 import { DriveCommandPublisher } from './drive-command-publisher';
@@ -28,10 +28,8 @@ describe('DriverControl', () => {
     TestBed.configureTestingModule({
       providers: [
         {
-          provide: RosConnection,
-          useValue: {
-            isConnected: rosConnected.asReadonly(),
-          },
+          provide: RosHeartbeatMonitor,
+          useValue: { roverAvailable: rosConnected.asReadonly() },
         },
         {
           provide: GamepadInput,

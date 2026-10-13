@@ -11,6 +11,7 @@ import { GamepadInput } from '../../../../../core/gamepad/gamepad-input';
 import { CameraFeedControl } from '../../../../../features/cameras/camera-feed-control';
 import { DriveMode, FmaStateService } from '../../../../../core/fma/fma-state.service';
 import { RosConnection } from '../../../../../core/ros/ros-connection';
+import { RosHeartbeatMonitor } from '../../../../../core/ros/ros-heartbeat-monitor';
 import { ConnectionManager } from '../../../../../features/connection/connection-manager/connection-manager';
 import { ActionButton, ActionButtonTone } from '../../../../../shared/action-button/action-button';
 import {
@@ -49,13 +50,14 @@ export class DriverMasterPage {
   private readonly fmaState = inject(FmaStateService);
   private readonly gamepad = inject(GamepadInput);
   private readonly rosConnection = inject(RosConnection);
+  private readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
   private readonly cameraFeedControl = inject(CameraFeedControl);
   private readonly dialog = inject(MatDialog);
   private driveModeSynchronized = false;
 
   private readonly modeHandshakeEffect = effect(() => {
     const client = this.rosConnection.client();
-    const connected = this.rosConnection.isConnected();
+    const connected = this.heartbeatMonitor.roverAvailable();
     const hasFmaTelemetry = this.fmaState.hasFmaTelemetry();
 
     untracked(() => {
@@ -81,7 +83,7 @@ export class DriverMasterPage {
   ];
   readonly masterDriveTone: ControlSwitchTone = 'normal';
   readonly readinessError = this.driverControl.readinessError;
-  readonly rosConnected = this.rosConnection.isConnected;
+  readonly rosConnected = this.heartbeatMonitor.roverAvailable;
   readonly gamepadConnected = this.gamepad.connected;
   readonly cameraFeedEnabled = this.cameraFeedControl.enabled;
   readonly gamepadStatusLabel = computed(() =>
@@ -94,7 +96,7 @@ export class DriverMasterPage {
     this.gamepadConnected() ? 'normal' : 'neutral',
   );
   readonly rosActionLabel = computed(() => {
-    switch (this.rosConnection.status()) {
+    switch (this.heartbeatMonitor.roverStatus()) {
       case 'connecting':
         return 'Connecting';
       case 'waiting-for-rover':
@@ -110,7 +112,7 @@ export class DriverMasterPage {
     }
   });
   readonly rosActionTone = computed<ActionButtonTone>(() => {
-    switch (this.rosConnection.status()) {
+    switch (this.heartbeatMonitor.roverStatus()) {
       case 'connected':
         return 'normal';
       case 'error':
@@ -122,9 +124,9 @@ export class DriverMasterPage {
         return 'info';
     }
   });
-  readonly rosActionBusy = computed(() => this.rosConnection.isConnecting());
+  readonly rosActionBusy = computed(() => this.heartbeatMonitor.isRoverConnecting());
   readonly rosFlowTone = computed<ControlFlowConnectorTone>(() => {
-    switch (this.rosConnection.status()) {
+    switch (this.heartbeatMonitor.roverStatus()) {
       case 'connected':
         return 'normal';
       case 'error':

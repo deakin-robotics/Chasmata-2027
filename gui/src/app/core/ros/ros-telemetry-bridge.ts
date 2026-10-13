@@ -13,6 +13,7 @@ import {
   GimbalPriorityOwner,
 } from '../fma/fma-state.service';
 import { RosConnection } from './ros-connection';
+import { RosHeartbeatMonitor } from './ros-heartbeat-monitor';
 
 const FMA_STATE_TOPIC = '/fma/state';
 const JOINT_STATE_TOPIC = '/arm/joint_states';
@@ -46,6 +47,7 @@ interface FmaTelemetryMessage {
 @Service()
 export class RosTelemetryBridge {
   private readonly rosConnection = inject(RosConnection);
+  private readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
   private readonly fmaState = inject(FmaStateService);
   private readonly armTelemetry = inject(ArmTelemetryService);
 
@@ -55,9 +57,9 @@ export class RosTelemetryBridge {
 
   private readonly connectionEffect = effect(() => {
     const client = this.rosConnection.client();
-    const connected = this.rosConnection.isConnected();
+    const roverAvailable = this.heartbeatMonitor.roverAvailable();
 
-    untracked(() => this.updateSubscriptions(connected ? client : null));
+    untracked(() => this.updateSubscriptions(roverAvailable ? client : null));
   });
 
   private updateSubscriptions(client: Ros | null): void {

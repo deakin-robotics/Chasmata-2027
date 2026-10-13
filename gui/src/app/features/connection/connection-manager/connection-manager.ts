@@ -6,10 +6,11 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatDialogRef } from '@angular/material/dialog';
+import { RosConnection } from '../../../core/ros/ros-connection';
 import {
-  RosConnection,
-  RosConnectionStatus,
-} from '../../../core/ros/ros-connection';
+  RosHeartbeatMonitor,
+  RoverConnectionStatus,
+} from '../../../core/ros/ros-heartbeat-monitor';
 import { environment } from '../../../../environments/environment';
 
 @Component({
@@ -27,6 +28,7 @@ import { environment } from '../../../../environments/environment';
 })
 export class ConnectionManager {
   readonly rosConnection = inject(RosConnection);
+  readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
   private readonly dialogRef = inject(MatDialogRef<ConnectionManager>, { optional: true });
 
   readonly endpoint = new FormControl(this.rosConnection.url() ?? environment.rosbridgeUrl, {
@@ -41,21 +43,20 @@ export class ConnectionManager {
     return (
       status === 'connected' ||
       status === 'connecting' ||
-      status === 'waiting-for-rover' ||
       status === 'reconnecting'
     );
   });
 
   readonly statusLabel = computed(() =>
-    this.getStatusLabel(this.rosConnection.status()),
+    this.getStatusLabel(this.heartbeatMonitor.roverStatus()),
   );
 
   readonly statusIcon = computed(() =>
-    this.getStatusIcon(this.rosConnection.status()),
+    this.getStatusIcon(this.heartbeatMonitor.roverStatus()),
   );
 
   readonly statusDescription = computed(() => {
-    const status = this.rosConnection.status();
+    const status = this.heartbeatMonitor.roverStatus();
     const attempt = this.rosConnection.reconnectAttempt();
 
     switch (status) {
@@ -78,7 +79,7 @@ export class ConnectionManager {
 
   connect(): void {
     this.endpoint.markAsTouched();
-    if (this.endpoint.invalid || this.rosConnection.isConnecting()) return;
+    if (this.endpoint.invalid || this.heartbeatMonitor.isRoverConnecting()) return;
 
     this.rosConnection.connect(this.endpoint.value);
     this.dialogRef?.close();
@@ -88,7 +89,7 @@ export class ConnectionManager {
     this.rosConnection.disconnect();
   }
 
-  private getStatusLabel(status: RosConnectionStatus): string {
+  private getStatusLabel(status: RoverConnectionStatus): string {
     switch (status) {
       case 'connecting':
         return 'Connecting';
@@ -105,7 +106,7 @@ export class ConnectionManager {
     }
   }
 
-  private getStatusIcon(status: RosConnectionStatus): string {
+  private getStatusIcon(status: RoverConnectionStatus): string {
     switch (status) {
       case 'connecting':
       case 'waiting-for-rover':

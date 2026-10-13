@@ -7,6 +7,7 @@ import { ControlModeCoordinator } from './control-mode-coordinator';
 import { DriverControlModeService } from './drive/drive-control-mode';
 import { ArmMode, DriveMode, FmaColumn, FmaStateService } from '../fma/fma-state.service';
 import { RosConnection } from '../ros/ros-connection';
+import { RosHeartbeatMonitor } from '../ros/ros-heartbeat-monitor';
 
 describe('ControlModeCoordinator', () => {
   let connected: ReturnType<typeof signal<boolean>>;
@@ -24,9 +25,12 @@ describe('ControlModeCoordinator', () => {
         {
           provide: RosConnection,
           useValue: {
-            isConnected: connected.asReadonly(),
             client: client.asReadonly(),
           },
+        },
+        {
+          provide: RosHeartbeatMonitor,
+          useValue: { roverAvailable: connected.asReadonly() },
         },
         {
           provide: ControlCommandPublisher,

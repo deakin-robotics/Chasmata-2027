@@ -1,7 +1,7 @@
 <mat-card
   class="connection-card"
   appearance="outlined"
-  [attr.data-status]="rosConnection.status()"
+  [attr.data-status]="heartbeatMonitor.roverStatus()"
 >
   <mat-card-header>
     <div class="header-content">
@@ -13,7 +13,7 @@
       <div class="status" role="status" aria-live="polite">
         <mat-icon
           aria-hidden="true"
-          [class.spinning]="rosConnection.isConnecting()"
+          [class.spinning]="heartbeatMonitor.isRoverConnecting()"
         >{{ statusIcon() }}</mat-icon>
         <span>{{ statusLabel() }}</span>
       </div>
@@ -44,7 +44,7 @@
 
       <div class="actions">
         @if (canDisconnect()) {
-          @if (rosConnection.status() === 'reconnecting') {
+          @if (heartbeatMonitor.roverStatus() === 'reconnecting') {
             <button matButton="outlined" type="button" (click)="disconnect()">
               <mat-icon aria-hidden="true">cancel</mat-icon>
               Stop reconnecting
