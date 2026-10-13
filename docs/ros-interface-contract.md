@@ -49,7 +49,7 @@ purpose: Tells a client whether the example node is ready or busy.
 ```yaml
 topic: /rover/heartbeat
 type: std_msgs/msg/Empty
-publisher: Rover Control (mock now, real rover later)
+publisher: Rover Control
 subscriber: GUI
 contract: {}
 behavior:
@@ -58,7 +58,7 @@ behavior:
   qos: {reliability: reliable, durability: volatile, depth: 1}
   gui_ready_on_first_message: true
   gui_timeout_seconds: 3
-purpose: Tells the GUI that the rover-side ROS interfaces are running.
+purpose: Provides a periodic signal that subscribers use to detect whether Rover Control is reachable.
 ```
 
 Example message:
@@ -67,8 +67,34 @@ Example message:
 {}
 ```
 
-This heartbeat covers the rover-side node, not the entire base-station stack.
-The real rover must publish it before the GUI can mark the rover ready.
+The rover publishes this heartbeat so subscribers can detect whether Rover
+Control remains reachable through ROS. If the messages stop, subscribers can
+treat Rover Control as unavailable independently of base-station connectivity.
+
+### Base-station heartbeat
+
+```yaml
+topic: /basestation/heartbeat
+type: std_msgs/msg/Empty
+publisher: Base-station arm MoveIt bridge
+contract: {}
+behavior:
+  publish_on_bridge_startup: true
+  publish_rate_hz: 1
+  qos: {reliability: reliable, durability: volatile, depth: 1}
+purpose: Provides a periodic signal that subscribers use to detect whether the base-station arm bridge is reachable.
+```
+
+Example message:
+
+```yaml
+{}
+```
+
+The base station publishes this heartbeat so subscribers can detect whether
+the arm MoveIt bridge remains reachable through ROS. If the messages stop,
+subscribers can treat the bridge as unavailable independently of rover
+connectivity.
 
 ### Driver input
 
