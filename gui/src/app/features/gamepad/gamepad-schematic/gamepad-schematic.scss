@@ -5,34 +5,6 @@
   position: relative;
 }
 
-.command-link {
-  position: absolute;
-  top: -0.3rem;
-  left: 50%;
-  z-index: 1;
-  width: 1.75rem;
-  height: 1.75rem;
-  fill: none;
-  stroke: var(--dcr-color-neutral);
-  stroke-linecap: round;
-  stroke-width: 1.8;
-  transform: translateX(-50%);
-}
-
-.command-link.active {
-  stroke: var(--dcr-color-info);
-}
-
-.command-link circle {
-  fill: currentColor;
-  stroke: none;
-  color: var(--dcr-color-neutral);
-}
-
-.command-link.active circle {
-  color: var(--dcr-color-info);
-}
-
 .controller {
   display: block;
   width: 100%;
@@ -46,6 +18,39 @@
   stroke: var(--dcr-color-neutral);
   stroke-linejoin: round;
   stroke-width: 2.5;
+}
+
+.shoulder-buttons .shoulder,
+.triggers .trigger-track {
+  fill: var(--dcr-color-background);
+  stroke: var(--dcr-color-neutral);
+  stroke-width: 1.5;
+}
+
+.shoulder-buttons .shoulder.active {
+  fill: var(--dcr-color-info);
+  stroke: var(--dcr-color-text);
+}
+
+.shoulder-buttons text {
+  fill: var(--dcr-color-text);
+  font-size: 8px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.triggers .trigger-label {
+  fill: var(--dcr-color-text);
+  font-size: 8px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+.triggers .trigger-fill {
+  fill: var(--dcr-color-info);
+  stroke: none;
+  transition: y 50ms linear, height 50ms linear;
 }
 
 .d-pad rect {

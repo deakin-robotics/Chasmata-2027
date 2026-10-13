@@ -1,5 +1,6 @@
 :host {
   display: block;
+  padding-top: 0.15rem;
 }
 
 .status-indicator {
@@ -35,8 +36,18 @@
   background: currentColor;
 }
 
-.tone-info { color: var(--dcr-color-info); }
-.tone-normal { color: var(--dcr-color-normal); }
-.tone-caution { color: var(--dcr-color-caution); }
-.tone-critical { color: var(--dcr-color-critical); }
-.tone-neutral { color: var(--dcr-color-neutral); }
+.tone-info {
+  color: var(--dcr-color-info);
+}
+.tone-normal {
+  color: var(--dcr-color-normal);
+}
+.tone-caution {
+  color: var(--dcr-color-caution);
+}
+.tone-critical {
+  color: var(--dcr-color-critical);
+}
+.tone-neutral {
+  color: var(--dcr-color-neutral);
+}

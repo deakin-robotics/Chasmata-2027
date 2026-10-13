@@ -3,7 +3,6 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ControlSwitch } from './control-switch';
 
 describe('ControlSwitch', () => {
-  let component: ControlSwitch;
   let fixture: ComponentFixture<ControlSwitch>;
 
   beforeEach(async () => {
@@ -13,12 +12,7 @@ describe('ControlSwitch', () => {
 
     fixture = TestBed.createComponent(ControlSwitch);
     fixture.componentRef.setInput('label', 'Master Drive');
-    component = fixture.componentInstance;
     fixture.detectChanges();
-  });
-
-  it('should create', () => {
-    expect(component).toBeTruthy();
   });
 
   it('should display its label', () => {

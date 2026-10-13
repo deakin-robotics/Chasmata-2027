@@ -7,8 +7,8 @@ import {
   ControlConfirmationDialog,
   ControlConfirmationDialogData,
 } from '../../shared/confirmation-dialog/control-confirmation-dialog';
-import { ArmControl } from './arm/arm-control';
-import { PilotDriveControl } from './pilot/pilot-drive-control';
+import { ArmControlModeService } from './arm/arm-control-mode';
+import { DriverControl } from './drive/driver-control';
 
 function openConfirmation(data: ControlConfirmationDialogData) {
   return inject(MatDialog)
@@ -20,17 +20,17 @@ function openConfirmation(data: ControlConfirmationDialogData) {
     .afterClosed();
 }
 
-/** Requires explicit confirmation before opening the Pilot workspace. */
-export const pilotControlGuard: CanActivateFn = () => {
+/** Requires explicit confirmation before opening the Driver workspace. */
+export const driverControlGuard: CanActivateFn = () => {
   return openConfirmation({
-    title: 'Enter Pilot Station?',
+    title: 'Enter Driver Station?',
     confirmLabel: 'Enter',
   }).pipe(map((confirmed) => confirmed === true));
 };
 
-/** Stops drivetrain output whenever the Pilot control workspace is left. */
-export const pilotControlExitGuard: CanDeactivateFn<unknown> = () => {
-  inject(PilotDriveControl).disable();
+/** Stops drivetrain output whenever the Driver control workspace is left. */
+export const driverControlExitGuard: CanDeactivateFn<unknown> = () => {
+  inject(DriverControl).disable();
   return true;
 };
 
@@ -44,6 +44,6 @@ export const armControlGuard: CanActivateFn = () => {
 
 /** Stops Arm output whenever the Arm control workspace is left. */
 export const armControlExitGuard: CanDeactivateFn<unknown> = () => {
-  inject(ArmControl).disable();
+  inject(ArmControlModeService).disable();
   return true;
 };

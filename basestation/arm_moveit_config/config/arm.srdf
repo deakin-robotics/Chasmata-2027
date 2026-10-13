@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<robot name="robot_arm">
+  <group name="arm">
+    <chain base_link="base_link" tip_link="ee_link" />
+  </group>
+
+  <group name="position_arm">
+    <chain base_link="base_link" tip_link="j4_pivot_link" />
+  </group>
+
+  <group_state name="home" group="arm">
+    <joint name="base_joint" value="0" />
+    <joint name="shoulder_joint" value="0" />
+    <joint name="elbow_joint" value="0" />
+    <joint name="yaw_joint" value="0" />
+    <joint name="pitch_joint" value="0" />
+    <joint name="roll_joint" value="0" />
+  </group_state>
+
+  <virtual_joint
+    name="world_joint"
+    type="fixed"
+    parent_frame="world"
+    child_link="base_link" />
+</robot>

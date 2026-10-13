@@ -28,11 +28,13 @@ The mission-control interface is inspired by the Airbus glass cockpit philosophy
 ## 📚 Documentation
 
 - [Colour palette](docs/color-palette.md) — the UI colour system and operational status semantics.
-- [Operator layouts](docs/operator-layouts.md) — the Pilot and Arm dashboard layouts and responsibilities.
+- [Operator layouts](docs/operator-layouts.md) — the Driver and Arm dashboard layouts and responsibilities.
 - [Functional Mode Annunciator](docs/fma.md) — confirmed DRIVE, ARM, LAW, SYSTEM, and LINK states.
 - [Electronic Centralized Advisory Monitor (ECAM) and System Display (SD)](docs/ecam-and-system-display.md) — alert behaviour, operator procedures, shared alert architecture, and subsystem display pages.
 - [ECAM Code Dictionary](docs/ecam-code-dictionary.md) — stable alert codes, severities, display text, and meanings.
 - [Telemetry requirements](docs/telemetry-requirements.md) — FMA, ECAM, and System Display (SD) telemetry, update rates, and recovery behaviour.
+- [Arm inverse kinematics](docs/arm-ik.md) — URDF model, browser-side IK solver, and the future joint-angle command handoff.
+- [Mock rover](../test/mock_rover/README.md) — ROS 2 feedback simulator for GUI integration testing.
 
 ## 🖥️ Current Angular implementation
 
@@ -40,9 +42,9 @@ The mission-control interface is inspired by the Airbus glass cockpit philosophy
 
 ![Current rover FMA](assets/fma.png)
 
-### Pilot dashboard
+### Driver dashboard
 
-![Pilot dashboard](assets/pilot.png)
+![Driver dashboard](assets/driver.png)
 
 ### Arm operator dashboard
 
@@ -54,21 +56,21 @@ The mission-control interface is inspired by the Airbus glass cockpit philosophy
 
 ## 🧭 System overview
 
-```text
-Gamepad API ───────────────┐
-                          │
-Angular mission control ──┼── JSON/WebSocket ── ROSbridge :9090 ── ROS 2 nodes
-                          │
-Camera <img> elements ────┴── HTTP/MJPEG ────── Camera stream servers
+```mermaid
+flowchart LR
+    gamepad[Gamepad API] --> gui[Angular mission control]
+    gui -->|JSON/WebSocket| rosbridge[ROSbridge :9090]
+    rosbridge --> ros[ROS 2 nodes]
+    camera[Camera img elements] -->|HTTP/MJPEG| streams[Camera stream servers]
 ```
 
 The GUI communicates directly with the rover on its private operator network:
 
 - Controls and telemetry use ROSLIB through ROSbridge.
 - Camera video uses separate HTTP MJPEG streams.
-- Pilot drive publishes `sensor_msgs/Joy` on `/joy`.
+- Driver control publishes `sensor_msgs/Joy` on `/joy`.
 - Arm control publishes remapped `sensor_msgs/Joy` on `/arm/joy`.
-- Pilot and Arm Operator GUIs may both view and control the shared Gimbal camera.
+- Driver and Arm Operator GUIs may both view and control the shared Gimbal camera.
   Gimbal ownership is requested through the controller's **GIMBAL PRIORITY**
   button and confirmed authoritatively by the rover.
 - The physical rover, radio link, controller, and safety behaviour must be tested before the Angular GUI replaces the existing interface.
@@ -134,7 +136,7 @@ The application uses a lightweight feature-based structure:
 ```text
 src/app/
 ├── core/
-│   ├── control/                 # Global control mode plus Pilot and Arm publishers
+│   ├── control/                 # Global control mode plus Driver and Arm publishers
 │   ├── ecam/                    # Application-wide ECAM alert state and messages
 │   ├── fma/                     # Functional Mode Annunciator state
 │   ├── gamepad/                 # Browser gamepad polling and mapping
@@ -151,7 +153,7 @@ src/app/
 ├── layout/
 │   ├── ecam-panel/              # ECAM alert and System Display panels
 │   ├── mission-control/         # Shared shell, navigation, header, and FMA
-│   ├── pilot/                   # Pilot dashboard and panel arrangement
+│   ├── driver/                  # Driver dashboard and panel arrangement
 │   └── arm/                     # Arm dashboard and panel arrangement
 │
 └── shared/
@@ -171,54 +173,6 @@ src/app/
 - Operator dashboards own their own viewport layout; `MissionControl` remains a shell.
 - Components should not create independent ROS connections.
 - ROS and gamepad logic should remain outside presentation-only components.
-
-## 🛡️ Control safety principles
-
-The combined dashboard must have explicit control modes:
-
-```text
-DISCONNECTED
-     ↓
-SAFE / IDLE
-     ├── DRIVE → publish only drivetrain commands
-     └── ARM   → publish only arm commands
-```
-
-- Drive and Arm commands must not be active simultaneously from the same controller.
-- Switching modes must stop the previously active subsystem first.
-- Gamepad, ROS, or radio disconnection must result in a safe stop.
-- Movement-command behaviour must be validated on the physical rover.
-
-## 📷 Camera reliability requirement
-
-Camera feeds must recover from temporary radio or stream interruptions without requiring a page refresh. The camera feature should provide:
-
-- Automatic reconnection with bounded retry delays
-- Clear loading, disconnected, and reconnecting states
-- A manual retry action
-- Configurable camera endpoints
-- Cleanup of retry activity when a component is destroyed
-
-The team is also evaluating uStreamer as a maintained alternative to the existing `mjpg-streamer` setup for UVC cameras.
-
-The Gimbal camera is shared between the Pilot and Arm Operator stations. Each
-station can request priority with its mapped **GIMBAL PRIORITY** controller
-button. The rover owns the confirmed owner, validates every Gimbal movement
-command, and broadcasts the current owner to all GUI instances. The GUI must
-show `GIMBAL PRIORITY UNKNOWN` when owner telemetry is stale or unavailable.
-
-## 🔄 Migration plan
-
-1. Connect to ROSbridge and display connection state.
-2. Display one resilient MJPEG camera stream.
-3. Subscribe to one harmless telemetry topic.
-4. Publish one harmless test message.
-5. Detect and display gamepad input without issuing motor commands.
-6. Port motor telemetry and existing operator controls.
-7. Implement centralized and mutually exclusive Drive/Arm modes.
-8. Reach feature parity with the existing Next.js GUI.
-9. Validate the replacement with the real controller, radio, cameras, and rover.
-10. Add new capabilities only after the port is stable.
 
 ## 🛠️ Development commands
 

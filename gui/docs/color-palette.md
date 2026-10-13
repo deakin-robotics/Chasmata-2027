@@ -44,4 +44,4 @@ For example, a static `FRONT CAMERA` label remains neutral, while `CONNECTING`, 
 - Tooltips can provide detail, but critical conditions must remain visible without hover interaction.
 - Keep normal screens low contrast and reserve saturated colours for meaningful state changes.
 
-See [operator-layouts.md](operator-layouts.md) for the Pilot and Arm operator arrangements.
+See [operator-layouts.md](operator-layouts.md) for the Driver and Arm operator arrangements.

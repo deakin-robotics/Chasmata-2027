@@ -1,0 +1,13 @@
+<div class="two-step-action-button">
+  <span class="two-step-action-button-label">{{ label() }}</span>
+  <button
+    type="button"
+    [disabled]="disabled()"
+    [attr.aria-label]="label()"
+    [attr.aria-pressed]="isActive()"
+    [attr.data-state]="state()"
+    (click)="handleClick()"
+  >
+    {{ actionLabel() }}
+  </button>
+</div>

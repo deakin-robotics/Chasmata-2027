@@ -1,0 +1,83 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+.control-panel-shell {
+  display: grid;
+  align-content: start;
+  grid-template-areas:
+    'header header header header'
+    'content content content content';
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  column-gap: 0.5rem;
+  row-gap: 0.6rem;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 4rem;
+  padding: 0.75rem;
+  border: 1px solid var(--dcr-color-border);
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--dcr-color-surface-raised) 92%, transparent);
+}
+
+.control-page-tabs {
+  --tab-count: 1;
+  --active-index: 0;
+  --tab-width: 4rem;
+
+  position: relative;
+  grid-area: header;
+  display: grid;
+  grid-template-columns: repeat(var(--tab-count), minmax(0, var(--tab-width)));
+  justify-self: center;
+  width: min(100%, calc(var(--tab-count) * var(--tab-width)));
+  border-bottom: 1px solid var(--dcr-color-border);
+}
+
+.control-page-tabs::after {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: min(var(--tab-width), calc(100% / var(--tab-count)));
+  height: 2px;
+  background: var(--dcr-color-normal);
+  content: '';
+  pointer-events: none;
+  transform: translateX(calc(var(--active-index) * 100%));
+  transition: transform 180ms ease-out;
+}
+
+.tab-button {
+  border: 0;
+  padding: 0.25rem 0.4rem 0.4rem;
+  background: transparent;
+  color: var(--dcr-color-neutral);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tab-button.active-tab {
+  color: var(--dcr-color-normal);
+}
+
+.control-panel-content {
+  grid-area: content;
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.control-panel-content > * {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}

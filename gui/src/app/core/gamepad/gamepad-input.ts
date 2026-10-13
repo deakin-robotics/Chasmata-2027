@@ -76,7 +76,7 @@ export class GamepadInput {
     this.nameState.set(gamepad.id);
     this.snapshotState.set({
       axes: gamepad.axes.map((axis) => this.applyDeadzone(axis)),
-      buttons: gamepad.buttons.map((button) => (button.pressed ? 1 : 0)),
+      buttons: gamepad.buttons.map((button) => button.value),
     });
   };
 

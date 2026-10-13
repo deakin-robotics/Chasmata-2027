@@ -3,7 +3,6 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ArmControlPanel } from './arm-control-panel';
 
 describe('ArmControlPanel', () => {
-  let component: ArmControlPanel;
   let fixture: ComponentFixture<ArmControlPanel>;
 
   beforeEach(async () => {
@@ -12,15 +11,20 @@ describe('ArmControlPanel', () => {
     }).compileComponents();
 
     fixture = TestBed.createComponent(ArmControlPanel);
-    component = fixture.componentInstance;
     fixture.detectChanges();
   });
 
-  it('should create', () => {
-    expect(component).toBeTruthy();
+  it('should render the Master page by default', () => {
+    expect(fixture.nativeElement.textContent).toContain('Master Drive');
+    expect(fixture.nativeElement.querySelector('app-arm-master-page')).toBeTruthy();
   });
 
-  it('should render the control panel placeholder', () => {
-    expect(fixture.nativeElement.textContent).toContain('Master Drive');
+  it('should render the Master tab', () => {
+    const tabElements = fixture.nativeElement.querySelectorAll(
+      '.tab-button',
+    ) as NodeListOf<HTMLElement>;
+    const tabs = Array.from(tabElements).map((tab) => tab.textContent.trim());
+
+    expect(tabs).toEqual(['Master']);
   });
 });

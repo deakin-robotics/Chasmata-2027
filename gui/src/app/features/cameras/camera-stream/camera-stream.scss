@@ -29,6 +29,10 @@
   &[data-status='error'] {
     --status-color: #e05b65;
   }
+
+  &[data-status='unavailable'] {
+    --status-color: #e05b65;
+  }
 }
 
 .stream-header {

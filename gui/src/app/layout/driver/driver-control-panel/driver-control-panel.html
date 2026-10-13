@@ -1,0 +1,5 @@
+<app-control-panel-shell label="Driver control panel" [tabs]="tabs" [(activeTab)]="activeTab">
+  @if (activeTab() === 'master') {
+    <app-driver-master-page />
+  }
+</app-control-panel-shell>

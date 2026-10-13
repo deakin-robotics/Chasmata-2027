@@ -19,7 +19,7 @@ button {
   gap: 0.35rem;
   min-width: 5rem;
   min-height: 1.75rem;
-  padding: 0.25rem 0.6rem;
+  padding: 0.15rem 0.45rem;
   border: 1px solid currentColor;
   border-radius: 0.25rem;
   background: color-mix(in srgb, currentColor 14%, transparent);
@@ -41,11 +41,21 @@ button:disabled {
   opacity: 0.55;
 }
 
-.tone-info { color: var(--dcr-color-info); }
-.tone-normal { color: var(--dcr-color-normal); }
-.tone-caution { color: var(--dcr-color-caution); }
-.tone-critical { color: var(--dcr-color-critical); }
-.tone-neutral { color: var(--dcr-color-neutral); }
+.tone-info {
+  color: var(--dcr-color-info);
+}
+.tone-normal {
+  color: var(--dcr-color-normal);
+}
+.tone-caution {
+  color: var(--dcr-color-caution);
+}
+.tone-critical {
+  color: var(--dcr-color-critical);
+}
+.tone-neutral {
+  color: var(--dcr-color-neutral);
+}
 
 .busy-indicator {
   width: 0.65rem;
@@ -57,5 +67,7 @@ button:disabled {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
