@@ -58,6 +58,7 @@ export class ArmMasterPage {
   private readonly cameraFeedControl = inject(CameraFeedControl);
   private readonly dialog = inject(MatDialog);
   private armModeSynchronized = false;
+  private baseStationWasAvailable = false;
 
   private readonly modeHandshakeEffect = effect(() => {
     const client = this.rosConnection.client();
@@ -79,6 +80,18 @@ export class ArmMasterPage {
     });
   });
 
+  private readonly baseStationHeartbeatEffect = effect(() => {
+    const available = this.heartbeatMonitor.baseStationAvailable();
+
+    untracked(() => {
+      if (this.baseStationWasAvailable && !available) {
+        this.selectArmMode(ArmMode.Manual);
+      }
+
+      this.baseStationWasAvailable = available;
+    });
+  });
+
   readonly masterDriveEnabled = this.armControlMode.enabled;
   readonly armMode = this.armControlMode.mode;
   readonly armModeOptions: readonly ControlModeOption[] = [
@@ -88,6 +101,7 @@ export class ArmMasterPage {
   readonly masterDriveTone: ControlSwitchTone = 'normal';
   readonly readinessError = this.armControlMode.readinessError;
   readonly rosConnected = this.heartbeatMonitor.roverAvailable;
+  readonly baseStationAvailable = this.heartbeatMonitor.baseStationAvailable;
   readonly gamepadConnected = this.gamepad.connected;
   readonly cameraFeedEnabled = this.cameraFeedControl.enabled;
   readonly gamepadStatusLabel = computed(() =>
