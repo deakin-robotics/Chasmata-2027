@@ -1,142 +1,73 @@
-# MoveIt 2 base station arm planning stack
+# Base station
 
-This folder contains the MoveIt 2 base station stack for the current six-joint arm.
-It runs MoveIt 2 in a base-station-style container and sends either partial or
-complete, time-parameterized planned trajectories to the mock rover through
-the standard `FollowJointTrajectory` action.
+The base station provides two independent services for rover operators:
+
+- MoveIt 2 planning for Arm Position/IK mode.
+- MediaMTX camera playback for Driver and Arm browsers.
+
+It does not run the rover, ROSbridge, or the GUI. The rover and base-station
+stacks can be started independently.
 
 ## Start
 
-From this directory:
+For local Windows development, enable Docker Desktop host networking in
+`Settings > Resources > Network > Enable host networking` (Docker Desktop 4.34
+or newer). Create the shared local camera network once:
 
 ```bash
-docker compose up --build
+docker network create chasmata-local-media
 ```
 
-The stack starts:
-
-- an isolated mock rover and ROSbridge on `ws://localhost:19090`;
-- a headless MoveIt 2 `move_group` node with the `position_arm` and `arm`
-  planning groups;
-- an `arm_moveit_bridge` node that owns MoveIt2 planning and rover action
-  execution;
-- an identity `world` to `base_link` transform and robot state publisher.
-
-If the GUI should connect to this isolated rover, use `localhost:19090` as its
-ROSbridge endpoint. The port defaults can be overridden with
-`MOVEIT2_ROSBRIDGE_PORT`, `MOVEIT2_FRONT_CAMERA_PORT`,
-`MOVEIT2_GIMBAL_CAMERA_PORT`, and `MOVEIT2_ARM_CAMERA_PORT`.
-
-The MoveIt container stays running after launch. In another terminal, run the
-planning demo:
+Then start this stack and the mock-rover stack in either order:
 
 ```bash
-docker compose exec moveit2 bash -lc \
-  'source /opt/ros/jazzy/setup.bash && \
-   source /workspace/install/setup.bash && \
-   ros2 run arm_moveit_demo plan_and_execute'
+docker compose -f docker-compose.local.yml up --build
 ```
 
-The GUI path is:
-
-```text
-GUI target pose
-  -> /arm/target_pose
-  -> arm_moveit_bridge
-  -> MoveIt2 global planning + time parameterization
-  -> /arm_controller/follow_joint_trajectory (J1-J3 or J1-J6)
-  -> mock/real rover controller
-  -> /joint_states
-  -> GUI model viewer
-```
-
-`/arm/target_pose` uses `base_link` coordinates. Its position is the target for
-`j4_pivot_link`, and its orientation is the desired `ee_link` orientation.
-`/arm/orientation_lock` selects the execution path:
-
-- `false` (UNLOCKED): position-only planning in the `position_arm` group generates a partial J1-J3
-  trajectory; J4-J6 remain under `/arm/joy`.
-- `true` (LOCKED): the full `arm` group generates a complete J1-J6 trajectory
-  while constraining `ee_link` to the requested orientation.
-
-While LOCKED, the GUI ignores joystick and trigger wrist input. The captured
-EE orientation remains fixed until the operator unlocks, adjusts the wrist,
-and locks again; digital button commands remain available.
-
-For LOCKED requests, the bridge first solves the proximal `position_arm` group
-and then uses that result as the J1-J3 goal for the full `arm` plan. This keeps
-the J4-pivot and EE orientation requirements compatible with the configured
-kinematics solver.
-
-Both paths use smooth joint-space planning. Collision checking is disabled for
-this first path; joint limits and rover-side safety checks remain active.
-
-Moving the target while a trajectory is active cancels the current action and
-causes the bridge to plan from the latest rover state. The GUI never schedules
-trajectory points or publishes trajectory points. The browser-side FK model is
-used for display only; MoveIt2 is the only Position mode solver.
-
-To plan without execution:
+For the production-shaped stack, configure the static LAN addresses:
 
 ```bash
-docker compose exec moveit2 bash -lc \
-  'source /opt/ros/jazzy/setup.bash && \
-   source /workspace/install/setup.bash && \
-   ros2 run arm_moveit_demo plan_and_execute --ros-args -p execute:=false'
+copy .env.example .env
+# Edit .env with the rover and base-station static LAN IPs.
+docker compose -f docker-compose.yml up --build
 ```
 
-Useful demo parameters:
+## Guides
 
-```text
-target_dx   X displacement in metres (default: 0.0)
-target_dy   Y displacement in metres (default: 0.0)
-target_dz   Z displacement in metres (default: 0.03)
-execute     Send the planned trajectory to the mock rover (default: true)
-```
+- [Arm MoveIt planning](docs/arm-moveit.md) — packages, Position/IK flow,
+  orientation modes, demos, and current safety boundary.
+- [Media gateway](docs/media-gateway.md) — rover RTSP input, browser playback,
+  ports, and MediaMTX configuration.
+- [Networking](docs/networking.md) — local mock setup, rover LAN setup, names,
+  and Command-team configuration.
 
-## Responsibility boundary
+## Operator and rover connections
+
+### Controls and arm planning
 
 ```mermaid
-flowchart TB
-    gui[GUI ArmIkCoordinator]
-    target[/arm/target_pose<br/>J4 pivot + EE orientation]
-    lock[/arm/orientation_lock<br/>Bool]
-    bridge[arm_moveit_bridge]
-    mode{Orientation mode}
-    unlocked[position_arm<br/>J1-J3 pivot goal]
-    locked[arm<br/>J1-J6 pivot goal<br/>EE orientation constraint]
-    time[MoveIt2 planning + time parameterization]
-    status[/arm/moveit/status<br/>planning/execution state]
-    action[FollowJointTrajectory<br/>/arm_controller]
-    rover[Rover controller<br/>limits + execution]
-    telemetry[/joint_states<br/>actual feedback]
-
-    gui --> target --> bridge
-    gui --> lock --> bridge
-    bridge --> mode
-    mode -->|UNLOCKED| unlocked --> time
-    mode -->|LOCKED| locked --> time
-    time --> action
-    action --> rover
-    bridge --> status
-    status --> gui
-    rover --> telemetry
-    telemetry --> gui
+flowchart LR
+    driver["Driver GUI"] <-->|"controls and telemetry\nrover.local :9090"| rover["Rover ROSbridge"]
+    arm["Arm GUI"] <-->|"controls and telemetry\nrover.local :9090"| rover
+    rover <-->|"arm planning and trajectories"| moveit["MoveIt + arm bridge\nBase-station PC"]
 ```
 
-The bridge publishes JSON status events on `/arm/moveit/status` using the
-`std_msgs/msg/String` shape:
+### Camera video
 
-```json
-{"request_id":1,"state":"EXECUTING","message":""}
+```mermaid
+flowchart LR
+    cameras["Rover cameras"] -->|"RTSP publish :8554"| roverMedia["MediaMTX\nRover PC"]
+    roverMedia -->|"RTSP media :8554\n(base gateway pulls)"| baseMedia["MediaMTX\nBase-station PC"]
+    baseMedia -->|"Primary WHEP :8889\nvideo UDP :8189"| driver["Driver GUI"]
+    baseMedia -->|"Primary WHEP :8889\nvideo UDP :8189"| arm["Arm GUI"]
+    roverMedia -->|"Fallback WHEP :8889\nvideo UDP :8189"| driver
+    roverMedia -->|"Fallback WHEP :8889\nvideo UDP :8189"| arm
+    driver -->|"Read-only status :9998"| health["Camera readiness\nBase station"]
+    arm -->|"Read-only status :9998"| health
+    health -->|"Private path check :9997"| api["MediaMTX API"]
 ```
 
-`state` is one of `PLANNING`, `EXECUTING`, `SUCCEEDED`, `CANCELED`, or
-`FAILED`. The request ID is carried in the target pose timestamp so stale
-status events cannot complete a newer GUI request.
-
-The checked-in URDF currently contains visual geometry but no collision
-geometry. This stack therefore tests joint-space planning, joint-limit-aware
-time parameterization, action execution, cancellation, and telemetry—not
-real-world obstacle avoidance. OMPL remains configured for later
-collision-aware planning mode.
+The Driver and Arm GUIs connect directly to the rover for controls and
+telemetry. Camera video normally comes through base-station MediaMTX; eligible
+tiles can switch directly to rover MediaMTX if the base gateway is unavailable.
+MoveIt handles Arm Position/IK planning.

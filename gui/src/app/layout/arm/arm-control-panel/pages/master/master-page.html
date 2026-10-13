@@ -13,6 +13,14 @@
     (pressed)="openRosConnectionSettings()"
   />
 
+  <app-control-switch
+    class="camera-feed"
+    label="Camera Link"
+    [checked]="cameraFeedEnabled()"
+    [tone]="masterDriveTone"
+    (checkedChange)="setCameraFeedEnabled($event)"
+  />
+
   <app-control-flow-connector class="gamepad-stem" variant="vertical" [tone]="gamepadFlowTone()" />
 
   <app-control-flow-connector class="gamepad-flow" variant="top-right" [tone]="gamepadFlowTone()" />

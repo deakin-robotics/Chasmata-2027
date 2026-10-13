@@ -2,10 +2,10 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { ArmControlModeService } from './arm/arm-control-mode';
-import { ControlModeCommandPublisher } from './control-mode-command-publisher';
+import { ControlCommandPublisher } from './control-command-publisher';
 import { ControlModeCoordinator } from './control-mode-coordinator';
 import { DriverControlModeService } from './drive/drive-control-mode';
-import { ArmMode, DriveMode, FmaStateService } from '../fma/fma-state.service';
+import { ArmMode, DriveMode, FmaColumn, FmaStateService } from '../fma/fma-state.service';
 import { RosConnection } from '../ros/ros-connection';
 
 describe('ControlModeCoordinator', () => {
@@ -29,7 +29,7 @@ describe('ControlModeCoordinator', () => {
           },
         },
         {
-          provide: ControlModeCommandPublisher,
+          provide: ControlCommandPublisher,
           useValue: { publishDriveMode, publishArmMode },
         },
       ],
@@ -52,8 +52,8 @@ describe('ControlModeCoordinator', () => {
     });
   });
 
-  it('creates one pending request for the local defaults when connected', () => {
-    TestBed.inject(ControlModeCoordinator);
+  it('waits for FMA telemetry before initializing a dashboard mode', () => {
+    const coordinator = TestBed.inject(ControlModeCoordinator);
     const fmaState = TestBed.inject(FmaStateService);
 
     TestBed.flushEffects();
@@ -63,18 +63,40 @@ describe('ControlModeCoordinator', () => {
     expect(getColumn(fmaState, 'DRIVE')).toEqual({
       label: 'DRIVE',
       confirmed: null,
-      commanded: DriveMode.Velocity,
+      commanded: null,
     });
     expect(getColumn(fmaState, 'ARM')).toEqual({
       label: 'ARM',
       confirmed: null,
-      commanded: ArmMode.Position,
+      commanded: null,
     });
+    expect(publishDriveMode).not.toHaveBeenCalled();
+    expect(publishArmMode).not.toHaveBeenCalled();
 
-    TestBed.flushEffects();
-
+    coordinator.synchronizeDriveModeFromRover();
+    expect(publishDriveMode).toHaveBeenCalledTimes(1);
+    expect(publishDriveMode).toHaveBeenCalledWith(DriveMode.Velocity);
     expect(getColumn(fmaState, 'DRIVE')?.commanded).toBe(DriveMode.Velocity);
-    expect(getColumn(fmaState, 'ARM')?.commanded).toBe(ArmMode.Position);
+    expect(publishArmMode).not.toHaveBeenCalled();
+  });
+
+  it('adopts a rover mode instead of overwriting it', () => {
+    const coordinator = TestBed.inject(ControlModeCoordinator);
+    const driverControlMode = TestBed.inject(DriverControlModeService);
+    const armControlMode = TestBed.inject(ArmControlModeService);
+    const fmaState = TestBed.inject(FmaStateService);
+
+    connected.set(true);
+    fmaState.setDriveTelemetry(DriveMode.Manual, null);
+    fmaState.setArmTelemetry(ArmMode.Manual, null);
+
+    coordinator.synchronizeDriveModeFromRover();
+    coordinator.synchronizeArmModeFromRover();
+
+    expect(driverControlMode.mode()).toBe(DriveMode.Manual);
+    expect(armControlMode.mode()).toBe(ArmMode.Manual);
+    expect(publishDriveMode).not.toHaveBeenCalled();
+    expect(publishArmMode).not.toHaveBeenCalled();
   });
 
   it('creates a pending request for a connected mode selection', () => {
@@ -138,7 +160,7 @@ describe('ControlModeCoordinator', () => {
     });
   });
 
-  it('re-requests the preserved local modes after reconnecting', () => {
+  it('initializes each dashboard independently after reconnecting', () => {
     const coordinator = TestBed.inject(ControlModeCoordinator);
     const fmaState = TestBed.inject(FmaStateService);
 
@@ -151,11 +173,20 @@ describe('ControlModeCoordinator', () => {
     connected.set(true);
     TestBed.flushEffects();
 
-    expect(getColumn(fmaState, 'DRIVE')?.commanded).toBe(DriveMode.Manual);
+    coordinator.synchronizeArmModeFromRover();
+
+    expect(getColumn(fmaState, 'DRIVE')?.commanded).toBeNull();
+    expect(publishDriveMode).not.toHaveBeenCalled();
     expect(getColumn(fmaState, 'ARM')?.commanded).toBe(ArmMode.Manual);
+    expect(publishArmMode).toHaveBeenCalledWith(ArmMode.Manual);
   });
 });
 
-function getColumn(fmaState: FmaStateService, label: 'DRIVE' | 'ARM') {
-  return fmaState.columns().find((column) => column.label === label);
+function getColumn<T extends 'DRIVE' | 'ARM'>(
+  fmaState: FmaStateService,
+  label: T,
+): Extract<FmaColumn, { label: T }> | undefined {
+  return fmaState.columns().find(
+    (column): column is Extract<FmaColumn, { label: T }> => column.label === label,
+  );
 }

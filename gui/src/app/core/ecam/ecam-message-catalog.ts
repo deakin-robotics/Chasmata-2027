@@ -119,6 +119,12 @@ export const ECAM_MESSAGE_CATALOG: Readonly<Record<EcamAlertCode, EcamAlertDefin
     severity: 'warning',
     text: 'CAMERA LATENCY HIGH',
   },
+  CAMERA_ROVER_FALLBACK_ACTIVE: {
+    code: 'CAMERA_ROVER_FALLBACK_ACTIVE',
+    source: 'CAMERA',
+    severity: 'warning',
+    text: 'ROVER CAMERA FALLBACK ACTIVE',
+  },
   GIMBAL_CONTROL_FAULT: {
     code: 'GIMBAL_CONTROL_FAULT',
     source: 'CAMERA',

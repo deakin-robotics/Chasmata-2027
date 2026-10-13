@@ -17,10 +17,23 @@ describe('ArmMasterPage', () => {
   it('should render the Master page controls', () => {
     expect(fixture.nativeElement.textContent).toContain('Master Drive');
     expect(fixture.nativeElement.textContent).toContain('ROS Link');
+    expect(fixture.nativeElement.textContent).toContain('Camera Link');
+    expect(fixture.nativeElement.querySelector('.camera-feed button').getAttribute('aria-checked')).toBe('false');
     expect(fixture.nativeElement.textContent).toContain('Law Override');
     expect(fixture.nativeElement.textContent).toContain('Clear Faults');
     expect(fixture.nativeElement.querySelector('app-control-mode-selector.arm-mode-selector')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('.law-override button').disabled).toBe(true);
     expect(fixture.nativeElement.querySelector('.clear-faults button').disabled).toBe(true);
+  });
+
+  it('should enable the camera feed when switched on', () => {
+    const button = fixture.nativeElement.querySelector(
+      '.camera-feed button',
+    ) as HTMLButtonElement;
+    button.click();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.cameraFeedEnabled()).toBe(true);
+    expect(button.getAttribute('aria-checked')).toBe('true');
   });
 });

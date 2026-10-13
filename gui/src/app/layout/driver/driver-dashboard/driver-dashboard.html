@@ -6,21 +6,24 @@
 
     <app-camera-stream
       label="Arm camera"
-      [url]="armCameraUrl()"
-      (urlChange)="armCameraUrl.set($event)"
+      [source]="armCamera"
+      [allowRoverFallback]="false"
+      [enabled]="cameraFeedControl.enabled()"
     />
   </section>
 
   <section class="rover-camera-column" aria-label="Driver rover camera workspace">
     <app-camera-stream
       label="Front camera"
-      [url]="frontCameraUrl()"
-      (urlChange)="frontCameraUrl.set($event)"
+      [source]="frontCamera"
+      [allowRoverFallback]="true"
+      [enabled]="cameraFeedControl.enabled()"
     />
     <app-camera-stream
       label="Gimbal camera"
-      [url]="gimbalCameraUrl()"
-      (urlChange)="gimbalCameraUrl.set($event)"
+      [source]="gimbalCamera"
+      [allowRoverFallback]="true"
+      [enabled]="cameraFeedControl.enabled()"
     />
   </section>
 

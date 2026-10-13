@@ -7,10 +7,12 @@ RUN apt-get update \
         python3-colcon-common-extensions \
         ros-jazzy-control-msgs \
         ros-jazzy-rosbridge-server \
+        ros-jazzy-rosidl-default-generators \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
-COPY . /workspace/src/mock_rover
+COPY interfaces/telemetry_interfaces /workspace/src/telemetry_interfaces
+COPY test/mock_rover /workspace/src/mock_rover
 
 RUN source /opt/ros/jazzy/setup.bash \
     && colcon build --symlink-install

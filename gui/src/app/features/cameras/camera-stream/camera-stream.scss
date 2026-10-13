@@ -21,7 +21,7 @@
     --status-color: #55b987;
   }
 
-  &[data-status='loading'],
+  &[data-status='connecting'],
   &[data-status='reconnecting'] {
     --status-color: #62a8e5;
   }
@@ -30,7 +30,8 @@
     --status-color: #e05b65;
   }
 
-  &[data-status='unavailable'] {
+  &[data-status='unavailable'],
+  &[data-status='off'] {
     --status-color: #e05b65;
   }
 }
@@ -88,10 +89,17 @@
   }
 }
 
-.stream-image {
+.stream-video {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  visibility: hidden;
+
+  &.active {
+    visibility: visible;
+  }
 }
 
 .empty-state,

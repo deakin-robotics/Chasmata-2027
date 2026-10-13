@@ -1,6 +1,5 @@
 """ROS 2 mock rover used for GUI integration testing."""
 
-import json
 import math
 import time
 import threading
@@ -14,7 +13,8 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import JointState, Joy
-from std_msgs.msg import Bool, String
+from std_msgs.msg import Bool, Empty, String
+from telemetry_interfaces.msg import ArmOverrideState, FmaModeState, FmaState
 
 from .simulation import JointSimulator
 
@@ -38,17 +38,18 @@ JOINT_LIMITS: Dict[str, Tuple[float, float]] = {
     'roll_joint': (math.radians(-185.0), math.radians(185.0)),
 }
 
-JOINT_COMMAND_TOPIC = '/joint_commands'
+JOINT_COMMAND_TOPIC = '/arm/joint_commands'
 ARM_TRAJECTORY_ACTION = '/arm_controller/follow_joint_trajectory'
-JOINT_STATE_TOPIC = '/joint_states'
-DRIVE_JOY_TOPIC = '/joy'
+JOINT_STATE_TOPIC = '/arm/joint_states'
+DRIVE_JOY_TOPIC = '/drive/joy'
 ARM_JOY_TOPIC = '/arm/joy'
 ORIENTATION_LOCK_TOPIC = '/arm/orientation_lock'
 DRIVE_MODE_REQUEST_TOPIC = '/fma/drive/request'
 ARM_MODE_REQUEST_TOPIC = '/fma/arm/request'
-LAW_MODE_REQUEST_TOPIC = '/fma/law/request'
+ARM_OVERRIDE_REQUEST_TOPIC = '/arm/override/request'
 GIMBAL_PRIORITY_REQUEST_TOPIC = '/fma/gimbal/request'
 FMA_STATE_TOPIC = '/fma/state'
+HEARTBEAT_TOPIC = '/rover/heartbeat'
 
 DRIVE_TRIGGER_AXES = (4, 5)
 ARM_TRIGGER_AXES = (8, 9)
@@ -61,7 +62,8 @@ MANUAL_JOINT_SPEED_RAD_S = 0.5
 DRIVE_MODES = {'MANUAL', 'VELOCITY', 'MANAGED'}
 ARM_MODES = {'MANUAL', 'POSITION', 'MANAGED', 'STOWED'}
 LAW_MODES = {'NORMAL', 'ALTERNATE', 'DIRECT'}
-LAW_REQUESTS = {'DIRECT', 'RESTORE'}
+ARM_OVERRIDE_COMMANDS = {'ENABLE', 'DISABLE'}
+ARM_OVERRIDE_STATES = {'INACTIVE', 'ACTIVE'}
 GIMBAL_PRIORITY_OWNERS = {'DRIVER', 'ARM OPS'}
 
 
@@ -89,8 +91,10 @@ class MockRoverNode(Node):
         self.arm_mode: Optional[str] = None
         self.orientation_locked = False
         self.law_mode = 'NORMAL'
-        self.law_before_override: Optional[str] = None
-        self.pending_law: Optional[Tuple[str, float]] = None
+        self.arm_override_state = 'INACTIVE'
+        self.pending_arm_override: Optional[Tuple[str, float]] = None
+        self.gui_protection_available = True
+        self.rover_protection_available = True
         self.gimbal_priority: Optional[str] = None
         self.pending_gimbal_priority: Optional[Tuple[str, float]] = None
         self.pending_modes: Dict[str, Optional[Tuple[str, float]]] = {
@@ -112,8 +116,14 @@ class MockRoverNode(Node):
         fma_qos.reliability = ReliabilityPolicy.RELIABLE
         fma_qos.durability = DurabilityPolicy.TRANSIENT_LOCAL
 
-        self.fma_publisher = self.create_publisher(String, FMA_STATE_TOPIC, fma_qos)
+        self.fma_publisher = self.create_publisher(FmaState, FMA_STATE_TOPIC, fma_qos)
         self.joint_state_publisher = self.create_publisher(JointState, JOINT_STATE_TOPIC, 10)
+        heartbeat_qos = QoSProfile(depth=1)
+        heartbeat_qos.reliability = ReliabilityPolicy.RELIABLE
+        heartbeat_qos.durability = DurabilityPolicy.VOLATILE
+        self.heartbeat_publisher = self.create_publisher(
+            Empty, HEARTBEAT_TOPIC, heartbeat_qos
+        )
         self.trajectory_action_server = ActionServer(
             self,
             FollowJointTrajectory,
@@ -162,8 +172,8 @@ class MockRoverNode(Node):
         )
         self.create_subscription(
             String,
-            LAW_MODE_REQUEST_TOPIC,
-            self.law_mode_request_callback,
+            ARM_OVERRIDE_REQUEST_TOPIC,
+            self.arm_override_request_callback,
             10,
         )
         self.create_subscription(
@@ -174,8 +184,10 @@ class MockRoverNode(Node):
         )
 
         self.create_timer(1.0 / publish_rate, self.tick)
+        self.create_timer(1.0, self.publish_heartbeat)
         self.publish_fma()
         self.publish_joint_state()
+        self.publish_heartbeat()
 
         self.get_logger().info('Mock rover ready')
         self.get_logger().info('ROSbridge should expose ws://localhost:9090')
@@ -383,18 +395,18 @@ class MockRoverNode(Node):
         self.publish_fma()
         self.get_logger().info(f'Pending Gimbal priority request: {owner}')
 
-    def law_mode_request_callback(self, message: String) -> None:
-        request = message.data.strip().upper()
-        if request not in LAW_REQUESTS:
-            self.get_logger().warn(f'Rejected LAW request: {request}')
+    def arm_override_request_callback(self, message: String) -> None:
+        command = message.data.strip().upper()
+        if command not in ARM_OVERRIDE_COMMANDS:
+            self.get_logger().warn(f'Rejected Arm Override command: {command}')
             return
 
-        self.pending_law = (
-            request,
+        self.pending_arm_override = (
+            command,
             time.monotonic() + self.mode_ack_delay_seconds,
         )
         self.publish_fma()
-        self.get_logger().info(f'Pending LAW request: {request}')
+        self.get_logger().info(f'Pending Arm Override command: {command}')
 
     def joy_callback(self, subsystem: str, message: Joy, trigger_axes: Tuple[int, int]) -> None:
         if len(message.axes) <= trigger_axes[1]:
@@ -489,11 +501,14 @@ class MockRoverNode(Node):
         if accepted:
             self.publish_joint_state()
 
+    def publish_heartbeat(self) -> None:
+        self.heartbeat_publisher.publish(Empty())
+
     def tick(self) -> None:
         now = time.monotonic()
 
         self.process_mode_requests(now)
-        self.process_law_request(now)
+        self.process_arm_override_request(now)
         self.process_gimbal_priority_request(now)
         self.clear_expired_rejections(now)
         self.publish_joint_state()
@@ -516,21 +531,32 @@ class MockRoverNode(Node):
             self.publish_fma()
             self.get_logger().info(f'Confirmed {subsystem} mode: {mode}')
 
-    def process_law_request(self, now: float) -> None:
-        if self.pending_law is None or self.pending_law[1] > now:
+    def process_arm_override_request(self, now: float) -> None:
+        if self.pending_arm_override is None or self.pending_arm_override[1] > now:
             return
 
-        request = self.pending_law[0]
-        if request == 'DIRECT' and self.law_mode != 'DIRECT':
-            self.law_before_override = self.law_mode
-            self.law_mode = 'DIRECT'
-        elif request == 'RESTORE' and self.law_mode == 'DIRECT':
-            self.law_mode = self.law_before_override or 'NORMAL'
-            self.law_before_override = None
+        command = self.pending_arm_override[0]
+        if command == 'ENABLE':
+            self.arm_override_state = 'ACTIVE'
+            self.rover_protection_available = False
+        elif command == 'DISABLE':
+            self.arm_override_state = 'INACTIVE'
+            self.rover_protection_available = True
 
-        self.pending_law = None
+        self.pending_arm_override = None
+        self.update_law_mode()
         self.publish_fma()
-        self.get_logger().info(f'Confirmed LAW state: {self.law_mode}')
+        self.get_logger().info(
+            f'Confirmed Arm Override state: {self.arm_override_state}; LAW: {self.law_mode}'
+        )
+
+    def update_law_mode(self) -> None:
+        if self.gui_protection_available and self.rover_protection_available:
+            self.law_mode = 'NORMAL'
+        elif self.rover_protection_available:
+            self.law_mode = 'ALTERNATE'
+        else:
+            self.law_mode = 'DIRECT'
 
     def process_gimbal_priority_request(self, now: float) -> None:
         if self.pending_gimbal_priority is None or self.pending_gimbal_priority[1] > now:
@@ -554,39 +580,40 @@ class MockRoverNode(Node):
 
     def publish_fma(self) -> None:
         self.sequence += 1
-        payload = {
-            'schema': 'dcr/fma-state/v1',
-            'sequence': self.sequence,
-            'drive': self.mode_state('drive', self.drive_mode),
-            'arm': self.mode_state('arm', self.arm_mode),
-            'law': {
-                'confirmed': self.law_mode,
-                'pending': self.pending_law[0] if self.pending_law is not None else None,
-                'rejected': None,
-            },
-            'system': 'GOOD',
-            'gimbal_priority': {
-                'confirmed': self.gimbal_priority,
-                'pending': (
-                    self.pending_gimbal_priority[0]
-                    if self.pending_gimbal_priority is not None
-                    else None
-                ),
-                'rejected': None,
-            },
-        }
-        message = String()
-        message.data = json.dumps(payload, separators=(',', ':'))
+        message = FmaState()
+        message.schema = 'dcr/fma-state/v1'
+        message.sequence = self.sequence
+        message.drive = self.mode_state('drive', self.drive_mode)
+        message.arm = self.mode_state('arm', self.arm_mode)
+        message.law = self.law_mode
+
+        arm_override = ArmOverrideState()
+        arm_override.state = self.arm_override_state
+        arm_override.pending = (
+            self.pending_arm_override[0]
+            if self.pending_arm_override is not None
+            else ''
+        )
+        message.arm_override = arm_override
+        message.system = 'GOOD'
+        message.gimbal_priority = FmaModeState()
+        message.gimbal_priority.confirmed = self.gimbal_priority or ''
+        message.gimbal_priority.pending = (
+            self.pending_gimbal_priority[0]
+            if self.pending_gimbal_priority is not None
+            else ''
+        )
+        message.gimbal_priority.rejected = ''
         self.fma_publisher.publish(message)
         self.last_fma_publish = time.monotonic()
 
-    def mode_state(self, subsystem: str, confirmed: Optional[str]) -> Dict[str, Optional[str]]:
+    def mode_state(self, subsystem: str, confirmed: Optional[str]) -> FmaModeState:
         pending = self.pending_modes[subsystem]
-        return {
-            'confirmed': confirmed,
-            'pending': pending[0] if pending is not None else None,
-            'rejected': self.rejected_modes[subsystem],
-        }
+        state = FmaModeState()
+        state.confirmed = confirmed or ''
+        state.pending = pending[0] if pending is not None else ''
+        state.rejected = self.rejected_modes[subsystem] or ''
+        return state
 
     def publish_joint_state(self) -> None:
         message = JointState()

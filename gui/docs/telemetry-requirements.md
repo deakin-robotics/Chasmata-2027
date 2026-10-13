@@ -73,18 +73,18 @@ pending DRIVE, ARM, LAW, or Gimbal priority request state.
 
 The FMA requires confirmed DRIVE, ARM, LAW, GIMBAL owner/priority, and SYSTEM
 state. Link health remains available as general telemetry and for the System
-Display. For DRIVE, ARM, and LAW mode changes, the rover must also publish the
-current pending request or rejection result. A pending requested value is
-displayed in blue by every GUI instance; it is not displayed as confirmed until
-the rover reports its updated authoritative state in green. For a LAW `DIRECT`
-request, this means the rover may broadcast the underlying confirmed LAW
-(`NORMAL` or `ALTERNATE`) together with a pending `DIRECT`; every GUI then shows
-blue `OVERRIDE` on the LAW third row. After confirmation, the GUI shows red
-`OVERRIDE` and confirmed LAW becomes `DIRECT`. To disable the override, the GUI
-sends `RESTORE`; the rover restores the LAW that was active before `DIRECT`.
-If the rover rejects or cannot complete a request, it must keep the confirmed
-LAW state authoritative and report the request outcome without making `DIRECT`
-appear confirmed.
+Display. For DRIVE and ARM mode changes, the rover must also publish the
+current pending request or rejection result. LAW reports only its authoritative
+`NORMAL`, `ALTERNATE`, or `DIRECT` state. Arm Override is reported
+independently in the same `/fma/state` bundle with its confirmed state and any
+pending `ENABLE` or `DISABLE` command.
+
+A pending Override enable is displayed in blue by every GUI instance; it is not
+displayed as active until the rover reports `arm_override.state = ACTIVE`. A
+pending disable leaves the confirmed red `OVERRIDE` visible until the rover
+reports `INACTIVE`. `DIRECT` with an inactive Override is valid when both
+protection layers are unavailable for another reason. The GUI sends `ENABLE` or
+`DISABLE` on `/arm/override/request`; LAW does not interpret those commands.
 
 ECAM uses complete active alert-code snapshots. The rover sends the full current
 set of stable active ECAM codes immediately whenever that set changes and in the

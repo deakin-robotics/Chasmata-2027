@@ -29,7 +29,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <std_msgs/msg/bool.hpp>
-#include <std_msgs/msg/string.hpp>
+#include <telemetry_interfaces/msg/arm_move_it_status.hpp>
 
 namespace
 {
@@ -51,6 +51,7 @@ constexpr double PI = 3.14159265358979323846;
 using FollowJointTrajectory = control_msgs::action::FollowJointTrajectory;
 using GoalHandle = rclcpp_action::ClientGoalHandle<FollowJointTrajectory>;
 using MoveGroup = moveit_msgs::action::MoveGroup;
+using ArmMoveItStatus = telemetry_interfaces::msg::ArmMoveItStatus;
 using PlanningGoalHandle = rclcpp_action::ClientGoalHandle<MoveGroup>;
 
 double wrapToPi(double angle)
@@ -82,16 +83,15 @@ std::uint64_t requestIdFromMessage(
 }
 
 void publishStatus(
-  const rclcpp::Publisher<std_msgs::msg::String>::SharedPtr & publisher,
+  const rclcpp::Publisher<ArmMoveItStatus>::SharedPtr & publisher,
   std::uint64_t request_id,
   const char * state,
   const std::string & message = {})
 {
-  std_msgs::msg::String status;
-  status.data =
-    "{\"request_id\":" + std::to_string(request_id) +
-    ",\"state\":\"" + state +
-    "\",\"message\":\"" + message + "\"}";
+  ArmMoveItStatus status;
+  status.request_id = request_id;
+  status.state = state;
+  status.message = message;
   publisher->publish(status);
 }
 
@@ -170,7 +170,7 @@ int main(int argc, char * argv[])
   rclcpp::init(argc, argv);
 
   const auto node = rclcpp::Node::make_shared("arm_moveit_bridge");
-  const auto status_publisher = node->create_publisher<std_msgs::msg::String>(
+  const auto status_publisher = node->create_publisher<ArmMoveItStatus>(
     STATUS_TOPIC,
     rclcpp::QoS(10));
   const auto trajectory_client = rclcpp_action::create_client<FollowJointTrajectory>(

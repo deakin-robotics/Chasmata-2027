@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, effect, inject, untracked } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 
 import {
@@ -7,9 +7,10 @@ import {
 } from '../../../../../core/control/arm/arm-control-mode';
 import { ArmCommandPublisher } from '../../../../../core/control/arm/arm-command-publisher';
 import { ControlModeCoordinator } from '../../../../../core/control/control-mode-coordinator';
-import { ControlModeCommandPublisher } from '../../../../../core/control/control-mode-command-publisher';
+import { ControlCommandPublisher } from '../../../../../core/control/control-command-publisher';
 import { GamepadInput } from '../../../../../core/gamepad/gamepad-input';
-import { ArmMode, LawRequest } from '../../../../../core/fma/fma-state.service';
+import { CameraFeedControl } from '../../../../../features/cameras/camera-feed-control';
+import { ArmMode, FmaStateService } from '../../../../../core/fma/fma-state.service';
 import { RosConnection } from '../../../../../core/ros/ros-connection';
 import { ConnectionManager } from '../../../../../features/connection/connection-manager/connection-manager';
 import { ActionButton, ActionButtonTone } from '../../../../../shared/action-button/action-button';
@@ -48,10 +49,33 @@ export class ArmMasterPage {
   private readonly armControlMode = inject(ArmControlModeService);
   private readonly armCommandPublisher = inject(ArmCommandPublisher);
   private readonly controlModeCoordinator = inject(ControlModeCoordinator);
-  private readonly controlModeCommandPublisher = inject(ControlModeCommandPublisher);
+  private readonly fmaState = inject(FmaStateService);
+  private readonly controlCommandPublisher = inject(ControlCommandPublisher);
   private readonly gamepad = inject(GamepadInput);
   private readonly rosConnection = inject(RosConnection);
+  private readonly cameraFeedControl = inject(CameraFeedControl);
   private readonly dialog = inject(MatDialog);
+  private armModeSynchronized = false;
+
+  private readonly modeHandshakeEffect = effect(() => {
+    const client = this.rosConnection.client();
+    const connected = this.rosConnection.isConnected();
+    const hasFmaTelemetry = this.fmaState.hasFmaTelemetry();
+
+    untracked(() => {
+      if (client) this.controlModeCoordinator.prepareArmModeRequest();
+
+      if (!connected) {
+        this.armModeSynchronized = false;
+        return;
+      }
+
+      if (!hasFmaTelemetry || this.armModeSynchronized) return;
+
+      this.armModeSynchronized = true;
+      this.controlModeCoordinator.synchronizeArmModeFromRover();
+    });
+  });
 
   readonly masterDriveEnabled = this.armControlMode.enabled;
   readonly armMode = this.armControlMode.mode;
@@ -63,6 +87,7 @@ export class ArmMasterPage {
   readonly readinessError = this.armControlMode.readinessError;
   readonly rosConnected = this.rosConnection.isConnected;
   readonly gamepadConnected = this.gamepad.connected;
+  readonly cameraFeedEnabled = this.cameraFeedControl.enabled;
   readonly gamepadStatusLabel = computed(() =>
     this.gamepadConnected() ? 'Connected' : 'Not detected',
   );
@@ -76,6 +101,8 @@ export class ArmMasterPage {
     switch (this.rosConnection.status()) {
       case 'connecting':
         return 'Connecting';
+      case 'waiting-for-rover':
+        return 'Standby';
       case 'connected':
         return 'Connected';
       case 'reconnecting':
@@ -93,6 +120,7 @@ export class ArmMasterPage {
       case 'error':
         return 'caution';
       case 'connecting':
+      case 'waiting-for-rover':
       case 'reconnecting':
       case 'disconnected':
         return 'info';
@@ -122,6 +150,11 @@ export class ArmMasterPage {
     });
   }
 
+  /** Starts or closes WHEP playback for every camera on this dashboard. */
+  setCameraFeedEnabled(enabled: boolean): void {
+    this.cameraFeedControl.setEnabled(enabled);
+  }
+
   /** Enables the input worker selected by ArmControlModeService. */
   toggleMasterDriveControl(nextState: boolean): void {
     if (nextState) this.armControlMode.enable();
@@ -140,10 +173,10 @@ export class ArmMasterPage {
   }
 
   activateLawOverride(): void {
-    this.controlModeCommandPublisher.publishLawRequest(LawRequest.EnableOverride);
+    this.controlCommandPublisher.enableArmOverride();
   }
 
   deactivateLawOverride(): void {
-    this.controlModeCommandPublisher.publishLawRequest(LawRequest.Restore);
+    this.controlCommandPublisher.disableArmOverride();
   }
 }

@@ -45,6 +45,7 @@ will be added after the responsible leads confirm the required operator steps.
 | `CAMERA_GIMBAL_RECONNECT_FAILED` | CAMERA | warning | GIMBAL CAMERA RECONNECT FAILED | Reconnection to the Gimbal camera has failed. |
 | `CAMERA_GIMBAL_STREAM_LOST` | CAMERA | warning | GIMBAL CAMERA STREAM LOST | The Gimbal camera is available but its video stream is unavailable. |
 | `CAMERA_LATENCY_HIGH` | CAMERA | warning | CAMERA LATENCY HIGH | Camera latency exceeds the configured acceptable range. |
+| `CAMERA_ROVER_FALLBACK_ACTIVE` | CAMERA | warning | ROVER CAMERA FALLBACK ACTIVE | The operator GUI is receiving camera video from rover MediaMTX instead of the base-station gateway. |
 | `GIMBAL_CONTROL_FAULT` | CAMERA | fault | GIMBAL CONTROL FAULT | The Gimbal control system reports a fault. |
 | `GIMBAL_POSITION_UNKNOWN` | CAMERA | warning | GIMBAL POSITION UNKNOWN | The authoritative Gimbal position is unavailable or stale. |
 | `GIMBAL_PRIORITY_UNKNOWN` | CAMERA | warning | GIMBAL PRIORITY UNKNOWN | The authoritative Gimbal owner is unavailable or stale. |

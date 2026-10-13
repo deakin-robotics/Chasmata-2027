@@ -15,8 +15,8 @@ export class MissionControlFma {
   private readonly rosConnection = inject(RosConnection);
 
   readonly columns = this.fmaState.columns;
-  readonly lawOverrideActive = this.fmaState.lawOverrideActive;
-  readonly lawOverridePending = this.fmaState.lawOverridePending;
+  readonly armOverrideActive = this.fmaState.armOverrideActive;
+  readonly armOverridePending = this.fmaState.armOverridePending;
   readonly gimbalPriorityOwner = this.fmaState.gimbalPriorityOwner;
   readonly gimbalPriorityPending = this.fmaState.gimbalPriorityPending;
   readonly gimbalPriorityDisplay = this.fmaState.gimbalPriorityDisplay;

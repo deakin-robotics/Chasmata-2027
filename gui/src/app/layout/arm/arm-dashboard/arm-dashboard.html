@@ -4,8 +4,9 @@
 
     <app-camera-stream
       label="Front camera"
-      [url]="frontCameraUrl()"
-      (urlChange)="frontCameraUrl.set($event)"
+      [source]="frontCamera"
+      [allowRoverFallback]="false"
+      [enabled]="cameraFeedControl.enabled()"
     />
   </section>
 
@@ -13,15 +14,17 @@
     <app-camera-stream
       class="arm-camera"
       label="Arm camera"
-      [url]="armCameraUrl()"
-      (urlChange)="armCameraUrl.set($event)"
+      [source]="armCamera"
+      [allowRoverFallback]="true"
+      [enabled]="cameraFeedControl.enabled()"
     />
 
     <app-camera-stream
       class="gimbal-camera"
       label="Gimbal camera"
-      [url]="gimbalCameraUrl()"
-      (urlChange)="gimbalCameraUrl.set($event)"
+      [source]="gimbalCamera"
+      [allowRoverFallback]="true"
+      [enabled]="cameraFeedControl.enabled()"
     />
   </section>
 

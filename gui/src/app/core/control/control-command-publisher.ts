@@ -2,26 +2,38 @@ import { Service, inject } from '@angular/core';
 import { Ros, Topic } from 'roslib';
 
 import { RosConnection } from '../ros/ros-connection';
-import { LawRequest } from '../fma/fma-state.service';
+import { ArmOverrideCommand } from './arm/arm-override';
 import { ArmControlMode } from './arm/arm-control-mode';
 import { DriverControlMode } from './drive/drive-control-mode';
 
 const DRIVE_MODE_REQUEST_TOPIC = '/fma/drive/request';
 const ARM_MODE_REQUEST_TOPIC = '/fma/arm/request';
-const LAW_MODE_REQUEST_TOPIC = '/fma/law/request';
+const ARM_OVERRIDE_REQUEST_TOPIC = '/arm/override/request';
 const STRING_MESSAGE_TYPE = 'std_msgs/String';
 
-/** Publishes local mode requests to the rover-side control boundary. */
+/** Publishes GUI control commands to their rover-side control boundaries. */
 @Service()
-export class ControlModeCommandPublisher {
+export class ControlCommandPublisher {
   private readonly rosConnection = inject(RosConnection);
 
   private driveTopic: Topic | null = null;
   private armTopic: Topic | null = null;
-  private lawTopic: Topic | null = null;
+  private armOverrideTopic: Topic | null = null;
   private topicClient: Ros | null = null;
 
+  /** Advertises the Driver mode-request topic before rover readiness is confirmed. */
+  prepareDriveModeRequest(): void {
+    this.getTopic('drive')?.advertise();
+  }
+
+  /** Advertises the Arm mode-request topic before rover readiness is confirmed. */
+  prepareArmModeRequest(): void {
+    this.getTopic('arm')?.advertise();
+  }
+
   publishDriveMode(mode: DriverControlMode): boolean {
+    if (!this.rosConnection.isConnected()) return false;
+
     const topic = this.getTopic('drive');
     if (!topic) return false;
 
@@ -30,6 +42,8 @@ export class ControlModeCommandPublisher {
   }
 
   publishArmMode(mode: ArmControlMode): boolean {
+    if (!this.rosConnection.isConnected()) return false;
+
     const topic = this.getTopic('arm');
     if (!topic) return false;
 
@@ -37,23 +51,33 @@ export class ControlModeCommandPublisher {
     return true;
   }
 
-  publishLawRequest(request: LawRequest): boolean {
-    const topic = this.getTopic('law');
+  enableArmOverride(): boolean {
+    return this.publishArmOverrideCommand(ArmOverrideCommand.Enable);
+  }
+
+  disableArmOverride(): boolean {
+    return this.publishArmOverrideCommand(ArmOverrideCommand.Disable);
+  }
+
+  private publishArmOverrideCommand(command: ArmOverrideCommand): boolean {
+    if (!this.rosConnection.isConnected()) return false;
+
+    const topic = this.getTopic('armOverride');
     if (!topic) return false;
 
-    topic.publish({ data: request });
+    topic.publish({ data: command });
     return true;
   }
 
-  private getTopic(kind: 'drive' | 'arm' | 'law'): Topic | null {
+  private getTopic(kind: 'drive' | 'arm' | 'armOverride'): Topic | null {
     const client = this.rosConnection.client();
-    if (!client || !this.rosConnection.isConnected()) return null;
+    if (!client) return null;
 
     if (client !== this.topicClient) {
       this.topicClient = client;
       this.driveTopic = null;
       this.armTopic = null;
-      this.lawTopic = null;
+      this.armOverrideTopic = null;
     }
 
     if (kind === 'drive') {
@@ -70,15 +94,16 @@ export class ControlModeCommandPublisher {
         ros: client,
         name: ARM_MODE_REQUEST_TOPIC,
         messageType: STRING_MESSAGE_TYPE,
+        latch: true,
       });
       return this.armTopic;
     }
 
-    this.lawTopic ??= new Topic({
+    this.armOverrideTopic ??= new Topic({
       ros: client,
-      name: LAW_MODE_REQUEST_TOPIC,
+      name: ARM_OVERRIDE_REQUEST_TOPIC,
       messageType: STRING_MESSAGE_TYPE,
     });
-    return this.lawTopic;
+    return this.armOverrideTopic;
   }
 }

@@ -29,6 +29,18 @@ describe('EcamAlertService', () => {
     ]);
   });
 
+  it('should catalogue rover camera fallback as an amber warning', () => {
+    service.raise('CAMERA_ROVER_FALLBACK_ACTIVE');
+
+    expect(service.activeAlerts()[0]).toMatchObject({
+      code: 'CAMERA_ROVER_FALLBACK_ACTIVE',
+      source: 'CAMERA',
+      severity: 'warning',
+      text: 'ROVER CAMERA FALLBACK ACTIVE',
+    });
+    expect(service.activeAlerts()[0].text).not.toContain('—');
+  });
+
   it('should expose an optional remote procedure with the active alert', () => {
     service.raise('DRIVE_CONTROLLER_OFFLINE');
 

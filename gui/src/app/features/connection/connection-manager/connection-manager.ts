@@ -10,6 +10,7 @@ import {
   RosConnection,
   RosConnectionStatus,
 } from '../../../core/ros/ros-connection';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-connection-manager',
@@ -28,14 +29,21 @@ export class ConnectionManager {
   readonly rosConnection = inject(RosConnection);
   private readonly dialogRef = inject(MatDialogRef<ConnectionManager>, { optional: true });
 
-  readonly endpoint = new FormControl(this.rosConnection.url() ?? 'rover.local:9090', {
+  readonly endpoint = new FormControl(this.rosConnection.url() ?? environment.rosbridgeUrl, {
     nonNullable: true,
     validators: [Validators.required],
   });
 
+  readonly defaultEndpoint = environment.rosbridgeUrl;
+
   readonly canDisconnect = computed(() => {
     const status = this.rosConnection.status();
-    return status === 'connected' || status === 'connecting' || status === 'reconnecting';
+    return (
+      status === 'connected' ||
+      status === 'connecting' ||
+      status === 'waiting-for-rover' ||
+      status === 'reconnecting'
+    );
   });
 
   readonly statusLabel = computed(() =>
@@ -53,8 +61,10 @@ export class ConnectionManager {
     switch (status) {
       case 'connecting':
         return 'Opening the ROSbridge WebSocket connection.';
+      case 'waiting-for-rover':
+        return 'ROSbridge is reachable. Waiting for rover heartbeat.';
       case 'connected':
-        return 'ROS topics and services are available to the GUI.';
+        return 'Rover heartbeat received. Rover controls are available.';
       case 'reconnecting':
         return attempt > 0
           ? `Connection lost. Reconnection attempt ${attempt} is in progress.`
@@ -82,6 +92,8 @@ export class ConnectionManager {
     switch (status) {
       case 'connecting':
         return 'Connecting';
+      case 'waiting-for-rover':
+        return 'Waiting for rover';
       case 'connected':
         return 'Connected';
       case 'reconnecting':
@@ -96,6 +108,7 @@ export class ConnectionManager {
   private getStatusIcon(status: RosConnectionStatus): string {
     switch (status) {
       case 'connecting':
+      case 'waiting-for-rover':
       case 'reconnecting':
         return 'sync';
       case 'connected':

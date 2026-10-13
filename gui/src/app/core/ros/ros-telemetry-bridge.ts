@@ -3,11 +3,11 @@ import { Ros, Topic } from 'roslib';
 
 import { ArmTelemetryService } from '../arm/telemetry/arm-telemetry.service';
 import { ArmJointState } from '../arm/ik/arm-ik-types';
+import { ArmOverrideCommand, ArmOverrideState } from '../control/arm/arm-override';
 import {
   ArmMode,
   DriveMode,
   FmaStateService,
-  LawRequest,
   LawMode,
   SystemMode,
   GimbalPriorityOwner,
@@ -15,13 +15,9 @@ import {
 import { RosConnection } from './ros-connection';
 
 const FMA_STATE_TOPIC = '/fma/state';
-const JOINT_STATE_TOPIC = '/joint_states';
-const STRING_MESSAGE_TYPE = 'std_msgs/String';
+const JOINT_STATE_TOPIC = '/arm/joint_states';
+const FMA_STATE_MESSAGE_TYPE = 'telemetry_interfaces/msg/FmaState';
 const JOINT_STATE_MESSAGE_TYPE = 'sensor_msgs/JointState';
-
-interface StringMessage {
-  data?: unknown;
-}
 
 interface JointStateMessage {
   name?: unknown;
@@ -36,11 +32,14 @@ interface FmaModeState {
 }
 
 interface FmaTelemetryMessage {
+  schema?: unknown;
+  sequence?: unknown;
   drive?: FmaModeState;
   arm?: FmaModeState;
   law?: unknown;
+  arm_override?: { state?: unknown; pending?: unknown };
   system?: unknown;
-  gimbal_priority?: unknown;
+  gimbal_priority?: FmaModeState;
 }
 
 /** Adapts ROS telemetry messages into the GUI's shared state services. */
@@ -74,7 +73,7 @@ export class RosTelemetryBridge {
     this.fmaTopic = new Topic({
       ros: client,
       name: FMA_STATE_TOPIC,
-      messageType: STRING_MESSAGE_TYPE,
+      messageType: FMA_STATE_MESSAGE_TYPE,
     });
     this.jointStateTopic = new Topic({
       ros: client,
@@ -82,21 +81,15 @@ export class RosTelemetryBridge {
       messageType: JOINT_STATE_MESSAGE_TYPE,
     });
 
-    this.fmaTopic.subscribe((message) => this.handleFmaMessage(message as StringMessage));
+    this.fmaTopic.subscribe((message) => this.handleFmaMessage(message));
     this.jointStateTopic.subscribe((message) =>
       this.handleJointStateMessage(message as JointStateMessage),
     );
   }
 
-  private handleFmaMessage(message: StringMessage): void {
-    if (typeof message.data !== 'string') return;
-
-    let telemetry: FmaTelemetryMessage;
-    try {
-      telemetry = JSON.parse(message.data) as FmaTelemetryMessage;
-    } catch {
-      return;
-    }
+  private handleFmaMessage(message: unknown): void {
+    if (!message || typeof message !== 'object') return;
+    const telemetry = message as FmaTelemetryMessage;
 
     this.applyModeTelemetry(telemetry.drive, 'drive');
     this.applyModeTelemetry(telemetry.arm, 'arm');
@@ -104,8 +97,10 @@ export class RosTelemetryBridge {
     const system = this.enumValue(telemetry.system, Object.values(SystemMode));
 
     this.applyLawTelemetry(telemetry.law);
+    this.applyArmOverrideTelemetry(telemetry.arm_override);
     if (system !== undefined) this.fmaState.setSystemMode(system);
     this.applyGimbalPriorityTelemetry(telemetry.gimbal_priority);
+    this.fmaState.markFmaTelemetryReceived();
   }
 
   private applyModeTelemetry(state: FmaModeState | undefined, subsystem: 'drive' | 'arm'): void {
@@ -136,25 +131,22 @@ export class RosTelemetryBridge {
     }
   }
 
-  private applyLawTelemetry(value: unknown): void {
-    if (value === null || typeof value === 'string') {
-      const confirmed = this.enumValue(value, Object.values(LawMode));
-      if (confirmed !== undefined) this.fmaState.setLawMode(confirmed);
-      return;
-    }
+  private applyLawTelemetry(value: FmaTelemetryMessage['law']): void {
+    const law = this.enumValue(value, Object.values(LawMode));
+    if (law !== undefined) this.fmaState.setLawTelemetry(law);
+  }
 
+  private applyArmOverrideTelemetry(value: FmaTelemetryMessage['arm_override']): void {
     if (!value || typeof value !== 'object') return;
 
-    const state = value as FmaModeState;
-    const confirmed = this.enumValue(state.confirmed, Object.values(LawMode));
-    const pending = this.enumValue(state.pending, Object.values(LawRequest));
+    const overrideState = this.enumValue(value.state, Object.values(ArmOverrideState));
+    const pending = this.enumValue(value.pending, Object.values(ArmOverrideCommand));
 
-    if (confirmed !== undefined && pending !== undefined) {
-      this.fmaState.setLawTelemetry(confirmed, pending);
-    } else if (confirmed !== undefined) {
-      this.fmaState.setLawTelemetry(confirmed, null);
-    } else if (pending !== undefined) {
-      this.fmaState.setLawTelemetry(null, pending);
+    if (overrideState !== undefined || pending !== undefined) {
+      this.fmaState.setArmOverrideTelemetry(
+        overrideState === undefined ? null : overrideState,
+        pending === undefined ? null : pending,
+      );
     }
   }
 
@@ -182,7 +174,7 @@ export class RosTelemetryBridge {
   }
 
   private enumValue<T extends string>(value: unknown, values: readonly T[]): T | null | undefined {
-    if (value === null) return null;
+    if (value === null || value === '') return null;
     return typeof value === 'string' && values.includes(value as T) ? (value as T) : undefined;
   }
 
@@ -209,7 +201,7 @@ export class RosTelemetryBridge {
   }
 
   private parseGimbalPriorityOwner(value: unknown): GimbalPriorityOwner | null | undefined {
-    if (value === null || value === 'UNKNOWN') return null;
+    if (value === null || value === '' || value === 'UNKNOWN') return null;
     return value === 'DRIVER' || value === 'ARM OPS' ? value : undefined;
   }
 
