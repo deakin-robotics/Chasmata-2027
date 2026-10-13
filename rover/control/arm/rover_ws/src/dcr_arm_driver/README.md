@@ -82,7 +82,7 @@ All arm commands use **CAN ID = joint CAN ID**, with the command byte in
 | Type    | Interface                        |
 |---------|----------------------------------|
 | Command | `position`                       |
-| State   | `position`, `velocity`, `effort` |
+| State   | `position`, `velocity`            |
 
 ### Topics
 
@@ -199,7 +199,7 @@ Controller (`config/arm_controllers.yaml`):
 
 | Controller                | Type                          | Interfaces                                     |
 |---------------------------|-------------------------------|------------------------------------------------|
-| `joint_state_broadcaster` | `joint_state_broadcaster`     | `position`, `velocity`, `effort`               |
+| `joint_state_broadcaster` | `joint_state_broadcaster`     | `position`, `velocity`                          |
 | `arm_controller`          | `joint_trajectory_controller` | cmd: `position`; state: `position`, `velocity` |
 
 ---

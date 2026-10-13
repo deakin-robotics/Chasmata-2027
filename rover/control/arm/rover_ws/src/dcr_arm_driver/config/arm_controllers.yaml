@@ -12,7 +12,6 @@ joint_state_broadcaster:
     interfaces:
       - position
       - velocity
-      - effort
 
 # Joint trajectory controller: receives trajectory commands from MoveIt2
 arm_controller:
