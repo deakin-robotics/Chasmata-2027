@@ -14,6 +14,7 @@ find_package(hardware_interface REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(can_msgs REQUIRED)
 find_package(arm_interfaces REQUIRED)
+find_package(std_msgs REQUIRED)
 
 # Build motor driver library
 add_library(dcr_arm_driver_lib src/motor.cpp)
@@ -26,6 +27,7 @@ ament_target_dependencies(
   rclcpp
   can_msgs
   arm_interfaces
+  std_msgs
 )
 
 # Build hardware interface plugin.
@@ -43,6 +45,7 @@ ament_target_dependencies(
   rclcpp_lifecycle
   can_msgs
   arm_interfaces
+  std_msgs
 )
 target_link_libraries(arm_hardware_interface dcr_arm_driver_lib)
 
@@ -84,6 +87,7 @@ ament_export_dependencies(
   rclcpp_lifecycle
   can_msgs
   arm_interfaces
+  std_msgs
 )
 
 # Finalize package

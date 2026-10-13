@@ -4,6 +4,8 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <atomic>
+#include <mutex>
 
 #include <hardware_interface/system_interface.hpp>
 #include <hardware_interface/handle.hpp>
@@ -15,6 +17,7 @@
 #include <arm_interfaces/msg/motor_stat1.hpp>
 #include <arm_interfaces/msg/motor_stat2.hpp>
 #include <arm_interfaces/msg/motor_move.hpp>
+#include <std_msgs/msg/bool.hpp>
 
 #include "dcr_arm_driver/motor.hpp"
 
@@ -25,7 +28,6 @@ struct JointInfo {
   uint32_t can_id;
   double position = 0.0;
   double velocity = 0.0;
-  double effort = 0.0;
   double temperature = 0.0;        // NEW (from MotorStat1.temp)
   double bus_voltage = 0.0;        // NEW (from MotorStat2.busv)
   double bus_current = 0.0;        // NEW (from MotorStat2.busc)
@@ -82,6 +84,8 @@ class ArmHardwareInterface : public hardware_interface::SystemInterface {
   // callbacks are actually executed - a privately created node would never be
   // added to an executor and would never be spun.
   rclcpp::Node::SharedPtr node_;
+  std::mutex lifecycle_mutex_;
+  bool active_{false};
 
   // CAN bridge topics: publish outgoing frames on .../tx, receive on .../rx
   rclcpp::Publisher<can_msgs::msg::Frame>::SharedPtr can_pub_;
@@ -93,9 +97,12 @@ class ArmHardwareInterface : public hardware_interface::SystemInterface {
 
   // Optional command input (MotorMove) - mirrors the old motor_node behaviour
   rclcpp::Subscription<arm_interfaces::msg::MotorMove>::SharedPtr move_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr estop_sub_;
+  std::atomic<bool> estop_asserted_{false};
   std::vector<JointInfo> joints_;
 
   JointInfo* find_joint(uint32_t can_id);
+  void deactivate_endpoints();
   void can_frame_callback(const can_msgs::msg::Frame& msg);
   void motor_move_callback(const arm_interfaces::msg::MotorMove& msg);
 };

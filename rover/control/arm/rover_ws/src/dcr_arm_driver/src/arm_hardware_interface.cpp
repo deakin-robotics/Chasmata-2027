@@ -81,6 +81,9 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_activate(
     const rclcpp_lifecycle::State& /*previous_state*/) {
   RCLCPP_INFO(rclcpp::get_logger("ArmHardwareInterface"), "Activating...");
 
+  std::lock_guard<std::mutex> lock(lifecycle_mutex_);
+  active_ = false;
+
   // IMPORTANT: do NOT create a private node here. A node created inside a
   // ros2_control plugin is never added to any executor, so its subscription
   // callbacks (from /socketcan_bridge/rx and /motor_move) would never fire.
@@ -113,6 +116,16 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_activate(
         this->motor_move_callback(msg);
       });
 
+  // Keep the stop state locally because write() runs in the ros2_control loop.
+  estop_sub_ = node->create_subscription<std_msgs::msg::Bool>(
+      "/estop", rclcpp::QoS(1), [this](const std_msgs::msg::Bool& msg) {
+        estop_asserted_.store(msg.data, std::memory_order_relaxed);
+        if (msg.data) {
+          RCLCPP_WARN(rclcpp::get_logger("ArmHardwareInterface"),
+                      "E-stop asserted; stopping arm motion");
+        }
+      });
+
   auto clear_fault_msg = motor_driver_->clr_faults();
   can_pub_->publish(clear_fault_msg);
 
@@ -124,6 +137,7 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_activate(
                 joint.can_id);
   }
 
+  active_ = true;
   RCLCPP_INFO(rclcpp::get_logger("ArmHardwareInterface"), "Arm activated");
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -131,25 +145,40 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_activate(
 hardware_interface::CallbackReturn ArmHardwareInterface::on_deactivate(
     const rclcpp_lifecycle::State& /*previous_state*/) {
   RCLCPP_INFO(rclcpp::get_logger("ArmHardwareInterface"), "Deactivating...");
+  deactivate_endpoints();
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
 hardware_interface::CallbackReturn ArmHardwareInterface::on_cleanup(
     const rclcpp_lifecycle::State& /*previous_state*/) {
   RCLCPP_INFO(rclcpp::get_logger("ArmHardwareInterface"), "Cleaning up...");
+  deactivate_endpoints();
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
 hardware_interface::CallbackReturn ArmHardwareInterface::on_shutdown(
     const rclcpp_lifecycle::State& /*previous_state*/) {
   RCLCPP_INFO(rclcpp::get_logger("ArmHardwareInterface"), "Shutting down...");
+  deactivate_endpoints();
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
 hardware_interface::CallbackReturn ArmHardwareInterface::on_error(
     const rclcpp_lifecycle::State& /*previous_state*/) {
   RCLCPP_ERROR(rclcpp::get_logger("ArmHardwareInterface"), "Error state");
+  deactivate_endpoints();
   return hardware_interface::CallbackReturn::SUCCESS;
+}
+
+void ArmHardwareInterface::deactivate_endpoints() {
+  std::lock_guard<std::mutex> lock(lifecycle_mutex_);
+  active_ = false;
+  move_sub_.reset();
+  estop_sub_.reset();
+  can_sub_.reset();
+  stat1_pub_.reset();
+  stat2_pub_.reset();
+  can_pub_.reset();
 }
 
 std::vector<hardware_interface::StateInterface>
@@ -161,8 +190,6 @@ ArmHardwareInterface::export_state_interfaces() {
         joints_[i].name, "position", &joints_[i].position));
     state_interfaces.emplace_back(hardware_interface::StateInterface(
         joints_[i].name, "velocity", &joints_[i].velocity));
-    state_interfaces.emplace_back(hardware_interface::StateInterface(
-        joints_[i].name, "effort", &joints_[i].effort));
   }
 
   RCLCPP_INFO(rclcpp::get_logger("ArmHardwareInterface"),
@@ -206,10 +233,16 @@ hardware_interface::return_type ArmHardwareInterface::read(
 
 hardware_interface::return_type ArmHardwareInterface::write(
     const rclcpp::Time& /*time*/, const rclcpp::Duration& /*period*/) {
+  const bool estop_asserted = estop_asserted_.load(std::memory_order_relaxed);
   for (auto& joint : joints_) {
-    auto cmd_msg = motor_driver_->position_control(joint.can_id,
-                                                    joint.position_command*180/3.14159265);
     if (can_pub_) {
+      // Repeated zero-speed commands clear any motor motion command already in
+      // flight while the E-stop is active. Do not send trajectory positions.
+      auto cmd_msg = estop_asserted
+                         ? motor_driver_->speed_control(joint.can_id, 0.0f)
+                         : motor_driver_->position_control(
+                               joint.can_id,
+                               joint.position_command * 180 / 3.14159265);
       can_pub_->publish(cmd_msg);
     }
   }
@@ -242,7 +275,6 @@ void ArmHardwareInterface::can_frame_callback(
     auto stat = motor_driver_->read_status_1(msg);
     joint->position = stat.angle;
     joint->velocity = stat.speed;
-    joint->effort = stat.current;
     joint->temperature = stat.temp;
     if (stat1_pub_) {
       stat1_pub_->publish(stat);
@@ -262,10 +294,20 @@ void ArmHardwareInterface::can_frame_callback(
 
 void ArmHardwareInterface::motor_move_callback(
     const arm_interfaces::msg::MotorMove& msg) {
+  std::lock_guard<std::mutex> lock(lifecycle_mutex_);
+  if (!active_) {
+    return;
+  }
+
   // Optional external command path (kept for parity with old motor_node).
   // mode == true -> position control (angle in degrees), else speed control.
   JointInfo* joint = find_joint(static_cast<uint32_t>(msg.id));
   if (joint == nullptr || !can_pub_) {
+    return;
+  }
+
+  if (estop_asserted_.load(std::memory_order_relaxed)) {
+    can_pub_->publish(motor_driver_->speed_control(joint->can_id, 0.0f));
     return;
   }
 
