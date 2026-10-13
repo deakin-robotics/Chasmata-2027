@@ -26,6 +26,7 @@ will be added after the responsible leads confirm the required operator steps.
 
 | Code | Source | Severity | Display text | Meaning |
 |---|---|---|---|---|
+| `BASE_STATION_HEARTBEAT_LOST` | ARM | warning | BASE STATION HEARTBEAT LOST | The base-station heartbeat is no longer received. |
 | `ARM_CAN_FAULT` | ARM | fault | ARM CAN FAULT | Communication fault reported on the arm CAN interface. |
 | `ARM_JOINT_FAULT` | ARM | fault | ARM JOINT FAULT | One or more arm joints report a fault. |
 | `ARM_JOINT_LIMIT` | ARM | warning | ARM JOINT LIMIT | An arm joint reports a configured limit condition. |
@@ -81,13 +82,13 @@ will be added after the responsible leads confirm the required operator steps.
 | `LINK_DEGRADED` | LINK | warning | LINK DEGRADED | The communication link remains usable but is degraded. |
 | `LINK_CONTROLLER_DISCONNECTED` | LINK | fault | CONTROLLER DISCONNECTED | A required controller connection is lost. |
 | `LINK_LATENCY_HIGH` | LINK | warning | LINK LATENCY HIGH | Network latency exceeds the configured acceptable range. |
-| `LINK_LOST` | LINK | fault | LINK LOST | The rover/base-station communication link is lost. |
 | `LINK_PACKET_LOSS_HIGH` | LINK | warning | LINK PACKET LOSS HIGH | Packet loss exceeds the configured acceptable range. |
 | `LINK_ROS_UNAVAILABLE` | LINK | fault | LINK ROS UNAVAILABLE | Required ROS communication over the link is unavailable. |
 | `POWER_BATTERY_LOW` | POWER | warning | BATTERY LOW | Battery state is below the configured operating threshold. |
 | `POWER_BATTERY_UNAVAILABLE` | POWER | fault | BATTERY DATA UNAVAILABLE | Required battery telemetry is unavailable or invalid. |
 | `POWER_RAIL_FAULT` | POWER | fault | POWER RAIL FAULT | A monitored power rail reports a fault. |
 | `POWER_TOTAL_POWER_UNAVAILABLE` | POWER | warning | TOTAL POWER UNAVAILABLE | Total system-power telemetry is unavailable. |
+| `ROVER_HEARTBEAT_LOST` | LINK | fault | ROVER HEARTBEAT LOST | The rover heartbeat is no longer received. |
 | `SYSTEM_CPU_HIGH` | SYSTEM | warning | CPU LOAD HIGH | CPU usage exceeds the configured acceptable range. |
 | `SYSTEM_CRITICAL_FAULT` | SYSTEM | fault | SYSTEM CRITICAL FAULT | The system reports a critical fault requiring operator attention. |
 | `SYSTEM_DIAGNOSTICS_UNAVAILABLE` | SYSTEM | warning | SYSTEM DIAGNOSTICS UNAVAILABLE | Required system diagnostics are unavailable. |

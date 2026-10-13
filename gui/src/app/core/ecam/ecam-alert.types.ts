@@ -12,6 +12,7 @@ export type EcamAlertSource =
 
 /** Stable identifiers used by features to raise and clear ECAM alerts. */
 export type EcamAlertCode =
+  | 'BASE_STATION_HEARTBEAT_LOST'
   | 'ARM_CAN_FAULT'
   | 'ARM_JOINT_FAULT'
   | 'ARM_JOINT_LIMIT'
@@ -67,13 +68,13 @@ export type EcamAlertCode =
   | 'LINK_DEGRADED'
   | 'LINK_CONTROLLER_DISCONNECTED'
   | 'LINK_LATENCY_HIGH'
-  | 'LINK_LOST'
   | 'LINK_PACKET_LOSS_HIGH'
   | 'LINK_ROS_UNAVAILABLE'
   | 'POWER_BATTERY_LOW'
   | 'POWER_BATTERY_UNAVAILABLE'
   | 'POWER_RAIL_FAULT'
   | 'POWER_TOTAL_POWER_UNAVAILABLE'
+  | 'ROVER_HEARTBEAT_LOST'
   | 'SYSTEM_CPU_HIGH'
   | 'SYSTEM_CRITICAL_FAULT'
   | 'SYSTEM_DIAGNOSTICS_UNAVAILABLE'
