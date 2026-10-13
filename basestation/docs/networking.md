@@ -95,7 +95,7 @@ docker network create chasmata-local-media
 Then start the mock rover and base-station stacks in either order:
 
 ```bash
-cd test/mock_rover
+cd rover/mock_rover
 docker compose up --build
 ```
 

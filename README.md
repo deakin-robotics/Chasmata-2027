@@ -17,7 +17,7 @@ Then run each stack in its own PowerShell terminal:
 **Mock rover**
 
 ```powershell
-cd test/mock_rover
+cd rover/mock_rover
 docker compose up --build
 ```
 

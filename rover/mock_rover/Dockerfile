@@ -12,7 +12,10 @@ RUN apt-get update \
 
 WORKDIR /workspace
 COPY interfaces/telemetry_interfaces /workspace/src/telemetry_interfaces
-COPY test/mock_rover /workspace/src/mock_rover
+COPY rover/mock_rover/package.xml rover/mock_rover/setup.cfg rover/mock_rover/setup.py /workspace/src/mock_rover/
+COPY rover/mock_rover/launch /workspace/src/mock_rover/launch
+COPY rover/mock_rover/mock_rover /workspace/src/mock_rover/mock_rover
+COPY rover/mock_rover/resource /workspace/src/mock_rover/resource
 
 RUN source /opt/ros/jazzy/setup.bash \
     && colcon build --symlink-install
