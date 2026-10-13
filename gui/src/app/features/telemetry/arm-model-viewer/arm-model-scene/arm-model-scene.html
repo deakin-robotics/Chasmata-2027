@@ -1,0 +1,24 @@
+<div class="viewer-frame">
+  <div #sceneHost class="scene-host"></div>
+
+  @if (status() === 'ready') {
+    <span class="viewer-view-mode" role="status" aria-label="Current camera view">
+      {{ viewModeLabel() }}
+    </span>
+  }
+
+  @if (status() === 'loading' || status() === 'waiting-telemetry') {
+    <div class="viewer-waiting" role="status" aria-live="polite">
+      <mat-icon class="spinning" aria-hidden="true">sync</mat-icon>
+      <span>{{ statusMessage() }}</span>
+    </div>
+  }
+
+  @if (!rosConnected()) {
+    <app-unavailable-overlay label="Arm model unavailable" />
+  }
+
+  @if (status() === 'error') {
+    <p class="viewer-message" role="status">{{ statusMessage() }}</p>
+  }
+</div>

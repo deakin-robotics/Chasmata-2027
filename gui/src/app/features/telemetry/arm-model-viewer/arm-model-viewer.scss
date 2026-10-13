@@ -34,12 +34,8 @@
   min-width: 0;
 }
 
-h2,
-p {
-  margin: 0;
-}
-
 h2 {
+  margin: 0;
   color: var(--dcr-color-text);
   font-size: 0.78rem;
   font-weight: 700;
@@ -137,65 +133,8 @@ h2 {
   }
 }
 
-.viewer-frame {
-  position: relative;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.scene-host {
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  height: 100%;
-}
-
-.viewer-view-mode {
-  position: absolute;
-  top: 0.7rem;
-  right: 0.75rem;
-  z-index: 1;
-  color: var(--dcr-color-normal);
-  font-size: 0.7rem;
-  font-weight: 700;
-  pointer-events: none;
-  user-select: none;
-}
-
-.viewer-waiting {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  color: var(--dcr-color-info);
-  font-size: 0.78rem;
-  font-weight: 700;
-  pointer-events: none;
-}
-
-.viewer-waiting mat-icon {
-  width: 1rem;
-  height: 1rem;
-  font-size: 1rem;
-}
-
-canvas {
+app-arm-model-scene {
   display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.viewer-message {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: max-content;
-  max-width: calc(100% - 2rem);
-  transform: translate(-50%, -50%);
-  color: var(--dcr-color-neutral);
-  font-size: 0.78rem;
-  text-align: center;
+  min-width: 0;
+  min-height: 0;
 }
