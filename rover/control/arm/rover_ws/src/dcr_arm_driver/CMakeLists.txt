@@ -15,6 +15,13 @@ find_package(pluginlib REQUIRED)
 find_package(can_msgs REQUIRED)
 find_package(arm_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/DirectDrive.msg"
+)
+rosidl_get_typesupport_target(direct_drive_typesupport ${PROJECT_NAME}
+  "rosidl_typesupport_cpp")
 
 # Build motor driver library
 add_library(dcr_arm_driver_lib src/motor.cpp)
@@ -47,7 +54,7 @@ ament_target_dependencies(
   arm_interfaces
   std_msgs
 )
-target_link_libraries(arm_hardware_interface dcr_arm_driver_lib)
+target_link_libraries(arm_hardware_interface dcr_arm_driver_lib "${direct_drive_typesupport}")
 
 # Install headers
 install(
@@ -89,6 +96,16 @@ ament_export_dependencies(
   arm_interfaces
   std_msgs
 )
+
+ament_export_dependencies(rosidl_default_runtime)
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_direct_drive test/test_direct_drive.cpp)
+  target_link_libraries(test_direct_drive arm_hardware_interface)
+  ament_target_dependencies(test_direct_drive hardware_interface rclcpp rclcpp_lifecycle
+    can_msgs arm_interfaces std_msgs)
+endif()
 
 # Finalize package
 ament_package()

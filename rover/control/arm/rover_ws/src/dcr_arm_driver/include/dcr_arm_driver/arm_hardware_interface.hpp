@@ -16,7 +16,7 @@
 #include <can_msgs/msg/frame.hpp>
 #include <arm_interfaces/msg/motor_stat1.hpp>
 #include <arm_interfaces/msg/motor_stat2.hpp>
-#include <arm_interfaces/msg/motor_move.hpp>
+#include <dcr_arm_driver/msg/direct_drive.hpp>
 #include <std_msgs/msg/bool.hpp>
 
 #include "dcr_arm_driver/motor.hpp"
@@ -34,6 +34,9 @@ struct JointInfo {
   std::string mode = "No Mode";    // NEW (from MotorStat2.mode)
   std::string fault = "";          // NEW (from MotorStat2.fault)
   double position_command = 0.0;
+  // Protected by lifecycle_mutex_; controller-owned position_command is untouched.
+  uint8_t direct_mode = dcr_arm_driver::msg::DirectDrive::CONTROLLER;
+  double direct_value = 0.0;
 };
 
 class ArmHardwareInterface : public hardware_interface::SystemInterface {
@@ -95,8 +98,8 @@ class ArmHardwareInterface : public hardware_interface::SystemInterface {
   rclcpp::Publisher<arm_interfaces::msg::MotorStat1>::SharedPtr stat1_pub_;
   rclcpp::Publisher<arm_interfaces::msg::MotorStat2>::SharedPtr stat2_pub_;
 
-  // Optional command input (MotorMove) - mirrors the old motor_node behaviour
-  rclcpp::Subscription<arm_interfaces::msg::MotorMove>::SharedPtr move_sub_;
+  // Direct drive is separate from the arm_interfaces telemetry topics.
+  rclcpp::Subscription<dcr_arm_driver::msg::DirectDrive>::SharedPtr direct_drive_sub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr estop_sub_;
   std::atomic<bool> estop_asserted_{false};
   std::vector<JointInfo> joints_;
@@ -104,7 +107,7 @@ class ArmHardwareInterface : public hardware_interface::SystemInterface {
   JointInfo* find_joint(uint32_t can_id);
   void deactivate_endpoints();
   void can_frame_callback(const can_msgs::msg::Frame& msg);
-  void motor_move_callback(const arm_interfaces::msg::MotorMove& msg);
+  void direct_drive_callback(const dcr_arm_driver::msg::DirectDrive& msg);
 };
 
 }  // namespace dcr_arm_driver

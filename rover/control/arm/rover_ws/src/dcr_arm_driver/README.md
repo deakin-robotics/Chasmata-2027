@@ -11,15 +11,30 @@ The end effector is **not** handled here — see
 
 ## Overview
 
-```
-   MoveIt2 / trajectory       ros2_control              /socketcan_bridge/tx        can0
-  ┌───────────────────┐   ┌────────────────────┐   ┌────────────────────┐   ┌──────────────┐
-  │ joint_trajectory  ├──►│ ArmHardwareInterface├──►│ socketcan_bridge    ├──►│ arm motors   │
-  │ _controller       │   │ (SystemInterface)   │   │                     │   │ (0x01..0x03) │
-  └───────────────────┘   └─────────┬──────────┘   └──────────▲─────────┘   └──────────────┘
-                                     │  publishes telemetry    │  /socketcan_bridge/rx
-                                     ▼  (arm_interfaces)       │
-                              /motor_stat_1, /motor_stat_2, /motor_move
+```mermaid
+flowchart LR
+    moveit[MoveIt2 / trajectory client] --> controller[joint_trajectory_controller]
+    direct["/arm/direct_drive<br/>dcr_arm_driver/msg/DirectDrive"]
+    estop["/estop<br/>std_msgs/msg/Bool"]
+
+    subgraph hardware[ArmHardwareInterface · ros2_control]
+        commands["Per-joint command selection<br/>Controller position or latched direct position / speed"]
+        write["write() · 50 Hz<br/>E-stop overrides with zero speed"]
+        read["read() · 50 Hz<br/>Request motor status"]
+        feedback["CAN feedback callback<br/>Update joint state and publish telemetry"]
+        commands --> write
+    end
+
+    controller -->|position command interfaces| commands
+    direct --> commands
+    estop --> write
+    write -->|/socketcan_bridge/tx| bridge[nobleo_socketcan_bridge]
+    read -->|/socketcan_bridge/tx| bridge
+    bridge -->|CAN commands / status requests · can0| motors["Arm motors<br/>CAN IDs 0x01–0x03"]
+    motors -->|CAN status · can0| bridge
+    bridge -->|/socketcan_bridge/rx| feedback
+    feedback -->|position / velocity state interfaces| controller
+    feedback --> telemetry["/motor_stat_1 · MotorStat1<br/>/motor_stat_2 · MotorStat2<br/>arm_interfaces telemetry"]
 ```
 
 * Provides a **ros2_control `SystemInterface`** plugin
@@ -28,8 +43,8 @@ The end effector is **not** handled here — see
   **subscribes** to `/socketcan_bridge/rx` (the `nobleo_socketcan_bridge`
   topics).
 * Exposes telemetry from `arm_interfaces` on dedicated topics
-  (`/motor_stat_1`, `/motor_stat_2`) and accepts an optional command input on
-  `/motor_move`.
+  (`/motor_stat_1`, `/motor_stat_2`). Direct drive uses the separate
+  `/arm/direct_drive` topic with `dcr_arm_driver/msg/DirectDrive`.
 * Runs a **50 Hz** control loop (configured in `arm_controllers.yaml`).
 
 ---
@@ -90,7 +105,8 @@ All arm commands use **CAN ID = joint CAN ID**, with the command byte in
 |------------------------|------------------|-----------|----------------------------------------|
 | `/motor_stat_1`        | `MotorStat1`     | publish   | temperature, current, speed, angle     |
 | `/motor_stat_2`        | `MotorStat2`     | publish   | bus voltage, bus current, mode, faults |
-| `/motor_move`          | `MotorMove`      | subscribe | optional direct move command           |
+| `/arm/direct_drive`   | `dcr_arm_driver/DirectDrive` | subscribe | persistent per-joint direct command |
+| `/estop`              | `std_msgs/Bool`  | subscribe | stop all joints while asserted         |
 | `/socketcan_bridge/tx` | `can_msgs/Frame` | publish   | outgoing CAN frames                    |
 | `/socketcan_bridge/rx` | `can_msgs/Frame` | subscribe | incoming CAN frames                    |
 
@@ -115,13 +131,25 @@ float64 busc
 string  mode
 string  fault
 
-# MotorMove.msg
-int64   id
-bool    mode      # true = position control, false = speed control
-float64 angle
 ```
 
 ---
+
+Direct-drive commands are defined in `dcr_arm_driver`, separately from telemetry:
+
+```text
+# DirectDrive.msg
+uint8 CONTROLLER=0
+uint8 POSITION=1
+uint8 SPEED=2
+uint32 id       # joint CAN ID
+uint8 mode
+float64 value  # degrees for POSITION; motor speed units for SPEED
+```
+
+`/motor_move` is no longer subscribed to. The legacy `MotorMove` definition
+remains in `arm_interfaces` for compatibility, but this driver uses that package
+only for telemetry.
 
 ## Build
 
@@ -137,7 +165,8 @@ source install/setup.bash
 
 * ROS 2 Jazzy: `rclcpp`, `rclcpp_lifecycle`, `hardware_interface`, `pluginlib`,
   `controller_manager`, `joint_state_broadcaster`, `joint_trajectory_controller`
-* `can_msgs`, `arm_interfaces`
+* `can_msgs`, `arm_interfaces`, `std_msgs`, `rosidl_default_generators`,
+  `rosidl_default_runtime`
 * `nobleo_socketcan_bridge` (runtime — provides the CAN <-> ROS bridge)
 
 Install via `rosdep` if missing:
@@ -213,15 +242,35 @@ ros2 topic echo /motor_stat_1
 ros2 topic echo /motor_stat_2
 ```
 
-Send an optional direct move command (bypasses MoveIt2):
+Direct drive bypasses MoveIt2 for the selected joint. Each accepted command is
+latched and sent by the 50 Hz `write()` loop until replaced, released with
+`CONTROLLER`, or reset on hardware activation. Other joints remain under
+controller control. Speed commands persist even if the publishing node exits;
+send zero speed to stop that joint.
 
 ```bash
-# position control (mode: true), angle in degrees
-ros2 topic pub --once /motor_move arm_interfaces/msg/MotorMove "{id: 1, mode: true, angle: 10.0}"
+# Position control (POSITION=1), value in degrees
+ros2 topic pub --once /arm/direct_drive dcr_arm_driver/msg/DirectDrive "{id: 1, mode: 1, value: 10.0}"
 
-# speed control (mode: false)
-ros2 topic pub --once /motor_move arm_interfaces/msg/MotorMove "{id: 1, mode: false, angle: 20.0}"
+# Speed control (SPEED=2), CAN speed payload = value * 100
+ros2 topic pub --once /arm/direct_drive dcr_arm_driver/msg/DirectDrive "{id: 1, mode: 2, value: 20.0}"
+
+# Stop this joint while retaining direct control
+ros2 topic pub --once /arm/direct_drive dcr_arm_driver/msg/DirectDrive "{id: 1, mode: 2, value: 0.0}"
+
+# Return this joint to its current ros2_control position target (CONTROLLER=0)
+ros2 topic pub --once /arm/direct_drive dcr_arm_driver/msg/DirectDrive "{id: 1, mode: 0}"
 ```
+
+The controller can continue updating its target during direct drive. Returning
+to `CONTROLLER` immediately uses that target; set the intended controller target
+before handing control back. Unknown IDs, invalid modes, and non-finite or
+unencodable values are ignored. Commands received while inactive or while
+E-stop is asserted are ignored.
+
+`/estop` overrides both command sources with repeated zero-speed CAN frames.
+Clearing E-stop resumes the previously selected command, including a latched
+direct speed. Hardware reactivation resets every joint to controller mode.
 
 Watch the raw CAN frames:
 
@@ -255,6 +304,8 @@ dcr_arm_driver/
 ├── include/dcr_arm_driver/
 │   ├── motor.hpp
 │   └── arm_hardware_interface.hpp
+├── msg/
+│   └── DirectDrive.msg
 ├── src/
 │   ├── motor.cpp
 │   └── arm_hardware_interface.cpp

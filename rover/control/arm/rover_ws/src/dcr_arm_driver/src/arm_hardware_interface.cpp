@@ -1,5 +1,8 @@
 #include "dcr_arm_driver/arm_hardware_interface.hpp"
 
+#include <cmath>
+#include <limits>
+
 #include <pluginlib/class_list_macros.hpp>
 #include <rclcpp/rclcpp.hpp>
 
@@ -86,7 +89,7 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_activate(
 
   // IMPORTANT: do NOT create a private node here. A node created inside a
   // ros2_control plugin is never added to any executor, so its subscription
-  // callbacks (from /socketcan_bridge/rx and /motor_move) would never fire.
+  // callbacks (from /socketcan_bridge/rx and /arm/direct_drive) would never fire.
   // Instead, use the node that controller_manager already owns and spins.
   auto node = this->get_node();
   node_ = node;
@@ -109,12 +112,18 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_activate(
   stat2_pub_ = node->create_publisher<arm_interfaces::msg::MotorStat2>(
       "/motor_stat_2", rclcpp::QoS(100));
 
-  // Optional command input (mirrors the old motor_node "/motor_move" topic)
-  move_sub_ = node->create_subscription<arm_interfaces::msg::MotorMove>(
-      "/motor_move", rclcpp::QoS(100),
-      [this](const arm_interfaces::msg::MotorMove& msg) {
-        this->motor_move_callback(msg);
+  // Direct commands are latched per joint and sent by write(), so controller
+  // positions cannot overwrite them on the next control iteration.
+  direct_drive_sub_ = node->create_subscription<dcr_arm_driver::msg::DirectDrive>(
+      "/arm/direct_drive", rclcpp::QoS(1),
+      [this](const dcr_arm_driver::msg::DirectDrive& msg) {
+        this->direct_drive_callback(msg);
       });
+
+  for (auto& joint : joints_) {
+    joint.direct_mode = dcr_arm_driver::msg::DirectDrive::CONTROLLER;
+    joint.direct_value = 0.0;
+  }
 
   // Keep the stop state locally because write() runs in the ros2_control loop.
   estop_sub_ = node->create_subscription<std_msgs::msg::Bool>(
@@ -173,7 +182,7 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_error(
 void ArmHardwareInterface::deactivate_endpoints() {
   std::lock_guard<std::mutex> lock(lifecycle_mutex_);
   active_ = false;
-  move_sub_.reset();
+  direct_drive_sub_.reset();
   estop_sub_.reset();
   can_sub_.reset();
   stat1_pub_.reset();
@@ -233,16 +242,26 @@ hardware_interface::return_type ArmHardwareInterface::read(
 
 hardware_interface::return_type ArmHardwareInterface::write(
     const rclcpp::Time& /*time*/, const rclcpp::Duration& /*period*/) {
+  std::lock_guard<std::mutex> lock(lifecycle_mutex_);
+  if (!active_ || !can_pub_) {
+    return hardware_interface::return_type::OK;
+  }
   const bool estop_asserted = estop_asserted_.load(std::memory_order_relaxed);
   for (auto& joint : joints_) {
     if (can_pub_) {
       // Repeated zero-speed commands clear any motor motion command already in
       // flight while the E-stop is active. Do not send trajectory positions.
-      auto cmd_msg = estop_asserted
-                         ? motor_driver_->speed_control(joint.can_id, 0.0f)
-                         : motor_driver_->position_control(
-                               joint.can_id,
-                               joint.position_command * 180 / 3.14159265);
+      can_msgs::msg::Frame cmd_msg;
+      if (estop_asserted) {
+        cmd_msg = motor_driver_->speed_control(joint.can_id, 0.0f);
+      } else if (joint.direct_mode == dcr_arm_driver::msg::DirectDrive::SPEED) {
+        cmd_msg = motor_driver_->speed_control(joint.can_id, joint.direct_value);
+      } else if (joint.direct_mode == dcr_arm_driver::msg::DirectDrive::POSITION) {
+        cmd_msg = motor_driver_->position_control(joint.can_id, joint.direct_value);
+      } else {
+        cmd_msg = motor_driver_->position_control(
+            joint.can_id, joint.position_command * 180 / 3.14159265);
+      }
       can_pub_->publish(cmd_msg);
     }
   }
@@ -292,34 +311,42 @@ void ArmHardwareInterface::can_frame_callback(
   }
 }
 
-void ArmHardwareInterface::motor_move_callback(
-    const arm_interfaces::msg::MotorMove& msg) {
+void ArmHardwareInterface::direct_drive_callback(
+    const dcr_arm_driver::msg::DirectDrive& msg) {
   std::lock_guard<std::mutex> lock(lifecycle_mutex_);
-  if (!active_) {
+  if (!active_ || estop_asserted_.load(std::memory_order_relaxed)) {
     return;
   }
 
-  // Optional external command path (kept for parity with old motor_node).
-  // mode == true -> position control (angle in degrees), else speed control.
-  JointInfo* joint = find_joint(static_cast<uint32_t>(msg.id));
-  if (joint == nullptr || !can_pub_) {
+  JointInfo* joint = find_joint(msg.id);
+  if (joint == nullptr) {
     return;
   }
 
-  if (estop_asserted_.load(std::memory_order_relaxed)) {
-    can_pub_->publish(motor_driver_->speed_control(joint->can_id, 0.0f));
+  using DirectDrive = dcr_arm_driver::msg::DirectDrive;
+  if (msg.mode != DirectDrive::CONTROLLER && msg.mode != DirectDrive::POSITION &&
+      msg.mode != DirectDrive::SPEED) {
+    RCLCPP_WARN(rclcpp::get_logger("ArmHardwareInterface"),
+                "Ignoring invalid direct-drive mode: %u", msg.mode);
     return;
   }
-
-  can_msgs::msg::Frame cmd;
-  if (msg.mode) {
-    cmd = motor_driver_->position_control(joint->can_id,
-                                          static_cast<float>(msg.angle));
-  } else {
-    cmd = motor_driver_->speed_control(joint->can_id,
-                                       static_cast<float>(msg.angle));
+  if (msg.mode != DirectDrive::CONTROLLER) {
+    // Motor encoders convert the scaled float value to int32_t.
+    const float value = static_cast<float>(msg.value);
+    const float scaled = msg.mode == DirectDrive::POSITION
+                             ? value / 360.0f * 16384.0f
+                             : value * 100.0f;
+    if (!std::isfinite(scaled) ||
+        static_cast<double>(scaled) < std::numeric_limits<int32_t>::min() ||
+        static_cast<double>(scaled) > std::numeric_limits<int32_t>::max()) {
+      RCLCPP_WARN(rclcpp::get_logger("ArmHardwareInterface"),
+                  "Ignoring invalid direct-drive value");
+      return;
+    }
   }
-  can_pub_->publish(cmd);
+
+  joint->direct_mode = msg.mode;
+  joint->direct_value = msg.value;
 }
 
 }  // namespace dcr_arm_driver
