@@ -1,0 +1,127 @@
+slam_toolbox:
+  ros__parameters:
+
+    # -----------------------------------------------------------------------
+    # Solver
+    # -----------------------------------------------------------------------
+    solver_plugin: solver_plugins::CeresSolver
+    ceres_linear_solver: SPARSE_NORMAL_CHOLESKY
+    ceres_preconditioner: SCHUR_JACOBI
+    ceres_trust_region: LEVENBERG_MARQUARDT
+    ceres_dogleg_type: TRADITIONAL_DOGLEG
+    ceres_loss_function: None
+
+    # -----------------------------------------------------------------------
+    # Frames & Topics
+    # -----------------------------------------------------------------------
+    odom_frame:  odom
+    map_frame:   map
+    # base_link is the physical robot body — SLAM tracks this directly.
+    # base_footprint is only a ground-plane projection helper for Nav2 costmaps.
+    base_frame:  base_link
+    # Standard topic; real LiDAR drivers are remapped to /scan in hardware_bringup.
+    scan_topic:  /scan
+    mode:        mapping
+    use_map_saver: true
+
+    # -----------------------------------------------------------------------
+    # Performance / Timing
+    # -----------------------------------------------------------------------
+    debug_logging: false
+
+    # Process every scan (throttle_scans: 1). Increase to 2 or 3 if CPU is tight.
+    throttle_scans: 1
+
+    # How often the map->odom TF is re-published (seconds). 0.02 = 50 Hz.
+    transform_publish_period: 0.02
+
+    # Rebuild the occupancy grid every 3 s (faster than default 5 s).
+    map_update_interval: 3.0
+
+    # 5 cm cells — good resolution for outdoor terrain.
+    resolution: 0.05
+
+    # Conservative range cap.  RPLIDAR A3 reaches ~12 m reliably outdoors;
+    # capping below the sensor's absolute maximum keeps noise hits out of the map.
+    # Assumption: real LiDAR max range <= 12 m.  Raise if using a longer-range unit.
+    max_laser_range: 12.0
+
+    # Must match LaserScan.range_min published by the sensor (RPLIDAR A3 = 0.15 m).
+    # Prevents SLAM from processing returns that are within the sensor's blind zone.
+    minimum_laser_range: 0.15
+
+    # Minimum time between scan insertions (s). 0.5 s @ 10 Hz = every 5th scan.
+    minimum_time_interval: 0.5
+
+    # Allow more TF latency for outdoor hardware on a real network.
+    transform_timeout: 0.5
+
+    # Keep 30 s of TF history so loop-closure can look back further.
+    tf_buffer_duration: 30.0
+
+    # Stack memory for the Ceres solver.
+    stack_size_to_use: 40000000
+
+    # Allow RViz interactive mode (manual pose corrections).
+    enable_interactive_mode: true
+
+    # -----------------------------------------------------------------------
+    # Scan Matching
+    # -----------------------------------------------------------------------
+    use_scan_matching:    true
+    use_scan_barycenter:  true
+
+    # Trigger a new node after 0.3 m of travel (down from 0.5 — better coverage
+    # for slow rover motion and tight terrain features).
+    minimum_travel_distance: 0.3
+
+    # Trigger a new node after ~11 deg of heading change (down from 0.5 rad ~29 deg).
+    minimum_travel_heading: 0.2
+
+    # Larger scan buffer improves loop closure quality.
+    scan_buffer_size: 15
+    scan_buffer_maximum_scan_distance: 10.0
+
+    link_match_minimum_response_fine:  0.1
+    link_scan_maximum_distance:        1.5
+
+    # Wider search area for outdoor/larger spaces.
+    loop_search_maximum_distance: 6.0
+
+    # -----------------------------------------------------------------------
+    # Loop Closure
+    # -----------------------------------------------------------------------
+    do_loop_closing: true
+    loop_match_minimum_chain_size:       10
+    loop_match_maximum_variance_coarse:  3.0
+    loop_match_minimum_response_coarse:  0.35
+    loop_match_minimum_response_fine:    0.45
+
+    # -----------------------------------------------------------------------
+    # Correlation
+    # -----------------------------------------------------------------------
+    correlation_search_space_dimension:       0.5
+    correlation_search_space_resolution:      0.01
+    correlation_search_space_smear_deviation: 0.1
+
+    # -----------------------------------------------------------------------
+    # Loop Search Space
+    # -----------------------------------------------------------------------
+    loop_search_space_dimension:          8.0
+    loop_search_space_resolution:         0.05
+    loop_search_space_smear_deviation:    0.03
+
+    # -----------------------------------------------------------------------
+    # Scan Matcher Penalties
+    # -----------------------------------------------------------------------
+    distance_variance_penalty: 0.5
+    angle_variance_penalty:    1.0
+
+    fine_search_angle_offset:   0.00349
+    coarse_search_angle_offset: 0.349
+    coarse_angle_resolution:    0.0349
+    minimum_angle_penalty:      0.9
+    minimum_distance_penalty:   0.5
+    use_response_expansion:     true
+
+
