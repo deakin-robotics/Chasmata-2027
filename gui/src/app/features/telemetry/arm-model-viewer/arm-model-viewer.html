@@ -3,38 +3,41 @@
     <h2>Arm model viewer</h2>
     <div class="viewer-statuses">
       <span
-        class="viewer-status"
+        class="viewer-status viewer-status-3d"
         [class.viewer-status-error]="sceneState().status === 'error' || !rosConnected()"
         [class.viewer-status-stale]="sceneState().telemetryStale"
+        [class.viewer-status-waiting]="sceneState().status === 'waiting-telemetry'"
       >
         3D: {{ viewerStatusLabel() }}
       </span>
-      <span class="status-separator" aria-hidden="true">|</span>
       <span
-        class="execution-status"
-        [class.execution-status-success]="executionStatus() === 'succeeded'"
-        [class.execution-status-error]="executionStatus() === 'failed'"
+        class="execution-status viewer-status-move"
+        [class.execution-status-success]="moveAvailable() && executionStatus() === 'succeeded'"
+        [class.execution-status-error]="moveAvailable() && executionStatus() === 'failed'"
+        [class.execution-status-disconnected]="!moveAvailable()"
         aria-live="polite"
       >
-        MOVE: {{ rosConnected() ? executionStatusLabel() : '—' }}
+        MOVE: {{ moveAvailable() ? executionStatusLabel() : 'DISCONNECTED' }}
       </span>
-      <span class="status-separator" aria-hidden="true">|</span>
       <span
-        class="ik-status"
-        [class.ik-status-solving]="ikStatus() === 'solving'"
-        [class.ik-status-valid]="ikStatus() === 'valid'"
-        [class.ik-status-unreachable]="ikStatus() === 'unreachable'"
-        [class.ik-status-invalid]="ikStatus() === 'invalid'"
+        class="ik-status viewer-status-ik"
+        [class.ik-status-solving]="baseStationAvailable() && ikStatus() === 'solving'"
+        [class.ik-status-valid]="baseStationAvailable() && ikStatus() === 'valid'"
+        [class.ik-status-unreachable]="baseStationAvailable() && ikStatus() === 'unreachable'"
+        [class.ik-status-invalid]="baseStationAvailable() && ikStatus() === 'invalid'"
+        [class.ik-status-disconnected]="!baseStationAvailable()"
         aria-live="polite"
       >
-        @if (rosConnected() && ikStatus() === 'solving') {
+        @if (baseStationAvailable() && ikStatus() === 'solving') {
           <mat-icon class="spinning" aria-hidden="true">sync</mat-icon>
         }
-        IK: {{ rosConnected() ? ikStatusLabel() : '—' }}
+        IK: {{ baseStationAvailable() ? ikStatusLabel() : 'DISCONNECTED' }}
       </span>
-      <span class="status-separator" aria-hidden="true">|</span>
-      <span class="orientation-mode-status" aria-live="polite">
-        MODE: {{ rosConnected() ? (orientationMode() === 'locked' ? 'LOCKED' : 'UNLOCKED') : '—' }}
+      <span class="orientation-mode-status viewer-status-mode" aria-live="polite">
+        MODE:
+        {{
+          baseStationAvailable() ? (orientationMode() === 'locked' ? 'LOCKED' : 'UNLOCKED') : '—'
+        }}
       </span>
     </div>
   </header>

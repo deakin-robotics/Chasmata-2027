@@ -1,8 +1,16 @@
+/**
+ * Status-bar labels:
+ * - 3D: LOADING, WAITING, READY, STALE, ERROR, UNAVAILABLE
+ * - MOVE: DISCONNECTED, WAITING, PLANNING, EXECUTING, DONE, CANCELED, FAILED
+ * - IK: DISCONNECTED, WAITING, SOLVING, VALID, UNREACHABLE, INVALID
+ * - MODE: em dash, LOCKED, UNLOCKED
+ */
 import { Component, computed, inject, signal } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 
 import { ArmIkCoordinator } from '../../../core/arm/ik/arm-ik-coordinator';
 import { RosConnection } from '../../../core/ros/ros-connection';
+import { RosHeartbeatMonitor } from '../../../core/ros/ros-heartbeat-monitor';
 import { ArmModelScene } from './arm-model-scene/arm-model-scene';
 import type { ArmModelSceneState, ArmModelSceneStatus } from './arm-model-scene/arm-model-scene';
 
@@ -15,6 +23,7 @@ import type { ArmModelSceneState, ArmModelSceneStatus } from './arm-model-scene/
 export class ArmModelViewer {
   private readonly armIkCoordinator = inject(ArmIkCoordinator);
   private readonly rosConnection = inject(RosConnection);
+  private readonly rosHeartbeatMonitor = inject(RosHeartbeatMonitor);
 
   readonly sceneState = signal<ArmModelSceneState>({
     status: 'unavailable',
@@ -26,7 +35,7 @@ export class ArmModelViewer {
       case 'loading':
         return 'LOADING';
       case 'waiting-telemetry':
-        return 'WAITING FOR TELEMETRY';
+        return 'WAITING';
       case 'ready':
         return telemetryStale ? 'STALE' : 'READY';
       case 'error':
@@ -40,6 +49,9 @@ export class ArmModelViewer {
   readonly ikStatusLabel = this.armIkCoordinator.statusLabel;
   readonly orientationMode = this.armIkCoordinator.orientationMode;
   readonly executionStatus = this.armIkCoordinator.executionStatus;
+  readonly baseStationAvailable = this.rosHeartbeatMonitor.baseStationAvailable;
+  readonly roverAvailable = this.rosHeartbeatMonitor.roverAvailable;
+  readonly moveAvailable = computed(() => this.baseStationAvailable() && this.roverAvailable());
   readonly executionStatusLabel = computed(() => {
     switch (this.executionStatus()) {
       case 'planning':

@@ -8,6 +8,7 @@
   position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  container-type: inline-size;
   height: 100%;
   min-height: 8rem;
   overflow: hidden;
@@ -59,16 +60,15 @@ h2 {
   color: var(--dcr-color-caution);
 }
 
-.status-separator {
-  color: var(--dcr-color-neutral);
-  font-size: 0.7rem;
-  font-weight: 700;
+.viewer-status-waiting {
+  color: var(--dcr-color-info);
 }
 
 .execution-status {
   color: var(--dcr-color-info);
   font-size: 0.7rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .execution-status-success {
@@ -79,6 +79,10 @@ h2 {
   color: var(--dcr-color-critical);
 }
 
+.execution-status-disconnected {
+  color: var(--dcr-color-critical);
+}
+
 .ik-status {
   display: inline-flex;
   align-items: center;
@@ -86,6 +90,7 @@ h2 {
   color: var(--dcr-color-info);
   font-size: 0.7rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .ik-status mat-icon {
@@ -110,11 +115,61 @@ h2 {
   color: var(--dcr-color-critical);
 }
 
+.ik-status-disconnected {
+  color: var(--dcr-color-critical);
+}
+
 .orientation-mode-status {
   color: var(--dcr-color-info);
   font-size: 0.7rem;
   font-weight: 700;
   white-space: nowrap;
+}
+
+@container (max-width: 40rem) {
+  .viewer-header {
+    display: grid;
+    grid-template-areas:
+      'title move three-d'
+      'title ik mode';
+    grid-template-columns: minmax(5.5rem, auto) repeat(2, minmax(0, 1fr));
+    align-items: center;
+    row-gap: 0.15rem;
+    column-gap: 0.75rem;
+  }
+
+  .viewer-header h2 {
+    grid-area: title;
+  }
+
+  .viewer-statuses {
+    display: contents;
+  }
+
+  .viewer-status-move {
+    grid-area: move;
+  }
+
+  .viewer-status-3d {
+    grid-area: three-d;
+  }
+
+  .viewer-status-ik {
+    grid-area: ik;
+  }
+
+  .viewer-status-mode {
+    grid-area: mode;
+  }
+
+  .viewer-status-move,
+  .viewer-status-ik,
+  .viewer-status-3d,
+  .viewer-status-mode {
+    justify-self: end;
+    line-height: 1;
+    text-align: right;
+  }
 }
 
 .spinning {
