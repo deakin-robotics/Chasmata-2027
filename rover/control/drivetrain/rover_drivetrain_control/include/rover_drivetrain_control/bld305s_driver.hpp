@@ -85,7 +85,6 @@ public:
   };
 
   static constexpr int DESIGN_BAUD_RATE = 38400;  // AD-07, bench-gated
-  static constexpr std::uint32_t COMM_FAILURE_LIMIT = 3; // consecutive FAILED CYCLES (AD-15)
 
   explicit Bld305sDriver(RtuConfig config);
   ~Bld305sDriver();

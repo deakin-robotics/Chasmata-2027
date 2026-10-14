@@ -74,6 +74,22 @@ int main()
   CHECK(driver.communicationState(1)==Driver::CommunicationState::HEALTHY);
   CHECK(driver.telemetryValid(1));
   CHECK(driver.controllerState(1)==Driver::ControllerState::UNKNOWN);
+  // After a good cycle: DEGRADED, not LOST, for one and two failed cycles, and
+  // the good data stays valid for exactly one missed cycle (AD-15 grace).
+  for (int cycle=1;cycle<=2;++cycle) {
+    CHECK(driver.beginCycle(1,2).ok());
+    fail_one=true;
+    CHECK(!driver.readTemperatureRaw(1,value).ok());
+    fail_one=false;
+    CHECK(driver.readTemperatureRaw(2,value).ok());
+    CHECK(driver.readCurrentRaw(2,value).ok());
+    CHECK(driver.readVoltageRaw(2,value).ok());
+    CHECK(driver.endCycle().ok());
+    CHECK(driver.consecutiveFailures(1)==static_cast<unsigned>(cycle));
+    CHECK(driver.communicationState(1)==Driver::CommunicationState::DEGRADED);
+    CHECK(driver.telemetryValid(1)==(cycle==1));
+    CHECK(driver.communicationState(2)==Driver::CommunicationState::HEALTHY);
+  }
   driver.close();
   std::cout<<"mock libmodbus driver per-cycle tests passed\n";
 }

@@ -65,8 +65,8 @@ void WheelCycleHealth::finishCycle(bool all_ok) noexcept
     ++missed_cycles;
   }
   // A failed cycle may keep previously good data valid (AD-15 grace), never grant it.
-  valid = valid && missed_cycles < 2;
-  lost = missed_cycles >= 3;
+  valid = valid && missed_cycles < INVALID_AFTER_MISSED_CYCLES;
+  lost = missed_cycles >= LOST_AFTER_MISSED_CYCLES;
 }
 
 bool lateTrigger(std::int64_t prev, std::int64_t now, double allowed_ms) noexcept

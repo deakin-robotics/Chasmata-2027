@@ -41,6 +41,9 @@ struct MotorSetpoint
 
 struct WheelCycleHealth
 {
+  static constexpr std::uint32_t INVALID_AFTER_MISSED_CYCLES = 2;  // AD-15
+  static constexpr std::uint32_t LOST_AFTER_MISSED_CYCLES = 3;     // AD-15
+
   std::uint32_t missed_cycles{0};
   bool valid{false};
   bool lost{false};
