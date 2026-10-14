@@ -19,6 +19,7 @@
 #include <dcr_arm_driver/msg/direct_drive.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_srvs/srv/trigger.hpp>
+#include <action_msgs/msg/goal_status_array.hpp>
 
 #include "dcr_arm_driver/motor.hpp"
 
@@ -32,12 +33,16 @@ struct JointInfo {
   double position_min = 0.0;
   double position_max = 0.0;
   bool has_position_feedback = false;
+  bool has_pending_status1 = false;
+  double pending_angle_degrees = 0.0;
+  double pending_speed_rpm = 0.0;
   double temperature = 0.0;        // NEW (from MotorStat1.temp)
   double bus_voltage = 0.0;        // NEW (from MotorStat2.busv)
   double bus_current = 0.0;        // NEW (from MotorStat2.busc)
   std::string mode = "No Mode";    // NEW (from MotorStat2.mode)
   std::string fault = "";          // NEW (from MotorStat2.fault)
   double position_command = 0.0;
+  double last_position_command = 0.0;
   // Protected by lifecycle_mutex_; controller-owned position_command is untouched.
   uint8_t direct_mode = dcr_arm_driver::msg::DirectDrive::CONTROLLER;
   double direct_value = 0.0;
@@ -102,17 +107,23 @@ class ArmHardwareInterface : public hardware_interface::SystemInterface {
   rclcpp::Publisher<arm_interfaces::msg::MotorStat1>::SharedPtr stat1_pub_;
   rclcpp::Publisher<arm_interfaces::msg::MotorStat2>::SharedPtr stat2_pub_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr set_home_service_;
+  rclcpp::Subscription<action_msgs::msg::GoalStatusArray>::SharedPtr
+      trajectory_status_sub_;
 
   // Direct drive is separate from the arm_interfaces telemetry topics.
   rclcpp::Subscription<dcr_arm_driver::msg::DirectDrive>::SharedPtr direct_drive_sub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr estop_sub_;
   std::atomic<bool> estop_asserted_{false};
+  bool trajectory_goal_active_{false};
+  bool home_pending_{false};
   std::vector<JointInfo> joints_;
 
   JointInfo* find_joint(uint32_t can_id);
   void ensure_estop_subscription(const rclcpp::Node::SharedPtr& node);
   void deactivate_endpoints();
   void can_frame_callback(const can_msgs::msg::Frame& msg);
+  void trajectory_status_callback(
+      const action_msgs::msg::GoalStatusArray& msg);
   void direct_drive_callback(const dcr_arm_driver::msg::DirectDrive& msg);
 };
 

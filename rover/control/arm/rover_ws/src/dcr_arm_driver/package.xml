@@ -19,6 +19,7 @@
   <depend>arm_interfaces</depend>
   <depend>std_msgs</depend>
   <depend>std_srvs</depend>
+  <depend>action_msgs</depend>
   <depend>hardware_interface</depend>
   <depend>pluginlib</depend>
   <depend>joint_state_broadcaster</depend>

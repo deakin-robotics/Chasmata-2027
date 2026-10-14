@@ -40,14 +40,18 @@ class DirectDriveTest : public ::testing::Test {
     frames_sub = hardware.node->create_subscription<can_msgs::msg::Frame>(
         "/socketcan_bridge/tx", 100,
         [this](const can_msgs::msg::Frame& frame) { frames.push_back(frame); });
+    feedback = hardware.node->create_publisher<can_msgs::msg::Frame>(
+        "/socketcan_bridge/rx", 10);
     commands = hardware.node->create_publisher<DirectDrive>("/arm/direct_drive", 1);
     estop = hardware.node->create_publisher<std_msgs::msg::Bool>("/estop", 1);
     ASSERT_EQ(hardware.on_activate(rclcpp_lifecycle::State()),
               hardware_interface::CallbackReturn::SUCCESS);
+    publish_feedback();
+    ASSERT_EQ(hardware.read(rclcpp::Time(0), rclcpp::Duration::from_seconds(0.02)),
+              hardware_interface::return_type::OK);
     auto interfaces = hardware.export_command_interfaces();
     ASSERT_TRUE(interfaces[0].set_value(0.5));
     ASSERT_TRUE(interfaces[1].set_value(1.0));
-    spin();
   }
 
   void TearDown() override {
@@ -74,6 +78,17 @@ class DirectDriveTest : public ::testing::Test {
     spin();
   }
 
+  void publish_feedback() {
+    for (uint32_t id = 1; id <= 2; ++id) {
+      can_msgs::msg::Frame frame;
+      frame.id = id;
+      frame.dlc = 8;
+      frame.data[0] = 0xA4;
+      feedback->publish(frame);
+    }
+    spin();
+  }
+
   void check_write(const can_msgs::msg::Frame& expected) {
     frames.clear();
     ASSERT_EQ(hardware.write(rclcpp::Time(0), rclcpp::Duration::from_seconds(0.02)),
@@ -90,6 +105,7 @@ class DirectDriveTest : public ::testing::Test {
   dcr_arm_driver::Motor motor;
   std::unique_ptr<rclcpp::executors::SingleThreadedExecutor> executor;
   rclcpp::Subscription<can_msgs::msg::Frame>::SharedPtr frames_sub;
+  rclcpp::Publisher<can_msgs::msg::Frame>::SharedPtr feedback;
   rclcpp::Publisher<DirectDrive>::SharedPtr commands;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr estop;
   std::vector<can_msgs::msg::Frame> frames;
@@ -118,6 +134,12 @@ TEST_F(DirectDriveTest, InvalidCommandsDoNotReplaceLatchedCommand) {
   check_write(motor.speed_control(1, 20.0));
 }
 
+TEST_F(DirectDriveTest, PositionOutsideJointLimitsIsRejected) {
+  command(DirectDrive::POSITION, 10.0);
+  command(DirectDrive::POSITION, 181.0);
+  check_write(motor.position_control(1, 10.0));
+}
+
 TEST_F(DirectDriveTest, EstopOverridesDirectDriveAndActivationResetsIt) {
   command(DirectDrive::SPEED, 20.0);
   std_msgs::msg::Bool stop;
@@ -138,6 +160,10 @@ TEST_F(DirectDriveTest, EstopOverridesDirectDriveAndActivationResetsIt) {
   check_write(motor.speed_control(1, 20.0));
   hardware.on_deactivate(rclcpp_lifecycle::State());
   hardware.on_activate(rclcpp_lifecycle::State());
-  spin();
+  publish_feedback();
+  hardware.read(rclcpp::Time(0), rclcpp::Duration::from_seconds(0.02));
+  auto interfaces = hardware.export_command_interfaces();
+  ASSERT_TRUE(interfaces[0].set_value(0.5));
+  ASSERT_TRUE(interfaces[1].set_value(1.0));
   check_write(motor.position_control(1, 0.5 * 180 / 3.14159265));
 }

@@ -3,6 +3,7 @@
 #include <cmath>
 #include <limits>
 #include <optional>
+#include <algorithm>
 
 #include <pluginlib/class_list_macros.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -191,7 +192,9 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_activate(
     joint.direct_mode = dcr_arm_driver::msg::DirectDrive::CONTROLLER;
     joint.direct_value = 0.0;
     joint.has_position_feedback = false;
+    joint.has_pending_status1 = false;
   }
+  trajectory_goal_active_ = false;
 
   auto clear_fault_msg = motor_driver_->clr_faults();
   can_pub_->publish(clear_fault_msg);
@@ -211,19 +214,48 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_activate(
           response->message = "Cannot set home while E-stop is asserted";
           return;
         }
+        if (trajectory_goal_active_) {
+          response->success = false;
+          response->message =
+              "Cannot set home while a trajectory goal is active or canceling";
+          return;
+        }
+        constexpr double kHomeToleranceRadians = 0.02;
+        constexpr double kHomeVelocityTolerance = 0.05;
+        for (const auto& joint : joints_) {
+          if (joint.direct_mode !=
+                  dcr_arm_driver::msg::DirectDrive::CONTROLLER ||
+              !joint.has_position_feedback ||
+              std::abs(joint.position) > kHomeToleranceRadians ||
+              std::abs(joint.velocity) > kHomeVelocityTolerance ||
+              std::abs(joint.last_position_command) >
+                  kHomeToleranceRadians) {
+            response->success = false;
+            response->message =
+                "Move every joint to its existing zero position, return direct drive to controller mode, and retry";
+            return;
+          }
+        }
 
         for (auto& joint : joints_) {
           can_pub_->publish(motor_driver_->speed_control(joint.can_id, 0.0f));
           can_pub_->publish(motor_driver_->set_home(joint.can_id));
-          joint.position = 0.0;
-          joint.velocity = 0.0;
-          joint.position_command = 0.0;
           joint.direct_mode = dcr_arm_driver::msg::DirectDrive::CONTROLLER;
           joint.direct_value = 0.0;
-          joint.has_position_feedback = true;
         }
+        // Apply the interface reset from read(), on the control-manager thread,
+        // rather than writing exported interfaces from this service callback.
+        home_pending_ = true;
         response->success = true;
-        response->message = "Arm joint home positions and controller targets reset to zero";
+        response->message = "Home command sent; controller state will reset on the next read";
+      });
+
+  trajectory_status_sub_ = node->create_subscription<
+      action_msgs::msg::GoalStatusArray>(
+      "/arm_controller/follow_joint_trajectory/_action/status",
+      rclcpp::QoS(1).transient_local(),
+      [this](const action_msgs::msg::GoalStatusArray& msg) {
+        this->trajectory_status_callback(msg);
       });
 
   active_ = true;
@@ -272,6 +304,7 @@ void ArmHardwareInterface::deactivate_endpoints() {
   direct_drive_sub_.reset();
   can_sub_.reset();
   set_home_service_.reset();
+  trajectory_status_sub_.reset();
   stat1_pub_.reset();
   stat2_pub_.reset();
   can_pub_.reset();
@@ -329,7 +362,38 @@ ArmHardwareInterface::export_command_interfaces() {
 
 hardware_interface::return_type ArmHardwareInterface::read(
     const rclcpp::Time& /*time*/, const rclcpp::Duration& /*period*/) {
+  std::lock_guard<std::mutex> lock(lifecycle_mutex_);
+  if (home_pending_) {
+    for (auto& joint : joints_) {
+      joint.position = 0.0;
+      joint.velocity = 0.0;
+      joint.position_command = 0.0;
+      joint.has_position_feedback = true;
+      joint.has_pending_status1 = false;
+    }
+    home_pending_ = false;
+  }
+
   for (auto& joint : joints_) {
+    if (joint.has_pending_status1) {
+      const auto position = normalize_encoder_angle(
+          joint.pending_angle_degrees, joint.position_min, joint.position_max,
+          joint.position);
+      if (position) {
+        joint.position = *position;
+        if (!joint.has_position_feedback) {
+          joint.position_command = *position;
+          joint.has_position_feedback = true;
+        }
+      } else {
+        RCLCPP_WARN_THROTTLE(
+            rclcpp::get_logger("ArmHardwareInterface"), *node_->get_clock(),
+            5000, "Encoder angle %.2f degrees for joint '%s' is outside its URDF limits",
+            joint.pending_angle_degrees, joint.name.c_str());
+      }
+      joint.velocity = joint.pending_speed_rpm * RPM_TO_RADIANS_PER_SECOND;
+      joint.has_pending_status1 = false;
+    }
     if (!can_pub_) {
       continue;
     }
@@ -362,10 +426,21 @@ hardware_interface::return_type ArmHardwareInterface::write(
       } else if (joint.direct_mode == dcr_arm_driver::msg::DirectDrive::SPEED) {
         cmd_msg = motor_driver_->speed_control(joint.can_id, joint.direct_value);
       } else if (joint.direct_mode == dcr_arm_driver::msg::DirectDrive::POSITION) {
-        cmd_msg = motor_driver_->position_control(joint.can_id, joint.direct_value);
-      } else {
+        const double direct_position =
+            std::clamp(joint.direct_value * DEGREES_TO_RADIANS,
+                       joint.position_min, joint.position_max);
         cmd_msg = motor_driver_->position_control(
-            joint.can_id, joint.position_command * 180 / 3.14159265);
+            joint.can_id, static_cast<float>(direct_position / DEGREES_TO_RADIANS));
+      } else {
+        const double command = std::isfinite(joint.position_command)
+                                   ? std::clamp(joint.position_command,
+                                                joint.position_min,
+                                                joint.position_max)
+                                   : joint.position;
+        cmd_msg = motor_driver_->position_control(
+            joint.can_id,
+            static_cast<float>(command / DEGREES_TO_RADIANS));
+        joint.last_position_command = command;
       }
       can_pub_->publish(cmd_msg);
     }
@@ -385,6 +460,7 @@ JointInfo* ArmHardwareInterface::find_joint(uint32_t can_id) {
 
 void ArmHardwareInterface::can_frame_callback(
     const can_msgs::msg::Frame& msg) {
+  std::lock_guard<std::mutex> lock(lifecycle_mutex_);
   if (msg.dlc < 8) {
     return;
   }
@@ -397,24 +473,11 @@ void ArmHardwareInterface::can_frame_callback(
   if (msg.data[0] == 0xA4) {
     // Status 1: temperature, current, speed, angle
     auto stat = motor_driver_->read_status_1(msg);
-    // ros2_control state is radians and radians/second; MotorStat1 reports
-    // degrees and RPM. Convert the wrapped encoder angle into this joint's
-    // configured URDF range.
-    const auto position = normalize_encoder_angle(
-        stat.angle, joint->position_min, joint->position_max, joint->position);
-    if (position) {
-      joint->position = *position;
-      if (!joint->has_position_feedback) {
-        joint->position_command = *position;
-        joint->has_position_feedback = true;
-      }
-    } else {
-      RCLCPP_WARN_THROTTLE(
-          rclcpp::get_logger("ArmHardwareInterface"), *node_->get_clock(),
-          5000, "Encoder angle %.2f degrees for joint '%s' is outside its URDF limits",
-          stat.angle, joint->name.c_str());
-    }
-    joint->velocity = stat.speed * RPM_TO_RADIANS_PER_SECOND;
+    // Stage feedback here. read() applies it to exported interfaces on the
+    // controller-manager thread, avoiding concurrent writes to state handles.
+    joint->pending_angle_degrees = stat.angle;
+    joint->pending_speed_rpm = stat.speed;
+    joint->has_pending_status1 = true;
     joint->temperature = stat.temp;
     if (stat1_pub_) {
       stat1_pub_->publish(stat);
@@ -430,6 +493,18 @@ void ArmHardwareInterface::can_frame_callback(
       stat2_pub_->publish(stat);
     }
   }
+}
+
+void ArmHardwareInterface::trajectory_status_callback(
+    const action_msgs::msg::GoalStatusArray& msg) {
+  std::lock_guard<std::mutex> lock(lifecycle_mutex_);
+  trajectory_goal_active_ = std::any_of(
+      msg.status_list.begin(), msg.status_list.end(),
+      [](const action_msgs::msg::GoalStatus& status) {
+        return status.status == action_msgs::msg::GoalStatus::STATUS_ACCEPTED ||
+               status.status == action_msgs::msg::GoalStatus::STATUS_EXECUTING ||
+               status.status == action_msgs::msg::GoalStatus::STATUS_CANCELING;
+      });
 }
 
 void ArmHardwareInterface::direct_drive_callback(
@@ -463,6 +538,18 @@ void ArmHardwareInterface::direct_drive_callback(
       RCLCPP_WARN(rclcpp::get_logger("ArmHardwareInterface"),
                   "Ignoring invalid direct-drive value");
       return;
+    }
+    if (msg.mode == DirectDrive::POSITION) {
+      const double position = msg.value * DEGREES_TO_RADIANS;
+      if (position < joint->position_min || position > joint->position_max) {
+        RCLCPP_WARN(
+            rclcpp::get_logger("ArmHardwareInterface"),
+            "Ignoring direct position %.2f degrees outside joint '%s' limits [%.2f, %.2f] degrees",
+            msg.value, joint->name.c_str(),
+            joint->position_min / DEGREES_TO_RADIANS,
+            joint->position_max / DEGREES_TO_RADIANS);
+        return;
+      }
     }
   }
 

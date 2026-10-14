@@ -131,21 +131,25 @@ configured position limits and converts RPM to radians per second.
 
 | Service         | Type                 | Description                                      |
 |-----------------|----------------------|--------------------------------------------------|
-| `/arm/set_home` | `std_srvs/srv/Trigger` | Explicitly set current arm pose as home and reset targets |
+| `/arm/set_home` | `std_srvs/srv/Trigger` | Set motor home only when all joints are already at zero and no trajectory is active |
 
 The `/estop` subscription remains active while the hardware is inactive, so
 its state is current when the arm is activated again. Activation waits for fresh
 encoder feedback and seeds each position target from the measured position.
 
 Homing is explicit; activation does not redefine the motor coordinate frame.
-When the arm is stationary at its intended home pose, call:
+The driver rejects homing while an accepted, executing, or canceling trajectory
+goal exists, while direct drive is selected, or unless every joint is stationary
+within 0.05 rad/s at its existing zero position (within 0.02 rad). Move the arm
+to zero, return to controller mode, and cancel all trajectory goals before calling:
 
 ```bash
 ros2 service call /arm/set_home std_srvs/srv/Trigger {}
 ```
 
-This sets all six motor home positions and resets their reported state and
-controller targets to zero.
+This sends zero-speed and motor home commands. The next hardware read resets
+reported positions and controller targets to zero. This restriction prevents
+rebasing the coordinate frame under a held controller target.
 
 ---
 
