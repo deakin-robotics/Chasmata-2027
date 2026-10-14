@@ -83,11 +83,13 @@ When the coordinator observes a ROS connection:
 2. It does this once for that connection transition.
 3. It does not locally author the authoritative FMA state.
 
-The rover publishes pending, confirmed, and rejected mode state through its
-FMA telemetry. That FMA telemetry is broadcast to every GUI instance. When the
-connection is lost, each browser hides or clears its displayed rover state
-without changing the local Driver or Arm defaults/selections. When the
-connection returns, those preserved local selections are requested again.
+Rover Control publishes pending, confirmed, and rejected mode state through
+its FMA telemetry. Each GUI prefers to receive `/fma/state` through its
+independent BaseStation ROSbridge connection and falls back to its direct Rover
+connection. That shared ROS topic keeps the three GUI instances synchronized.
+Control commands and heartbeat monitoring remain on the direct Rover
+connection. The FMA is unavailable when neither subscribed feed is delivering
+state; local Driver and Arm selections are preserved across Rover disconnects.
 
 ## Gamepad Joy contract
 
@@ -115,16 +117,22 @@ flowchart LR
     coordinator --> request[ROS 2 mode request]
     request --> rover[Rover Control<br/>authoritative FMA state]
     rover --> broadcast[FMA telemetry broadcast<br/>pending / confirmed / rejected]
-    broadcast --> browser1[FmaStateService<br/>Driver GUI]
-    broadcast --> browser2[FmaStateService<br/>Arm GUI]
-    broadcast --> browser3[FmaStateService<br/>ECAM GUI]
+    broadcast --> basestation[BaseStation ROSbridge<br/>preferred GUI feed]
+    broadcast --> direct[Rover ROSbridge<br/>fallback GUI feed]
+    basestation --> browser1[FmaStateService<br/>Driver GUI]
+    basestation --> browser2[FmaStateService<br/>Arm GUI]
+    basestation --> browser3[FmaStateService<br/>ECAM GUI]
+    direct --> browser1
+    direct --> browser2
+    direct --> browser3
     browser1 --> renderer1[FMA renderer]
     browser2 --> renderer2[FMA renderer]
     browser3 --> renderer3[FMA renderer]
 ```
 
-`FmaStateService` is a shared store only within one browser instance. The rover
-FMA telemetry broadcast is what keeps the three browser instances synchronized.
+`FmaStateService` is a shared store only within one browser instance. The Rover
+FMA telemetry broadcast, visible through either independent ROSbridge, keeps
+the three browser instances synchronized.
 The FMA component only renders its local store; it does not select modes,
 create requests, reset modes, or coordinate the ROS connection.
 

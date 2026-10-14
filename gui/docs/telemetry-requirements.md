@@ -13,9 +13,9 @@ telemetry, 1 Hz operational telemetry, and a complete 1 Hz recovery snapshot.
 
 Every telemetry value must include validity or staleness information. When ROS
 is connected, the GUI must show unavailable or unknown state when data is stale
-or missing rather than continue to present old data as current. When ROS is
-disconnected entirely, the FMA and dependent displays use their overall
-unavailable state instead of rendering individual telemetry values.
+or missing rather than continue to present old data as current. Without an FMA
+telemetry feed, the FMA and dependent displays use their overall unavailable
+state instead of rendering individual telemetry values.
 
 ### Immediate state-change updates
 

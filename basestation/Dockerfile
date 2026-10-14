@@ -11,6 +11,7 @@ RUN apt-get update \
         ros-jazzy-moveit-ros-planning-interface \
         ros-jazzy-rosidl-default-generators \
         ros-jazzy-robot-state-publisher \
+        ros-jazzy-rosbridge-server \
         ros-jazzy-tf2-ros \
     && rm -rf /var/lib/apt/lists/*
 

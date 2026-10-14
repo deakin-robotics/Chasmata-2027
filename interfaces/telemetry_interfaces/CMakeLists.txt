@@ -7,6 +7,7 @@ find_package(rosidl_default_generators REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/ArmMoveItStatus.msg"
   "msg/ArmOverrideState.msg"
+  "msg/EcamAlerts.msg"
   "msg/FmaModeState.msg"
   "msg/FmaState.msg"
 )

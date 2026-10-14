@@ -11,7 +11,7 @@
   display: grid;
   align-content: start;
   grid-template-areas:
-    'gamepad ros . camera .'
+    'gamepad ros . base-station camera'
     'gamepad-stem ros-flow . . .'
     'gamepad-flow master . . .'
     'arm-mode arm-mode . law-override clear-faults'
@@ -35,7 +35,7 @@
 }
 
 app-status-indicator,
-app-action-button,
+app-ros-connection-button,
 app-control-flow-connector,
 app-control-switch,
 app-control-mode-selector {
@@ -46,8 +46,12 @@ app-status-indicator {
   grid-area: gamepad;
 }
 
-app-action-button {
+app-ros-connection-button {
   grid-area: ros;
+}
+
+.base-station-link {
+  grid-area: base-station;
 }
 
 .camera-feed {

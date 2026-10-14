@@ -48,11 +48,14 @@ describe('EcamAlertDisplay', () => {
   });
 
   it('should populate representative alerts when T/O CONFIG is selected', () => {
-    fixture.nativeElement.querySelector('button').click();
+    const takeoffConfigButton = fixture.nativeElement.querySelector(
+      '.takeoff-config-button',
+    ) as HTMLButtonElement;
+    takeoffConfigButton.click();
     fixture.detectChanges();
 
     expect(component.takeoffConfigResult()).toBe('FAILED');
-    expect(fixture.nativeElement.querySelector('button').classList).toContain('config-warning');
+    expect(takeoffConfigButton.classList).toContain('config-warning');
     expect(ecamAlerts.activeAlerts().map((alert) => alert.code)).toEqual([
       'CONFIG_ESTOP_STATUS_UNAVAILABLE',
       'CONFIG_LAW_DIRECT',
@@ -64,7 +67,9 @@ describe('EcamAlertDisplay', () => {
     component.takeoffConfigResult.set('NORMAL');
     fixture.detectChanges();
 
-    const button = fixture.nativeElement.querySelector('button') as HTMLButtonElement;
+    const button = fixture.nativeElement.querySelector(
+      '.takeoff-config-button',
+    ) as HTMLButtonElement;
     expect(button.classList).toContain('config-normal');
   });
 });

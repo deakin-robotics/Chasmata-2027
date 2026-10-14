@@ -19,6 +19,7 @@ flowchart LR
 
         subgraph basePC["Base-station PC"]
             moveit["MoveIt 2\n(host network)"]
+            baseBridge["ROSbridge :9091\n(shared ROS graph)"]
         end
 
         subgraph driverPC["Driver PC"]
@@ -31,14 +32,20 @@ flowchart LR
 
         driver <-->|"controls and telemetry\nWebSocket :9090"| bridge
         arm <-->|"Arm manual mode and telemetry\nWebSocket :9090"| bridge
+        driver <-->|"FMA telemetry\nWebSocket :9091"| baseBridge
+        arm <-->|"FMA telemetry\nWebSocket :9091"| baseBridge
         moveit <-->|"ROS 2 discovery via :11811\nthen topics and actions"| ros
+        baseBridge <-->|"ROS 2 discovery via :11811\nthen topics"| ros
         arm -->|"Position target\n/arm/target_pose"| moveit
     end
 
 ```
 
-The Driver and Arm GUIs connect to the rover for controls and telemetry.
-MoveIt exchanges planning and trajectory data with the rover over ROS 2.
+The Driver and Arm GUIs connect directly to the rover for controls, IK, and
+rover heartbeat. They can also connect independently to BaseStation ROSbridge
+for shared FMA telemetry. Both gateways join the same ROS 2 graph; FMA remains
+published by Rover Control. MoveIt exchanges planning and trajectory data
+with the rover over ROS 2.
 
 ### Camera video
 
@@ -107,8 +114,9 @@ docker compose -f docker-compose.local.yml up --build
 ```
 
 The mock rover runs ROSbridge at `ws://localhost:9090` and the Fast DDS
-discovery server on UDP `11811`. Its ROS services and local MoveIt use host
-networking and connect through `127.0.0.1:11811`; they do not use the shared
+discovery server on UDP `11811`. The BaseStation stack runs its independent
+ROSbridge at `ws://localhost:9091`. Its ROS services, bridge, and local MoveIt
+use host networking and connect through `127.0.0.1:11811`; they do not use the shared
 camera network. Only the rover and base-station MediaMTX gateways share
 `chasmata-local-media`; the base gateway pulls the mock feeds from
 `rover-media-gateway:8554`. Rover MediaMTX also exposes local fallback playback
@@ -143,7 +151,7 @@ Operator PCs use names instead of numeric addresses:
 | Name                | Used for                                                            |
 | ------------------- | ------------------------------------------------------------------- |
 | `rover.local`       | ROSbridge and rover controls/telemetry, such as `rover.local:9090`. |
-| `basestation.local` | Camera gateway, such as `http://basestation.local:8889`.            |
+| `basestation.local` | BaseStation ROSbridge (`:9091`) and camera gateway (`:8889`).       |
 
 Windows resolves these names through the rover network's DNS or hosts-file
 configuration. The Driver GUI and Arm GUI use the same names.
@@ -153,7 +161,8 @@ configuration. The Driver GUI and Arm GUI use the same names.
 Command owns the real network setup: static rover and base-station IPs, name
 resolution for `rover.local` and `basestation.local`, and firewall/radio rules
 for ROS discovery, rover RTSP `8554`, both gateways' WHEP `8889` and ICE UDP
-`8189`, and the base camera-readiness endpoint `9998`.
+`8189`, both ROSbridge WebSockets (`9090` Rover and `9091` BaseStation), and the
+base camera-readiness endpoint `9998`.
 
 This repository supplies the service configuration that consumes those values.
 It does not assign IPs, create DNS records, or configure the radio network.

@@ -1,20 +1,13 @@
-<mat-card
-  class="connection-card"
-  appearance="outlined"
-  [attr.data-status]="heartbeatMonitor.roverStatus()"
->
+<mat-card class="connection-card" appearance="outlined" [attr.data-status]="status()">
   <mat-card-header>
     <div class="header-content">
       <div>
-        <mat-card-title>Rover connection</mat-card-title>
+        <mat-card-title>{{ connectionName }} connection</mat-card-title>
         <mat-card-subtitle>ROSbridge WebSocket</mat-card-subtitle>
       </div>
 
       <div class="status" role="status" aria-live="polite">
-        <mat-icon
-          aria-hidden="true"
-          [class.spinning]="heartbeatMonitor.isRoverConnecting()"
-        >{{ statusIcon() }}</mat-icon>
+        <mat-icon aria-hidden="true" [class.spinning]="isConnecting()">{{ statusIcon() }}</mat-icon>
         <span>{{ statusLabel() }}</span>
       </div>
     </div>
@@ -44,7 +37,7 @@
 
       <div class="actions">
         @if (canDisconnect()) {
-          @if (heartbeatMonitor.roverStatus() === 'reconnecting') {
+          @if (status() === 'reconnecting') {
             <button matButton="outlined" type="button" (click)="disconnect()">
               <mat-icon aria-hidden="true">cancel</mat-icon>
               Stop reconnecting
@@ -56,14 +49,12 @@
             </button>
           }
         } @else {
-          <button matButton="filled" type="submit" [disabled]="endpoint.invalid">
-            Connect
-          </button>
+          <button matButton="filled" type="submit" [disabled]="endpoint.invalid">Connect</button>
         }
       </div>
     </form>
 
-    @if (rosConnection.error(); as error) {
+    @if (connection.error(); as error) {
       <div class="error-message" role="alert">
         <mat-icon aria-hidden="true">warning</mat-icon>
         <span>{{ error }}</span>
@@ -73,6 +64,6 @@
 
   <mat-card-footer>
     <span class="endpoint-label">Endpoint</span>
-    <code>{{ rosConnection.url() ?? 'Not configured' }}</code>
+    <code>{{ connection.url() ?? 'Not configured' }}</code>
   </mat-card-footer>
 </mat-card>

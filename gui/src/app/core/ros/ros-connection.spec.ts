@@ -2,11 +2,13 @@ import { effect } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Ros, Topic } from 'roslib';
 
+import { BaseStationConnection } from './base-station-connection';
 import { RosConnection } from './ros-connection';
 import { RosHeartbeatMonitor } from './ros-heartbeat-monitor';
 
 describe('RosConnection and RosHeartbeatMonitor', () => {
   let service: RosConnection;
+  let baseStationConnection: BaseStationConnection;
   let heartbeatMonitor: RosHeartbeatMonitor;
   let heartbeats: Array<{ topic: Topic; callback: () => void }>;
   let unsubscribe: ReturnType<typeof vi.spyOn>;
@@ -22,12 +24,14 @@ describe('RosConnection and RosHeartbeatMonitor', () => {
     unsubscribe = vi.spyOn(Topic.prototype, 'unsubscribe').mockImplementation(() => {});
     TestBed.configureTestingModule({});
     service = TestBed.inject(RosConnection);
+    baseStationConnection = TestBed.inject(BaseStationConnection);
     heartbeatMonitor = TestBed.inject(RosHeartbeatMonitor);
     TestBed.flushEffects();
   });
 
   afterEach(() => {
     service.disconnect();
+    baseStationConnection.disconnect();
     TestBed.flushEffects();
     vi.restoreAllMocks();
     vi.useRealTimers();
@@ -56,6 +60,95 @@ describe('RosConnection and RosHeartbeatMonitor', () => {
     expect(service.error()).toBe('No ROSbridge URL has been configured.');
   });
 
+  it('keeps Rover and BaseStation sockets and disconnect actions independent', () => {
+    service.connect('localhost:9090');
+    const roverClient = service.client()!;
+    TestBed.flushEffects();
+    roverClient.emit('connection', {} as never);
+
+    baseStationConnection.connect('localhost:9091');
+    const baseStationClient = baseStationConnection.client()!;
+    TestBed.flushEffects();
+    baseStationClient.emit('connection', {} as never);
+
+    expect(roverClient).not.toBe(baseStationClient);
+    expect(service.status()).toBe('connected');
+    expect(baseStationConnection.status()).toBe('connected');
+
+    baseStationConnection.disconnect();
+    TestBed.flushEffects();
+
+    expect(baseStationConnection.status()).toBe('disconnected');
+    expect(baseStationConnection.client()).toBeNull();
+    expect(service.status()).toBe('connected');
+    expect(service.client()).toBe(roverClient);
+  });
+
+  it('retries a failed BaseStation socket without disturbing an active Rover socket', () => {
+    service.connect('localhost:9090');
+    const roverClient = service.client()!;
+    TestBed.flushEffects();
+    roverClient.emit('connection', {} as never);
+
+    baseStationConnection.connect('');
+    expect(baseStationConnection.status()).toBe('error');
+    expect(service.status()).toBe('connected');
+
+    baseStationConnection.connect('localhost:9091');
+    const failedClient = baseStationConnection.client()!;
+    TestBed.flushEffects();
+    failedClient.emit('connection', {} as never);
+    failedClient.emit('close', {} as never);
+    TestBed.flushEffects();
+
+    expect(baseStationConnection.status()).toBe('reconnecting');
+    expect(service.status()).toBe('connected');
+
+    vi.advanceTimersByTime(1_000);
+    TestBed.flushEffects();
+    const recoveredClient = baseStationConnection.client()!;
+    expect(recoveredClient).not.toBe(failedClient);
+    recoveredClient.emit('connection', {} as never);
+
+    expect(baseStationConnection.status()).toBe('connected');
+    expect(service.status()).toBe('connected');
+    expect(service.client()).toBe(roverClient);
+  });
+
+  it('retries a failed Rover socket without disturbing an active BaseStation socket', () => {
+    baseStationConnection.connect('localhost:9091');
+    const baseStationClient = baseStationConnection.client()!;
+    TestBed.flushEffects();
+    baseStationClient.emit('connection', {} as never);
+
+    service.connect('');
+    expect(service.status()).toBe('error');
+    expect(baseStationConnection.status()).toBe('connected');
+
+    service.connect('localhost:9090');
+    const failedClient = service.client()!;
+    TestBed.flushEffects();
+    failedClient.emit('connection', {} as never);
+    failedClient.emit('close', {} as never);
+    TestBed.flushEffects();
+
+    expect(service.status()).toBe('reconnecting');
+    expect(baseStationConnection.status()).toBe('connected');
+
+    vi.advanceTimersByTime(1_000);
+    TestBed.flushEffects();
+    const recoveredClient = service.client()!;
+    expect(recoveredClient).not.toBe(failedClient);
+    recoveredClient.emit('connection', {} as never);
+
+    expect(service.status()).toBe('connected');
+    expect(baseStationConnection.status()).toBe('connected');
+    expect(baseStationConnection.client()).toBe(baseStationClient);
+
+    service.disconnect();
+    expect(baseStationConnection.status()).toBe('connected');
+  });
+
   it('returns to a clean disconnected state', () => {
     service.connect('');
     service.disconnect();
@@ -68,9 +161,11 @@ describe('RosConnection and RosHeartbeatMonitor', () => {
 
   it('tracks rover and base-station heartbeats independently', () => {
     let roverReadyTransitions = 0;
-    TestBed.runInInjectionContext(() => effect(() => {
-      if (heartbeatMonitor.roverAvailable()) roverReadyTransitions += 1;
-    }));
+    TestBed.runInInjectionContext(() =>
+      effect(() => {
+        if (heartbeatMonitor.roverAvailable()) roverReadyTransitions += 1;
+      }),
+    );
     TestBed.flushEffects();
 
     service.connect('ws://localhost:9090');

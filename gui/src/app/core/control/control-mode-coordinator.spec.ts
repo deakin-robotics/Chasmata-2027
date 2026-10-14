@@ -133,7 +133,7 @@ describe('ControlModeCoordinator', () => {
     expect(publishArmMode).toHaveBeenCalledTimes(initialArmRequests);
   });
 
-  it('clears FMA control state on disconnect while preserving local modes', () => {
+  it('preserves shared FMA telemetry on Rover disconnect while preserving local modes', () => {
     const coordinator = TestBed.inject(ControlModeCoordinator);
     const driverControlMode = TestBed.inject(DriverControlModeService);
     const armControlMode = TestBed.inject(ArmControlModeService);
@@ -154,12 +154,12 @@ describe('ControlModeCoordinator', () => {
     expect(armControlMode.mode()).toBe(ArmMode.Manual);
     expect(getColumn(fmaState, 'DRIVE')).toEqual({
       label: 'DRIVE',
-      confirmed: null,
-      commanded: null,
+      confirmed: DriveMode.Manual,
+      commanded: DriveMode.Velocity,
     });
     expect(getColumn(fmaState, 'ARM')).toEqual({
       label: 'ARM',
-      confirmed: null,
+      confirmed: ArmMode.Manual,
       commanded: null,
     });
   });
@@ -190,7 +190,7 @@ function getColumn<T extends 'DRIVE' | 'ARM'>(
   fmaState: FmaStateService,
   label: T,
 ): Extract<FmaColumn, { label: T }> | undefined {
-  return fmaState.columns().find(
-    (column): column is Extract<FmaColumn, { label: T }> => column.label === label,
-  );
+  return fmaState
+    .columns()
+    .find((column): column is Extract<FmaColumn, { label: T }> => column.label === label);
 }

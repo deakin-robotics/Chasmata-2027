@@ -1,4 +1,4 @@
-import { Service, effect, inject, untracked } from '@angular/core';
+import { Service, inject } from '@angular/core';
 
 import { ArmControlMode, ArmControlModeService } from './arm/arm-control-mode';
 import { ControlCommandPublisher } from './control-command-publisher';
@@ -14,18 +14,6 @@ export class ControlModeCoordinator {
   private readonly fmaState = inject(FmaStateService);
   private readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
   private readonly commandPublisher = inject(ControlCommandPublisher);
-
-  private readonly connectionEffect = effect(() => {
-    const connected = this.heartbeatMonitor.roverAvailable();
-
-    untracked(() => {
-      if (!connected) {
-        this.fmaState.resetControlModes();
-        return;
-      }
-
-    });
-  });
 
   /** Prepares the Driver request topic before this dashboard receives rover readiness. */
   prepareDriveModeRequest(): void {
@@ -96,18 +84,21 @@ export class ControlModeCoordinator {
   }
 
   private currentDriveModeFromRover(): DriveMode | null {
-    const column = this.fmaState.columns().find(
-      (candidate): candidate is Extract<FmaColumn, { label: 'DRIVE' }> =>
-        candidate.label === 'DRIVE',
-    );
+    const column = this.fmaState
+      .columns()
+      .find(
+        (candidate): candidate is Extract<FmaColumn, { label: 'DRIVE' }> =>
+          candidate.label === 'DRIVE',
+      );
     return column ? (column.confirmed ?? column.commanded) : null;
   }
 
   private currentArmModeFromRover(): ArmMode | null {
-    const column = this.fmaState.columns().find(
-      (candidate): candidate is Extract<FmaColumn, { label: 'ARM' }> =>
-        candidate.label === 'ARM',
-    );
+    const column = this.fmaState
+      .columns()
+      .find(
+        (candidate): candidate is Extract<FmaColumn, { label: 'ARM' }> => candidate.label === 'ARM',
+      );
     return column ? (column.confirmed ?? column.commanded) : null;
   }
 }

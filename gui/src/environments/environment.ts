@@ -3,4 +3,5 @@ export const environment = {
   roverCameraGatewayUrl: 'http://localhost:8890',
   cameraHealthUrl: 'http://localhost:9998/cameras/status',
   rosbridgeUrl: 'localhost:9090',
+  basestationRosbridgeUrl: 'localhost:9091',
 } as const;

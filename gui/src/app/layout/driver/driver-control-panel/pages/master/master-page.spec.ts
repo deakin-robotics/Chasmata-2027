@@ -20,11 +20,15 @@ describe('DriverMasterPage', () => {
 
   it('should render the Driver master controls', () => {
     expect(fixture.nativeElement.textContent).toContain('Master Drive');
-    expect(fixture.nativeElement.textContent).toContain('ROS Link');
+    expect(fixture.nativeElement.textContent).toContain('Rover Link');
+    expect(fixture.nativeElement.textContent).toContain('BaseStation Link');
     expect(fixture.nativeElement.textContent).toContain('Camera Link');
-    expect(fixture.nativeElement.querySelector('.camera-feed button').getAttribute('aria-checked')).toBe('false');
-    expect(fixture.nativeElement.querySelector('app-control-mode-selector.drive-mode-selector'))
-      .toBeTruthy();
+    expect(
+      fixture.nativeElement.querySelector('.camera-feed button').getAttribute('aria-checked'),
+    ).toBe('false');
+    expect(
+      fixture.nativeElement.querySelector('app-control-mode-selector.drive-mode-selector'),
+    ).toBeTruthy();
   });
 
   it('should default to Velocity mode', () => {
@@ -37,9 +41,7 @@ describe('DriverMasterPage', () => {
   });
 
   it('should enable the camera feed when switched on', () => {
-    const button = fixture.nativeElement.querySelector(
-      '.camera-feed button',
-    ) as HTMLButtonElement;
+    const button = fixture.nativeElement.querySelector('.camera-feed button') as HTMLButtonElement;
     button.click();
     fixture.detectChanges();
 

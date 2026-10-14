@@ -1,12 +1,13 @@
 # Base station
 
-The base station provides two independent services for rover operators:
+The base station provides these services for rover operators:
 
 - MoveIt 2 planning for Arm Position/IK mode.
+- ROSbridge access to shared FMA telemetry on port `9091`.
 - MediaMTX camera playback for Driver and Arm browsers.
 
-It does not run the rover, ROSbridge, or the GUI. The rover and base-station
-stacks can be started independently.
+It does not run the rover or the GUI. The rover and base-station stacks can be
+started independently.
 
 ## Start
 
@@ -48,8 +49,11 @@ docker compose -f docker-compose.yml up --build
 ```mermaid
 flowchart LR
     driver["Driver GUI"] <-->|"controls and telemetry\nrover.local :9090"| rover["Rover ROSbridge"]
-    arm["Arm GUI"] <-->|"controls and telemetry\nrover.local :9090"| rover
+    arm["Arm GUI"] <-->|"controls, IK, and rover telemetry\nrover.local :9090"| rover
+    driver <-->|"shared FMA telemetry\nbasestation.local :9091"| baseBridge["BaseStation ROSbridge"]
+    arm <-->|"shared FMA telemetry\nbasestation.local :9091"| baseBridge
     rover <-->|"arm planning and trajectories"| moveit["MoveIt + arm bridge\nBase-station PC"]
+    baseBridge <-->|"shared ROS 2 graph"| rover
 ```
 
 ### Camera video
@@ -67,7 +71,9 @@ flowchart LR
     health -->|"Private path check :9997"| api["MediaMTX API"]
 ```
 
-The Driver and Arm GUIs connect directly to the rover for controls and
-telemetry. Camera video normally comes through base-station MediaMTX; eligible
-tiles can switch directly to rover MediaMTX if the base gateway is unavailable.
-MoveIt handles Arm Position/IK planning.
+The Driver and Arm GUIs connect directly to the rover for controls, IK, and
+rover heartbeat, and independently to BaseStation ROSbridge for FMA telemetry.
+Both bridges join the same ROS 2 graph; FMA remains published by Rover Control.
+Camera video normally comes through base-station MediaMTX; eligible tiles can
+switch directly to rover MediaMTX if the base gateway is unavailable. MoveIt
+handles Arm Position/IK planning.

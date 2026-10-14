@@ -40,3 +40,17 @@ services:
       ROS_LOCALHOST_ONLY: "0"
       RMW_IMPLEMENTATION: rmw_fastrtps_cpp
       ROS_DISCOVERY_SERVER: "${ROVER_DISCOVERY_SERVER:-rover.local:11811}"
+
+  rosbridge:
+    build:
+      context: ..
+      dockerfile: basestation/Dockerfile
+    network_mode: host
+    command:
+      - source /opt/ros/jazzy/setup.bash && source /workspace/install/setup.bash && ros2 run rosbridge_server rosbridge_websocket --ros-args -p port:=9091
+    environment:
+      ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
+      ROS_LOCALHOST_ONLY: "0"
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
+      ROS_DISCOVERY_SERVER: "${ROVER_DISCOVERY_SERVER:-rover.local:11811}"
+    restart: unless-stopped

@@ -18,5 +18,12 @@ describe('EcamPanel', () => {
     expect(fixture.nativeElement.textContent).toContain('ECAM');
     expect(fixture.nativeElement.textContent).toContain('T/O CONFIG');
     expect(fixture.nativeElement.textContent).toContain('DRIVE');
+    expect(fixture.nativeElement.textContent).toContain('Rover Link');
+    expect(fixture.nativeElement.textContent).toContain('BaseStation Link');
+
+    const headerControls = fixture.nativeElement.querySelector('.header-controls');
+    expect(headerControls.children[0].getAttribute('aria-label')).toBe('ROS connections');
+    expect(headerControls.children[1].getAttribute('role')).toBe('separator');
+    expect(headerControls.children[2].classList).toContain('takeoff-config-button');
   });
 });

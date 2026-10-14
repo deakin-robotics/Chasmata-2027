@@ -2,7 +2,7 @@
   @for (column of columns(); track column.label) {
     <div class="fma-column">
       <h2>{{ column.label }}</h2>
-      @if (rosConnected()) {
+      @if (fmaAvailable()) {
         @if (column.label === 'GIMBAL') {
           <span
             class="mode mode-active gimbal-priority"
@@ -53,12 +53,18 @@
               {{ armOverridePending() || armOverrideActive() ? 'OVERRIDE' : '' }}
             </span>
           }
+
+          @if (column.label === 'SYSTEM') {
+            <span class="mode mode-active">{{
+              fmaTelemetrySource() === 'BASESTATION' ? 'SRC BSTATION' : 'SRC ROVER'
+            }}</span>
+          }
         }
       }
     </div>
   }
 
-  @if (!rosConnected()) {
+  @if (!fmaAvailable()) {
     <app-unavailable-overlay label="Flight mode annunciator unavailable" />
   }
 </section>

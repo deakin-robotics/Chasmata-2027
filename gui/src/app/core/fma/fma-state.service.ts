@@ -34,6 +34,7 @@ export enum SystemMode {
 }
 
 export type GimbalPriorityOwner = 'DRIVER' | 'ARM OPS';
+export type FmaTelemetrySource = 'ROVER' | 'BASESTATION';
 
 export type FmaColumn =
   | { label: 'DRIVE'; confirmed: DriveMode | null; commanded: DriveMode | null }
@@ -61,9 +62,11 @@ export class FmaStateService {
     pending: null,
   });
   private readonly fmaTelemetryReceivedState = signal(false);
+  private readonly fmaTelemetrySourceState = signal<FmaTelemetrySource | null>(null);
 
   readonly columns = this.columnsState.asReadonly();
   readonly hasFmaTelemetry = this.fmaTelemetryReceivedState.asReadonly();
+  readonly telemetrySource = this.fmaTelemetrySourceState.asReadonly();
   readonly armOverrideState = computed(() => this.armOverrideTelemetryState().state);
   readonly armOverridePendingCommand = computed(() => this.armOverrideTelemetryState().pending);
   readonly armOverrideActive = computed(() => this.armOverrideState() === ArmOverrideState.Active);
@@ -198,14 +201,16 @@ export class FmaStateService {
     this.updateColumn('GIMBAL', (column) => ({ ...column, confirmed, commanded }));
   }
 
-  /** Marks that the current rover connection has supplied an FMA state. */
-  markFmaTelemetryReceived(): void {
+  /** Marks that an active ROSbridge feed has supplied an FMA state. */
+  markFmaTelemetryReceived(source: FmaTelemetrySource): void {
     this.fmaTelemetryReceivedState.set(true);
+    this.fmaTelemetrySourceState.set(source);
   }
 
-  /** Clears DRIVE and ARM state when the rover connection is unavailable. */
+  /** Clears DRIVE and ARM state when no FMA telemetry feed is available. */
   resetControlModes(): void {
     this.fmaTelemetryReceivedState.set(false);
+    this.fmaTelemetrySourceState.set(null);
     this.columnsState.update((columns) =>
       columns.map((column) => {
         if (column.label === 'DRIVE' || column.label === 'ARM') {

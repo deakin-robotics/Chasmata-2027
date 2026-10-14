@@ -518,7 +518,9 @@ publishes pending and confirmed states as its Control package processes them.
 topic: /fma/state
 type: telemetry_interfaces/msg/FmaState
 publisher: Rover Control
-subscriber: GUI
+subscriber: >-
+  GUI through BaseStation ROSbridge when its FMA feed is active, otherwise
+  through Rover ROSbridge
 contract:
   schema: {type: string, const: dcr/fma-state/v1}
   sequence: {type: uint64}
@@ -550,6 +552,9 @@ behavior:
 purpose: FMA telemetry broadcast.
 ```
 
+The BaseStation ROSbridge exposes the Rover-published topic from the shared ROS
+graph. It does not republish or change the FMA state.
+
 Example initial message from the mock:
 
 ```yaml
@@ -565,6 +570,26 @@ gimbal_priority: {confirmed: "", pending: "", rejected: ""}
 
 The mock reports `system: GOOD` and an empty string for
 `gimbal_priority.rejected` when no rejection is active.
+
+### ECAM alerts interface
+
+```yaml
+topic: /ecam/alerts
+type: telemetry_interfaces/msg/EcamAlerts
+publisher: Reserved shared ECAM relay
+subscriber: Reserved GUI clients
+contract:
+  active_codes:
+    type: string[]
+    semantics: complete_snapshot
+    unique: true
+behavior:
+  updates: complete_active_code_set
+purpose: Shares the current active ECAM alert codes with operator displays.
+```
+
+`EcamAlerts` reserves the message shape for the shared alert feed. The message
+is built with the interfaces package, but no runtime topic is added here.
 
 ## Actions
 

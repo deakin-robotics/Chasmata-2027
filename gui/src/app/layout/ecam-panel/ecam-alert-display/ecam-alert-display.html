@@ -2,15 +2,25 @@
   <header class="alert-header">
     <h1>ECAM</h1>
 
-    <button
-      class="takeoff-config-button"
-      type="button"
-      [class.config-normal]="takeoffConfigResult() === 'NORMAL'"
-      [class.config-warning]="takeoffConfigResult() === 'FAILED' || takeoffConfigResult() === 'UNKNOWN'"
-      (click)="runMockTakeoffConfiguration()"
-    >
-      T/O CONFIG
-    </button>
+    <div class="header-controls">
+
+      <nav class="connection-links" aria-label="ROS connections">
+        <app-ros-connection-button target="rover" />
+        <app-ros-connection-button target="basestation" />
+      </nav>
+
+      <span class="header-divider" role="separator" aria-orientation="vertical"></span>
+
+      <button
+        class="takeoff-config-button"
+        type="button"
+        [class.config-normal]="takeoffConfigResult() === 'NORMAL'"
+        [class.config-warning]="takeoffConfigResult() === 'FAILED' || takeoffConfigResult() === 'UNKNOWN'"
+        (click)="runMockTakeoffConfiguration()"
+      >
+        T/O CONFIG
+      </button>
+    </div>
   </header>
 
   @if (activeAlerts().length > 0) {
