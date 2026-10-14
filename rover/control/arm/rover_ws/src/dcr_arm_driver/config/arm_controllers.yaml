@@ -6,7 +6,7 @@ controller_manager:
     arm_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
-# Joint state broadcaster: publishes /joint_states topic
+# Joint state broadcaster is remapped to /arm/joint_states in arm_control.launch.py
 joint_state_broadcaster:
   ros__parameters:
     interfaces:
@@ -20,6 +20,9 @@ arm_controller:
       - base_joint
       - shoulder_joint
       - elbow_joint
+      - yaw_joint
+      - pitch_joint
+      - roll_joint
     command_interfaces:
       - position
     state_interfaces:
@@ -35,3 +38,6 @@ arm_controller:
       base_joint: { p: 100.0, i: 0.01, d: 5.0 }
       shoulder_joint: { p: 100.0, i: 0.01, d: 5.0 }
       elbow_joint: { p: 100.0, i: 0.01, d: 5.0 }
+      yaw_joint: { p: 100.0, i: 0.01, d: 5.0 }
+      pitch_joint: { p: 100.0, i: 0.01, d: 5.0 }
+      roll_joint: { p: 100.0, i: 0.01, d: 5.0 }

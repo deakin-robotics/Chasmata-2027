@@ -30,6 +30,10 @@ def generate_launch_description():
         Node(
             package='controller_manager',
             executable='ros2_control_node',
+            remappings=[
+                ('joint_states', '/arm/joint_states'),
+                ('/joint_states', '/arm/joint_states'),
+            ],
             parameters=[
                 {'robot_description': robot_description},
                 controller_config,

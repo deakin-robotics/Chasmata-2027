@@ -292,8 +292,10 @@ void ArmHardwareInterface::can_frame_callback(
   if (msg.data[0] == 0xA4) {
     // Status 1: temperature, current, speed, angle
     auto stat = motor_driver_->read_status_1(msg);
-    joint->position = stat.angle;
-    joint->velocity = stat.speed;
+    // ros2_control joint position and velocity interfaces use radians and
+    // radians per second; MotorStat1 reports degrees and degrees per second.
+    joint->position = stat.angle * (3.14159265358979323846 / 180.0);
+    joint->velocity = stat.speed * (3.14159265358979323846 / 180.0);
     joint->temperature = stat.temp;
     if (stat1_pub_) {
       stat1_pub_->publish(stat);
