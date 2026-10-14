@@ -33,26 +33,16 @@ describe('MissionControlFma', () => {
     expect(fixture.nativeElement.querySelector('app-unavailable-overlay')).toBeTruthy();
   });
 
-  it('shows received FMA telemetry independently of the direct Rover socket', () => {
+  it('shows Rover FMA telemetry when available', () => {
     const fmaState = TestBed.inject(FmaStateService);
     fmaState.confirmDriveMode(DriveMode.Velocity);
-    fmaState.markFmaTelemetryReceived('ROVER');
+    fmaState.markFmaTelemetryReceived();
 
     fixture = TestBed.createComponent(MissionControlFma);
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('app-unavailable-overlay')).toBeNull();
     expect(fixture.nativeElement.textContent).toContain(DriveMode.Velocity);
-    expect(
-      fixture.nativeElement.querySelector('.fma-column:last-child .mode-active:last-child')
-        .textContent,
-    ).toBe('SRC ROVER');
-
-    fmaState.markFmaTelemetryReceived('BASESTATION');
-    fixture.detectChanges();
-    expect(
-      fixture.nativeElement.querySelector('.fma-column:last-child .mode-active:last-child')
-        .textContent,
-    ).toBe('SRC BSTATION');
+    expect(fixture.nativeElement.textContent).not.toContain('SRC');
   });
 });

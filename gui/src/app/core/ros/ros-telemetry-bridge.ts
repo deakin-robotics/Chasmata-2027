@@ -12,7 +12,6 @@ import {
   SystemMode,
   GimbalPriorityOwner,
 } from '../fma/fma-state.service';
-import { BaseStationConnection } from './base-station-connection';
 import { RosConnection } from './ros-connection';
 import { RosHeartbeatMonitor } from './ros-heartbeat-monitor';
 
@@ -48,15 +47,12 @@ interface FmaTelemetryMessage {
 @Service()
 export class RosTelemetryBridge {
   private readonly rosConnection = inject(RosConnection);
-  private readonly baseStationConnection = inject(BaseStationConnection);
   private readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
   private readonly fmaState = inject(FmaStateService);
   private readonly armTelemetry = inject(ArmTelemetryService);
 
   private roverFmaTopic: Topic | null = null;
   private jointStateTopic: Topic | null = null;
-  private baseStationFmaTopic: Topic | null = null;
-  private baseStationFmaActive = false;
 
   private readonly roverTelemetryEffect = effect((onCleanup) => {
     const client = this.rosConnection.client();
@@ -84,12 +80,11 @@ export class RosTelemetryBridge {
       if (
         this.rosConnection.client() !== client ||
         this.roverFmaTopic !== fmaTopic ||
-        !this.heartbeatMonitor.roverAvailable() ||
-        this.baseStationFmaActive
+        !this.heartbeatMonitor.roverAvailable()
       )
         return;
 
-      this.handleFmaMessage(message, 'ROVER');
+      this.handleFmaMessage(message);
     });
     jointStateTopic.subscribe((message) => {
       if (
@@ -108,48 +103,11 @@ export class RosTelemetryBridge {
       if (this.roverFmaTopic === fmaTopic) this.roverFmaTopic = null;
       if (this.jointStateTopic === jointStateTopic) this.jointStateTopic = null;
       this.armTelemetry.clear();
-
-      if (!this.baseStationFmaActive) this.fmaState.resetControlModes();
+      this.fmaState.resetControlModes();
     });
   });
 
-  private readonly baseStationFmaEffect = effect((onCleanup) => {
-    const client = this.baseStationConnection.client();
-    const connected = this.baseStationConnection.isConnected();
-    const roverAvailable = this.heartbeatMonitor.roverAvailable();
-
-    if (!client || !connected || !roverAvailable) return;
-
-    const topic = new Topic({
-      ros: client,
-      name: FMA_STATE_TOPIC,
-      messageType: FMA_STATE_MESSAGE_TYPE,
-    });
-    this.baseStationFmaTopic = topic;
-
-    topic.subscribe((message) => {
-      if (
-        this.baseStationConnection.client() !== client ||
-        this.baseStationFmaTopic !== topic ||
-        !this.baseStationConnection.isConnected() ||
-        !this.heartbeatMonitor.roverAvailable()
-      )
-        return;
-
-      this.baseStationFmaActive = true;
-      this.handleFmaMessage(message, 'BASESTATION');
-    });
-
-    onCleanup(() => {
-      topic.unsubscribe();
-      if (this.baseStationFmaTopic === topic) this.baseStationFmaTopic = null;
-      this.baseStationFmaActive = false;
-
-      if (!this.heartbeatMonitor.roverAvailable()) this.fmaState.resetControlModes();
-    });
-  });
-
-  private handleFmaMessage(message: unknown, source: 'ROVER' | 'BASESTATION'): void {
+  private handleFmaMessage(message: unknown): void {
     if (!message || typeof message !== 'object') return;
     const telemetry = message as FmaTelemetryMessage;
 
@@ -162,7 +120,7 @@ export class RosTelemetryBridge {
     this.applyArmOverrideTelemetry(telemetry.arm_override);
     if (system !== undefined) this.fmaState.setSystemMode(system);
     this.applyGimbalPriorityTelemetry(telemetry.gimbal_priority);
-    this.fmaState.markFmaTelemetryReceived(source);
+    this.fmaState.markFmaTelemetryReceived();
   }
 
   private applyModeTelemetry(state: FmaModeState | undefined, subsystem: 'drive' | 'arm'): void {

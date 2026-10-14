@@ -6,10 +6,9 @@ This document defines the five Functional Mode Annunciator (FMA) columns used in
 
 The FMA should display the rover's **confirmed active state**, not merely a requested state.
 
-The GUI prefers the shared `/fma/state` feed through BaseStation ROSbridge and
-falls back to the direct Rover ROSbridge feed. Both carry the Rover Control
-publisher's state. Rover commands, heartbeat, and Arm IK remain on the direct
-Rover connection.
+Every GUI subscribes to `/fma/state` directly through its Rover ROSbridge
+connection. Rover Control is the authoritative publisher. Rover commands,
+heartbeat, FMA telemetry, and Arm IK use the direct Rover connection.
 
 ## Visual references
 
@@ -47,7 +46,7 @@ are not shown as FMA requests. Once the connection is established, the
 coordinator requests them and the rover broadcasts the pending state in blue
 until telemetry confirms them.
 
-When neither FMA telemetry feed is available, the FMA hides all status values,
+When Rover FMA telemetry is unavailable, the FMA hides all status values,
 including Gimbal Priority, and shows the unavailable red X overlay. The X
 represents the overall cold-and-dark state; individual `UNKNOWN` values are
 used after an FMA state has been received.
@@ -236,8 +235,8 @@ null, invalid, or stale. The FMA displays:
 PRIORITY UNK
 ```
 
-When neither FMA telemetry feed is available, the FMA hides the Gimbal value
-and shows the overall unavailable red X instead.
+When Rover FMA telemetry is unavailable, the FMA hides the Gimbal value and
+shows the overall unavailable red X instead.
 
 The FMA may render the owner with the existing directional labels:
 

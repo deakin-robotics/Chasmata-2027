@@ -53,12 +53,6 @@
               {{ armOverridePending() || armOverrideActive() ? 'OVERRIDE' : '' }}
             </span>
           }
-
-          @if (column.label === 'SYSTEM') {
-            <span class="mode mode-active">{{
-              fmaTelemetrySource() === 'BASESTATION' ? 'SRC BSTATION' : 'SRC ROVER'
-            }}</span>
-          }
         }
       }
     </div>

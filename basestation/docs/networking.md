@@ -32,8 +32,8 @@ flowchart LR
 
         driver <-->|"controls and telemetry\nWebSocket :9090"| bridge
         arm <-->|"Arm manual mode and telemetry\nWebSocket :9090"| bridge
-        driver <-->|"FMA telemetry\nWebSocket :9091"| baseBridge
-        arm <-->|"FMA telemetry\nWebSocket :9091"| baseBridge
+        driver <-->|"shared ECAM telemetry\nWebSocket :9091"| baseBridge
+        arm <-->|"shared ECAM telemetry\nWebSocket :9091"| baseBridge
         moveit <-->|"ROS 2 discovery via :11811\nthen topics and actions"| ros
         baseBridge <-->|"ROS 2 discovery via :11811\nthen topics"| ros
         arm -->|"Position target\n/arm/target_pose"| moveit
@@ -41,11 +41,11 @@ flowchart LR
 
 ```
 
-The Driver and Arm GUIs connect directly to the rover for controls, IK, and
-rover heartbeat. They can also connect independently to BaseStation ROSbridge
-for shared FMA telemetry. Both gateways join the same ROS 2 graph; FMA remains
-published by Rover Control. MoveIt exchanges planning and trajectory data
-with the rover over ROS 2.
+The Driver and Arm GUIs connect directly to the rover for controls, IK, rover
+heartbeat, and FMA telemetry. They also connect independently to BaseStation
+ROSbridge for BaseStation heartbeat and shared ECAM telemetry. Both gateways
+join the same ROS 2 graph. MoveIt exchanges planning and trajectory data with
+the rover over ROS 2.
 
 ### Camera video
 

@@ -13,7 +13,6 @@ export class MissionControlFma {
   private readonly fmaState = inject(FmaStateService);
 
   readonly columns = this.fmaState.columns;
-  readonly fmaTelemetrySource = this.fmaState.telemetrySource;
   readonly armOverrideActive = this.fmaState.armOverrideActive;
   readonly armOverridePending = this.fmaState.armOverridePending;
   readonly gimbalPriorityOwner = this.fmaState.gimbalPriorityOwner;

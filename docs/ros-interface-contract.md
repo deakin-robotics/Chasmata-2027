@@ -519,8 +519,7 @@ topic: /fma/state
 type: telemetry_interfaces/msg/FmaState
 publisher: Rover Control
 subscriber: >-
-  GUI through BaseStation ROSbridge when its FMA feed is active, otherwise
-  through Rover ROSbridge
+  Each GUI through its direct Rover ROSbridge connection
 contract:
   schema: {type: string, const: dcr/fma-state/v1}
   sequence: {type: uint64}
