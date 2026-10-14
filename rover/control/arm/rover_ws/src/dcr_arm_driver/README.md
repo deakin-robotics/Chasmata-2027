@@ -110,11 +110,15 @@ All arm commands use **CAN ID = joint CAN ID**, with the command byte in
 | Command | `position`                       |
 | State   | `position` (rad), `velocity` (rad/s) |
 
+The motor telemetry message retains angle in degrees and speed in RPM. The
+ros2_control state interface unwraps each encoder angle into that joint's
+configured position limits and converts RPM to radians per second.
+
 ### Topics
 
 | Topic                  | Message          | Direction | Description                            |
 |------------------------|------------------|-----------|----------------------------------------|
-| `/motor_stat_1`        | `MotorStat1`     | publish   | temperature, current, speed, angle     |
+| `/motor_stat_1`        | `MotorStat1`     | publish   | temperature, current, speed (RPM), angle (degrees) |
 | `/motor_stat_2`        | `MotorStat2`     | publish   | bus voltage, bus current, mode, faults |
 | `/arm/direct_drive`   | `dcr_arm_driver/DirectDrive` | subscribe | persistent per-joint direct command |
 | `/arm/joint_states`   | `sensor_msgs/JointState` | publish | six-joint feedback consumed by MoveIt |
@@ -280,7 +284,9 @@ E-stop is asserted are ignored.
 
 `/estop` overrides both command sources with repeated zero-speed CAN frames.
 Clearing E-stop resumes the previously selected command, including a latched
-direct speed. Hardware reactivation resets every joint to controller mode.
+direct speed. Hardware deactivation, cleanup, shutdown, and error transitions
+send zero-speed frames to every joint before destroying the CAN publisher.
+Hardware reactivation resets every joint to controller mode.
 
 Watch the raw CAN frames:
 

@@ -28,6 +28,8 @@ struct JointInfo {
   uint32_t can_id;
   double position = 0.0;
   double velocity = 0.0;
+  double position_min = 0.0;
+  double position_max = 0.0;
   double temperature = 0.0;        // NEW (from MotorStat1.temp)
   double bus_voltage = 0.0;        // NEW (from MotorStat2.busv)
   double bus_current = 0.0;        // NEW (from MotorStat2.busc)

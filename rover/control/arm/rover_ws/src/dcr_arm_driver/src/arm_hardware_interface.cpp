@@ -2,11 +2,49 @@
 
 #include <cmath>
 #include <limits>
+#include <optional>
 
 #include <pluginlib/class_list_macros.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 namespace dcr_arm_driver {
+namespace {
+
+constexpr double TWO_PI = 6.28318530717958647692;
+constexpr double PI = 3.14159265358979323846;
+constexpr double DEGREES_TO_RADIANS = PI / 180.0;
+constexpr double RPM_TO_RADIANS_PER_SECOND = TWO_PI / 60.0;
+
+std::optional<double> normalize_encoder_angle(
+    double angle_degrees, double lower_limit, double upper_limit,
+    double reference_position) {
+  double wrapped_angle = std::fmod(angle_degrees * DEGREES_TO_RADIANS, TWO_PI);
+  if (wrapped_angle < 0.0) {
+    wrapped_angle += TWO_PI;
+  }
+
+  const auto first_turn = static_cast<long>(
+      std::ceil((lower_limit - wrapped_angle) / TWO_PI));
+  const auto last_turn = static_cast<long>(
+      std::floor((upper_limit - wrapped_angle) / TWO_PI));
+  if (first_turn > last_turn) {
+    return std::nullopt;
+  }
+
+  double closest_position = 0.0;
+  double closest_distance = std::numeric_limits<double>::max();
+  for (long turn = first_turn; turn <= last_turn; ++turn) {
+    const double candidate = wrapped_angle + turn * TWO_PI;
+    const double distance = std::abs(candidate - reference_position);
+    if (distance < closest_distance) {
+      closest_position = candidate;
+      closest_distance = distance;
+    }
+  }
+  return closest_position;
+}
+
+}  // namespace
 
 // NEW SIGNATURE - use HardwareComponentInterfaceParams [1]
 hardware_interface::CallbackReturn ArmHardwareInterface::on_init(
@@ -37,6 +75,32 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_init(
   for (const auto& joint : info_.joints) {
     JointInfo joint_info;
     joint_info.name = joint.name;
+
+    bool has_position_limits = false;
+    for (const auto& command_interface : joint.command_interfaces) {
+      if (command_interface.name != hardware_interface::HW_IF_POSITION) {
+        continue;
+      }
+      try {
+        joint_info.position_min = std::stod(command_interface.min);
+        joint_info.position_max = std::stod(command_interface.max);
+      } catch (const std::exception& e) {
+        RCLCPP_ERROR(rclcpp::get_logger("ArmHardwareInterface"),
+                     "Missing or invalid position limits for joint %s: %s",
+                     joint.name.c_str(), e.what());
+        return hardware_interface::CallbackReturn::ERROR;
+      }
+      has_position_limits = joint_info.position_min <= joint_info.position_max;
+    }
+    if (!has_position_limits) {
+      // Keep compatibility with ros2_control descriptions that omit explicit
+      // interface limits. The production arm URDF provides each joint's range.
+      joint_info.position_min = -PI;
+      joint_info.position_max = PI;
+      RCLCPP_WARN(rclcpp::get_logger("ArmHardwareInterface"),
+                  "No position interface limits for joint %s; using [-pi, pi] for encoder normalization",
+                  joint.name.c_str());
+    }
 
     // Read CAN ID for this joint from URDF
     std::string can_id_param = joint.name + "_can_id";
@@ -182,6 +246,13 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_error(
 void ArmHardwareInterface::deactivate_endpoints() {
   std::lock_guard<std::mutex> lock(lifecycle_mutex_);
   active_ = false;
+  // Stop every motor before dropping the publisher. Direct speed commands are
+  // latched by the motor, so stopping callbacks alone would leave it moving.
+  if (can_pub_ && motor_driver_) {
+    for (const auto& joint : joints_) {
+      can_pub_->publish(motor_driver_->speed_control(joint.can_id, 0.0f));
+    }
+  }
   direct_drive_sub_.reset();
   estop_sub_.reset();
   can_sub_.reset();
@@ -292,10 +363,20 @@ void ArmHardwareInterface::can_frame_callback(
   if (msg.data[0] == 0xA4) {
     // Status 1: temperature, current, speed, angle
     auto stat = motor_driver_->read_status_1(msg);
-    // ros2_control joint position and velocity interfaces use radians and
-    // radians per second; MotorStat1 reports degrees and degrees per second.
-    joint->position = stat.angle * (3.14159265358979323846 / 180.0);
-    joint->velocity = stat.speed * (3.14159265358979323846 / 180.0);
+    // ros2_control state is radians and radians/second; MotorStat1 reports
+    // degrees and RPM. Convert the wrapped encoder angle into this joint's
+    // configured URDF range.
+    const auto position = normalize_encoder_angle(
+        stat.angle, joint->position_min, joint->position_max, joint->position);
+    if (position) {
+      joint->position = *position;
+    } else {
+      RCLCPP_WARN_THROTTLE(
+          rclcpp::get_logger("ArmHardwareInterface"), *node_->get_clock(),
+          5000, "Encoder angle %.2f degrees for joint '%s' is outside its URDF limits",
+          stat.angle, joint->name.c_str());
+    }
+    joint->velocity = stat.speed * RPM_TO_RADIANS_PER_SECOND;
     joint->temperature = stat.temp;
     if (stat1_pub_) {
       stat1_pub_->publish(stat);
