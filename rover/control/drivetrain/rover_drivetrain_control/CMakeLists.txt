@@ -79,6 +79,7 @@ if(BUILD_TESTING)
   # without opening any real serial ports or sending motor commands.
   add_executable(test_driver_mock test/test_driver_mock.cpp src/bld305s_driver.cpp)
   target_include_directories(test_driver_mock PRIVATE include ${LIBMODBUS_INCLUDE_DIRS})
+  target_link_libraries(test_driver_mock ${PROJECT_NAME}_core)
   add_test(NAME drivetrain_modbus_mock COMMAND test_driver_mock)
 
   # Unpopulated telemetry must never claim success or valid data.

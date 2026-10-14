@@ -1,4 +1,5 @@
 #include "rover_drivetrain_control/bld305s_driver.hpp"
+#include "rover_drivetrain_control/drivetrain_core.hpp"
 
 #include <modbus/modbus.h>
 
@@ -447,19 +448,20 @@ Bld305sDriver::Result Bld305sDriver::endCycle()
     // V0.4 minimum mandatory cycle: speed setpoint, actual-speed read, fault read.
     // Diagnostics are additional rotating reads and do not relax these.
     const bool good = state.success_count_cycle >= 3 && !state.exchange_failed_cycle;
+    // Miss counting and the valid/lost decision live in the core (AD-15).
+    core::WheelCycleHealth health;
+    health.missed_cycles = state.consecutive_failures;
+    health.valid = state.telemetry_valid;
+    health.finishCycle(good);
+    state.consecutive_failures = health.missed_cycles;
+    state.telemetry_valid = health.valid;
     if (good) {
-      state.consecutive_failures = 0;
       state.communication = CommunicationState::HEALTHY;
-      state.telemetry_valid = true;
       // A good communication cycle does NOT restore controller initialization.
     } else {
-      if (state.consecutive_failures < std::numeric_limits<std::uint32_t>::max()) {
-        ++state.consecutive_failures;
-      }
-      state.telemetry_valid = state.telemetry_valid && state.consecutive_failures < 2;
-      state.communication = state.consecutive_failures >= COMM_FAILURE_LIMIT ?
+      state.communication = health.lost ?
         CommunicationState::LOST : CommunicationState::DEGRADED;
-      if (state.communication == CommunicationState::LOST) {
+      if (health.lost) {
         state.controller = ControllerState::UNKNOWN;
       }
     }
