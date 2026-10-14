@@ -20,6 +20,9 @@ that are sent through [`nobleo_socketcan_bridge`](../nobleo_socketcan_bridge).
 ```
 
 * **Subscribes** to `arm_interfaces/msg/EeCommand` on `/ee_command`.
+* **Subscribes** to `/estop` (`std_msgs/msg/Bool`). Asserting E-stop sends a
+  zero-speed command to CAN ID `0x07` and suppresses end-effector commands until
+  E-stop is cleared.
 * **Publishes** `can_msgs/msg/Frame` on `/socketcan_bridge/tx` (the tx topic of
   `nobleo_socketcan_bridge`, node name `socketcan_bridge`, private topic `~/tx`).
 * Does **not** depend on `ros2_control` / `controller_manager`.
@@ -78,6 +81,7 @@ source install/setup.bash
 * ROS 2 Jazzy (`rclcpp`)
 * `can_msgs`
 * `arm_interfaces`
+* `std_msgs` (shared rover E-stop state)
 * `nobleo_socketcan_bridge` (runtime — provides the CAN <-> ROS bridge)
 
 ---
@@ -112,6 +116,7 @@ Configured in `config/ee_params.yaml`:
 |-----------------|----------|--------------------------|----------------------------------------------------------|
 | `can_tx_topic`  | string   | `/socketcan_bridge/tx`   | CAN frame output topic (bridge tx)                       |
 | `command_topic` | string   | `/ee_command`            | Topic the node subscribes to for `EeCommand`             |
+| `estop_topic`   | string   | `/estop`                 | Shared rover E-stop state topic                          |
 | `ee_can_id`     | int      | `0x07`                   | CAN ID of the end-effector controller                    |
 
 ---
@@ -142,9 +147,10 @@ candump can0
 
 ## Relationship to `dcr_arm_driver`
 
-* `dcr_arm_driver` controls the three arm joints through **ros2_control**.
+* `dcr_arm_driver` controls the six arm joints through **ros2_control**.
 * `dcr_ee_driver` controls **only the end effector** through its **own topic**,
   bypassing ros2_control entirely.
+* Both drivers listen to `/estop`; the EE driver stops CAN ID `0x07` directly.
 * All end-effector code (`ee_set_spd`, `ee_set_pos`, `ee_laser`) has been
   removed from `dcr_arm_driver` and lives in this package instead.
 

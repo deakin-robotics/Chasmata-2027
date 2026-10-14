@@ -10,6 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(can_msgs REQUIRED)
 find_package(arm_interfaces REQUIRED)
+find_package(std_msgs REQUIRED)
 
 # Build end effector driver node
 add_executable(ee_driver_node src/ee_driver_node.cpp)
@@ -19,6 +20,7 @@ ament_target_dependencies(
   rclcpp
   can_msgs
   arm_interfaces
+  std_msgs
 )
 
 # Install the executable

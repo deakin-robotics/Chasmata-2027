@@ -18,6 +18,7 @@
 #include <arm_interfaces/msg/motor_stat2.hpp>
 #include <dcr_arm_driver/msg/direct_drive.hpp>
 #include <std_msgs/msg/bool.hpp>
+#include <std_srvs/srv/trigger.hpp>
 
 #include "dcr_arm_driver/motor.hpp"
 
@@ -30,6 +31,7 @@ struct JointInfo {
   double velocity = 0.0;
   double position_min = 0.0;
   double position_max = 0.0;
+  bool has_position_feedback = false;
   double temperature = 0.0;        // NEW (from MotorStat1.temp)
   double bus_voltage = 0.0;        // NEW (from MotorStat2.busv)
   double bus_current = 0.0;        // NEW (from MotorStat2.busc)
@@ -99,6 +101,7 @@ class ArmHardwareInterface : public hardware_interface::SystemInterface {
   // Telemetry exposed from arm_interfaces (everything except the end effector)
   rclcpp::Publisher<arm_interfaces::msg::MotorStat1>::SharedPtr stat1_pub_;
   rclcpp::Publisher<arm_interfaces::msg::MotorStat2>::SharedPtr stat2_pub_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr set_home_service_;
 
   // Direct drive is separate from the arm_interfaces telemetry topics.
   rclcpp::Subscription<dcr_arm_driver::msg::DirectDrive>::SharedPtr direct_drive_sub_;
@@ -107,6 +110,7 @@ class ArmHardwareInterface : public hardware_interface::SystemInterface {
   std::vector<JointInfo> joints_;
 
   JointInfo* find_joint(uint32_t can_id);
+  void ensure_estop_subscription(const rclcpp::Node::SharedPtr& node);
   void deactivate_endpoints();
   void can_frame_callback(const can_msgs::msg::Frame& msg);
   void direct_drive_callback(const dcr_arm_driver::msg::DirectDrive& msg);

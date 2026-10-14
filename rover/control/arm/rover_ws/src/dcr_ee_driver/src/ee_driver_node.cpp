@@ -13,11 +13,14 @@
 //     0xA1 -> position control   (data[1] = position)
 //     0xA2 -> laser control      (data[1] = 0x00)
 
+#include <atomic>
 #include <memory>
+#include <mutex>
 
 #include "rclcpp/rclcpp.hpp"
 #include "can_msgs/msg/frame.hpp"
 #include "arm_interfaces/msg/ee_command.hpp"
+#include "std_msgs/msg/bool.hpp"
 
 namespace dcr_ee_driver {
 
@@ -30,6 +33,8 @@ class EeDriverNode : public rclcpp::Node {
         this->declare_parameter<std::string>("can_tx_topic", "/socketcan_bridge/tx");
     command_topic_ =
         this->declare_parameter<std::string>("command_topic", "/ee_command");
+    estop_topic_ =
+        this->declare_parameter<std::string>("estop_topic", "/estop");
     ee_can_id_ = this->declare_parameter<int>("ee_can_id", 0x07);
 
     can_pub_ = this->create_publisher<can_msgs::msg::Frame>(
@@ -40,15 +45,24 @@ class EeDriverNode : public rclcpp::Node {
         [this](const arm_interfaces::msg::EeCommand& msg) {
           this->on_command(msg);
         });
+    estop_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+        estop_topic_, rclcpp::QoS(1),
+        [this](const std_msgs::msg::Bool& msg) { this->on_estop(msg); });
 
     RCLCPP_INFO(this->get_logger(),
-                "EE driver ready. cmd topic='%s', CAN tx=%s, CAN ID=0x%02X",
-                command_topic_.c_str(), can_tx_topic_.c_str(),
+                "EE driver ready. cmd topic='%s', E-stop topic='%s', CAN tx=%s, CAN ID=0x%02X",
+                command_topic_.c_str(), estop_topic_.c_str(), can_tx_topic_.c_str(),
                 static_cast<unsigned int>(ee_can_id_));
   }
 
  private:
   void on_command(const arm_interfaces::msg::EeCommand& msg) {
+    std::lock_guard<std::mutex> lock(command_mutex_);
+    if (estop_asserted_.load(std::memory_order_relaxed)) {
+      RCLCPP_WARN(this->get_logger(), "Ignoring end-effector command while E-stop is asserted");
+      return;
+    }
+
     can_msgs::msg::Frame frame;
     frame.id = static_cast<uint32_t>(ee_can_id_);
     frame.dlc = 0x02;
@@ -77,11 +91,31 @@ class EeDriverNode : public rclcpp::Node {
                  frame.data[0], static_cast<unsigned int>(frame.data[1]));
   }
 
+  void on_estop(const std_msgs::msg::Bool& msg) {
+    std::lock_guard<std::mutex> lock(command_mutex_);
+    estop_asserted_.store(msg.data, std::memory_order_relaxed);
+    if (!msg.data) {
+      return;
+    }
+
+    can_msgs::msg::Frame stop_frame;
+    stop_frame.id = static_cast<uint32_t>(ee_can_id_);
+    stop_frame.dlc = 0x02;
+    stop_frame.data[0] = 0xA0;
+    stop_frame.data[1] = 0x00;
+    can_pub_->publish(stop_frame);
+    RCLCPP_WARN(this->get_logger(), "E-stop asserted; sent end-effector zero-speed command");
+  }
+
   std::string can_tx_topic_;
   std::string command_topic_;
+  std::string estop_topic_;
   int ee_can_id_;
+  std::atomic<bool> estop_asserted_{false};
+  std::mutex command_mutex_;
   rclcpp::Publisher<can_msgs::msg::Frame>::SharedPtr can_pub_;
   rclcpp::Subscription<arm_interfaces::msg::EeCommand>::SharedPtr command_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr estop_sub_;
 };
 
 }  // namespace dcr_ee_driver

@@ -127,6 +127,26 @@ configured position limits and converts RPM to radians per second.
 | `/socketcan_bridge/tx` | `can_msgs/Frame` | publish   | outgoing CAN frames                    |
 | `/socketcan_bridge/rx` | `can_msgs/Frame` | subscribe | incoming CAN frames                    |
 
+### Service
+
+| Service         | Type                 | Description                                      |
+|-----------------|----------------------|--------------------------------------------------|
+| `/arm/set_home` | `std_srvs/srv/Trigger` | Explicitly set current arm pose as home and reset targets |
+
+The `/estop` subscription remains active while the hardware is inactive, so
+its state is current when the arm is activated again. Activation waits for fresh
+encoder feedback and seeds each position target from the measured position.
+
+Homing is explicit; activation does not redefine the motor coordinate frame.
+When the arm is stationary at its intended home pose, call:
+
+```bash
+ros2 service call /arm/set_home std_srvs/srv/Trigger {}
+```
+
+This sets all six motor home positions and resets their reported state and
+controller targets to zero.
+
 ---
 
 ## Message definitions
@@ -182,7 +202,7 @@ source install/setup.bash
 
 * ROS 2 Jazzy: `rclcpp`, `rclcpp_lifecycle`, `hardware_interface`, `pluginlib`,
   `controller_manager`, `joint_state_broadcaster`, `joint_trajectory_controller`
-* `can_msgs`, `arm_interfaces`, `std_msgs`, `rosidl_default_generators`,
+* `can_msgs`, `arm_interfaces`, `std_msgs`, `std_srvs`, `rosidl_default_generators`,
   `rosidl_default_runtime`
 * `nobleo_socketcan_bridge` (runtime — provides the CAN <-> ROS bridge)
 
@@ -260,7 +280,8 @@ Direct drive bypasses MoveIt2 for the selected joint. Each accepted command is
 latched and sent by the 50 Hz `write()` loop until replaced, released with
 `CONTROLLER`, or reset on hardware activation. Other joints remain under
 controller control. Speed commands persist even if the publishing node exits;
-send zero speed to stop that joint.
+send zero speed to stop that joint. Hardware reactivation seeds controller
+targets from fresh feedback before sending position commands.
 
 ```bash
 # Position control (POSITION=1), value in degrees

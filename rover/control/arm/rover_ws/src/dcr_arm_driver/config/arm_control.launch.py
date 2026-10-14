@@ -24,6 +24,10 @@ def generate_launch_description():
             package='robot_state_publisher',
             executable='robot_state_publisher',
             parameters=[{'robot_description': robot_description}],
+            remappings=[
+                ('joint_states', '/arm/joint_states'),
+                ('/joint_states', '/arm/joint_states'),
+            ],
             output='screen',
         ),
         # ros2_control node (main control manager)

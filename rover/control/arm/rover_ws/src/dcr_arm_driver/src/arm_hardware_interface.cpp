@@ -141,6 +141,8 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_init(
 hardware_interface::CallbackReturn ArmHardwareInterface::on_configure(
     const rclcpp_lifecycle::State& /*previous_state*/) {
   RCLCPP_INFO(rclcpp::get_logger("ArmHardwareInterface"), "Configuring...");
+  node_ = this->get_node();
+  ensure_estop_subscription(node_);
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -157,6 +159,7 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_activate(
   // Instead, use the node that controller_manager already owns and spins.
   auto node = this->get_node();
   node_ = node;
+  ensure_estop_subscription(node);
 
   // Talk to nobleo_socketcan_bridge. Its node is named "socketcan_bridge"
   // and it publishes received frames on "~/rx" (-> /socketcan_bridge/rx) and
@@ -187,28 +190,41 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_activate(
   for (auto& joint : joints_) {
     joint.direct_mode = dcr_arm_driver::msg::DirectDrive::CONTROLLER;
     joint.direct_value = 0.0;
+    joint.has_position_feedback = false;
   }
-
-  // Keep the stop state locally because write() runs in the ros2_control loop.
-  estop_sub_ = node->create_subscription<std_msgs::msg::Bool>(
-      "/estop", rclcpp::QoS(1), [this](const std_msgs::msg::Bool& msg) {
-        estop_asserted_.store(msg.data, std::memory_order_relaxed);
-        if (msg.data) {
-          RCLCPP_WARN(rclcpp::get_logger("ArmHardwareInterface"),
-                      "E-stop asserted; stopping arm motion");
-        }
-      });
 
   auto clear_fault_msg = motor_driver_->clr_faults();
   can_pub_->publish(clear_fault_msg);
 
-  for (auto& joint : joints_) {
-    auto home_msg = motor_driver_->set_home(joint.can_id);
-    can_pub_->publish(home_msg);
-    RCLCPP_INFO(rclcpp::get_logger("ArmHardwareInterface"),
-                "Set home for joint: %s (CAN ID: 0x%02X)", joint.name.c_str(),
-                joint.can_id);
-  }
+  set_home_service_ = node->create_service<std_srvs::srv::Trigger>(
+      "/arm/set_home",
+      [this](const std_srvs::srv::Trigger::Request::SharedPtr /*request*/,
+             std_srvs::srv::Trigger::Response::SharedPtr response) {
+        std::lock_guard<std::mutex> lock(lifecycle_mutex_);
+        if (!active_ || !can_pub_) {
+          response->success = false;
+          response->message = "Arm hardware is inactive";
+          return;
+        }
+        if (estop_asserted_.load(std::memory_order_relaxed)) {
+          response->success = false;
+          response->message = "Cannot set home while E-stop is asserted";
+          return;
+        }
+
+        for (auto& joint : joints_) {
+          can_pub_->publish(motor_driver_->speed_control(joint.can_id, 0.0f));
+          can_pub_->publish(motor_driver_->set_home(joint.can_id));
+          joint.position = 0.0;
+          joint.velocity = 0.0;
+          joint.position_command = 0.0;
+          joint.direct_mode = dcr_arm_driver::msg::DirectDrive::CONTROLLER;
+          joint.direct_value = 0.0;
+          joint.has_position_feedback = true;
+        }
+        response->success = true;
+        response->message = "Arm joint home positions and controller targets reset to zero";
+      });
 
   active_ = true;
   RCLCPP_INFO(rclcpp::get_logger("ArmHardwareInterface"), "Arm activated");
@@ -254,11 +270,29 @@ void ArmHardwareInterface::deactivate_endpoints() {
     }
   }
   direct_drive_sub_.reset();
-  estop_sub_.reset();
   can_sub_.reset();
+  set_home_service_.reset();
   stat1_pub_.reset();
   stat2_pub_.reset();
   can_pub_.reset();
+}
+
+void ArmHardwareInterface::ensure_estop_subscription(
+    const rclcpp::Node::SharedPtr& node) {
+  if (estop_sub_) {
+    return;
+  }
+
+  // Keep this subscription alive across deactivation and cleanup so stop
+  // changes are not missed while motion endpoints are torn down.
+  estop_sub_ = node->create_subscription<std_msgs::msg::Bool>(
+      "/estop", rclcpp::QoS(1), [this](const std_msgs::msg::Bool& msg) {
+        estop_asserted_.store(msg.data, std::memory_order_relaxed);
+        if (msg.data) {
+          RCLCPP_WARN(rclcpp::get_logger("ArmHardwareInterface"),
+                      "E-stop asserted; stopping arm motion");
+        }
+      });
 }
 
 std::vector<hardware_interface::StateInterface>
@@ -323,7 +357,7 @@ hardware_interface::return_type ArmHardwareInterface::write(
       // Repeated zero-speed commands clear any motor motion command already in
       // flight while the E-stop is active. Do not send trajectory positions.
       can_msgs::msg::Frame cmd_msg;
-      if (estop_asserted) {
+      if (estop_asserted || !joint.has_position_feedback) {
         cmd_msg = motor_driver_->speed_control(joint.can_id, 0.0f);
       } else if (joint.direct_mode == dcr_arm_driver::msg::DirectDrive::SPEED) {
         cmd_msg = motor_driver_->speed_control(joint.can_id, joint.direct_value);
@@ -370,6 +404,10 @@ void ArmHardwareInterface::can_frame_callback(
         stat.angle, joint->position_min, joint->position_max, joint->position);
     if (position) {
       joint->position = *position;
+      if (!joint->has_position_feedback) {
+        joint->position_command = *position;
+        joint->has_position_feedback = true;
+      }
     } else {
       RCLCPP_WARN_THROTTLE(
           rclcpp::get_logger("ArmHardwareInterface"), *node_->get_clock(),

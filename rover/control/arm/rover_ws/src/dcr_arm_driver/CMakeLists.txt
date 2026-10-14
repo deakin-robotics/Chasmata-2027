@@ -15,6 +15,7 @@ find_package(pluginlib REQUIRED)
 find_package(can_msgs REQUIRED)
 find_package(arm_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -53,6 +54,7 @@ ament_target_dependencies(
   can_msgs
   arm_interfaces
   std_msgs
+  std_srvs
 )
 target_link_libraries(arm_hardware_interface dcr_arm_driver_lib "${direct_drive_typesupport}")
 
@@ -95,6 +97,7 @@ ament_export_dependencies(
   can_msgs
   arm_interfaces
   std_msgs
+  std_srvs
 )
 
 ament_export_dependencies(rosidl_default_runtime)
@@ -104,7 +107,7 @@ if(BUILD_TESTING)
   ament_add_gtest(test_direct_drive test/test_direct_drive.cpp)
   target_link_libraries(test_direct_drive arm_hardware_interface)
   ament_target_dependencies(test_direct_drive hardware_interface rclcpp rclcpp_lifecycle
-    can_msgs arm_interfaces std_msgs)
+    can_msgs arm_interfaces std_msgs std_srvs)
 endif()
 
 # Finalize package
