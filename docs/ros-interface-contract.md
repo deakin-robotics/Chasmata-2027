@@ -571,25 +571,79 @@ gimbal_priority: {confirmed: "", pending: "", rejected: ""}
 The mock reports `system: GOOD` and an empty string for
 `gimbal_priority.rejected` when no rejection is active.
 
-### ECAM alerts interface
+### ECAM source snapshots
+
+```yaml
+topic: /ecam/alerts/source
+type: telemetry_interfaces/msg/EcamAlertSourceSnapshot
+publisher: GUI source service or a Rover/BaseStation participant
+subscriber: Rover and BaseStation ECAM aggregators
+contract:
+  source: {type: string, enum: [driver, ecam, arm, basestation, rover]}
+  timestamp: {type: builtin_interfaces/msg/Time}
+  active_codes:
+    type: string[]
+    semantics: complete_snapshot_for_source
+    unique: true
+behavior:
+  publish: {on_active_set_change: true, on_connection_recovery: true}
+  qos: {reliability: reliable, durability: transient_local, depth: 1}
+purpose: Reports the current active ECAM codes from one participant.
+```
+
+Example:
+
+```yaml
+source: driver
+timestamp: {sec: 123, nanosec: 456000000}
+active_codes: [DRIVE_CONTROLLER_OFFLINE]
+```
+
+The GUI reports as `driver`, `arm`, or `ecam` according to its active route.
+Rover and BaseStation participants use the corresponding source name. Each
+message replaces that source's previous code set.
+
+### Combined ECAM alerts
 
 ```yaml
 topic: /ecam/alerts
 type: telemetry_interfaces/msg/EcamAlerts
-publisher: Reserved shared ECAM relay
-subscriber: Reserved GUI clients
+publisher: Rover primary aggregator or BaseStation failover aggregator
+subscriber: GUI alert services and BaseStation aggregator
 contract:
-  active_codes:
-    type: string[]
-    semantics: complete_snapshot
-    unique: true
+  timestamp: {type: builtin_interfaces/msg/Time}
+  authority: {type: string, enum: [rover, basestation]}
+  sources: {type: telemetry_interfaces/msg/EcamAlertSourceSnapshot[]}
 behavior:
-  updates: complete_active_code_set
-purpose: Shares the current active ECAM alert codes with operator displays.
+  sources: latest_complete_snapshot_per_source
+  active_codes: union_of_all_source_snapshots
+  base_station_takeover_after_rover_heartbeat_timeout_seconds: 3
+  handback: resend_non_rover_snapshots_then_wait_for_rover_reflection
+  qos: {reliability: reliable, durability: transient_local, depth: 1}
+purpose: Shares the latest combined ECAM alert state with operator displays.
 ```
 
-`EcamAlerts` reserves the message shape for the shared alert feed. The message
-is built with the interfaces package, but no runtime topic is added here.
+Example:
+
+```yaml
+timestamp: {sec: 123, nanosec: 457000000}
+authority: rover
+sources:
+  - source: driver
+    timestamp: {sec: 123, nanosec: 456000000}
+    active_codes: [DRIVE_CONTROLLER_OFFLINE]
+  - source: arm
+    timestamp: {sec: 123, nanosec: 455000000}
+    active_codes: []
+```
+
+Rover normally combines source snapshots. BaseStation caches source and Rover
+combined snapshots and publishes a combined state after `/rover/heartbeat` has
+been absent for three seconds. When Rover returns, BaseStation resends its
+latest non-Rover source snapshots and waits for a Rover-authority combined
+snapshot containing those versions before returning to relay-only operation.
+The `authority` field lets consumers and the standby aggregator identify which
+participant produced the combined snapshot.
 
 ## Actions
 

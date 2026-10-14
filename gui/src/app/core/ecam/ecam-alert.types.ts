@@ -1,14 +1,10 @@
 /** Visual priority applied consistently anywhere an ECAM alert is rendered. */
 export type EcamAlertSeverity = 'attention' | 'warning' | 'fault';
 
-export type EcamAlertSource =
-  | 'ARM'
-  | 'CAMERA'
-  | 'CONFIG'
-  | 'DRIVE'
-  | 'LINK'
-  | 'POWER'
-  | 'SYSTEM';
+export type EcamAlertSource = 'ARM' | 'CAMERA' | 'CONFIG' | 'DRIVE' | 'LINK' | 'POWER' | 'SYSTEM';
+
+/** ROS source identity selected from the active GUI route. */
+export type EcamAlertReporterSource = 'driver' | 'ecam' | 'arm' | 'basestation' | 'rover';
 
 /** Stable identifiers used by features to raise and clear ECAM alerts. */
 export type EcamAlertCode =

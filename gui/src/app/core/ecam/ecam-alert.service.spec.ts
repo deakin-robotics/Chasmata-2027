@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 
 import { EcamAlertService } from './ecam-alert.service';
 
@@ -6,7 +7,7 @@ describe('EcamAlertService', () => {
   let service: EcamAlertService;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({});
+    TestBed.configureTestingModule({ providers: [provideRouter([])] });
     service = TestBed.inject(EcamAlertService);
   });
 
@@ -86,8 +87,45 @@ describe('EcamAlertService', () => {
 
     service.clear('LINK_DEGRADED');
 
-    expect(service.activeAlerts().map((alert) => alert.code)).toEqual([
-      'POWER_BATTERY_LOW',
-    ]);
+    expect(service.activeAlerts().map((alert) => alert.code)).toEqual(['POWER_BATTERY_LOW']);
+  });
+
+  it('keeps a shared code active until every reporting source clears it', () => {
+    const applyAggregate = (message: unknown) =>
+      (service as unknown as { handleAggregate: (value: unknown) => void }).handleAggregate(
+        message,
+      );
+    const timestamp = { sec: 123, nanosec: 456_000_000 };
+
+    applyAggregate({
+      authority: 'basestation',
+      timestamp,
+      sources: [
+        { source: 'driver', timestamp, active_codes: ['POWER_BATTERY_LOW'] },
+        { source: 'arm', timestamp, active_codes: ['POWER_BATTERY_LOW'] },
+      ],
+    });
+    expect(service.activeAlerts().map((alert) => alert.code)).toEqual(['POWER_BATTERY_LOW']);
+    expect(service.activeAlerts()[0].lastUpdatedAt).toBe(123_456);
+
+    applyAggregate({
+      authority: 'basestation',
+      timestamp: { sec: 124, nanosec: 0 },
+      sources: [
+        { source: 'driver', timestamp, active_codes: [] },
+        { source: 'arm', timestamp, active_codes: ['POWER_BATTERY_LOW'] },
+      ],
+    });
+    expect(service.activeAlerts().map((alert) => alert.code)).toEqual(['POWER_BATTERY_LOW']);
+
+    applyAggregate({
+      authority: 'basestation',
+      timestamp: { sec: 125, nanosec: 0 },
+      sources: [
+        { source: 'driver', timestamp, active_codes: [] },
+        { source: 'arm', timestamp, active_codes: [] },
+      ],
+    });
+    expect(service.activeAlerts()).toEqual([]);
   });
 });

@@ -13,17 +13,11 @@ type TakeoffConfigResult = 'NORMAL' | 'FAILED' | 'UNKNOWN';
   styleUrl: './ecam-alert-display.scss',
 })
 export class EcamAlertDisplay {
-  private readonly ecamAlerts = inject(EcamAlertService);
-
-  readonly activeAlerts = this.ecamAlerts.activeAlerts;
+  readonly activeAlerts = inject(EcamAlertService).activeAlerts;
   readonly takeoffConfigResult = signal<TakeoffConfigResult | null>(null);
 
   /** Temporary visual test until T/O configuration receives real rover state. */
   runMockTakeoffConfiguration(): void {
     this.takeoffConfigResult.set('FAILED');
-    this.ecamAlerts.clearAll();
-    this.ecamAlerts.raise('CONFIG_ESTOP_STATUS_UNAVAILABLE');
-    this.ecamAlerts.raise('CONFIG_LAW_DIRECT');
-    this.ecamAlerts.raise('CONFIG_ANTENNA_NOT_DEPLOYED');
   }
 }

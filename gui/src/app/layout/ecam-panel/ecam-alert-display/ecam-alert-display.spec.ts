@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 
 import { EcamAlertService } from '../../../core/ecam/ecam-alert.service';
 import { EcamAlertDisplay } from './ecam-alert-display';
@@ -11,6 +12,7 @@ describe('EcamAlertDisplay', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [EcamAlertDisplay],
+      providers: [provideRouter([])],
     }).compileComponents();
 
     ecamAlerts = TestBed.inject(EcamAlertService);
@@ -31,9 +33,7 @@ describe('EcamAlertDisplay', () => {
     ecamAlerts.raise('CONFIG_LAW_DIRECT');
     fixture.detectChanges();
 
-    const rows = Array.from(
-      fixture.nativeElement.querySelectorAll('.alert'),
-    ) as HTMLElement[];
+    const rows = Array.from(fixture.nativeElement.querySelectorAll('.alert')) as HTMLElement[];
 
     expect(rows.map((row) => row.querySelector('.alert-text')?.textContent?.trim())).toEqual([
       'CONFIG E-STOP STATUS UNAVAILABLE',
@@ -47,7 +47,7 @@ describe('EcamAlertDisplay', () => {
     ]);
   });
 
-  it('should populate representative alerts when T/O CONFIG is selected', () => {
+  it('should not seed demo alerts when T/O CONFIG is selected', () => {
     const takeoffConfigButton = fixture.nativeElement.querySelector(
       '.takeoff-config-button',
     ) as HTMLButtonElement;
@@ -56,11 +56,7 @@ describe('EcamAlertDisplay', () => {
 
     expect(component.takeoffConfigResult()).toBe('FAILED');
     expect(takeoffConfigButton.classList).toContain('config-warning');
-    expect(ecamAlerts.activeAlerts().map((alert) => alert.code)).toEqual([
-      'CONFIG_ESTOP_STATUS_UNAVAILABLE',
-      'CONFIG_LAW_DIRECT',
-      'CONFIG_ANTENNA_NOT_DEPLOYED',
-    ]);
+    expect(ecamAlerts.activeAlerts()).toEqual([]);
   });
 
   it('maps a confirmed normal result to the green button state', () => {

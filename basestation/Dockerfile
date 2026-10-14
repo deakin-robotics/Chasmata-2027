@@ -17,6 +17,7 @@ RUN apt-get update \
 
 WORKDIR /workspace
 COPY interfaces/telemetry_interfaces /workspace/src/telemetry_interfaces
+COPY rover/shared/ecam_alerts /workspace/src/ecam_alerts
 COPY basestation/arm_moveit_config /workspace/src/arm_moveit_config
 COPY basestation/arm_moveit_demo /workspace/src/arm_moveit_demo
 COPY basestation/arm_moveit_bridge /workspace/src/arm_moveit_bridge

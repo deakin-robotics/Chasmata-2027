@@ -86,7 +86,7 @@ green normal data.
 
 The GUI contains one application-wide `EcamAlertService` under `core/ecam/`.
 
-Features raise and clear stable alert codes through the service. They do not choose colours, message wording, or ordering. The service deduplicates repeated codes and exposes one active-alert list to the ECAM, Driver, Arm, and FMA interfaces.
+Features raise and clear stable alert codes through the service. They do not choose colours, message wording, or ordering. The service publishes complete snapshots for its active GUI source on `/ecam/alerts/source` and consumes the combined state from `/ecam/alerts`. The ECAM route displays the shared alert list; Driver and Arm can report alerts without adding a separate alert list to those screens.
 
 The current core consists of:
 
@@ -94,7 +94,7 @@ The current core consists of:
 - `ecam-message-catalog.ts` — the central message definitions.
 - `ecam-alert.service.ts` — active alert state and ordering.
 
-The service is currently GUI-local. It is not yet connected to rover telemetry or a shared ROS alert topic.
+Each GUI keeps local source state and synchronizes it through the shared ROS alert topics.
 
 ## T/O CONFIG behaviour
 
@@ -143,9 +143,9 @@ for the response package, recovery-snapshot, and timeout contract.
 
 ## Multiple operator PCs
 
-The Angular singleton is local to one browser instance. It cannot directly share state between the Driver, Arm, and ECAM PCs.
+The Angular singleton is local to one browser instance, so the Driver, Arm, and ECAM PCs share alert state through ROS rather than shared browser memory.
 
-The intended competition architecture is:
+The shared ECAM architecture is:
 
 ```mermaid
 flowchart TB
@@ -159,7 +159,26 @@ flowchart TB
     alerts --> ecamDisplay[ECAM GUI]
 ```
 
-The relay/aggregator is a separate shared service or ROS node, not part of the ECAM GUI. It will become the shared source of truth. The GUIs will each maintain a local copy of the canonical alert state.
+The aggregators are ROS nodes separate from the ECAM GUI. Rover normally combines source snapshots. BaseStation takes over after `/rover/heartbeat` has been absent for three seconds, then resends its latest source snapshots when Rover returns. It resumes relay-only operation after Rover publishes a combined snapshot reflecting those updates. Each GUI maintains a local copy of the latest combined alert state.
+
+Example combined message on `/ecam/alerts` (`telemetry_interfaces/msg/EcamAlerts`):
+
+```yaml
+timestamp: {sec: 123, nanosec: 457000000}
+authority: rover
+sources:
+  - source: driver
+    timestamp: {sec: 123, nanosec: 456000000}
+    active_codes: [CAMERA_ROVER_FALLBACK_ACTIVE]
+  - source: arm
+    timestamp: {sec: 123, nanosec: 455000000}
+    active_codes: [ARM_TELEMETRY_UNAVAILABLE]
+  - source: ecam
+    timestamp: {sec: 123, nanosec: 456500000}
+    active_codes: []
+```
+
+The top-level timestamp is when the combined snapshot was created. Each source timestamp marks its latest complete snapshot, and the combined active alert list is the union of all source `active_codes` arrays.
 
 Rover Control owns rover faults and health. Driver and Arm GUIs only report station-local conditions, such as a browser being unable to display a camera. They do not become the source of truth for global rover alerts.
 

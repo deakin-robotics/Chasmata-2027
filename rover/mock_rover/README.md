@@ -12,7 +12,8 @@ From this directory:
 docker compose up --build
 ```
 
-The Compose stack runs the mock node and ROSbridge on port `9090`, a rover-side
+The Compose stack runs the mock node, the Rover-primary ECAM snapshot
+aggregator, and ROSbridge on port `9090`, a rover-side
 discovery service on UDP port `11811`, rover MediaMTX, and three synthetic
 H.264 RTSP publishers. Connect the GUI normally to:
 

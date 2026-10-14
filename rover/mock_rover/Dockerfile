@@ -12,6 +12,7 @@ RUN apt-get update \
 
 WORKDIR /workspace
 COPY interfaces/telemetry_interfaces /workspace/src/telemetry_interfaces
+COPY rover/shared/ecam_alerts /workspace/src/ecam_alerts
 COPY rover/mock_rover/package.xml rover/mock_rover/setup.cfg rover/mock_rover/setup.py /workspace/src/mock_rover/
 COPY rover/mock_rover/launch /workspace/src/mock_rover/launch
 COPY rover/mock_rover/mock_rover /workspace/src/mock_rover/mock_rover
