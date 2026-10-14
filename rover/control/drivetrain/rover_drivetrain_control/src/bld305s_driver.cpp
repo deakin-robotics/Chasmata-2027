@@ -443,11 +443,15 @@ Bld305sDriver::Result Bld305sDriver::endCycle()
   if (!cycle_active_) {
     return {ErrorCode::INVALID_CYCLE_STATE, 0, 0};
   }
+  // V0.4 minimum mandatory cycle: speed setpoint, actual-speed read, fault read.
+  // Diagnostics are additional rotating reads and do not relax these.
+  // KNOWN PROBLEM: readFaultRaw() returns UNSUPPORTED (fault register unknown),
+  // so no real cycle can reach this count yet. Only the mock does, via diagnostic reads.
+  constexpr std::uint8_t MANDATORY_EXCHANGES_PER_CYCLE = 3;
   for (auto id : cycle_slaves_) {
     auto & state = slave_states_[id];
-    // V0.4 minimum mandatory cycle: speed setpoint, actual-speed read, fault read.
-    // Diagnostics are additional rotating reads and do not relax these.
-    const bool good = state.success_count_cycle >= 3 && !state.exchange_failed_cycle;
+    const bool good = state.success_count_cycle >= MANDATORY_EXCHANGES_PER_CYCLE &&
+      !state.exchange_failed_cycle;
     // Miss counting and the valid/lost decision live in the core (AD-15).
     core::WheelCycleHealth health;
     health.missed_cycles = state.consecutive_failures;
