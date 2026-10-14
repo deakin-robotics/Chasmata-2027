@@ -84,12 +84,17 @@ class DirectDriveTest : public ::testing::Test {
       frame.id = id;
       frame.dlc = 8;
       frame.data[0] = 0xA4;
+      frame.data[6] = static_cast<uint8_t>(feedback_angle_raw & 0xFF);
+      frame.data[7] = static_cast<uint8_t>((feedback_angle_raw >> 8) & 0xFF);
       feedback->publish(frame);
     }
     spin();
   }
 
   void check_write(const can_msgs::msg::Frame& expected) {
+    publish_feedback();
+    ASSERT_EQ(hardware.read(rclcpp::Time(0), rclcpp::Duration::from_seconds(0.02)),
+              hardware_interface::return_type::OK);
     frames.clear();
     ASSERT_EQ(hardware.write(rclcpp::Time(0), rclcpp::Duration::from_seconds(0.02)),
               hardware_interface::return_type::OK);
@@ -109,6 +114,7 @@ class DirectDriveTest : public ::testing::Test {
   rclcpp::Publisher<DirectDrive>::SharedPtr commands;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr estop;
   std::vector<can_msgs::msg::Frame> frames;
+  uint16_t feedback_angle_raw{0};
 };
 
 TEST_F(DirectDriveTest, DirectCommandsPersistAndCanReturnToController) {
@@ -138,6 +144,30 @@ TEST_F(DirectDriveTest, PositionOutsideJointLimitsIsRejected) {
   command(DirectDrive::POSITION, 10.0);
   command(DirectDrive::POSITION, 181.0);
   check_write(motor.position_control(1, 10.0));
+}
+
+TEST_F(DirectDriveTest, DirectSpeedStopsAtTheJointLimit) {
+  feedback_angle_raw = 8165;  // About 0.006 rad below the default upper limit.
+  command(DirectDrive::SPEED, 20.0);
+  check_write(motor.speed_control(1, 0.0));
+}
+
+TEST_F(DirectDriveTest, StaleFeedbackStopsAndClearsLatchedDirectSpeed) {
+  command(DirectDrive::SPEED, 20.0);
+  std::this_thread::sleep_for(300ms);
+  frames.clear();
+  ASSERT_EQ(hardware.write(rclcpp::Time(0), rclcpp::Duration::from_seconds(0.02)),
+            hardware_interface::return_type::OK);
+  spin();
+  ASSERT_EQ(frames.size(), 2u);
+  EXPECT_EQ(frames[0].data, motor.speed_control(1, 0.0).data);
+
+  // Feedback recovery does not restart a speed command that was latched
+  // before the timeout.
+  publish_feedback();
+  ASSERT_EQ(hardware.read(rclcpp::Time(0), rclcpp::Duration::from_seconds(0.02)),
+            hardware_interface::return_type::OK);
+  check_write(motor.position_control(1, 0.0));
 }
 
 TEST_F(DirectDriveTest, EstopOverridesDirectDriveAndActivationResetsIt) {

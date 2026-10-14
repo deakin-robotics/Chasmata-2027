@@ -23,6 +23,8 @@ that are sent through [`nobleo_socketcan_bridge`](../nobleo_socketcan_bridge).
 * **Subscribes** to `/estop` (`std_msgs/msg/Bool`). Asserting E-stop sends a
   zero-speed command to CAN ID `0x07` and suppresses end-effector commands until
   E-stop is cleared.
+* On `SIGINT` or `SIGTERM`, sends a zero-speed command before shutting ROS down
+  and allows a short interval for the CAN bridge to transmit it.
 * **Publishes** `can_msgs/msg/Frame` on `/socketcan_bridge/tx` (the tx topic of
   `nobleo_socketcan_bridge`, node name `socketcan_bridge`, private topic `~/tx`).
 * Does **not** depend on `ros2_control` / `controller_manager`.

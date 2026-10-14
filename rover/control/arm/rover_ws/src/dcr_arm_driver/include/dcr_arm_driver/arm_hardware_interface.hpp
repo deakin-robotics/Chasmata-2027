@@ -5,6 +5,7 @@
 #include <string>
 #include <memory>
 #include <atomic>
+#include <chrono>
 #include <mutex>
 
 #include <hardware_interface/system_interface.hpp>
@@ -33,6 +34,7 @@ struct JointInfo {
   double position_min = 0.0;
   double position_max = 0.0;
   bool has_position_feedback = false;
+  std::chrono::steady_clock::time_point last_feedback_time{};
   bool has_pending_status1 = false;
   double pending_angle_degrees = 0.0;
   double pending_speed_rpm = 0.0;

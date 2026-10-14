@@ -307,6 +307,11 @@ before handing control back. Unknown IDs, invalid modes, and non-finite or
 unencodable values are ignored. Commands received while inactive or while
 E-stop is asserted are ignored.
 
+Feedback older than 250 ms causes the driver to send zero speed and clear any
+latched direct-speed command. Direct-speed commands are also suppressed when
+they would move outward within 0.02 rad of a configured joint limit; inward
+commands remain available so the joint can move away from a limit.
+
 `/estop` overrides both command sources with repeated zero-speed CAN frames.
 Clearing E-stop resumes the previously selected command, including a latched
 direct speed. Hardware deactivation, cleanup, shutdown, and error transitions

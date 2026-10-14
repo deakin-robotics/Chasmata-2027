@@ -14,8 +14,11 @@
 //     0xA2 -> laser control      (data[1] = 0x00)
 
 #include <atomic>
+#include <chrono>
+#include <csignal>
 #include <memory>
 #include <mutex>
+#include <thread>
 
 #include "rclcpp/rclcpp.hpp"
 #include "can_msgs/msg/frame.hpp"
@@ -55,11 +58,22 @@ class EeDriverNode : public rclcpp::Node {
                 static_cast<unsigned int>(ee_can_id_));
   }
 
+  void stop_motion() {
+    std::lock_guard<std::mutex> lock(command_mutex_);
+    if (stopping_) {
+      return;
+    }
+    stopping_ = true;
+    publish_zero_speed();
+    RCLCPP_INFO(this->get_logger(), "Sent end-effector zero-speed command before shutdown");
+  }
+
  private:
   void on_command(const arm_interfaces::msg::EeCommand& msg) {
     std::lock_guard<std::mutex> lock(command_mutex_);
-    if (estop_asserted_.load(std::memory_order_relaxed)) {
-      RCLCPP_WARN(this->get_logger(), "Ignoring end-effector command while E-stop is asserted");
+    if (stopping_ || estop_asserted_.load(std::memory_order_relaxed)) {
+      RCLCPP_WARN(this->get_logger(),
+                  "Ignoring end-effector command while E-stop is asserted or driver is stopping");
       return;
     }
 
@@ -98,13 +112,17 @@ class EeDriverNode : public rclcpp::Node {
       return;
     }
 
+    publish_zero_speed();
+    RCLCPP_WARN(this->get_logger(), "E-stop asserted; sent end-effector zero-speed command");
+  }
+
+  void publish_zero_speed() {
     can_msgs::msg::Frame stop_frame;
     stop_frame.id = static_cast<uint32_t>(ee_can_id_);
     stop_frame.dlc = 0x02;
     stop_frame.data[0] = 0xA0;
     stop_frame.data[1] = 0x00;
     can_pub_->publish(stop_frame);
-    RCLCPP_WARN(this->get_logger(), "E-stop asserted; sent end-effector zero-speed command");
   }
 
   std::string can_tx_topic_;
@@ -113,6 +131,7 @@ class EeDriverNode : public rclcpp::Node {
   int ee_can_id_;
   std::atomic<bool> estop_asserted_{false};
   std::mutex command_mutex_;
+  bool stopping_{false};
   rclcpp::Publisher<can_msgs::msg::Frame>::SharedPtr can_pub_;
   rclcpp::Subscription<arm_interfaces::msg::EeCommand>::SharedPtr command_sub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr estop_sub_;
@@ -120,9 +139,31 @@ class EeDriverNode : public rclcpp::Node {
 
 }  // namespace dcr_ee_driver
 
+namespace {
+volatile std::sig_atomic_t shutdown_requested = 0;
+
+void handle_shutdown_signal(int /*signal*/) { shutdown_requested = 1; }
+}  // namespace
+
 int main(int argc, char** argv) {
-  rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<dcr_ee_driver::EeDriverNode>());
+  rclcpp::init(argc, argv, rclcpp::InitOptions(),
+               rclcpp::SignalHandlerOptions::None);
+  std::signal(SIGINT, handle_shutdown_signal);
+  std::signal(SIGTERM, handle_shutdown_signal);
+
+  auto node = std::make_shared<dcr_ee_driver::EeDriverNode>();
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(node);
+  while (rclcpp::ok() && !shutdown_requested) {
+    executor.spin_some();
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+
+  // Publish while the ROS context and CAN publisher are still alive, then
+  // leave a short window for the bridge to transmit the final frame.
+  node->stop_motion();
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  executor.remove_node(node);
   rclcpp::shutdown();
   return 0;
 }

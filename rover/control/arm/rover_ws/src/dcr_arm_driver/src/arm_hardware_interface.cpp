@@ -15,6 +15,8 @@ constexpr double TWO_PI = 6.28318530717958647692;
 constexpr double PI = 3.14159265358979323846;
 constexpr double DEGREES_TO_RADIANS = PI / 180.0;
 constexpr double RPM_TO_RADIANS_PER_SECOND = TWO_PI / 60.0;
+constexpr auto FEEDBACK_TIMEOUT = std::chrono::milliseconds(250);
+constexpr double DIRECT_SPEED_LIMIT_MARGIN_RADIANS = 0.02;
 
 std::optional<double> normalize_encoder_angle(
     double angle_degrees, double lower_limit, double upper_limit,
@@ -381,6 +383,7 @@ hardware_interface::return_type ArmHardwareInterface::read(
           joint.position);
       if (position) {
         joint.position = *position;
+        joint.last_feedback_time = std::chrono::steady_clock::now();
         if (!joint.has_position_feedback) {
           joint.position_command = *position;
           joint.has_position_feedback = true;
@@ -416,15 +419,35 @@ hardware_interface::return_type ArmHardwareInterface::write(
     return hardware_interface::return_type::OK;
   }
   const bool estop_asserted = estop_asserted_.load(std::memory_order_relaxed);
+  const auto now = std::chrono::steady_clock::now();
   for (auto& joint : joints_) {
     if (can_pub_) {
+      const bool feedback_stale =
+          !joint.has_position_feedback ||
+          now - joint.last_feedback_time > FEEDBACK_TIMEOUT;
+      if (feedback_stale) {
+        // Never resume a latched manual speed command after feedback loss.
+        joint.has_position_feedback = false;
+        joint.direct_mode = dcr_arm_driver::msg::DirectDrive::CONTROLLER;
+        joint.direct_value = 0.0;
+      }
       // Repeated zero-speed commands clear any motor motion command already in
       // flight while the E-stop is active. Do not send trajectory positions.
       can_msgs::msg::Frame cmd_msg;
-      if (estop_asserted || !joint.has_position_feedback) {
+      if (estop_asserted || feedback_stale) {
         cmd_msg = motor_driver_->speed_control(joint.can_id, 0.0f);
       } else if (joint.direct_mode == dcr_arm_driver::msg::DirectDrive::SPEED) {
-        cmd_msg = motor_driver_->speed_control(joint.can_id, joint.direct_value);
+        double speed_command = joint.direct_value;
+        if ((speed_command > 0.0 &&
+             joint.position >= joint.position_max -
+                                   DIRECT_SPEED_LIMIT_MARGIN_RADIANS) ||
+            (speed_command < 0.0 &&
+             joint.position <= joint.position_min +
+                                   DIRECT_SPEED_LIMIT_MARGIN_RADIANS)) {
+          speed_command = 0.0;
+        }
+        cmd_msg = motor_driver_->speed_control(
+            joint.can_id, static_cast<float>(speed_command));
       } else if (joint.direct_mode == dcr_arm_driver::msg::DirectDrive::POSITION) {
         const double direct_position =
             std::clamp(joint.direct_value * DEGREES_TO_RADIANS,
