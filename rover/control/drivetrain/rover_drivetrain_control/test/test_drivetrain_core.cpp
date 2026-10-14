@@ -8,6 +8,15 @@
 using namespace rover_drivetrain_control::core;
 int main()
 {
+  WheelCycleHealth fresh;
+  fresh.finishCycle(false);
+  CHECK(!fresh.valid && fresh.missed_cycles == 1);  // never valid without a good cycle
+  WheelCycleHealth grace;
+  grace.finishCycle(true);
+  grace.finishCycle(false);
+  CHECK(grace.valid && grace.missed_cycles == 1);   // one-cycle grace for good data
+  grace.finishCycle(false);
+  CHECK(!grace.valid && !grace.lost);
   WheelCycleHealth a, b;
   a.finishCycle(false); a.finishCycle(false);
   CHECK(!a.valid && !a.lost && a.missed_cycles == 2);

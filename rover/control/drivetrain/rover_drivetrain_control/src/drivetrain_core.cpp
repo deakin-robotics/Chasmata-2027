@@ -64,7 +64,8 @@ void WheelCycleHealth::finishCycle(bool all_ok) noexcept
   if (missed_cycles < std::numeric_limits<std::uint32_t>::max()) {
     ++missed_cycles;
   }
-  valid = missed_cycles < 2;
+  // A failed cycle may keep previously good data valid (AD-15 grace), never grant it.
+  valid = valid && missed_cycles < 2;
   lost = missed_cycles >= 3;
 }
 
