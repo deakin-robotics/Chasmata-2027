@@ -55,7 +55,6 @@ export class ArmMasterPage {
   private readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
   private readonly cameraFeedControl = inject(CameraFeedControl);
   private armModeSynchronized = false;
-  private baseStationWasAvailable = false;
 
   private readonly modeHandshakeEffect = effect(() => {
     const client = this.rosConnection.client();
@@ -81,11 +80,9 @@ export class ArmMasterPage {
     const available = this.heartbeatMonitor.baseStationAvailable();
 
     untracked(() => {
-      if (this.baseStationWasAvailable && !available) {
+      if (!available && this.armControlMode.mode() === ArmMode.Position) {
         this.selectArmMode(ArmMode.Manual);
       }
-
-      this.baseStationWasAvailable = available;
     });
   });
 
