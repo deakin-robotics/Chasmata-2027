@@ -1,6 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { EcamAlertService } from '../../core/ecam/ecam-alert.service';
+import { EcamAlertReporterService } from '../../core/ecam/ecam-alert-reporter.service';
 import { ControlModeCoordinator } from '../../core/control/control-mode-coordinator';
 import { RosTelemetryBridge } from '../../core/ros/ros-telemetry-bridge';
 import { MissionControlHeader } from './mission-control-header/mission-control-header';
@@ -14,5 +14,5 @@ import { MissionControlHeader } from './mission-control-header/mission-control-h
 export class MissionControl {
   private readonly controlModeCoordinator = inject(ControlModeCoordinator);
   private readonly rosTelemetryBridge = inject(RosTelemetryBridge);
-  private readonly ecamAlertService = inject(EcamAlertService);
+  private readonly ecamAlertReporter = inject(EcamAlertReporterService);
 }

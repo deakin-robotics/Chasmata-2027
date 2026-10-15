@@ -1,13 +1,14 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
-import { EcamAlertService } from '../../../core/ecam/ecam-alert.service';
+import { EcamAlertConsumerService } from '../../../core/ecam/ecam-alert-consumer.service';
+import { EcamAlertReporterService } from '../../../core/ecam/ecam-alert-reporter.service';
 import { EcamAlertDisplay } from './ecam-alert-display';
 
 describe('EcamAlertDisplay', () => {
   let component: EcamAlertDisplay;
   let fixture: ComponentFixture<EcamAlertDisplay>;
-  let ecamAlerts: EcamAlertService;
+  let ecamAlerts: EcamAlertReporterService;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -15,7 +16,7 @@ describe('EcamAlertDisplay', () => {
       providers: [provideRouter([])],
     }).compileComponents();
 
-    ecamAlerts = TestBed.inject(EcamAlertService);
+    ecamAlerts = TestBed.inject(EcamAlertReporterService);
     ecamAlerts.clearAll();
     fixture = TestBed.createComponent(EcamAlertDisplay);
     component = fixture.componentInstance;
@@ -53,7 +54,11 @@ describe('EcamAlertDisplay', () => {
   });
 
   it('shows all reporters on one alert row', () => {
-    (ecamAlerts as unknown as { handleAggregate: (value: unknown) => void }).handleAggregate({
+    (
+      TestBed.inject(EcamAlertConsumerService) as unknown as {
+        handleAggregate: (value: unknown) => void;
+      }
+    ).handleAggregate({
       authority: 'basestation',
       timestamp: { sec: 123, nanosec: 0 },
       sources: [
@@ -77,7 +82,7 @@ describe('EcamAlertDisplay', () => {
 
     expect(component.takeoffConfigResult()).toBe('FAILED');
     expect(takeoffConfigButton.classList).toContain('config-warning');
-    expect(ecamAlerts.activeAlerts()).toEqual([]);
+    expect(ecamAlerts.localAlerts()).toEqual([]);
   });
 
   it('maps a confirmed normal result to the green button state', () => {

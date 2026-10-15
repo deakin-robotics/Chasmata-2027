@@ -11,25 +11,12 @@ import {
   EcamAlert,
   EcamAlertCode,
   EcamAlertReporterSource,
-  EcamAlertSeverity,
   RaiseEcamAlertOptions,
 } from './ecam-alert.types';
 
-const SEVERITY_PRIORITY: Readonly<Record<EcamAlertSeverity, number>> = {
-  fault: 0,
-  warning: 1,
-  attention: 2,
-};
 const SOURCE_TOPIC = '/ecam/alerts/source';
-const COMBINED_TOPIC = '/ecam/alerts';
 const SOURCE_MESSAGE_TYPE = 'telemetry_interfaces/msg/EcamAlertSourceSnapshot';
-const COMBINED_MESSAGE_TYPE = 'telemetry_interfaces/msg/EcamAlerts';
 const GUI_SOURCES = ['driver', 'ecam', 'arm'] as const;
-const REPORTER_SOURCES: readonly EcamAlertReporterSource[] = [
-  ...GUI_SOURCES,
-  'basestation',
-  'rover',
-];
 const ECAM_SNAPSHOT_QOS = {
   history: 'keep_last',
   depth: 1,
@@ -38,82 +25,28 @@ const ECAM_SNAPSHOT_QOS = {
 } as const;
 
 type GuiEcamSource = Extract<EcamAlertReporterSource, 'driver' | 'ecam' | 'arm'>;
-type AggregateAuthority = 'rover' | 'basestation';
 
-interface RosTime {
-  sec?: unknown;
-  nanosec?: unknown;
-}
-
-interface EcamAlertSourceSnapshotMessage {
-  source?: unknown;
-  timestamp?: RosTime;
-  active_codes?: unknown;
-}
-
-interface EcamAlertsMessage {
-  authority?: unknown;
-  timestamp?: RosTime;
-  sources?: unknown;
-}
-
-/** Shared ECAM source reporter and combined-alert state for this GUI route. */
+/** Reports this GUI's active ECAM conditions through complete source snapshots. */
 @Service()
-export class EcamAlertService {
+export class EcamAlertReporterService {
   private readonly router = inject(Router);
   private readonly roverConnection = inject(RosConnection);
   private readonly baseStationConnection = inject(BaseStationConnection);
   private readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
 
-  private readonly activeAlertsState = signal<ReadonlyMap<EcamAlertCode, EcamAlert>>(new Map());
-  private readonly sharedAlertsState = signal<ReadonlyMap<EcamAlertCode, EcamAlert>>(new Map());
+  private readonly localAlertsState = signal<ReadonlyMap<EcamAlertCode, EcamAlert>>(new Map());
   private readonly activeSourceState = signal<GuiEcamSource>(this.sourceFromUrl(this.router.url));
   private readonly sourceCodesState = signal<
     ReadonlyMap<GuiEcamSource, ReadonlySet<EcamAlertCode>>
   >(new Map());
   private readonly sourcePublisherRevision = signal(0);
   private sourcePublisher: Topic | null = null;
-  private sharedAuthority: AggregateAuthority | null = null;
   private roverWasAvailable = false;
   private roverHeartbeatAlertRaised = false;
   private baseStationWasAvailable = false;
   private baseStationHeartbeatAlertRaised = false;
 
-  readonly activeAlerts = computed(() => {
-    const sharedAlerts = this.sharedAlertsState();
-    const alerts = new Map(sharedAlerts);
-    for (const [code, alert] of this.activeAlertsState()) alerts.set(code, alert);
-
-    const localReporters = new Map<EcamAlertCode, Set<EcamAlertReporterSource>>();
-    for (const [source, codes] of this.sourceCodesState()) {
-      for (const code of codes) {
-        const reporters = localReporters.get(code) ?? new Set<EcamAlertReporterSource>();
-        reporters.add(source);
-        localReporters.set(code, reporters);
-      }
-    }
-
-    for (const [code, alert] of alerts) {
-      const reporters = new Set([
-        ...(sharedAlerts.get(code)?.reporterSources ?? []),
-        ...(localReporters.get(code) ?? []),
-      ]);
-      alerts.set(code, {
-        ...alert,
-        reporterSources: REPORTER_SOURCES.filter((source) => reporters.has(source)),
-      });
-    }
-
-    return [...alerts.values()].sort((left, right) => {
-      const severityDifference =
-        SEVERITY_PRIORITY[left.severity] - SEVERITY_PRIORITY[right.severity];
-
-      if (severityDifference !== 0) return severityDifference;
-      return left.firstSeenAt - right.firstSeenAt;
-    });
-  });
-
-  readonly hasActiveAlerts = computed(() => this.activeAlerts().length > 0);
+  readonly localAlerts = computed(() => [...this.localAlertsState().values()]);
 
   private readonly sourceTransportEffect = effect((onCleanup) => {
     const roverAvailable = this.heartbeatMonitor.roverAvailable();
@@ -168,26 +101,6 @@ export class EcamAlertService {
     }
   });
 
-  private readonly roverAggregateEffect = effect((onCleanup) => {
-    const client = this.roverConnection.client();
-    if (!client || !this.roverConnection.isConnected()) return;
-
-    const topic = this.subscribeAggregate(client);
-    const callback = (message: unknown) => this.handleAggregate(message);
-    topic.subscribe(callback);
-    onCleanup(() => topic.unsubscribe(callback));
-  });
-
-  private readonly baseStationAggregateEffect = effect((onCleanup) => {
-    const client = this.baseStationConnection.client();
-    if (!client || !this.baseStationConnection.isConnected()) return;
-
-    const topic = this.subscribeAggregate(client);
-    const callback = (message: unknown) => this.handleAggregate(message);
-    topic.subscribe(callback);
-    onCleanup(() => topic.unsubscribe(callback));
-  });
-
   private readonly roverHeartbeatAlertEffect = effect(() => {
     const available = this.heartbeatMonitor.roverAvailable();
     if (available === this.roverWasAvailable) return;
@@ -236,7 +149,7 @@ export class EcamAlertService {
   raise(code: EcamAlertCode, options: RaiseEcamAlertOptions = {}): void {
     const definition = ECAM_MESSAGE_CATALOG[code];
     const now = Date.now();
-    const existing = this.activeAlertsState().get(code);
+    const existing = this.localAlertsState().get(code);
     const alert: EcamAlert = {
       ...definition,
       detail: options.detail?.trim() || null,
@@ -245,7 +158,7 @@ export class EcamAlertService {
       reporterSources: [this.activeSourceState()],
     };
 
-    this.activeAlertsState.update((alerts) => {
+    this.localAlertsState.update((alerts) => {
       const nextAlerts = new Map(alerts);
       nextAlerts.set(code, alert);
       return nextAlerts;
@@ -255,7 +168,7 @@ export class EcamAlertService {
 
   /** Clear a recovered condition from this GUI's source snapshot. */
   clear(code: EcamAlertCode): void {
-    this.activeAlertsState.update((alerts) => {
+    this.localAlertsState.update((alerts) => {
       if (!alerts.has(code)) return alerts;
 
       const nextAlerts = new Map(alerts);
@@ -273,29 +186,16 @@ export class EcamAlertService {
         nextSources.set(source, nextCodes);
         changed = true;
       }
-      if (!changed) return sources;
-      return nextSources;
+      return changed ? nextSources : sources;
     });
   }
 
-  /** Clear every alert raised by this GUI; alerts reported by other sources remain. */
   clearAll(): void {
-    this.activeAlertsState.set(new Map());
+    this.localAlertsState.set(new Map());
     const clearedSources = new Map<GuiEcamSource, ReadonlySet<EcamAlertCode>>();
     for (const source of this.sourceCodesState().keys()) clearedSources.set(source, new Set());
     clearedSources.set(this.activeSourceState(), new Set());
     this.sourceCodesState.set(clearedSources);
-  }
-
-  private subscribeAggregate(client: NonNullable<ReturnType<RosConnection['client']>>): Topic {
-    const topic = new Topic({
-      ros: client,
-      name: COMBINED_TOPIC,
-      messageType: COMBINED_MESSAGE_TYPE,
-      queue_length: 1,
-    });
-    this.applySnapshotQos(topic);
-    return topic;
   }
 
   private applySnapshotQos(topic: Topic): void {
@@ -304,68 +204,23 @@ export class EcamAlertService {
       sendWithReconnect({ ...message, qos: ECAM_SNAPSHOT_QOS } as unknown as typeof message);
   }
 
-  private handleAggregate(value: unknown): void {
-    if (!value || typeof value !== 'object') return;
-    const message = value as EcamAlertsMessage;
-    if (message.authority !== 'rover' && message.authority !== 'basestation') return;
-
-    const authority = message.authority as AggregateAuthority;
-    const roverAvailable = this.heartbeatMonitor.roverAvailable();
-    if (authority === 'basestation' && roverAvailable) return;
-    if (authority === 'rover' && !roverAvailable && this.sharedAuthority === 'basestation') return;
-
-    const timestamp = this.timeToMilliseconds(message.timestamp) ?? Date.now();
-    const sourceSnapshots = Array.isArray(message.sources)
-      ? (message.sources as EcamAlertSourceSnapshotMessage[])
-      : [];
-    const activeCodeReporters = new Map<EcamAlertCode, Set<EcamAlertReporterSource>>();
-
-    for (const snapshot of sourceSnapshots) {
-      if (
-        !snapshot ||
-        typeof snapshot !== 'object' ||
-        !REPORTER_SOURCES.includes(snapshot.source as EcamAlertReporterSource) ||
-        !Array.isArray(snapshot.active_codes)
-      ) {
-        continue;
-      }
-      for (const code of snapshot.active_codes) {
-        if (typeof code === 'string' && Object.hasOwn(ECAM_MESSAGE_CATALOG, code)) {
-          const alertCode = code as EcamAlertCode;
-          const reporters = activeCodeReporters.get(alertCode) ?? new Set<EcamAlertReporterSource>();
-          reporters.add(snapshot.source as EcamAlertReporterSource);
-          activeCodeReporters.set(alertCode, reporters);
-        }
-      }
-    }
-
-    const previousAlerts = this.sharedAlertsState();
-    const nextAlerts = new Map<EcamAlertCode, EcamAlert>();
-    for (const [code, reporters] of activeCodeReporters) {
-      const existing = previousAlerts.get(code);
-      nextAlerts.set(code, {
-        ...ECAM_MESSAGE_CATALOG[code],
-        detail: null,
-        firstSeenAt: existing?.firstSeenAt ?? timestamp,
-        lastUpdatedAt: timestamp,
-        reporterSources: REPORTER_SOURCES.filter((source) => reporters.has(source)),
-      });
-    }
-
-    this.sharedAuthority = authority;
-    this.sharedAlertsState.set(nextAlerts);
-  }
-
   private setActiveSource(source: GuiEcamSource): void {
     const previousSource = this.activeSourceState();
     if (source === previousSource) return;
 
-    const currentCodes = new Set(this.activeAlertsState().keys());
+    const currentCodes = new Set(this.localAlertsState().keys());
     this.sourceCodesState.update((sources) => {
       const nextSources = new Map(sources);
       nextSources.set(previousSource, new Set());
       nextSources.set(source, currentCodes);
       return nextSources;
+    });
+    this.localAlertsState.update((alerts) => {
+      const nextAlerts = new Map(alerts);
+      for (const [code, alert] of nextAlerts) {
+        nextAlerts.set(code, { ...alert, reporterSources: [source] });
+      }
+      return nextAlerts;
     });
     this.activeSourceState.set(source);
   }
@@ -394,13 +249,5 @@ export class EcamAlertService {
       sec: Math.floor(milliseconds / 1000),
       nanosec: (milliseconds % 1000) * 1_000_000,
     };
-  }
-
-  private timeToMilliseconds(value: RosTime | undefined): number | null {
-    if (!value || typeof value.sec !== 'number' || typeof value.nanosec !== 'number') {
-      return null;
-    }
-    if (!Number.isFinite(value.sec) || !Number.isFinite(value.nanosec)) return null;
-    return value.sec * 1000 + value.nanosec / 1_000_000;
   }
 }
