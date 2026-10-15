@@ -21,7 +21,7 @@ constexpr double DIRECT_SPEED_LIMIT_MARGIN_RADIANS = 0.02;
 
 std::optional<double> normalize_encoder_angle(
     double angle_degrees, double lower_limit, double upper_limit,
-    double reference_position) {
+    double reference_position, bool reference_known) {
   double wrapped_angle = std::fmod(angle_degrees * DEGREES_TO_RADIANS, TWO_PI);
   if (wrapped_angle < 0.0) {
     wrapped_angle += TWO_PI;
@@ -32,6 +32,12 @@ std::optional<double> normalize_encoder_angle(
   const auto last_turn = static_cast<long>(
       std::floor((upper_limit - wrapped_angle) / TWO_PI));
   if (first_turn > last_turn) {
+    return std::nullopt;
+  }
+  if (!reference_known && first_turn != last_turn) {
+    // A wrapped encoder value cannot identify which turn the joint occupies
+    // when more than one value fits the limits. Never guess from zero at
+    // startup; wait for an unambiguous reading or an established reference.
     return std::nullopt;
   }
 
@@ -445,7 +451,7 @@ hardware_interface::return_type ArmHardwareInterface::read(
     if (joint.has_pending_status1) {
       const auto position = normalize_encoder_angle(
           joint.pending_angle_degrees, joint.position_min, joint.position_max,
-          joint.position);
+          joint.position, joint.has_position_feedback);
       if (position) {
         joint.position = *position;
         joint.last_feedback_time = std::chrono::steady_clock::now();
@@ -470,7 +476,7 @@ hardware_interface::return_type ArmHardwareInterface::read(
         }
         RCLCPP_WARN_THROTTLE(
             rclcpp::get_logger("ArmHardwareInterface"), *node_->get_clock(),
-            5000, "Encoder angle %.2f degrees for joint '%s' is outside its URDF limits",
+            5000, "Encoder angle %.2f degrees for joint '%s' is outside its URDF limits or ambiguous without a turn reference",
             joint.pending_angle_degrees, joint.name.c_str());
       }
       joint.velocity = joint.pending_speed_rpm * RPM_TO_RADIANS_PER_SECOND;
@@ -526,6 +532,7 @@ hardware_interface::return_type ArmHardwareInterface::write(
     motion_inhibited_ = true;
     trajectory_rearm_ready_ = false;
     for (auto& joint : joints_) {
+      joint.estop_hold_position = joint.position;
       joint.direct_mode = dcr_arm_driver::msg::DirectDrive::CONTROLLER;
       joint.direct_value = 0.0;
     }

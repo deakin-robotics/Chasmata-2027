@@ -141,7 +141,11 @@ startup. Until that message arrives, the driver sends zero speed and ignores
 direct-drive commands. It also waits for fresh encoder and motor status from
 every joint before accepting motion, and seeds each position target from fresh
 encoder feedback. Activation does not automatically clear reported motor
-faults.
+faults. Base and roll encoder readings in the overlapping turn range are
+ambiguous on startup; the driver keeps motion inhibited until each such joint
+reports an angle that identifies a unique turn. If either joint is in that
+range at startup, move it into an unambiguous position and let feedback update
+before requesting motion.
 
 Homing is explicit; activation does not redefine the motor coordinate frame.
 The driver rejects homing while an accepted, executing, or canceling trajectory
@@ -318,9 +322,11 @@ missing, stale, or reports a fault are ignored.
 Encoder or motor status older than 250 ms causes the driver to send zero speed,
 clear latched direct commands, and inhibit all controller motion. An encoder
 sample outside its URDF position limits is treated as invalid immediately and
-also inhibits motion. A reported motor fault stops that joint and inhibits the
-arm. After feedback and motor status recover, the trajectory action must report
-idle before a new trajectory can re-enable controller motion. Direct speed
+also inhibits motion. When motor status becomes unsafe, the driver snapshots
+each joint's latest measured position for its hold target. A reported motor
+fault stops that joint and inhibits the arm. After feedback and motor status
+recover, the trajectory action must report idle before a new trajectory can
+re-enable controller motion. Direct speed
 commands are limited to each joint's URDF `velocity` limit (converted to RPM)
 and are suppressed when they would move outward within 0.02 rad of a configured
 joint limit; inward commands remain available so the joint can move away from a

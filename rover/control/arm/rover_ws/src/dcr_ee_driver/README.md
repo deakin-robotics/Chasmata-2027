@@ -20,9 +20,10 @@ that are sent through [`nobleo_socketcan_bridge`](../nobleo_socketcan_bridge).
 ```
 
 * **Subscribes** to `arm_interfaces/msg/EeCommand` on `/ee_command`.
-* **Subscribes** to `/estop` (`std_msgs/msg/Bool`). Asserting E-stop sends a
-  zero-speed command to CAN ID `0x07` and suppresses end-effector commands until
-  E-stop is cleared.
+* **Subscribes** to `/estop` (`std_msgs/msg/Bool`). The driver rejects
+  end-effector commands until it receives an explicit clear E-stop state.
+  Asserting E-stop sends a zero-speed command to CAN ID `0x07` and suppresses
+  commands until a clear state is received.
 * On `SIGINT` or `SIGTERM`, sends a zero-speed command before shutting ROS down
   and allows a short interval for the CAN bridge to transmit it.
 * **Publishes** `can_msgs/msg/Frame` on `/socketcan_bridge/tx` (the tx topic of

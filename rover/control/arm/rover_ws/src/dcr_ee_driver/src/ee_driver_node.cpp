@@ -71,9 +71,10 @@ class EeDriverNode : public rclcpp::Node {
  private:
   void on_command(const arm_interfaces::msg::EeCommand& msg) {
     std::lock_guard<std::mutex> lock(command_mutex_);
-    if (stopping_ || estop_asserted_.load(std::memory_order_relaxed)) {
+    if (stopping_ || !estop_state_received_ ||
+        estop_asserted_.load(std::memory_order_relaxed)) {
       RCLCPP_WARN(this->get_logger(),
-                  "Ignoring end-effector command while E-stop is asserted or driver is stopping");
+                  "Ignoring end-effector command until E-stop is clear and driver is ready");
       return;
     }
 
@@ -107,6 +108,7 @@ class EeDriverNode : public rclcpp::Node {
 
   void on_estop(const std_msgs::msg::Bool& msg) {
     std::lock_guard<std::mutex> lock(command_mutex_);
+    estop_state_received_ = true;
     estop_asserted_.store(msg.data, std::memory_order_relaxed);
     if (!msg.data) {
       return;
@@ -130,6 +132,7 @@ class EeDriverNode : public rclcpp::Node {
   std::string estop_topic_;
   int ee_can_id_;
   std::atomic<bool> estop_asserted_{false};
+  bool estop_state_received_{false};
   std::mutex command_mutex_;
   bool stopping_{false};
   rclcpp::Publisher<can_msgs::msg::Frame>::SharedPtr can_pub_;
