@@ -29,10 +29,21 @@ class DirectDriveTest : public ::testing::Test {
     params.hardware_info.name = "test_arm";
     params.hardware_info.type = "system";
     params.hardware_info.hardware_parameters["can_interface"] = "can0";
+    params.hardware_info.original_xml = R"(
+      <robot name="test_arm">
+        <link name="link0"/><link name="link1"/><link name="link2"/>
+        <joint name="joint_1" type="revolute">
+          <parent link="link0"/><child link="link1"/>
+          <limit lower="-3.14" upper="3.14" effort="1" velocity="1.0"/>
+        </joint>
+        <joint name="joint_2" type="revolute">
+          <parent link="link1"/><child link="link2"/>
+          <limit lower="-3.14" upper="3.14" effort="1" velocity="1.0"/>
+        </joint>
+      </robot>)";
     for (unsigned id = 1; id <= 2; ++id) {
       hardware_interface::ComponentInfo joint;
       joint.name = "joint_" + std::to_string(id);
-      joint.parameters["max_velocity"] = "1.0";
       params.hardware_info.joints.push_back(joint);
       params.hardware_info.hardware_parameters[joint.name + "_can_id"] =
           std::to_string(id);
@@ -96,6 +107,12 @@ class DirectDriveTest : public ::testing::Test {
       frame.data[6] = static_cast<uint8_t>(feedback_angle_raw & 0xFF);
       frame.data[7] = static_cast<uint8_t>((feedback_angle_raw >> 8) & 0xFF);
       feedback->publish(frame);
+
+      can_msgs::msg::Frame status2;
+      status2.id = id;
+      status2.dlc = 8;
+      status2.data[0] = 0xAE;
+      feedback->publish(status2);
     }
     spin();
   }

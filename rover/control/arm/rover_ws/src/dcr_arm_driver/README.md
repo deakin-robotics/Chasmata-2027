@@ -131,15 +131,17 @@ configured position limits and converts RPM to radians per second.
 
 | Service         | Type                 | Description                                      |
 |-----------------|----------------------|--------------------------------------------------|
-| `/arm/set_home` | `std_srvs/srv/Trigger` | Set motor home only when all joints are already at zero and no trajectory is active |
+| `/arm/set_home` | `std_srvs/srv/Trigger` | Set motor home only with fresh feedback, fault-free motor status, all joints at zero, and no active trajectory |
 
-The `/estop` subscription remains active while the hardware is inactive. The
-driver starts motion-inhibited and requires an explicit `/estop` state message;
-the E-stop publisher must publish its current state, including `false` when
-clear, after startup. Until that message arrives, the driver sends zero speed
-and ignores direct-drive commands.
-Activation also waits for fresh encoder feedback and seeds each position target
-from the measured position.
+The `/estop` subscription remains active while the hardware is inactive. On
+activation, the driver sends zero speed to every motor and starts
+motion-inhibited. It requires an explicit `/estop` state message; the E-stop
+publisher must publish its current state, including `false` when clear, after
+startup. Until that message arrives, the driver sends zero speed and ignores
+direct-drive commands. It also waits for fresh encoder and motor status from
+every joint before accepting motion, and seeds each position target from fresh
+encoder feedback. Activation does not automatically clear reported motor
+faults.
 
 Homing is explicit; activation does not redefine the motor coordinate frame.
 The driver rejects homing while an accepted, executing, or canceling trajectory
@@ -210,8 +212,8 @@ source install/setup.bash
 
 * ROS 2 Jazzy: `rclcpp`, `rclcpp_lifecycle`, `hardware_interface`, `pluginlib`,
   `controller_manager`, `joint_state_broadcaster`, `joint_trajectory_controller`
-* `can_msgs`, `arm_interfaces`, `std_msgs`, `std_srvs`, `rosidl_default_generators`,
-  `rosidl_default_runtime`
+* `can_msgs`, `arm_interfaces`, `std_msgs`, `std_srvs`, `urdf`,
+  `rosidl_default_generators`, `rosidl_default_runtime`
 * `nobleo_socketcan_bridge` (runtime — provides the CAN <-> ROS bridge)
 
 Install via `rosdep` if missing:
@@ -264,7 +266,7 @@ Set in the URDF `<ros2_control>` block (`urdf/robot_arm.urdf`) and
 |------------------|--------|----------------------|------------------------|
 | `can_interface`  | string | `can0`               | SocketCAN device name  |
 | `<joint>_can_id` | int    | `0x01`–`0x06` | CAN ID per arm joint   |
-| joint `max_velocity` | float | configured per joint | Direct-speed limit in rad/s; current values are `1.0` |
+| URDF joint `velocity` | float | set per joint | Direct-speed limit in rad/s, read from each joint's URDF `<limit>` |
 | `update_rate`    | int    | `50`                 | Control loop freq (Hz) |
 
 Controller (`config/arm_controllers.yaml`):
@@ -309,27 +311,32 @@ ros2 topic pub --once /arm/direct_drive dcr_arm_driver/msg/DirectDrive "{id: 1, 
 The controller can continue updating its target during direct drive. Returning
 to `CONTROLLER` immediately uses that target; set the intended controller target
 before handing control back. Unknown IDs, invalid modes, and non-finite or
-unencodable values are ignored. Commands received while inactive or while
-E-stop is asserted or its state has not yet been received are ignored.
+unencodable values are ignored. Commands received while inactive, while E-stop
+is asserted or its state has not yet been received, or while any motor status is
+missing, stale, or reports a fault are ignored.
 
-Feedback older than 250 ms causes the driver to send zero speed, clear latched
-direct commands, and inhibit all controller motion. Once feedback is fresh
-again, the trajectory action must report idle before a new trajectory can
-re-enable controller motion. Direct speed commands are limited to each joint's
-configured `max_velocity` (converted to RPM) and are suppressed when they would
-move outward within 0.02 rad of a configured joint limit; inward commands remain
-available so the joint can move away from a limit.
+Encoder or motor status older than 250 ms causes the driver to send zero speed,
+clear latched direct commands, and inhibit all controller motion. An encoder
+sample outside its URDF position limits is treated as invalid immediately and
+also inhibits motion. A reported motor fault stops that joint and inhibits the
+arm. After feedback and motor status recover, the trajectory action must report
+idle before a new trajectory can re-enable controller motion. Direct speed
+commands are limited to each joint's URDF `velocity` limit (converted to RPM)
+and are suppressed when they would move outward within 0.02 rad of a configured
+joint limit; inward commands remain available so the joint can move away from a
+limit.
 
 `/estop` overrides both command sources with repeated zero-speed CAN frames.
 Asserting E-stop clears latched direct modes and inhibits controller motion.
 When E-stop clears, the arm holds its measured pose; it does not resume an old
 trajectory or speed command. Cancel any prior trajectory goal if it remains
 active, wait until the action status is idle, then send a new trajectory goal
-to re-enable controller motion. A new explicit
-direct position or speed command can operate a joint while controller motion is
-inhibited. Hardware deactivation, cleanup, shutdown, and error transitions send
-zero-speed frames to every joint before destroying the CAN publisher. Hardware
-reactivation returns all joints to the motion-inhibited controller state.
+to re-enable controller motion. A new explicit direct position or speed command
+can operate a joint while controller motion is inhibited if all encoder and
+motor status is fresh and fault-free. Hardware deactivation, cleanup, shutdown,
+and error transitions send zero-speed frames to every joint before destroying
+the CAN publisher. Hardware reactivation returns all joints to the
+motion-inhibited controller state.
 
 Watch the raw CAN frames:
 
