@@ -442,6 +442,7 @@ hardware_interface::return_type ArmHardwareInterface::read(
       joint.velocity = 0.0;
       joint.position_command = 0.0;
       joint.has_position_feedback = true;
+      joint.has_encoder_turn_reference = true;
       joint.has_pending_status1 = false;
     }
     home_pending_ = false;
@@ -451,9 +452,10 @@ hardware_interface::return_type ArmHardwareInterface::read(
     if (joint.has_pending_status1) {
       const auto position = normalize_encoder_angle(
           joint.pending_angle_degrees, joint.position_min, joint.position_max,
-          joint.position, joint.has_position_feedback);
+          joint.position, joint.has_encoder_turn_reference);
       if (position) {
         joint.position = *position;
+        joint.has_encoder_turn_reference = true;
         joint.last_feedback_time = std::chrono::steady_clock::now();
         if (!joint.has_position_feedback) {
           joint.position_command = *position;

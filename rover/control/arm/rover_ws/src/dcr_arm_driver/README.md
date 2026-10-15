@@ -69,7 +69,7 @@ flowchart LR
 | shoulder_joint | 0x02   | -0.0873 to 3.2288  | 1.0 rad/s |
 | elbow_joint    | 0x03   | -0.0873 to 4.7997  | 1.0 rad/s |
 | yaw_joint      | 0x04   | -1.6581 to 3.2288  | 1.0 rad/s |
-| pitch_joint    | 0x05   | -0.0873 to 4.7997  | 1.0 rad/s |
+| pitch_joint    | 0x05   | -0.0873 to 3.7525  | 1.0 rad/s |
 | roll_joint     | 0x06   | -3.2288 to 3.2288  | 1.0 rad/s |
 
 The URDF assigns arm CAN IDs `0x01`–`0x06`; the end-effector controller remains
@@ -145,7 +145,8 @@ faults. Base and roll encoder readings in the overlapping turn range are
 ambiguous on startup; the driver keeps motion inhibited until each such joint
 reports an angle that identifies a unique turn. If either joint is in that
 range at startup, move it into an unambiguous position and let feedback update
-before requesting motion.
+before requesting motion. A feedback timeout clears feedback freshness but
+retains the last valid encoder turn reference for unwrapping the next sample.
 
 Homing is explicit; activation does not redefine the motor coordinate frame.
 The driver rejects homing while an accepted, executing, or canceling trajectory

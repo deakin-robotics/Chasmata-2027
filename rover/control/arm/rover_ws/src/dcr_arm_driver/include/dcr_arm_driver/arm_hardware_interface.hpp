@@ -35,6 +35,7 @@ struct JointInfo {
   double position_max = 0.0;
   double max_velocity = 0.0;
   bool has_position_feedback = false;
+  bool has_encoder_turn_reference = false;
   std::chrono::steady_clock::time_point last_feedback_time{};
   bool has_motor_status2 = false;
   bool motor_faulted = false;
