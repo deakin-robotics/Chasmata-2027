@@ -1,5 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 
+import { EcamAlertReporterSource } from '../../../core/ecam/ecam-alert.types';
 import { EcamAlertService } from '../../../core/ecam/ecam-alert.service';
 import { RosConnectionButton } from '../../../features/connection/ros-connection-button/ros-connection-button';
 
@@ -15,6 +16,10 @@ type TakeoffConfigResult = 'NORMAL' | 'FAILED' | 'UNKNOWN';
 export class EcamAlertDisplay {
   readonly activeAlerts = inject(EcamAlertService).activeAlerts;
   readonly takeoffConfigResult = signal<TakeoffConfigResult | null>(null);
+
+  reporterSourceText(sources: readonly EcamAlertReporterSource[]): string {
+    return sources.map((source) => source.toUpperCase()).join(' · ');
+  }
 
   /** Temporary visual test until T/O configuration receives real rover state. */
   runMockTakeoffConfiguration(): void {

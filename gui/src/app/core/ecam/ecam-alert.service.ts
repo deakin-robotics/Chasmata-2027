@@ -25,6 +25,11 @@ const COMBINED_TOPIC = '/ecam/alerts';
 const SOURCE_MESSAGE_TYPE = 'telemetry_interfaces/msg/EcamAlertSourceSnapshot';
 const COMBINED_MESSAGE_TYPE = 'telemetry_interfaces/msg/EcamAlerts';
 const GUI_SOURCES = ['driver', 'ecam', 'arm'] as const;
+const REPORTER_SOURCES: readonly EcamAlertReporterSource[] = [
+  ...GUI_SOURCES,
+  'basestation',
+  'rover',
+];
 const ECAM_SNAPSHOT_QOS = {
   history: 'keep_last',
   depth: 1,
@@ -75,8 +80,29 @@ export class EcamAlertService {
   private baseStationHeartbeatAlertRaised = false;
 
   readonly activeAlerts = computed(() => {
-    const alerts = new Map(this.sharedAlertsState());
+    const sharedAlerts = this.sharedAlertsState();
+    const alerts = new Map(sharedAlerts);
     for (const [code, alert] of this.activeAlertsState()) alerts.set(code, alert);
+
+    const localReporters = new Map<EcamAlertCode, Set<EcamAlertReporterSource>>();
+    for (const [source, codes] of this.sourceCodesState()) {
+      for (const code of codes) {
+        const reporters = localReporters.get(code) ?? new Set<EcamAlertReporterSource>();
+        reporters.add(source);
+        localReporters.set(code, reporters);
+      }
+    }
+
+    for (const [code, alert] of alerts) {
+      const reporters = new Set([
+        ...(sharedAlerts.get(code)?.reporterSources ?? []),
+        ...(localReporters.get(code) ?? []),
+      ]);
+      alerts.set(code, {
+        ...alert,
+        reporterSources: REPORTER_SOURCES.filter((source) => reporters.has(source)),
+      });
+    }
 
     return [...alerts.values()].sort((left, right) => {
       const severityDifference =
@@ -216,6 +242,7 @@ export class EcamAlertService {
       detail: options.detail?.trim() || null,
       firstSeenAt: existing?.firstSeenAt ?? now,
       lastUpdatedAt: now,
+      reporterSources: [this.activeSourceState()],
     };
 
     this.activeAlertsState.update((alerts) => {
@@ -291,28 +318,37 @@ export class EcamAlertService {
     const sourceSnapshots = Array.isArray(message.sources)
       ? (message.sources as EcamAlertSourceSnapshotMessage[])
       : [];
-    const activeCodes = new Set<EcamAlertCode>();
+    const activeCodeReporters = new Map<EcamAlertCode, Set<EcamAlertReporterSource>>();
 
     for (const snapshot of sourceSnapshots) {
-      if (!snapshot || typeof snapshot !== 'object' || !Array.isArray(snapshot.active_codes)) {
+      if (
+        !snapshot ||
+        typeof snapshot !== 'object' ||
+        !REPORTER_SOURCES.includes(snapshot.source as EcamAlertReporterSource) ||
+        !Array.isArray(snapshot.active_codes)
+      ) {
         continue;
       }
       for (const code of snapshot.active_codes) {
         if (typeof code === 'string' && Object.hasOwn(ECAM_MESSAGE_CATALOG, code)) {
-          activeCodes.add(code as EcamAlertCode);
+          const alertCode = code as EcamAlertCode;
+          const reporters = activeCodeReporters.get(alertCode) ?? new Set<EcamAlertReporterSource>();
+          reporters.add(snapshot.source as EcamAlertReporterSource);
+          activeCodeReporters.set(alertCode, reporters);
         }
       }
     }
 
     const previousAlerts = this.sharedAlertsState();
     const nextAlerts = new Map<EcamAlertCode, EcamAlert>();
-    for (const code of activeCodes) {
+    for (const [code, reporters] of activeCodeReporters) {
       const existing = previousAlerts.get(code);
       nextAlerts.set(code, {
         ...ECAM_MESSAGE_CATALOG[code],
         detail: null,
         firstSeenAt: existing?.firstSeenAt ?? timestamp,
         lastUpdatedAt: timestamp,
+        reporterSources: REPORTER_SOURCES.filter((source) => reporters.has(source)),
       });
     }
 

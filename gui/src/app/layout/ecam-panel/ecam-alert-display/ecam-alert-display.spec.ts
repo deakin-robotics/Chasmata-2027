@@ -45,6 +45,27 @@ describe('EcamAlertDisplay', () => {
       'alert severity-warning',
       'alert severity-attention',
     ]);
+    expect(rows.map((row) => row.querySelector('.alert-source')?.textContent?.trim())).toEqual([
+      'ECAM',
+      'ECAM',
+      'ECAM',
+    ]);
+  });
+
+  it('shows all reporters on one alert row', () => {
+    (ecamAlerts as unknown as { handleAggregate: (value: unknown) => void }).handleAggregate({
+      authority: 'basestation',
+      timestamp: { sec: 123, nanosec: 0 },
+      sources: [
+        { source: 'driver', active_codes: ['ROVER_HEARTBEAT_LOST'] },
+        { source: 'arm', active_codes: ['ROVER_HEARTBEAT_LOST'] },
+      ],
+    });
+    fixture.detectChanges();
+
+    const rows = fixture.nativeElement.querySelectorAll('.alert');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].querySelector('.alert-source')?.textContent?.trim()).toBe('DRIVER · ARM');
   });
 
   it('should not seed demo alerts when T/O CONFIG is selected', () => {

@@ -109,6 +109,7 @@ export interface EcamAlert extends EcamAlertDefinition {
   detail: string | null;
   firstSeenAt: number;
   lastUpdatedAt: number;
+  reporterSources: readonly EcamAlertReporterSource[];
 }
 
 /** Optional contextual information supplied when an alert is raised. */

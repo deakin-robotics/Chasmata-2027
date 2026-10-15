@@ -279,6 +279,7 @@ describe('EcamAlertService', () => {
     });
     expect(service.activeAlerts().map((alert) => alert.code)).toEqual(['POWER_BATTERY_LOW']);
     expect(service.activeAlerts()[0].lastUpdatedAt).toBe(123_456);
+    expect(service.activeAlerts()[0].reporterSources).toEqual(['driver', 'arm']);
 
     applyAggregate({
       authority: 'basestation',
@@ -289,6 +290,7 @@ describe('EcamAlertService', () => {
       ],
     });
     expect(service.activeAlerts().map((alert) => alert.code)).toEqual(['POWER_BATTERY_LOW']);
+    expect(service.activeAlerts()[0].reporterSources).toEqual(['arm']);
 
     applyAggregate({
       authority: 'basestation',
