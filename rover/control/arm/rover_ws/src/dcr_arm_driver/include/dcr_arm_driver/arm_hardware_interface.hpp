@@ -1,0 +1,146 @@
+#ifndef DCR_ARM_DRIVER_ARM_HARDWARE_INTERFACE_HPP_
+#define DCR_ARM_DRIVER_ARM_HARDWARE_INTERFACE_HPP_
+
+#include <vector>
+#include <string>
+#include <memory>
+#include <atomic>
+#include <chrono>
+#include <mutex>
+
+#include <hardware_interface/system_interface.hpp>
+#include <hardware_interface/handle.hpp>
+#include <hardware_interface/hardware_info.hpp>
+//#include <hardware_component_interface_params.hpp>
+#include <hardware_interface/types/hardware_interface_return_values.hpp>
+#include <rclcpp/rclcpp.hpp>
+#include <can_msgs/msg/frame.hpp>
+#include <arm_interfaces/msg/motor_stat1.hpp>
+#include <arm_interfaces/msg/motor_stat2.hpp>
+#include <dcr_arm_driver/msg/direct_drive.hpp>
+#include <std_msgs/msg/bool.hpp>
+#include <std_srvs/srv/trigger.hpp>
+#include <action_msgs/msg/goal_status_array.hpp>
+
+#include "dcr_arm_driver/motor.hpp"
+
+namespace dcr_arm_driver {
+
+struct JointInfo {
+  std::string name;
+  uint32_t can_id;
+  double position = 0.0;
+  double velocity = 0.0;
+  double position_min = 0.0;
+  double position_max = 0.0;
+  double max_velocity = 0.0;
+  bool has_position_feedback = false;
+  bool has_encoder_turn_reference = false;
+  std::chrono::steady_clock::time_point last_feedback_time{};
+  bool has_motor_status2 = false;
+  bool motor_faulted = false;
+  std::chrono::steady_clock::time_point last_motor_status2_time{};
+  bool has_pending_status1 = false;
+  double pending_angle_degrees = 0.0;
+  double pending_speed_rpm = 0.0;
+  double temperature = 0.0;        // NEW (from MotorStat1.temp)
+  double bus_voltage = 0.0;        // NEW (from MotorStat2.busv)
+  double bus_current = 0.0;        // NEW (from MotorStat2.busc)
+  std::string mode = "No Mode";    // NEW (from MotorStat2.mode)
+  std::string fault = "";          // NEW (from MotorStat2.fault)
+  double position_command = 0.0;
+  double last_position_command = 0.0;
+  double estop_hold_position = 0.0;
+  // Protected by lifecycle_mutex_; controller-owned position_command is untouched.
+  uint8_t direct_mode = dcr_arm_driver::msg::DirectDrive::CONTROLLER;
+  double direct_value = 0.0;
+};
+
+class ArmHardwareInterface : public hardware_interface::SystemInterface {
+ public:
+  ArmHardwareInterface() = default;
+  ~ArmHardwareInterface() = default;
+
+  hardware_interface::CallbackReturn on_init(
+      const hardware_interface::HardwareComponentInterfaceParams& params) override;
+
+  hardware_interface::CallbackReturn on_configure(
+      const rclcpp_lifecycle::State& previous_state) override;
+
+  hardware_interface::CallbackReturn on_activate(
+      const rclcpp_lifecycle::State& previous_state) override;
+
+  hardware_interface::CallbackReturn on_deactivate(
+      const rclcpp_lifecycle::State& previous_state) override;
+
+  hardware_interface::CallbackReturn on_cleanup(
+      const rclcpp_lifecycle::State& previous_state) override;
+
+  hardware_interface::CallbackReturn on_shutdown(
+      const rclcpp_lifecycle::State& previous_state) override;
+
+  hardware_interface::CallbackReturn on_error(
+      const rclcpp_lifecycle::State& previous_state) override;
+
+  std::vector<hardware_interface::StateInterface> export_state_interfaces()
+      override;
+
+  std::vector<hardware_interface::CommandInterface>
+  export_command_interfaces() override;
+
+  hardware_interface::return_type read(const rclcpp::Time& time,
+                                       const rclcpp::Duration& period) override;
+
+  hardware_interface::return_type write(const rclcpp::Time& time,
+                                        const rclcpp::Duration& period)
+      override;
+
+ private:
+  std::unique_ptr<Motor> motor_driver_;
+  std::string can_interface_;
+
+  // Non-owning handle to the node owned by controller_manager (returned by
+  // get_node()). We create all publishers/subscriptions on this node so their
+  // callbacks are actually executed - a privately created node would never be
+  // added to an executor and would never be spun.
+  rclcpp::Node::SharedPtr node_;
+  std::mutex lifecycle_mutex_;
+  bool active_{false};
+
+  // CAN bridge topics: publish outgoing frames on .../tx, receive on .../rx
+  rclcpp::Publisher<can_msgs::msg::Frame>::SharedPtr can_pub_;
+  rclcpp::Subscription<can_msgs::msg::Frame>::SharedPtr can_sub_;
+
+  // Telemetry exposed from arm_interfaces (everything except the end effector)
+  rclcpp::Publisher<arm_interfaces::msg::MotorStat1>::SharedPtr stat1_pub_;
+  rclcpp::Publisher<arm_interfaces::msg::MotorStat2>::SharedPtr stat2_pub_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr set_home_service_;
+  rclcpp::Subscription<action_msgs::msg::GoalStatusArray>::SharedPtr
+      trajectory_status_sub_;
+
+  // Direct drive is separate from the arm_interfaces telemetry topics.
+  rclcpp::Subscription<dcr_arm_driver::msg::DirectDrive>::SharedPtr direct_drive_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr estop_sub_;
+  std::atomic<bool> estop_asserted_{false};
+  bool estop_state_received_{false};
+  bool motion_inhibited_{true};
+  bool trajectory_rearm_ready_{false};
+  bool trajectory_goal_active_{false};
+  bool home_pending_{false};
+  std::vector<JointInfo> joints_;
+
+  JointInfo* find_joint(uint32_t can_id);
+  void ensure_estop_subscription(const rclcpp::Node::SharedPtr& node);
+  void estop_callback(const std_msgs::msg::Bool& msg);
+  void deactivate_endpoints();
+  void can_frame_callback(const can_msgs::msg::Frame& msg);
+  void trajectory_status_callback(
+      const action_msgs::msg::GoalStatusArray& msg);
+  void direct_drive_callback(const dcr_arm_driver::msg::DirectDrive& msg);
+  bool all_feedback_fresh(std::chrono::steady_clock::time_point now) const;
+  bool all_motor_status_safe(std::chrono::steady_clock::time_point now) const;
+};
+
+}  // namespace dcr_arm_driver
+
+#endif  // DCR_ARM_DRIVER_ARM_HARDWARE_INTERFACE_HPP_

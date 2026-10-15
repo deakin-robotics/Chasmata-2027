@@ -13,6 +13,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/MotorStat1.msg"
   "msg/MotorStat2.msg"
   "msg/MotorMove.msg"
+  "msg/EeCommand.msg"
 )
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -27,3 +28,4 @@ if(BUILD_TESTING)
 endif()
 
 ament_package()
+
