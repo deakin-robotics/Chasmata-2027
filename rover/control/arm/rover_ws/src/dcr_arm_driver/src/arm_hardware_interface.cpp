@@ -648,6 +648,7 @@ void ArmHardwareInterface::can_frame_callback(
       motion_inhibited_ = true;
       trajectory_rearm_ready_ = false;
       for (auto& affected_joint : joints_) {
+        affected_joint.estop_hold_position = affected_joint.position;
         affected_joint.direct_mode =
             dcr_arm_driver::msg::DirectDrive::CONTROLLER;
         affected_joint.direct_value = 0.0;
