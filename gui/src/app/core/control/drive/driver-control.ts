@@ -1,7 +1,7 @@
 import { Service, computed, inject, signal } from '@angular/core';
 
 import { GamepadInput } from '../../gamepad/gamepad-input';
-import { RosConnection } from '../../ros/ros-connection';
+import { RosHeartbeatMonitor } from '../../ros/ros-heartbeat-monitor';
 import { ControlModeService } from '../control-mode';
 import { GimbalPriorityCommandPublisher } from '../gimbal-priority-command-publisher';
 import { DriveCommandPublisher } from './drive-command-publisher';
@@ -13,7 +13,7 @@ const RIGHT_STICK_CLICK_BUTTON_INDEX = 11;
 /** Coordinates authorised gamepad input with gated drivetrain publishing. */
 @Service()
 export class DriverControl {
-  private readonly rosConnection = inject(RosConnection);
+  private readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
   private readonly controlMode = inject(ControlModeService);
   private readonly gamepad = inject(GamepadInput);
   private readonly gimbalPriorityPublisher = inject(GimbalPriorityCommandPublisher);
@@ -36,7 +36,7 @@ export class DriverControl {
   readiness(): string | null {
     this.gamepad.start();
 
-    if (!this.rosConnection.isConnected()) {
+    if (!this.heartbeatMonitor.roverAvailable()) {
       return 'Connect to ROSbridge before enabling Driver control.';
     }
 
@@ -89,7 +89,7 @@ export class DriverControl {
   private publishCurrentInput(): void {
     const snapshot = this.gamepad.snapshot();
 
-    if (!this.rosConnection.isConnected() || !this.gamepad.connected()) {
+    if (!this.heartbeatMonitor.roverAvailable() || !this.gamepad.connected()) {
       this.disable();
       return;
     }

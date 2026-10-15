@@ -7,6 +7,7 @@ import { ControlModeCoordinator } from './control-mode-coordinator';
 import { DriverControlModeService } from './drive/drive-control-mode';
 import { ArmMode, DriveMode, FmaColumn, FmaStateService } from '../fma/fma-state.service';
 import { RosConnection } from '../ros/ros-connection';
+import { RosHeartbeatMonitor } from '../ros/ros-heartbeat-monitor';
 
 describe('ControlModeCoordinator', () => {
   let connected: ReturnType<typeof signal<boolean>>;
@@ -24,9 +25,12 @@ describe('ControlModeCoordinator', () => {
         {
           provide: RosConnection,
           useValue: {
-            isConnected: connected.asReadonly(),
             client: client.asReadonly(),
           },
+        },
+        {
+          provide: RosHeartbeatMonitor,
+          useValue: { roverAvailable: connected.asReadonly() },
         },
         {
           provide: ControlCommandPublisher,
@@ -129,7 +133,7 @@ describe('ControlModeCoordinator', () => {
     expect(publishArmMode).toHaveBeenCalledTimes(initialArmRequests);
   });
 
-  it('clears FMA control state on disconnect while preserving local modes', () => {
+  it('preserves shared FMA telemetry on Rover disconnect while preserving local modes', () => {
     const coordinator = TestBed.inject(ControlModeCoordinator);
     const driverControlMode = TestBed.inject(DriverControlModeService);
     const armControlMode = TestBed.inject(ArmControlModeService);
@@ -150,12 +154,12 @@ describe('ControlModeCoordinator', () => {
     expect(armControlMode.mode()).toBe(ArmMode.Manual);
     expect(getColumn(fmaState, 'DRIVE')).toEqual({
       label: 'DRIVE',
-      confirmed: null,
-      commanded: null,
+      confirmed: DriveMode.Manual,
+      commanded: DriveMode.Velocity,
     });
     expect(getColumn(fmaState, 'ARM')).toEqual({
       label: 'ARM',
-      confirmed: null,
+      confirmed: ArmMode.Manual,
       commanded: null,
     });
   });
@@ -186,7 +190,7 @@ function getColumn<T extends 'DRIVE' | 'ARM'>(
   fmaState: FmaStateService,
   label: T,
 ): Extract<FmaColumn, { label: T }> | undefined {
-  return fmaState.columns().find(
-    (column): column is Extract<FmaColumn, { label: T }> => column.label === label,
-  );
+  return fmaState
+    .columns()
+    .find((column): column is Extract<FmaColumn, { label: T }> => column.label === label);
 }

@@ -198,12 +198,12 @@ export class FmaStateService {
     this.updateColumn('GIMBAL', (column) => ({ ...column, confirmed, commanded }));
   }
 
-  /** Marks that the current rover connection has supplied an FMA state. */
+  /** Marks that Rover has supplied an FMA state. */
   markFmaTelemetryReceived(): void {
     this.fmaTelemetryReceivedState.set(true);
   }
 
-  /** Clears DRIVE and ARM state when the rover connection is unavailable. */
+  /** Clears DRIVE and ARM state when Rover FMA telemetry is unavailable. */
   resetControlModes(): void {
     this.fmaTelemetryReceivedState.set(false);
     this.columnsState.update((columns) =>

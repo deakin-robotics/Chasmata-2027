@@ -3,6 +3,7 @@ import { Ros, Topic } from 'roslib';
 
 import { GamepadSnapshot } from '../../gamepad/gamepad-input';
 import { RosConnection } from '../../ros/ros-connection';
+import { RosHeartbeatMonitor } from '../../ros/ros-heartbeat-monitor';
 import { ControlModeService } from '../control-mode';
 
 export interface ArmJoyCommand {
@@ -36,13 +37,14 @@ const CLEAR_FAULTS_COMMAND: ArmJoyCommand = {
 @Service()
 export class ArmCommandPublisher {
   private readonly rosConnection = inject(RosConnection);
+  private readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
   private readonly controlMode = inject(ControlModeService);
 
   private joyTopic: Topic | null = null;
   private topicClient: Ros | null = null;
 
   readonly canPublish = computed(
-    () => this.rosConnection.isConnected() && this.controlMode.isArmActive(),
+    () => this.heartbeatMonitor.roverAvailable() && this.controlMode.isArmActive(),
   );
 
   /** Builds a Joy command from mode-specific axes and shared gamepad fields. */
@@ -107,7 +109,7 @@ export class ArmCommandPublisher {
 
   private getJoyTopic(): Topic | null {
     const client = this.rosConnection.client();
-    if (!client || !this.rosConnection.isConnected()) return null;
+    if (!client || !this.heartbeatMonitor.roverAvailable()) return null;
 
     if (this.joyTopic && this.topicClient === client) return this.joyTopic;
 

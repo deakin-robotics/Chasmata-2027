@@ -19,9 +19,32 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 0.7rem;
   border-bottom: 1px solid var(--dcr-color-border);
   padding: 0.7rem 0.9rem;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-left: auto;
+}
+
+.header-divider {
+  align-self: stretch;
+  min-height: 1.75rem;
+  border-left: 1px solid var(--dcr-color-border);
+}
+
+.connection-links {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
 }
 
 h1,
@@ -107,10 +130,6 @@ button:focus-visible {
   letter-spacing: 0.025em;
 }
 
-.alert:last-child {
-  border-bottom: 0;
-}
-
 .severity-fault {
   color: var(--dcr-color-critical);
 }
@@ -125,6 +144,22 @@ button:focus-visible {
 
 .alert-text {
   min-width: 0;
+}
+
+.alert-meta {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.12rem;
+}
+
+.alert-source {
+  color: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: right;
 }
 
 .alert-detail {
@@ -162,6 +197,10 @@ button:focus-visible {
 @media (max-width: 42rem) {
   .alert {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .alert-meta {
+    grid-column: 1;
   }
 
   .alert-detail {

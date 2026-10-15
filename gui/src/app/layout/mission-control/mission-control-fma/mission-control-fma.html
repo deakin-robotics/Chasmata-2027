@@ -2,7 +2,7 @@
   @for (column of columns(); track column.label) {
     <div class="fma-column">
       <h2>{{ column.label }}</h2>
-      @if (rosConnected()) {
+      @if (fmaAvailable()) {
         @if (column.label === 'GIMBAL') {
           <span
             class="mode mode-active gimbal-priority"
@@ -58,7 +58,7 @@
     </div>
   }
 
-  @if (!rosConnected()) {
+  @if (!fmaAvailable()) {
     <app-unavailable-overlay label="Flight mode annunciator unavailable" />
   }
 </section>

@@ -29,6 +29,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <std_msgs/msg/bool.hpp>
+#include <std_msgs/msg/empty.hpp>
 #include <telemetry_interfaces/msg/arm_move_it_status.hpp>
 
 namespace
@@ -36,6 +37,7 @@ namespace
 constexpr char TARGET_TOPIC[] = "/arm/target_pose";
 constexpr char ORIENTATION_LOCK_TOPIC[] = "/arm/orientation_lock";
 constexpr char STATUS_TOPIC[] = "/arm/moveit/status";
+constexpr char HEARTBEAT_TOPIC[] = "/basestation/heartbeat";
 constexpr char TRAJECTORY_ACTION[] = "/arm_controller/follow_joint_trajectory";
 constexpr char MOVEIT_PLANNING_ACTION[] = "/move_action";
 constexpr char PLANNING_GROUP[] = "arm";
@@ -173,6 +175,15 @@ int main(int argc, char * argv[])
   const auto status_publisher = node->create_publisher<ArmMoveItStatus>(
     STATUS_TOPIC,
     rclcpp::QoS(10));
+  const auto heartbeat_publisher = node->create_publisher<std_msgs::msg::Empty>(
+    HEARTBEAT_TOPIC,
+    rclcpp::QoS(1).reliable().durability_volatile());
+  const auto heartbeat_timer = node->create_wall_timer(
+    std::chrono::seconds(1),
+    [heartbeat_publisher]() {
+      heartbeat_publisher->publish(std_msgs::msg::Empty{});
+    });
+  heartbeat_publisher->publish(std_msgs::msg::Empty{});
   const auto trajectory_client = rclcpp_action::create_client<FollowJointTrajectory>(
     node,
     TRAJECTORY_ACTION);

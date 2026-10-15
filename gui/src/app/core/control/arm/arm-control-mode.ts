@@ -3,7 +3,7 @@ import { Service, computed, inject, signal } from '@angular/core';
 import { ArmIkCoordinator } from '../../arm/ik/arm-ik-coordinator';
 import { GamepadInput, GamepadSnapshot } from '../../gamepad/gamepad-input';
 import { ArmMode } from '../../fma/fma-state.service';
-import { RosConnection } from '../../ros/ros-connection';
+import { RosHeartbeatMonitor } from '../../ros/ros-heartbeat-monitor';
 import { ControlModeService } from '../control-mode';
 import { GimbalPriorityCommandPublisher } from '../gimbal-priority-command-publisher';
 import { ArmCommandPublisher } from './arm-command-publisher';
@@ -22,7 +22,7 @@ type ArmControlHandler = ArmManualControl | ArmPositionControl;
 /** Owns Arm mode selection, the shared control session, and input routing. */
 @Service()
 export class ArmControlModeService {
-  private readonly rosConnection = inject(RosConnection);
+  private readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
   private readonly controlMode = inject(ControlModeService);
   private readonly gamepad = inject(GamepadInput);
   private readonly armIkCoordinator = inject(ArmIkCoordinator);
@@ -49,14 +49,14 @@ export class ArmControlModeService {
   readonly gamepadConnected = this.gamepad.connected;
   readonly gamepadName = this.gamepad.name;
   readonly canControlArm = computed(
-    () => this.enabledState() && this.rosConnection.isConnected() && this.controlMode.isArmActive(),
+    () => this.enabledState() && this.heartbeatMonitor.roverAvailable() && this.controlMode.isArmActive(),
   );
 
   /** Returns the reason Arm control cannot be enabled, or null when ready. */
   readiness(): string | null {
     this.gamepad.start();
 
-    if (!this.rosConnection.isConnected()) {
+    if (!this.heartbeatMonitor.roverAvailable()) {
       return 'Connect to ROSbridge before enabling Arm control.';
     }
 
@@ -152,7 +152,7 @@ export class ArmControlModeService {
     const snapshot = this.gamepad.snapshot();
 
     if (
-      !this.rosConnection.isConnected() ||
+      !this.heartbeatMonitor.roverAvailable() ||
       !this.gamepad.connected() ||
       !this.controlMode.isArmActive()
     ) {

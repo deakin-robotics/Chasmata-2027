@@ -1,5 +1,4 @@
 import { Component, computed, effect, inject, untracked } from '@angular/core';
-import { MatDialog } from '@angular/material/dialog';
 
 import {
   ArmControlMode,
@@ -12,8 +11,8 @@ import { GamepadInput } from '../../../../../core/gamepad/gamepad-input';
 import { CameraFeedControl } from '../../../../../features/cameras/camera-feed-control';
 import { ArmMode, FmaStateService } from '../../../../../core/fma/fma-state.service';
 import { RosConnection } from '../../../../../core/ros/ros-connection';
-import { ConnectionManager } from '../../../../../features/connection/connection-manager/connection-manager';
-import { ActionButton, ActionButtonTone } from '../../../../../shared/action-button/action-button';
+import { RosHeartbeatMonitor } from '../../../../../core/ros/ros-heartbeat-monitor';
+import { RosConnectionButton } from '../../../../../features/connection/ros-connection-button/ros-connection-button';
 import {
   ControlFlowConnector,
   ControlFlowConnectorTone,
@@ -35,7 +34,7 @@ import {
 @Component({
   selector: 'app-arm-master-page',
   imports: [
-    ActionButton,
+    RosConnectionButton,
     ControlFlowConnector,
     ControlSwitch,
     StatusIndicator,
@@ -53,13 +52,13 @@ export class ArmMasterPage {
   private readonly controlCommandPublisher = inject(ControlCommandPublisher);
   private readonly gamepad = inject(GamepadInput);
   private readonly rosConnection = inject(RosConnection);
+  private readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
   private readonly cameraFeedControl = inject(CameraFeedControl);
-  private readonly dialog = inject(MatDialog);
   private armModeSynchronized = false;
 
   private readonly modeHandshakeEffect = effect(() => {
     const client = this.rosConnection.client();
-    const connected = this.rosConnection.isConnected();
+    const connected = this.heartbeatMonitor.roverAvailable();
     const hasFmaTelemetry = this.fmaState.hasFmaTelemetry();
 
     untracked(() => {
@@ -77,6 +76,16 @@ export class ArmMasterPage {
     });
   });
 
+  private readonly baseStationHeartbeatEffect = effect(() => {
+    const available = this.heartbeatMonitor.baseStationAvailable();
+
+    untracked(() => {
+      if (!available && this.armControlMode.mode() === ArmMode.Position) {
+        this.selectArmMode(ArmMode.Manual);
+      }
+    });
+  });
+
   readonly masterDriveEnabled = this.armControlMode.enabled;
   readonly armMode = this.armControlMode.mode;
   readonly armModeOptions: readonly ControlModeOption[] = [
@@ -85,7 +94,8 @@ export class ArmMasterPage {
   ];
   readonly masterDriveTone: ControlSwitchTone = 'normal';
   readonly readinessError = this.armControlMode.readinessError;
-  readonly rosConnected = this.rosConnection.isConnected;
+  readonly rosConnected = this.heartbeatMonitor.roverAvailable;
+  readonly baseStationAvailable = this.heartbeatMonitor.baseStationAvailable;
   readonly gamepadConnected = this.gamepad.connected;
   readonly cameraFeedEnabled = this.cameraFeedControl.enabled;
   readonly gamepadStatusLabel = computed(() =>
@@ -97,38 +107,8 @@ export class ArmMasterPage {
   readonly gamepadFlowTone = computed<ControlFlowConnectorTone>(() =>
     this.gamepadConnected() ? 'normal' : 'neutral',
   );
-  readonly rosActionLabel = computed(() => {
-    switch (this.rosConnection.status()) {
-      case 'connecting':
-        return 'Connecting';
-      case 'waiting-for-rover':
-        return 'Standby';
-      case 'connected':
-        return 'Connected';
-      case 'reconnecting':
-        return 'Reconnecting';
-      case 'error':
-        return 'Retry';
-      default:
-        return 'Connect';
-    }
-  });
-  readonly rosActionTone = computed<ActionButtonTone>(() => {
-    switch (this.rosConnection.status()) {
-      case 'connected':
-        return 'normal';
-      case 'error':
-        return 'caution';
-      case 'connecting':
-      case 'waiting-for-rover':
-      case 'reconnecting':
-      case 'disconnected':
-        return 'info';
-    }
-  });
-  readonly rosActionBusy = computed(() => this.rosConnection.isConnecting());
   readonly rosFlowTone = computed<ControlFlowConnectorTone>(() => {
-    switch (this.rosConnection.status()) {
+    switch (this.heartbeatMonitor.roverStatus()) {
       case 'connected':
         return 'normal';
       case 'error':
@@ -140,14 +120,6 @@ export class ArmMasterPage {
 
   constructor() {
     this.gamepad.start();
-  }
-
-  /** Opens ROSbridge endpoint configuration and connection controls. */
-  openRosConnectionSettings(): void {
-    this.dialog.open(ConnectionManager, {
-      ariaLabel: 'ROS connection settings',
-      width: 'min(100% - 2rem, 32rem)',
-    });
   }
 
   /** Starts or closes WHEP playback for every camera on this dashboard. */

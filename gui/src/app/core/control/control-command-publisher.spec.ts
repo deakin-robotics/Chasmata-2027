@@ -5,6 +5,7 @@ import type { Ros } from 'roslib';
 
 import { ArmMode, DriveMode } from '../fma/fma-state.service';
 import { RosConnection } from '../ros/ros-connection';
+import { RosHeartbeatMonitor } from '../ros/ros-heartbeat-monitor';
 import { ControlCommandPublisher } from './control-command-publisher';
 
 const { sentMessages } = vi.hoisted(() => ({
@@ -30,9 +31,12 @@ describe('ControlCommandPublisher', () => {
         {
           provide: RosConnection,
           useValue: {
-            isConnected: connected.asReadonly(),
             client: signal(client).asReadonly(),
           },
+        },
+        {
+          provide: RosHeartbeatMonitor,
+          useValue: { roverAvailable: connected.asReadonly() },
         },
       ],
     });

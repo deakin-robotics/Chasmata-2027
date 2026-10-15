@@ -1,7 +1,6 @@
 import { Component, inject } from '@angular/core';
 
 import { FmaStateService } from '../../../core/fma/fma-state.service';
-import { RosConnection } from '../../../core/ros/ros-connection';
 import { UnavailableOverlay } from '../../../shared/unavailable-overlay/unavailable-overlay';
 
 @Component({
@@ -12,7 +11,6 @@ import { UnavailableOverlay } from '../../../shared/unavailable-overlay/unavaila
 })
 export class MissionControlFma {
   private readonly fmaState = inject(FmaStateService);
-  private readonly rosConnection = inject(RosConnection);
 
   readonly columns = this.fmaState.columns;
   readonly armOverrideActive = this.fmaState.armOverrideActive;
@@ -23,5 +21,5 @@ export class MissionControlFma {
   readonly gimbalPriorityAriaLabel = this.fmaState.gimbalPriorityAriaLabel;
   readonly gimbalPriorityPendingDisplay = this.fmaState.gimbalPriorityPendingDisplay;
   readonly gimbalPriorityPendingAriaLabel = this.fmaState.gimbalPriorityPendingAriaLabel;
-  readonly rosConnected = this.rosConnection.isConnected;
+  readonly fmaAvailable = this.fmaState.hasFmaTelemetry;
 }

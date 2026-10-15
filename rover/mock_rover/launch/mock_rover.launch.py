@@ -12,6 +12,13 @@ def generate_launch_description():
                 output='screen',
             ),
             Node(
+                package='ecam_alerts',
+                executable='ecam_alert_aggregator',
+                name='ecam_alert_aggregator_rover',
+                parameters=[{'role': 'rover'}],
+                output='screen',
+            ),
+            Node(
                 package='rosbridge_server',
                 executable='rosbridge_websocket',
                 name='rosbridge_websocket',

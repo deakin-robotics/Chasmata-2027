@@ -18,7 +18,7 @@ describe('DriverControlPanel', () => {
     expect(fixture.nativeElement.querySelector('app-control-switch')).toBeTruthy();
   });
 
-  it('should render the ROS Link action', () => {
+  it('should render the Rover Link action', () => {
     expect(fixture.nativeElement.querySelector('app-action-button')).toBeTruthy();
   });
 

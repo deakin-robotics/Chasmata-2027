@@ -1,5 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { MAT_DIALOG_DATA } from '@angular/material/dialog';
 
+import { BaseStationConnection } from '../../../core/ros/base-station-connection';
 import { RosConnection } from '../../../core/ros/ros-connection';
 import { ConnectionManager } from './connection-manager';
 
@@ -38,6 +40,52 @@ describe('ConnectionManager', () => {
 
   it('should disconnect through the connection service', () => {
     const disconnectSpy = vi.spyOn(rosConnection, 'disconnect');
+
+    component.disconnect();
+
+    expect(disconnectSpy).toHaveBeenCalledOnce();
+  });
+});
+
+describe('BaseStation ConnectionManager', () => {
+  let component: ConnectionManager;
+  let fixture: ComponentFixture<ConnectionManager>;
+  let connection: BaseStationConnection;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [ConnectionManager],
+      providers: [{ provide: MAT_DIALOG_DATA, useValue: { target: 'basestation' } }],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(ConnectionManager);
+    component = fixture.componentInstance;
+    connection = TestBed.inject(BaseStationConnection);
+    fixture.detectChanges();
+  });
+
+  it('shows the independent BaseStation endpoint and connection state', () => {
+    const element = fixture.nativeElement as HTMLElement;
+    const endpointInput = element.querySelector('input') as HTMLInputElement;
+
+    expect(element.textContent).toContain('BaseStation connection');
+    expect(element.textContent).toContain('Disconnected');
+    expect(endpointInput.value).toBe('localhost:9091');
+  });
+
+  it('connects the BaseStation service to the entered endpoint', () => {
+    const connectSpy = vi.spyOn(connection, 'connect').mockImplementation(() => {});
+    const roverConnectSpy = vi.spyOn(TestBed.inject(RosConnection), 'connect');
+    component.endpoint.setValue('basestation.local:9091');
+
+    component.connect();
+
+    expect(connectSpy).toHaveBeenCalledWith('basestation.local:9091');
+    expect(roverConnectSpy).not.toHaveBeenCalled();
+  });
+
+  it('disconnects only the BaseStation service', () => {
+    const disconnectSpy = vi.spyOn(connection, 'disconnect');
 
     component.disconnect();
 

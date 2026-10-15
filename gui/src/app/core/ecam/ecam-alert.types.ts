@@ -1,17 +1,14 @@
 /** Visual priority applied consistently anywhere an ECAM alert is rendered. */
 export type EcamAlertSeverity = 'attention' | 'warning' | 'fault';
 
-export type EcamAlertSource =
-  | 'ARM'
-  | 'CAMERA'
-  | 'CONFIG'
-  | 'DRIVE'
-  | 'LINK'
-  | 'POWER'
-  | 'SYSTEM';
+export type EcamAlertSource = 'ARM' | 'CAMERA' | 'CONFIG' | 'DRIVE' | 'LINK' | 'POWER' | 'SYSTEM';
+
+/** ROS source identity selected from the active GUI route. */
+export type EcamAlertReporterSource = 'driver' | 'ecam' | 'arm' | 'basestation' | 'rover';
 
 /** Stable identifiers used by features to raise and clear ECAM alerts. */
 export type EcamAlertCode =
+  | 'BASE_STATION_HEARTBEAT_LOST'
   | 'ARM_CAN_FAULT'
   | 'ARM_JOINT_FAULT'
   | 'ARM_JOINT_LIMIT'
@@ -67,13 +64,13 @@ export type EcamAlertCode =
   | 'LINK_DEGRADED'
   | 'LINK_CONTROLLER_DISCONNECTED'
   | 'LINK_LATENCY_HIGH'
-  | 'LINK_LOST'
   | 'LINK_PACKET_LOSS_HIGH'
   | 'LINK_ROS_UNAVAILABLE'
   | 'POWER_BATTERY_LOW'
   | 'POWER_BATTERY_UNAVAILABLE'
   | 'POWER_RAIL_FAULT'
   | 'POWER_TOTAL_POWER_UNAVAILABLE'
+  | 'ROVER_HEARTBEAT_LOST'
   | 'SYSTEM_CPU_HIGH'
   | 'SYSTEM_CRITICAL_FAULT'
   | 'SYSTEM_DIAGNOSTICS_UNAVAILABLE'
@@ -112,6 +109,7 @@ export interface EcamAlert extends EcamAlertDefinition {
   detail: string | null;
   firstSeenAt: number;
   lastUpdatedAt: number;
+  reporterSources: readonly EcamAlertReporterSource[];
 }
 
 /** Optional contextual information supplied when an alert is raised. */

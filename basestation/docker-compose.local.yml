@@ -28,6 +28,27 @@ services:
       context: ..
       dockerfile: basestation/Dockerfile
     network_mode: host
+    ipc: host
+    environment:
+      ROS_DISCOVERY_SERVER: 127.0.0.1:11811
+      ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
+      ROS_LOCALHOST_ONLY: "0"
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
+
+  rosbridge:
+    extends:
+      file: docker-compose.yml
+      service: rosbridge
+    environment:
+      ROS_DISCOVERY_SERVER: 127.0.0.1:11811
+      ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
+      ROS_LOCALHOST_ONLY: "0"
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
+
+  ecam-alert-aggregator:
+    extends:
+      file: docker-compose.yml
+      service: ecam-alert-aggregator
     environment:
       ROS_DISCOVERY_SERVER: 127.0.0.1:11811
       ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"

@@ -25,11 +25,24 @@ describe('MissionControlFma', () => {
     expect(fmaState.columns()).toEqual(stateBeforeMount);
   });
 
-  it('hides all FMA status values while ROS is disconnected', () => {
+  it('hides all FMA status values until an FMA feed delivers telemetry', () => {
     fixture = TestBed.createComponent(MissionControlFma);
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelectorAll('.mode')).toHaveLength(0);
     expect(fixture.nativeElement.querySelector('app-unavailable-overlay')).toBeTruthy();
+  });
+
+  it('shows Rover FMA telemetry when available', () => {
+    const fmaState = TestBed.inject(FmaStateService);
+    fmaState.confirmDriveMode(DriveMode.Velocity);
+    fmaState.markFmaTelemetryReceived();
+
+    fixture = TestBed.createComponent(MissionControlFma);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-unavailable-overlay')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain(DriveMode.Velocity);
+    expect(fixture.nativeElement.textContent).not.toContain('SRC');
   });
 });

@@ -5,4 +5,4 @@ scaffold is documented in
 [`rover_control`](rover_ws/src/rover_control/README.md).
 
 The executable mock remains in
-[`test/mock_rover`](../../test/mock_rover/README.md) for GUI integration tests.
+[`mock_rover`](../mock_rover/README.md) for GUI integration tests.
