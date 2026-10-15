@@ -1,6 +1,7 @@
 import { Service, computed, effect, inject, signal } from '@angular/core';
 import { Ros, Topic } from 'roslib';
 
+import { BaseStationConnection } from './base-station-connection';
 import { RosConnection, type RosConnectionStatus } from './ros-connection';
 
 const HEARTBEAT_TIMEOUT_MS = 3_000;
@@ -10,12 +11,14 @@ const HEARTBEAT_MESSAGE_TYPE = 'std_msgs/msg/Empty';
 
 export type RoverConnectionStatus = RosConnectionStatus | 'waiting-for-rover';
 
-/** Tracks rover and base-station liveness over the shared ROS connection. */
+/** Tracks rover and base-station liveness over their independent ROS connections. */
 @Service()
 export class RosHeartbeatMonitor {
-  private readonly rosConnection = inject(RosConnection);
+  private readonly roverConnection = inject(RosConnection);
+  private readonly baseStationConnection = inject(BaseStationConnection);
 
-  private activeClient: Ros | null = null;
+  private activeRoverClient: Ros | null = null;
+  private activeBaseStationClient: Ros | null = null;
   private roverTopic: Topic | null = null;
   private baseStationTopic: Topic | null = null;
   private roverTimer: ReturnType<typeof setTimeout> | null = null;
@@ -25,31 +28,27 @@ export class RosHeartbeatMonitor {
   private readonly baseStationAvailableState = signal(false);
 
   readonly roverAvailable = computed(
-    () => this.rosConnection.status() === 'connected' && this.roverAvailableState(),
+    () => this.roverConnection.status() === 'connected' && this.roverAvailableState(),
   );
   readonly baseStationAvailable = computed(
-    () => this.rosConnection.status() === 'connected' && this.baseStationAvailableState(),
+    () => this.baseStationConnection.status() === 'connected' && this.baseStationAvailableState(),
   );
   readonly roverStatus = computed<RoverConnectionStatus>(() => {
-    const connectionStatus = this.rosConnection.status();
+    const connectionStatus = this.roverConnection.status();
     if (connectionStatus !== 'connected') return connectionStatus;
     return this.roverAvailable() ? 'connected' : 'waiting-for-rover';
   });
   readonly isRoverConnecting = computed(() => {
     const status = this.roverStatus();
-    return (
-      status === 'connecting' ||
-      status === 'waiting-for-rover' ||
-      status === 'reconnecting'
-    );
+    return status === 'connecting' || status === 'waiting-for-rover' || status === 'reconnecting';
   });
 
-  private readonly clientEffect = effect((onCleanup) => {
-    const client = this.rosConnection.client();
+  private readonly roverClientEffect = effect((onCleanup) => {
+    const client = this.roverConnection.client();
     if (!client) return;
 
-    const onConnection = () => this.startMonitoring(client);
-    const onUnavailable = () => this.stopMonitoring(client);
+    const onConnection = () => this.startMonitoring(client, 'rover');
+    const onUnavailable = () => this.stopMonitoring(client, 'rover');
 
     client.on('connection', onConnection);
     client.on('close', onUnavailable);
@@ -61,44 +60,59 @@ export class RosHeartbeatMonitor {
       client.off('connection', onConnection);
       client.off('close', onUnavailable);
       client.off('error', onUnavailable);
-      this.stopMonitoring(client);
+      this.stopMonitoring(client, 'rover');
     });
   });
 
-  private startMonitoring(client: Ros): void {
-    if (this.rosConnection.client() !== client || this.activeClient === client) return;
-    if (this.activeClient) this.stopMonitoring(this.activeClient);
+  private readonly baseStationClientEffect = effect((onCleanup) => {
+    const client = this.baseStationConnection.client();
+    if (!client) return;
 
-    this.activeClient = client;
-    this.roverTopic = this.subscribe(client, ROVER_HEARTBEAT_TOPIC, 'rover');
-    this.baseStationTopic = this.subscribe(
-      client,
-      BASE_STATION_HEARTBEAT_TOPIC,
-      'base-station',
-    );
+    const onConnection = () => this.startMonitoring(client, 'base-station');
+    const onUnavailable = () => this.stopMonitoring(client, 'base-station');
+
+    client.on('connection', onConnection);
+    client.on('close', onUnavailable);
+    client.on('error', onUnavailable);
+
+    if (client.isConnected) onConnection();
+
+    onCleanup(() => {
+      client.off('connection', onConnection);
+      client.off('close', onUnavailable);
+      client.off('error', onUnavailable);
+      this.stopMonitoring(client, 'base-station');
+    });
+  });
+
+  private startMonitoring(client: Ros, source: 'rover' | 'base-station'): void {
+    const connection = source === 'rover' ? this.roverConnection : this.baseStationConnection;
+    if (connection.client() !== client) return;
+
+    const activeClient = this.getActiveClient(source);
+    if (activeClient === client) return;
+    if (activeClient) this.stopMonitoring(activeClient, source);
+
+    this.setActiveClient(source, client);
+    const name = source === 'rover' ? ROVER_HEARTBEAT_TOPIC : BASE_STATION_HEARTBEAT_TOPIC;
+    this.setTopic(source, this.subscribe(client, name, source));
   }
 
-  private subscribe(
-    client: Ros,
-    name: string,
-    source: 'rover' | 'base-station',
-  ): Topic {
+  private subscribe(client: Ros, name: string, source: 'rover' | 'base-station'): Topic {
     const topic = new Topic({ ros: client, name, messageType: HEARTBEAT_MESSAGE_TYPE });
     topic.subscribe(() => this.handleHeartbeat(client, topic, source));
     return topic;
   }
 
-  private handleHeartbeat(
-    client: Ros,
-    topic: Topic,
-    source: 'rover' | 'base-station',
-  ): void {
-    const activeTopic = source === 'rover' ? this.roverTopic : this.baseStationTopic;
+  private handleHeartbeat(client: Ros, topic: Topic, source: 'rover' | 'base-station'): void {
+    const activeTopic = this.getTopic(source);
+    const connection = source === 'rover' ? this.roverConnection : this.baseStationConnection;
     if (
-      this.rosConnection.client() !== client ||
-      this.activeClient !== client ||
+      connection.client() !== client ||
+      this.getActiveClient(source) !== client ||
       activeTopic !== topic
-    ) return;
+    )
+      return;
 
     const availableState =
       source === 'rover' ? this.roverAvailableState : this.baseStationAvailableState;
@@ -106,12 +120,13 @@ export class RosHeartbeatMonitor {
     if (timer) clearTimeout(timer);
 
     const timeout = setTimeout(() => {
-      const currentTopic = source === 'rover' ? this.roverTopic : this.baseStationTopic;
+      const currentTopic = this.getTopic(source);
       if (
-        this.rosConnection.client() !== client ||
-        this.activeClient !== client ||
+        connection.client() !== client ||
+        this.getActiveClient(source) !== client ||
         currentTopic !== topic
-      ) return;
+      )
+        return;
 
       if (source === 'rover') this.roverTimer = null;
       else this.baseStationTimer = null;
@@ -123,19 +138,35 @@ export class RosHeartbeatMonitor {
     availableState.set(true);
   }
 
-  private stopMonitoring(client: Ros): void {
-    if (this.activeClient !== client) return;
+  private stopMonitoring(client: Ros, source: 'rover' | 'base-station'): void {
+    if (this.getActiveClient(source) !== client) return;
 
-    if (this.roverTimer) clearTimeout(this.roverTimer);
-    if (this.baseStationTimer) clearTimeout(this.baseStationTimer);
-    this.roverTimer = null;
-    this.baseStationTimer = null;
-    this.roverTopic?.unsubscribe();
-    this.baseStationTopic?.unsubscribe();
-    this.roverTopic = null;
-    this.baseStationTopic = null;
-    this.activeClient = null;
-    this.roverAvailableState.set(false);
-    this.baseStationAvailableState.set(false);
+    const timer = source === 'rover' ? this.roverTimer : this.baseStationTimer;
+    if (timer) clearTimeout(timer);
+    if (source === 'rover') this.roverTimer = null;
+    else this.baseStationTimer = null;
+    this.getTopic(source)?.unsubscribe();
+    this.setTopic(source, null);
+    this.setActiveClient(source, null);
+    if (source === 'rover') this.roverAvailableState.set(false);
+    else this.baseStationAvailableState.set(false);
+  }
+
+  private getActiveClient(source: 'rover' | 'base-station'): Ros | null {
+    return source === 'rover' ? this.activeRoverClient : this.activeBaseStationClient;
+  }
+
+  private setActiveClient(source: 'rover' | 'base-station', client: Ros | null): void {
+    if (source === 'rover') this.activeRoverClient = client;
+    else this.activeBaseStationClient = client;
+  }
+
+  private getTopic(source: 'rover' | 'base-station'): Topic | null {
+    return source === 'rover' ? this.roverTopic : this.baseStationTopic;
+  }
+
+  private setTopic(source: 'rover' | 'base-station', topic: Topic | null): void {
+    if (source === 'rover') this.roverTopic = topic;
+    else this.baseStationTopic = topic;
   }
 }

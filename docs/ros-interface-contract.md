@@ -587,6 +587,7 @@ contract:
     unique: true
 behavior:
   publish: {on_active_set_change: true, on_connection_recovery: true}
+  gui_transport: Rover while its heartbeat is available, otherwise BaseStation when connected
   qos: {reliability: reliable, durability: transient_local, depth: 1}
 purpose: Reports the current active ECAM codes from one participant.
 ```

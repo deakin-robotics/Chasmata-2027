@@ -116,9 +116,11 @@ docker compose -f docker-compose.local.yml up --build
 The mock rover runs ROSbridge at `ws://localhost:9090` and the Fast DDS
 discovery server on UDP `11811`. The BaseStation stack runs its independent
 ROSbridge at `ws://localhost:9091`. Its ROS services, bridge, and local MoveIt
-use host networking and connect through `127.0.0.1:11811`; they do not use the shared
-camera network. Only the rover and base-station MediaMTX gateways share
-`chasmata-local-media`; the base gateway pulls the mock feeds from
+use host networking and connect through `127.0.0.1:11811`; they do not use the
+shared camera network. The ROS containers also share host IPC so Fast DDS can
+deliver topics between containers it detects on the same host. Only the rover
+and base-station MediaMTX gateways share `chasmata-local-media`; the base
+gateway pulls the mock feeds from
 `rover-media-gateway:8554`. Rover MediaMTX also exposes local fallback playback
 on WHEP `8890` and ICE UDP `8190`.
 

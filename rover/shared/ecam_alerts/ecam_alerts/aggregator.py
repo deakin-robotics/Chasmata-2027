@@ -8,13 +8,14 @@ from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Empty
 from telemetry_interfaces.msg import EcamAlertSourceSnapshot, EcamAlerts
 
-from .source import SOURCE_TOPIC, ecam_snapshot_qos
+from .source import EcamAlertSource, SOURCE_TOPIC, ecam_snapshot_qos
 from .state import SOURCE_NAMES as VALID_SOURCES, SourceSnapshotStore
 
 
 COMBINED_TOPIC = '/ecam/alerts'
 ROVER_HEARTBEAT_TOPIC = '/rover/heartbeat'
 ROVER_TIMEOUT_SECONDS = 3.0
+ROVER_HEARTBEAT_LOST = 'ROVER_HEARTBEAT_LOST'
 
 
 def combined_qos() -> QoSProfile:
@@ -26,7 +27,7 @@ def combined_qos() -> QoSProfile:
 
 
 class EcamAlertAggregator(Node):
-    """Combines source snapshots on Rover and takes over on BaseStation loss."""
+    """Combines source snapshots on Rover and takes over when Rover is lost."""
 
     def __init__(
         self,
@@ -58,7 +59,13 @@ class EcamAlertAggregator(Node):
         self._taking_over = self.role == 'rover'
         self._awaiting_rover_reflection = False
         self._source_state = SourceSnapshotStore()
+        self._source_replay_queue: list[str] = []
         self._rover_combined: EcamAlerts | None = None
+        self._base_station_alerts = (
+            EcamAlertSource(self, 'basestation')
+            if self.role == 'basestation'
+            else None
+        )
 
         self._source_publisher = self.create_publisher(
             EcamAlertSourceSnapshot,
@@ -95,8 +102,6 @@ class EcamAlertAggregator(Node):
                 ),
             )
             self.create_timer(0.1, self._check_rover_liveness)
-        else:
-            self._publish_combined()
 
         self.get_logger().info(f'ECAM aggregator started as {self.role}')
 
@@ -113,9 +118,9 @@ class EcamAlertAggregator(Node):
             # Publishing even an unchanged replay is the handback acknowledgement.
             self._publish_combined()
         elif self._taking_over and changed:
+            if self._awaiting_rover_reflection and source != 'rover':
+                self._queue_source_replay(source)
             self._publish_combined()
-        elif self._awaiting_rover_reflection and changed:
-            self._republish_non_rover_sources()
 
     def _on_combined_snapshot(self, message: EcamAlerts) -> None:
         if self.role != 'basestation' or message.authority != 'rover':
@@ -126,6 +131,7 @@ class EcamAlertAggregator(Node):
         if self._awaiting_rover_reflection and rover_state.reflects(self._source_state):
             self._awaiting_rover_reflection = False
             self._taking_over = False
+            self._source_replay_queue.clear()
             self.get_logger().info('Rover combined snapshot reflects BaseStation source state')
 
         for snapshot in message.sources:
@@ -152,12 +158,17 @@ class EcamAlertAggregator(Node):
 
     def _check_rover_liveness(self) -> None:
         now = time.monotonic()
+        if self._awaiting_rover_reflection:
+            self._publish_next_replay_snapshot()
+
         if self._last_rover_heartbeat is None:
             if (
                 now - self._started_at >= self._timeout_seconds
                 and not self._taking_over
             ):
                 self._taking_over = True
+                self._source_replay_queue.clear()
+                self._raise_rover_heartbeat_lost()
                 self._publish_combined()
                 self.get_logger().warning(
                     'Rover heartbeat not received; BaseStation is combining ECAM state'
@@ -173,26 +184,71 @@ class EcamAlertAggregator(Node):
         if rover_alive:
             if self._taking_over:
                 self._awaiting_rover_reflection = True
-                self._republish_non_rover_sources()
+                self._queue_all_non_rover_sources()
+                if (
+                    self._base_station_alerts is not None
+                    and ROVER_HEARTBEAT_LOST
+                    in self._base_station_alerts.active_codes
+                ):
+                    self._base_station_alerts.clear(ROVER_HEARTBEAT_LOST)
+                    self._sync_base_station_source_snapshot()
+                    self._queue_source_replay('basestation')
+                self._publish_combined()
                 self.get_logger().info(
                     'Rover heartbeat returned; synchronizing source snapshots'
                 )
         else:
             self._awaiting_rover_reflection = False
             self._taking_over = True
+            self._source_replay_queue.clear()
+            self._raise_rover_heartbeat_lost()
             self._publish_combined()
             self.get_logger().warning('Rover heartbeat lost; BaseStation is combining ECAM state')
 
-    def _republish_non_rover_sources(self) -> None:
-        for snapshot in self._source_state.snapshots():
-            if snapshot.source == 'rover':
-                continue
-            message = EcamAlertSourceSnapshot()
-            message.source = snapshot.source
-            message.timestamp.sec = snapshot.timestamp[0]
-            message.timestamp.nanosec = snapshot.timestamp[1]
-            message.active_codes = list(snapshot.active_codes)
-            self._source_publisher.publish(message)
+    def _raise_rover_heartbeat_lost(self) -> None:
+        if self._base_station_alerts is not None:
+            self._base_station_alerts.raise_alert(ROVER_HEARTBEAT_LOST)
+            self._sync_base_station_source_snapshot()
+
+    def _sync_base_station_source_snapshot(self) -> None:
+        if self._base_station_alerts is None:
+            return
+
+        self._source_state.update(
+            'basestation',
+            self._base_station_alerts.last_snapshot_timestamp,
+            self._base_station_alerts.active_codes,
+        )
+
+    def _queue_all_non_rover_sources(self) -> None:
+        self._source_replay_queue = [
+            snapshot.source
+            for snapshot in self._source_state.snapshots()
+            if snapshot.source != 'rover'
+        ]
+
+    def _queue_source_replay(self, source: str) -> None:
+        if source != 'rover' and source not in self._source_replay_queue:
+            self._source_replay_queue.append(source)
+
+    def _publish_next_replay_snapshot(self) -> None:
+        if not self._source_replay_queue:
+            self._queue_all_non_rover_sources()
+        if not self._source_replay_queue:
+            return
+
+        # Depth-1 QoS needs paced replay so one source cannot replace another.
+        source = self._source_replay_queue.pop(0)
+        snapshot = self._source_state.get(source)
+        if snapshot is None or source == 'rover':
+            return
+
+        message = EcamAlertSourceSnapshot()
+        message.source = snapshot.source
+        message.timestamp.sec = snapshot.timestamp[0]
+        message.timestamp.nanosec = snapshot.timestamp[1]
+        message.active_codes = list(snapshot.active_codes)
+        self._source_publisher.publish(message)
 
     def _publish_combined(self) -> None:
         message = EcamAlerts()

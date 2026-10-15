@@ -27,6 +27,9 @@ rover-side discovery server at UDP `11811` without a shared Docker network.
 On Windows, enable Docker Desktop host networking (Docker Desktop 4.34 or
 newer) to run this local setup. The GUI still uses `ws://localhost:9090` for
 local testing.
+The ROS containers also share host IPC. Fast DDS uses shared memory between
+containers it detects on the same host; host networking without shared IPC can
+leave ROSbridge unable to receive topics from another container.
 
 For camera RTSP between the two local Compose stacks, create their shared
 Docker network once before starting either stack:

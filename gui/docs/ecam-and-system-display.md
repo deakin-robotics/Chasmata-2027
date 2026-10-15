@@ -161,6 +161,8 @@ flowchart TB
 
 The aggregators are ROS nodes separate from the ECAM GUI. Rover normally combines source snapshots. BaseStation takes over after `/rover/heartbeat` has been absent for three seconds, then resends its latest source snapshots when Rover returns. It resumes relay-only operation after Rover publishes a combined snapshot reflecting those updates. Each GUI maintains a local copy of the latest combined alert state.
 
+Each GUI publishes its complete source snapshot through Rover while the Rover heartbeat is available. When it is lost, the GUI publishes through BaseStation if that bridge is connected, even if the Rover WebSocket is still open. It republishes the complete source snapshot when the selected path changes.
+
 Example combined message on `/ecam/alerts` (`telemetry_interfaces/msg/EcamAlerts`):
 
 ```yaml

@@ -27,6 +27,7 @@ class EcamAlertSource:
         self._node = node
         self.source = source
         self._active_codes: set[str] = set()
+        self._last_snapshot_timestamp = (0, 0)
         self._publisher = node.create_publisher(
             EcamAlertSourceSnapshot,
             SOURCE_TOPIC,
@@ -37,6 +38,10 @@ class EcamAlertSource:
     @property
     def active_codes(self) -> frozenset[str]:
         return frozenset(self._active_codes)
+
+    @property
+    def last_snapshot_timestamp(self) -> tuple[int, int]:
+        return self._last_snapshot_timestamp
 
     def raise_alert(self, code: str) -> None:
         normalized = code.strip()
@@ -63,4 +68,8 @@ class EcamAlertSource:
         message.source = self.source
         message.timestamp = self._node.get_clock().now().to_msg()
         message.active_codes = sorted(self._active_codes)
+        self._last_snapshot_timestamp = (
+            int(message.timestamp.sec),
+            int(message.timestamp.nanosec),
+        )
         self._publisher.publish(message)

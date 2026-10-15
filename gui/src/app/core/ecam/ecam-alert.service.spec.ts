@@ -1,14 +1,62 @@
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { Ros, Topic } from 'roslib';
 
+import { BaseStationConnection } from '../ros/base-station-connection';
+import { RosConnection } from '../ros/ros-connection';
+import { RosHeartbeatMonitor } from '../ros/ros-heartbeat-monitor';
 import { EcamAlertService } from './ecam-alert.service';
 
 describe('EcamAlertService', () => {
   let service: EcamAlertService;
+  let roverAvailable: ReturnType<typeof signal<boolean>>;
+  let baseStationAvailable: ReturnType<typeof signal<boolean>>;
+  let roverConnected: ReturnType<typeof signal<boolean>>;
+  let baseStationConnected: ReturnType<typeof signal<boolean>>;
+  let roverClient: ReturnType<typeof signal<Ros | null>>;
+  let baseStationClient: ReturnType<typeof signal<Ros | null>>;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [provideRouter([])] });
+    roverAvailable = signal(false);
+    baseStationAvailable = signal(false);
+    roverConnected = signal(false);
+    baseStationConnected = signal(false);
+    roverClient = signal<Ros | null>(null);
+    baseStationClient = signal<Ros | null>(null);
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        {
+          provide: RosConnection,
+          useValue: {
+            isConnected: roverConnected.asReadonly(),
+            client: roverClient.asReadonly(),
+          },
+        },
+        {
+          provide: BaseStationConnection,
+          useValue: {
+            isConnected: baseStationConnected.asReadonly(),
+            client: baseStationClient.asReadonly(),
+          },
+        },
+        {
+          provide: RosHeartbeatMonitor,
+          useValue: {
+            roverAvailable: roverAvailable.asReadonly(),
+            baseStationAvailable: baseStationAvailable.asReadonly(),
+          },
+        },
+      ],
+    });
     service = TestBed.inject(EcamAlertService);
+    TestBed.flushEffects();
+  });
+
+  afterEach(() => {
+    TestBed.resetTestingModule();
+    vi.restoreAllMocks();
   });
 
   it('should start without active alerts', () => {
@@ -88,6 +136,130 @@ describe('EcamAlertService', () => {
     service.clear('LINK_DEGRADED');
 
     expect(service.activeAlerts().map((alert) => alert.code)).toEqual(['POWER_BATTERY_LOW']);
+  });
+
+  it('raises Rover heartbeat loss locally and clears it when Rover returns', () => {
+    roverAvailable.set(true);
+    TestBed.flushEffects();
+    expect(service.activeAlerts()).toEqual([]);
+
+    roverAvailable.set(false);
+    TestBed.flushEffects();
+    expect(service.activeAlerts().map((alert) => alert.code)).toEqual(['ROVER_HEARTBEAT_LOST']);
+
+    roverAvailable.set(true);
+    TestBed.flushEffects();
+    expect(service.activeAlerts()).toEqual([]);
+  });
+
+  it('raises BaseStation heartbeat loss locally without waiting for a shared snapshot', () => {
+    baseStationAvailable.set(true);
+    TestBed.flushEffects();
+
+    baseStationAvailable.set(false);
+    TestBed.flushEffects();
+    expect(service.activeAlerts().map((alert) => alert.code)).toEqual([
+      'BASE_STATION_HEARTBEAT_LOST',
+    ]);
+
+    baseStationAvailable.set(true);
+    TestBed.flushEffects();
+    expect(service.activeAlerts()).toEqual([]);
+  });
+
+  it('does not raise BaseStation loss when only Rover becomes unavailable', () => {
+    roverAvailable.set(true);
+    baseStationAvailable.set(true);
+    TestBed.flushEffects();
+
+    roverAvailable.set(false);
+    TestBed.flushEffects();
+    expect(service.activeAlerts().map((alert) => alert.code)).toEqual(['ROVER_HEARTBEAT_LOST']);
+
+    roverAvailable.set(true);
+    TestBed.flushEffects();
+    expect(service.activeAlerts()).toEqual([]);
+
+    baseStationAvailable.set(false);
+    TestBed.flushEffects();
+    expect(service.activeAlerts().map((alert) => alert.code)).toEqual([
+      'BASE_STATION_HEARTBEAT_LOST',
+    ]);
+  });
+
+  it('routes complete source snapshots by Rover heartbeat, even while its socket remains connected', () => {
+    const advertisedTopics: Topic[] = [];
+    const publishedSnapshots: Array<{ source: string; active_codes: string[] }> = [];
+    vi.spyOn(Topic.prototype, 'advertise').mockImplementation(function (this: Topic) {
+      advertisedTopics.push(this);
+    });
+    vi.spyOn(Topic.prototype, 'unadvertise').mockImplementation(() => {});
+    vi.spyOn(Topic.prototype, 'subscribe').mockImplementation(() => {});
+    vi.spyOn(Topic.prototype, 'unsubscribe').mockImplementation(() => {});
+    vi.spyOn(Topic.prototype, 'publish').mockImplementation(function (this: Topic, message) {
+      if (this.name === '/ecam/alerts/source') {
+        publishedSnapshots.push(message as { source: string; active_codes: string[] });
+      }
+    });
+
+    roverClient.set(new Ros());
+    baseStationClient.set(new Ros());
+    roverConnected.set(true);
+    baseStationConnected.set(true);
+    roverAvailable.set(true);
+    TestBed.flushEffects();
+
+    publishedSnapshots.length = 0;
+    service.raise('POWER_BATTERY_LOW');
+    TestBed.flushEffects();
+
+    expect(advertisedTopics).toHaveLength(1);
+    expect(advertisedTopics[0].ros).toBe(roverClient());
+    expect(publishedSnapshots).toHaveLength(1);
+    expect(publishedSnapshots[0].active_codes).toEqual(['POWER_BATTERY_LOW']);
+
+    roverAvailable.set(false);
+    TestBed.flushEffects();
+
+    expect(roverConnected()).toBe(true);
+    expect(advertisedTopics).toHaveLength(2);
+    expect(advertisedTopics[1].ros).toBe(baseStationClient());
+    expect(publishedSnapshots.at(-1)?.active_codes).toEqual([
+      'POWER_BATTERY_LOW',
+      'ROVER_HEARTBEAT_LOST',
+    ]);
+
+    service.clear('POWER_BATTERY_LOW');
+    TestBed.flushEffects();
+    expect(publishedSnapshots.at(-1)?.active_codes).toEqual(['ROVER_HEARTBEAT_LOST']);
+
+    roverAvailable.set(true);
+    TestBed.flushEffects();
+    expect(advertisedTopics).toHaveLength(3);
+    expect(advertisedTopics[2].ros).toBe(roverClient());
+    expect(publishedSnapshots.at(-1)?.active_codes).toEqual([]);
+  });
+
+  it('uses Rover combined snapshots while its heartbeat is available', () => {
+    const applyAggregate = (message: unknown) =>
+      (service as unknown as { handleAggregate: (value: unknown) => void }).handleAggregate(
+        message,
+      );
+    roverAvailable.set(true);
+    TestBed.flushEffects();
+
+    applyAggregate({
+      authority: 'rover',
+      timestamp: { sec: 1, nanosec: 0 },
+      sources: [{ source: 'driver', active_codes: ['POWER_BATTERY_LOW'] }],
+    });
+    applyAggregate({ authority: 'basestation', sources: [] });
+    expect(service.activeAlerts().some((alert) => alert.code === 'POWER_BATTERY_LOW')).toBe(true);
+
+    roverAvailable.set(false);
+    TestBed.flushEffects();
+    applyAggregate({ authority: 'basestation', sources: [] });
+    expect(service.activeAlerts().some((alert) => alert.code === 'POWER_BATTERY_LOW')).toBe(false);
   });
 
   it('keeps a shared code active until every reporting source clears it', () => {

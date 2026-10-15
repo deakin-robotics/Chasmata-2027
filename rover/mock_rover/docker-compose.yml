@@ -23,6 +23,7 @@ services:
       context: ../..
       dockerfile: rover/mock_rover/Dockerfile
     network_mode: host
+    ipc: host
     command:
       - source /opt/ros/jazzy/setup.bash && exec fastdds discovery -i 0 -l 0.0.0.0 -p 11811
     restart: unless-stopped
@@ -32,6 +33,7 @@ services:
       context: ../..
       dockerfile: rover/mock_rover/Dockerfile
     network_mode: host
+    ipc: host
     environment:
       ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
       ROS_LOCALHOST_ONLY: "0"

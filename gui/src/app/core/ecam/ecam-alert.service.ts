@@ -1,4 +1,4 @@
-import { Service, computed, effect, inject, signal } from '@angular/core';
+import { Service, computed, effect, inject, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router } from '@angular/router';
 import { Topic } from 'roslib';
@@ -69,6 +69,10 @@ export class EcamAlertService {
   private readonly sourcePublisherRevision = signal(0);
   private sourcePublisher: Topic | null = null;
   private sharedAuthority: AggregateAuthority | null = null;
+  private roverWasAvailable = false;
+  private roverHeartbeatAlertRaised = false;
+  private baseStationWasAvailable = false;
+  private baseStationHeartbeatAlertRaised = false;
 
   readonly activeAlerts = computed(() => {
     const alerts = new Map(this.sharedAlertsState());
@@ -86,11 +90,17 @@ export class EcamAlertService {
   readonly hasActiveAlerts = computed(() => this.activeAlerts().length > 0);
 
   private readonly sourceTransportEffect = effect((onCleanup) => {
+    const roverAvailable = this.heartbeatMonitor.roverAvailable();
     const roverConnected = this.roverConnection.isConnected();
     const baseStationConnected = this.baseStationConnection.isConnected();
     const roverClient = this.roverConnection.client();
     const baseStationClient = this.baseStationConnection.client();
-    const client = roverConnected ? roverClient : baseStationConnected ? baseStationClient : null;
+    const client =
+      roverAvailable && roverConnected && roverClient
+        ? roverClient
+        : baseStationConnected
+          ? baseStationClient
+          : null;
 
     if (!client) {
       this.sourcePublisher = null;
@@ -150,6 +160,42 @@ export class EcamAlertService {
     const callback = (message: unknown) => this.handleAggregate(message);
     topic.subscribe(callback);
     onCleanup(() => topic.unsubscribe(callback));
+  });
+
+  private readonly roverHeartbeatAlertEffect = effect(() => {
+    const available = this.heartbeatMonitor.roverAvailable();
+    if (available === this.roverWasAvailable) return;
+
+    const wasAvailable = this.roverWasAvailable;
+    this.roverWasAvailable = available;
+
+    untracked(() => {
+      if (wasAvailable) {
+        this.raise('ROVER_HEARTBEAT_LOST');
+        this.roverHeartbeatAlertRaised = true;
+      } else if (this.roverHeartbeatAlertRaised) {
+        this.clear('ROVER_HEARTBEAT_LOST');
+        this.roverHeartbeatAlertRaised = false;
+      }
+    });
+  });
+
+  private readonly baseStationHeartbeatAlertEffect = effect(() => {
+    const available = this.heartbeatMonitor.baseStationAvailable();
+    if (available === this.baseStationWasAvailable) return;
+
+    const wasAvailable = this.baseStationWasAvailable;
+    this.baseStationWasAvailable = available;
+
+    untracked(() => {
+      if (wasAvailable) {
+        this.raise('BASE_STATION_HEARTBEAT_LOST');
+        this.baseStationHeartbeatAlertRaised = true;
+      } else if (this.baseStationHeartbeatAlertRaised) {
+        this.clear('BASE_STATION_HEARTBEAT_LOST');
+        this.baseStationHeartbeatAlertRaised = false;
+      }
+    });
   });
 
   constructor() {

@@ -159,7 +159,7 @@ describe('RosConnection and RosHeartbeatMonitor', () => {
     expect(service.reconnectAttempt()).toBe(0);
   });
 
-  it('tracks rover and base-station heartbeats independently', () => {
+  it('tracks each heartbeat on its matching ROS connection', () => {
     let roverReadyTransitions = 0;
     TestBed.runInInjectionContext(() =>
       effect(() => {
@@ -176,17 +176,25 @@ describe('RosConnection and RosHeartbeatMonitor', () => {
     expect(service.status()).toBe('connected');
     expect(service.isConnected()).toBe(true);
     expect(heartbeatMonitor.roverStatus()).toBe('waiting-for-rover');
-    expect(heartbeats).toHaveLength(2);
+    expect(heartbeats).toHaveLength(1);
     expect(heartbeats[0].topic.ros).toBe(client);
     expect(heartbeats[0].topic.name).toBe('/rover/heartbeat');
     expect(heartbeats[0].topic.messageType).toBe('std_msgs/msg/Empty');
-    expect(heartbeats[1].topic.ros).toBe(client);
+
+    baseStationConnection.connect('ws://localhost:9091');
+    TestBed.flushEffects();
+    const connectedBaseStationClient = baseStationConnection.client()!;
+    connectedBaseStationClient.emit('connection', {} as never);
+    expect(connectedBaseStationClient).not.toBe(client);
+    expect(heartbeats).toHaveLength(2);
+    expect(heartbeats[1].topic.ros).toBe(connectedBaseStationClient);
     expect(heartbeats[1].topic.name).toBe('/basestation/heartbeat');
     expect(heartbeats[1].topic.messageType).toBe('std_msgs/msg/Empty');
 
     heartbeats[0].callback();
     expect(heartbeatMonitor.roverAvailable()).toBe(true);
     expect(heartbeatMonitor.baseStationAvailable()).toBe(false);
+    expect(baseStationConnection.client()).toBe(connectedBaseStationClient);
     expect(heartbeatMonitor.roverStatus()).toBe('connected');
     TestBed.flushEffects();
     expect(roverReadyTransitions).toBe(1);
@@ -212,34 +220,37 @@ describe('RosConnection and RosHeartbeatMonitor', () => {
     expect(roverReadyTransitions).toBe(2);
   });
 
-  it('cleans up both heartbeat listeners and timers on disconnect and reconnect', () => {
+  it('keeps the BaseStation heartbeat active when Rover disconnects', () => {
     service.connect('ws://localhost:9090');
     TestBed.flushEffects();
     service.client()!.emit('connection', {} as never);
     heartbeats[0].callback();
-    const oldRoverTopic = heartbeats[0].topic;
-    const oldBaseStationTopic = heartbeats[1].topic;
-
-    service.reconnect();
+    baseStationConnection.connect('ws://localhost:9091');
     TestBed.flushEffects();
-    expect(unsubscribe.mock.contexts).toContain(oldRoverTopic);
-    expect(unsubscribe.mock.contexts).toContain(oldBaseStationTopic);
-    expect(heartbeatMonitor.roverAvailable()).toBe(false);
-    expect(heartbeatMonitor.baseStationAvailable()).toBe(false);
-
-    service.client()!.emit('connection', {} as never);
-    heartbeats[0].callback();
-    expect(heartbeatMonitor.roverAvailable()).toBe(false);
-    heartbeats[2].callback();
-    expect(heartbeatMonitor.roverAvailable()).toBe(true);
+    baseStationConnection.client()!.emit('connection', {} as never);
+    heartbeats[1].callback();
 
     service.disconnect();
     TestBed.flushEffects();
-    expect(unsubscribe.mock.contexts).toContain(heartbeats[2].topic);
-    expect(unsubscribe.mock.contexts).toContain(heartbeats[3].topic);
-    vi.advanceTimersByTime(3_000);
-    expect(service.status()).toBe('disconnected');
+    expect(unsubscribe.mock.contexts).toContain(heartbeats[0].topic);
+    expect(unsubscribe.mock.contexts).not.toContain(heartbeats[1].topic);
     expect(heartbeatMonitor.roverAvailable()).toBe(false);
+    expect(heartbeatMonitor.baseStationAvailable()).toBe(true);
+
+    heartbeats[1].callback();
+    expect(heartbeatMonitor.baseStationAvailable()).toBe(true);
+
+    service.connect('ws://localhost:9090');
+    TestBed.flushEffects();
+    service.client()!.emit('connection', {} as never);
+    heartbeats[2].callback();
+    expect(heartbeatMonitor.roverAvailable()).toBe(true);
+    expect(heartbeatMonitor.baseStationAvailable()).toBe(true);
+
+    baseStationConnection.disconnect();
+    TestBed.flushEffects();
+    expect(unsubscribe.mock.contexts).toContain(heartbeats[1].topic);
+    expect(heartbeatMonitor.roverAvailable()).toBe(true);
     expect(heartbeatMonitor.baseStationAvailable()).toBe(false);
   });
 
@@ -255,13 +266,12 @@ describe('RosConnection and RosHeartbeatMonitor', () => {
     expect(service.status()).toBe('reconnecting');
     expect(heartbeatMonitor.roverAvailable()).toBe(false);
     expect(unsubscribe.mock.contexts).toContain(heartbeats[0].topic);
-    expect(unsubscribe.mock.contexts).toContain(heartbeats[1].topic);
 
     vi.advanceTimersByTime(1_000);
     TestBed.flushEffects();
     service.client()!.emit('connection', {} as never);
     expect(heartbeatMonitor.roverStatus()).toBe('waiting-for-rover');
-    heartbeats[2].callback();
+    heartbeats[1].callback();
     expect(heartbeatMonitor.roverAvailable()).toBe(true);
   });
 });
