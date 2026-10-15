@@ -3,6 +3,7 @@ import { Ros, Topic } from 'roslib';
 
 import { GimbalPriorityOwner } from '../fma/fma-state.service';
 import { RosConnection } from '../ros/ros-connection';
+import { RosHeartbeatMonitor } from '../ros/ros-heartbeat-monitor';
 
 // Temporary mock-rover contract until Control provides the production topic.
 const GIMBAL_PRIORITY_REQUEST_TOPIC = '/fma/gimbal/request';
@@ -12,6 +13,7 @@ const STRING_MESSAGE_TYPE = 'std_msgs/String';
 @Service()
 export class GimbalPriorityCommandPublisher {
   private readonly rosConnection = inject(RosConnection);
+  private readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
 
   private topic: Topic | null = null;
   private topicClient: Ros | null = null;
@@ -26,7 +28,7 @@ export class GimbalPriorityCommandPublisher {
 
   private getTopic(): Topic | null {
     const client = this.rosConnection.client();
-    if (!client || !this.rosConnection.isConnected()) return null;
+    if (!client || !this.heartbeatMonitor.roverAvailable()) return null;
 
     if (this.topic && this.topicClient === client) return this.topic;
 

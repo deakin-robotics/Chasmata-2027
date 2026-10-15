@@ -7,6 +7,7 @@ import {
   ArmIkSolveResult,
 } from '../arm-ik-types';
 import { RosConnection } from '../../../ros/ros-connection';
+import { RosHeartbeatMonitor } from '../../../ros/ros-heartbeat-monitor';
 
 const MOVEIT_TARGET_TOPIC = '/arm/target_pose';
 const MOVEIT_ORIENTATION_LOCK_TOPIC = '/arm/orientation_lock';
@@ -36,6 +37,7 @@ interface PendingRequest {
 @Service()
 export class ArmMoveItIkProvider {
   private readonly rosConnection = inject(RosConnection);
+  private readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
 
   private readonly executionStatusState = signal<ArmIkExecutionStatus>('idle');
   readonly executionStatus = this.executionStatusState.asReadonly();
@@ -198,7 +200,7 @@ export class ArmMoveItIkProvider {
 
   private ensureTopics(): { target: Topic; orientationLock: Topic; status: Topic } | null {
     const client = this.rosConnection.client();
-    if (!client || !this.rosConnection.isConnected()) return null;
+    if (!client || !this.heartbeatMonitor.roverAvailable()) return null;
 
     if (
       client === this.activeClient &&

@@ -5,6 +5,12 @@ import { EcamAlertCode, EcamAlertDefinition } from './ecam-alert.types';
  * Features raise stable codes; they do not choose colours or user-facing text.
  */
 export const ECAM_MESSAGE_CATALOG: Readonly<Record<EcamAlertCode, EcamAlertDefinition>> = {
+  BASE_STATION_HEARTBEAT_LOST: {
+    code: 'BASE_STATION_HEARTBEAT_LOST',
+    source: 'ARM',
+    severity: 'warning',
+    text: 'BASE STATION HEARTBEAT LOST',
+  },
   ARM_CAN_FAULT: {
     code: 'ARM_CAN_FAULT',
     source: 'ARM',
@@ -354,12 +360,6 @@ export const ECAM_MESSAGE_CATALOG: Readonly<Record<EcamAlertCode, EcamAlertDefin
     severity: 'warning',
     text: 'LINK LATENCY HIGH',
   },
-  LINK_LOST: {
-    code: 'LINK_LOST',
-    source: 'LINK',
-    severity: 'fault',
-    text: 'LINK LOST',
-  },
   LINK_PACKET_LOSS_HIGH: {
     code: 'LINK_PACKET_LOSS_HIGH',
     source: 'LINK',
@@ -395,6 +395,12 @@ export const ECAM_MESSAGE_CATALOG: Readonly<Record<EcamAlertCode, EcamAlertDefin
     source: 'POWER',
     severity: 'warning',
     text: 'TOTAL POWER UNAVAILABLE',
+  },
+  ROVER_HEARTBEAT_LOST: {
+    code: 'ROVER_HEARTBEAT_LOST',
+    source: 'LINK',
+    severity: 'fault',
+    text: 'ROVER HEARTBEAT LOST',
   },
   SYSTEM_CPU_HIGH: {
     code: 'SYSTEM_CPU_HIGH',

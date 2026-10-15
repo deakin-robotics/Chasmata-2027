@@ -49,7 +49,7 @@ purpose: Tells a client whether the example node is ready or busy.
 ```yaml
 topic: /rover/heartbeat
 type: std_msgs/msg/Empty
-publisher: Rover Control (mock now, real rover later)
+publisher: Rover Control
 subscriber: GUI
 contract: {}
 behavior:
@@ -58,7 +58,7 @@ behavior:
   qos: {reliability: reliable, durability: volatile, depth: 1}
   gui_ready_on_first_message: true
   gui_timeout_seconds: 3
-purpose: Tells the GUI that the rover-side ROS interfaces are running.
+purpose: Provides a periodic signal that subscribers use to detect whether Rover Control is reachable.
 ```
 
 Example message:
@@ -67,8 +67,34 @@ Example message:
 {}
 ```
 
-This heartbeat covers the rover-side node, not the entire base-station stack.
-The real rover must publish it before the GUI can mark the rover ready.
+The rover publishes this heartbeat so subscribers can detect whether Rover
+Control remains reachable through ROS. If the messages stop, subscribers can
+treat Rover Control as unavailable independently of base-station connectivity.
+
+### Base-station heartbeat
+
+```yaml
+topic: /basestation/heartbeat
+type: std_msgs/msg/Empty
+publisher: Base-station arm MoveIt bridge
+contract: {}
+behavior:
+  publish_on_bridge_startup: true
+  publish_rate_hz: 1
+  qos: {reliability: reliable, durability: volatile, depth: 1}
+purpose: Provides a periodic signal that subscribers use to detect whether the base-station arm bridge is reachable.
+```
+
+Example message:
+
+```yaml
+{}
+```
+
+The base station publishes this heartbeat so subscribers can detect whether
+the arm MoveIt bridge remains reachable through ROS. If the messages stop,
+subscribers can treat the bridge as unavailable independently of rover
+connectivity.
 
 ### Driver input
 
@@ -492,7 +518,8 @@ publishes pending and confirmed states as its Control package processes them.
 topic: /fma/state
 type: telemetry_interfaces/msg/FmaState
 publisher: Rover Control
-subscriber: GUI
+subscriber: >-
+  Each GUI through its direct Rover ROSbridge connection
 contract:
   schema: {type: string, const: dcr/fma-state/v1}
   sequence: {type: uint64}
@@ -524,6 +551,9 @@ behavior:
 purpose: FMA telemetry broadcast.
 ```
 
+The BaseStation ROSbridge exposes the Rover-published topic from the shared ROS
+graph. It does not republish or change the FMA state.
+
 Example initial message from the mock:
 
 ```yaml
@@ -539,6 +569,81 @@ gimbal_priority: {confirmed: "", pending: "", rejected: ""}
 
 The mock reports `system: GOOD` and an empty string for
 `gimbal_priority.rejected` when no rejection is active.
+
+### ECAM source snapshots
+
+```yaml
+topic: /ecam/alerts/source
+type: telemetry_interfaces/msg/EcamAlertSourceSnapshot
+publisher: GUI source service or a Rover/BaseStation participant
+subscriber: Rover and BaseStation ECAM aggregators
+contract:
+  source: {type: string, enum: [driver, ecam, arm, basestation, rover]}
+  timestamp: {type: builtin_interfaces/msg/Time}
+  active_codes:
+    type: string[]
+    semantics: complete_snapshot_for_source
+    unique: true
+behavior:
+  publish: {on_active_set_change: true, on_connection_recovery: true}
+  gui_transport: Rover while its heartbeat is available, otherwise BaseStation when connected
+  qos: {reliability: reliable, durability: transient_local, depth: 1}
+purpose: Reports the current active ECAM codes from one participant.
+```
+
+Example:
+
+```yaml
+source: driver
+timestamp: {sec: 123, nanosec: 456000000}
+active_codes: [DRIVE_CONTROLLER_OFFLINE]
+```
+
+The GUI reports as `driver`, `arm`, or `ecam` according to its active route.
+Rover and BaseStation participants use the corresponding source name. Each
+message replaces that source's previous code set.
+
+### Combined ECAM alerts
+
+```yaml
+topic: /ecam/alerts
+type: telemetry_interfaces/msg/EcamAlerts
+publisher: Rover primary aggregator or BaseStation failover aggregator
+subscriber: GUI alert services and BaseStation aggregator
+contract:
+  timestamp: {type: builtin_interfaces/msg/Time}
+  authority: {type: string, enum: [rover, basestation]}
+  sources: {type: telemetry_interfaces/msg/EcamAlertSourceSnapshot[]}
+behavior:
+  sources: latest_complete_snapshot_per_source
+  active_codes: union_of_all_source_snapshots
+  base_station_takeover_after_rover_heartbeat_timeout_seconds: 3
+  handback: resend_non_rover_snapshots_then_wait_for_rover_reflection
+  qos: {reliability: reliable, durability: transient_local, depth: 1}
+purpose: Shares the latest combined ECAM alert state with operator displays.
+```
+
+Example:
+
+```yaml
+timestamp: {sec: 123, nanosec: 457000000}
+authority: rover
+sources:
+  - source: driver
+    timestamp: {sec: 123, nanosec: 456000000}
+    active_codes: [DRIVE_CONTROLLER_OFFLINE]
+  - source: arm
+    timestamp: {sec: 123, nanosec: 455000000}
+    active_codes: []
+```
+
+Rover normally combines source snapshots. BaseStation caches source and Rover
+combined snapshots and publishes a combined state after `/rover/heartbeat` has
+been absent for three seconds. When Rover returns, BaseStation resends its
+latest non-Rover source snapshots and waits for a Rover-authority combined
+snapshot containing those versions before returning to relay-only operation.
+The `authority` field lets consumers and the standby aggregator identify which
+participant produced the combined snapshot.
 
 ## Actions
 

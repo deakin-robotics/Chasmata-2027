@@ -1,5 +1,5 @@
-import { Service, effect, inject, untracked } from '@angular/core';
-import { Ros, Topic } from 'roslib';
+import { Service, effect, inject } from '@angular/core';
+import { Topic } from 'roslib';
 
 import { ArmTelemetryService } from '../arm/telemetry/arm-telemetry.service';
 import { ArmJointState } from '../arm/ik/arm-ik-types';
@@ -13,6 +13,7 @@ import {
   GimbalPriorityOwner,
 } from '../fma/fma-state.service';
 import { RosConnection } from './ros-connection';
+import { RosHeartbeatMonitor } from './ros-heartbeat-monitor';
 
 const FMA_STATE_TOPIC = '/fma/state';
 const JOINT_STATE_TOPIC = '/arm/joint_states';
@@ -46,46 +47,65 @@ interface FmaTelemetryMessage {
 @Service()
 export class RosTelemetryBridge {
   private readonly rosConnection = inject(RosConnection);
+  private readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
   private readonly fmaState = inject(FmaStateService);
   private readonly armTelemetry = inject(ArmTelemetryService);
 
-  private activeClient: Ros | null = null;
-  private fmaTopic: Topic | null = null;
+  private roverFmaTopic: Topic | null = null;
   private jointStateTopic: Topic | null = null;
 
-  private readonly connectionEffect = effect(() => {
+  private readonly roverTelemetryEffect = effect((onCleanup) => {
     const client = this.rosConnection.client();
-    const connected = this.rosConnection.isConnected();
+    const roverAvailable = this.heartbeatMonitor.roverAvailable();
 
-    untracked(() => this.updateSubscriptions(connected ? client : null));
-  });
-
-  private updateSubscriptions(client: Ros | null): void {
-    if (client === this.activeClient) return;
-
-    this.disposeSubscriptions();
-    if (!client) {
+    if (!client || !roverAvailable) {
       this.armTelemetry.clear();
       return;
     }
 
-    this.activeClient = client;
-    this.fmaTopic = new Topic({
+    const fmaTopic = new Topic({
       ros: client,
       name: FMA_STATE_TOPIC,
       messageType: FMA_STATE_MESSAGE_TYPE,
     });
-    this.jointStateTopic = new Topic({
+    const jointStateTopic = new Topic({
       ros: client,
       name: JOINT_STATE_TOPIC,
       messageType: JOINT_STATE_MESSAGE_TYPE,
     });
+    this.roverFmaTopic = fmaTopic;
+    this.jointStateTopic = jointStateTopic;
 
-    this.fmaTopic.subscribe((message) => this.handleFmaMessage(message));
-    this.jointStateTopic.subscribe((message) =>
-      this.handleJointStateMessage(message as JointStateMessage),
-    );
-  }
+    fmaTopic.subscribe((message) => {
+      if (
+        this.rosConnection.client() !== client ||
+        this.roverFmaTopic !== fmaTopic ||
+        !this.heartbeatMonitor.roverAvailable()
+      )
+        return;
+
+      this.handleFmaMessage(message);
+    });
+    jointStateTopic.subscribe((message) => {
+      if (
+        this.rosConnection.client() !== client ||
+        this.jointStateTopic !== jointStateTopic ||
+        !this.heartbeatMonitor.roverAvailable()
+      )
+        return;
+
+      this.handleJointStateMessage(message as JointStateMessage);
+    });
+
+    onCleanup(() => {
+      fmaTopic.unsubscribe();
+      jointStateTopic.unsubscribe();
+      if (this.roverFmaTopic === fmaTopic) this.roverFmaTopic = null;
+      if (this.jointStateTopic === jointStateTopic) this.jointStateTopic = null;
+      this.armTelemetry.clear();
+      this.fmaState.resetControlModes();
+    });
+  });
 
   private handleFmaMessage(message: unknown): void {
     if (!message || typeof message !== 'object') return;
@@ -203,13 +223,5 @@ export class RosTelemetryBridge {
   private parseGimbalPriorityOwner(value: unknown): GimbalPriorityOwner | null | undefined {
     if (value === null || value === '' || value === 'UNKNOWN') return null;
     return value === 'DRIVER' || value === 'ARM OPS' ? value : undefined;
-  }
-
-  private disposeSubscriptions(): void {
-    this.fmaTopic?.unsubscribe();
-    this.jointStateTopic?.unsubscribe();
-    this.fmaTopic = null;
-    this.jointStateTopic = null;
-    this.activeClient = null;
   }
 }

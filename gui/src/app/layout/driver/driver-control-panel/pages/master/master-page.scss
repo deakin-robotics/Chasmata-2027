@@ -11,7 +11,7 @@
   display: grid;
   align-content: start;
   grid-template-areas:
-    'gamepad ros . camera .'
+    'gamepad ros . base-station camera'
     'gamepad-stem ros-flow . . .'
     'gamepad-flow master . . .'
     'drive-mode drive-mode . . .'
@@ -35,15 +35,19 @@
 }
 
 app-status-indicator,
-app-action-button,
+app-ros-connection-button,
 app-control-flow-connector,
 app-control-switch,
 app-control-mode-selector {
   justify-self: center;
 }
 
-app-action-button {
+app-ros-connection-button {
   grid-area: ros;
+}
+
+.base-station-link {
+  grid-area: base-station;
 }
 
 .camera-feed {

@@ -3,6 +3,7 @@ import type { Ros } from 'roslib';
 import { vi } from 'vitest';
 
 import { RosConnection } from '../../../ros/ros-connection';
+import { RosHeartbeatMonitor } from '../../../ros/ros-heartbeat-monitor';
 import { ArmMoveItIkProvider } from './arm-moveit-ik-provider';
 
 const rosMocks = {
@@ -55,8 +56,11 @@ describe('ArmMoveItIkProvider', () => {
           provide: RosConnection,
           useValue: {
             client: () => rosMocks.rosClient,
-            isConnected: () => true,
           },
+        },
+        {
+          provide: RosHeartbeatMonitor,
+          useValue: { roverAvailable: () => true },
         },
       ],
     });

@@ -128,7 +128,7 @@ Recovery ownership is deliberately split:
 ## Local development runbook
 
 On Windows, enable Docker Desktop host networking (Docker Desktop 4.34 or
-newer). Start the mock rover from `test/mock_rover` and the base-station stack
+newer). Start the mock rover from `rover/mock_rover` and the base-station stack
 in either order. Before the first start, create the shared local camera network
 once:
 
