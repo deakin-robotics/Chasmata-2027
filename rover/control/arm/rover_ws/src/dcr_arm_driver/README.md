@@ -281,6 +281,10 @@ Controller (`config/arm_controllers.yaml`):
 | `joint_state_broadcaster` | `joint_state_broadcaster`     | six joints: `position`, `velocity`; publishes `/arm/joint_states` |
 | `arm_controller`          | `joint_trajectory_controller` | six joints; cmd: `position`; state: `position`, `velocity` |
 
+`arm_controller` accepts partial joint goals so the base-station MoveIt
+`position_arm` group can send its three-joint unlocked trajectories. This is
+configured by `allow_partial_joints_goal: true`.
+
 ---
 
 ## Usage examples

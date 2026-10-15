@@ -28,7 +28,7 @@ arm_controller:
     state_interfaces:
       - position
       - velocity
-    allow_partial_joints_goal: false
+    allow_partial_joints_goal: true
     action_monitor_rate: 10.0
     allow_integration_in_goal_trajectories: true
     constraints:
