@@ -33,6 +33,7 @@ struct JointInfo {
   double velocity = 0.0;
   double position_min = 0.0;
   double position_max = 0.0;
+  double max_velocity = 0.0;
   bool has_position_feedback = false;
   std::chrono::steady_clock::time_point last_feedback_time{};
   bool has_pending_status1 = false;
@@ -132,6 +133,7 @@ class ArmHardwareInterface : public hardware_interface::SystemInterface {
   void trajectory_status_callback(
       const action_msgs::msg::GoalStatusArray& msg);
   void direct_drive_callback(const dcr_arm_driver::msg::DirectDrive& msg);
+  bool all_feedback_fresh(std::chrono::steady_clock::time_point now) const;
 };
 
 }  // namespace dcr_arm_driver

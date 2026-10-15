@@ -105,6 +105,29 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_init(
                   joint.name.c_str());
     }
 
+    const auto max_velocity_param = joint.parameters.find("max_velocity");
+    if (max_velocity_param == joint.parameters.end()) {
+      RCLCPP_ERROR(rclcpp::get_logger("ArmHardwareInterface"),
+                   "Missing max_velocity parameter for joint %s",
+                   joint.name.c_str());
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+    try {
+      joint_info.max_velocity = std::stod(max_velocity_param->second);
+    } catch (const std::exception& e) {
+      RCLCPP_ERROR(rclcpp::get_logger("ArmHardwareInterface"),
+                   "Invalid max_velocity for joint %s: %s",
+                   joint.name.c_str(), e.what());
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+    if (!std::isfinite(joint_info.max_velocity) ||
+        joint_info.max_velocity <= 0.0) {
+      RCLCPP_ERROR(rclcpp::get_logger("ArmHardwareInterface"),
+                   "max_velocity for joint %s must be finite and positive",
+                   joint.name.c_str());
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+
     // Read CAN ID for this joint from URDF
     std::string can_id_param = joint.name + "_can_id";
     if (info.hardware_parameters.count(can_id_param) == 0) {
@@ -455,19 +478,35 @@ hardware_interface::return_type ArmHardwareInterface::write(
   }
   const bool estop_asserted = estop_asserted_.load(std::memory_order_relaxed);
   const auto now = std::chrono::steady_clock::now();
+  bool any_feedback_stale = false;
+  for (auto& joint : joints_) {
+    const bool feedback_stale =
+        !joint.has_position_feedback ||
+        now - joint.last_feedback_time > FEEDBACK_TIMEOUT;
+    if (feedback_stale) {
+      joint.has_position_feedback = false;
+      any_feedback_stale = true;
+    }
+  }
+  if (any_feedback_stale) {
+    // A trajectory may still be active when one motor stops reporting state.
+    // Inhibit all joints and require an idle action state followed by a new
+    // goal after feedback has recovered, so an old target cannot resume.
+    motion_inhibited_ = true;
+    trajectory_rearm_ready_ = false;
+    for (auto& joint : joints_) {
+      joint.estop_hold_position = joint.position;
+      joint.direct_mode = dcr_arm_driver::msg::DirectDrive::CONTROLLER;
+      joint.direct_value = 0.0;
+    }
+  }
   for (auto& joint : joints_) {
     if (can_pub_) {
       const bool feedback_stale =
           !joint.has_position_feedback ||
           now - joint.last_feedback_time > FEEDBACK_TIMEOUT;
-      if (feedback_stale) {
-        // Never resume a latched manual speed command after feedback loss.
-        joint.has_position_feedback = false;
-        joint.direct_mode = dcr_arm_driver::msg::DirectDrive::CONTROLLER;
-        joint.direct_value = 0.0;
-      }
       // Repeated zero-speed commands clear any motor motion command already in
-      // flight while the E-stop is active. Do not send trajectory positions.
+      // flight during E-stop or feedback loss. Do not send trajectory positions.
       can_msgs::msg::Frame cmd_msg;
       if (estop_asserted || !estop_state_received_ || feedback_stale) {
         cmd_msg = motor_driver_->speed_control(joint.can_id, 0.0f);
@@ -566,6 +605,8 @@ void ArmHardwareInterface::can_frame_callback(
 void ArmHardwareInterface::trajectory_status_callback(
     const action_msgs::msg::GoalStatusArray& msg) {
   std::lock_guard<std::mutex> lock(lifecycle_mutex_);
+  const bool feedback_fresh =
+      all_feedback_fresh(std::chrono::steady_clock::now());
   const bool active_goal = std::any_of(
       msg.status_list.begin(), msg.status_list.end(),
       [](const action_msgs::msg::GoalStatus& status) {
@@ -574,11 +615,12 @@ void ArmHardwareInterface::trajectory_status_callback(
                status.status == action_msgs::msg::GoalStatus::STATUS_CANCELING;
       });
   if (!active_goal) {
-    trajectory_rearm_ready_ = true;
+    trajectory_rearm_ready_ = feedback_fresh;
   } else if (!estop_state_received_ ||
-             estop_asserted_.load(std::memory_order_relaxed)) {
-    // An action that remained active through E-stop must finish before a new
-    // goal can re-enable controller output.
+             estop_asserted_.load(std::memory_order_relaxed) ||
+             !feedback_fresh) {
+    // A goal that remained active through E-stop or feedback loss must finish
+    // before a new goal can re-enable controller output.
     trajectory_rearm_ready_ = false;
   } else if (motion_inhibited_ && trajectory_rearm_ready_) {
     motion_inhibited_ = false;
@@ -600,6 +642,16 @@ void ArmHardwareInterface::direct_drive_callback(
 
   JointInfo* joint = find_joint(msg.id);
   if (joint == nullptr) {
+    return;
+  }
+
+  const auto now = std::chrono::steady_clock::now();
+  if (msg.mode != dcr_arm_driver::msg::DirectDrive::CONTROLLER &&
+      (!joint->has_position_feedback ||
+       now - joint->last_feedback_time > FEEDBACK_TIMEOUT)) {
+    RCLCPP_WARN(rclcpp::get_logger("ArmHardwareInterface"),
+                "Ignoring direct-drive command for joint '%s' without fresh feedback",
+                joint->name.c_str());
     return;
   }
 
@@ -634,6 +686,15 @@ void ArmHardwareInterface::direct_drive_callback(
             joint->position_max / DEGREES_TO_RADIANS);
         return;
       }
+    } else if (msg.mode == DirectDrive::SPEED &&
+               std::abs(static_cast<double>(msg.value)) *
+                       RPM_TO_RADIANS_PER_SECOND >
+                   joint->max_velocity) {
+      RCLCPP_WARN(
+          rclcpp::get_logger("ArmHardwareInterface"),
+          "Ignoring direct speed %.2f RPM above joint '%s' velocity limit %.3f rad/s",
+          msg.value, joint->name.c_str(), joint->max_velocity);
+      return;
     }
   }
 
@@ -642,6 +703,15 @@ void ArmHardwareInterface::direct_drive_callback(
   if (msg.mode == DirectDrive::CONTROLLER) {
     joint->estop_hold_position = joint->position;
   }
+}
+
+bool ArmHardwareInterface::all_feedback_fresh(
+    std::chrono::steady_clock::time_point now) const {
+  return std::all_of(
+      joints_.begin(), joints_.end(), [now](const JointInfo& joint) {
+        return joint.has_position_feedback &&
+               now - joint.last_feedback_time <= FEEDBACK_TIMEOUT;
+      });
 }
 
 }  // namespace dcr_arm_driver

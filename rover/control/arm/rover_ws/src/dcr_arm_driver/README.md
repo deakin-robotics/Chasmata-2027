@@ -189,7 +189,7 @@ uint8 POSITION=1
 uint8 SPEED=2
 uint32 id       # joint CAN ID
 uint8 mode
-float64 value  # degrees for POSITION; motor speed units for SPEED
+float64 value  # degrees for POSITION; RPM for SPEED
 ```
 
 `/motor_move` is no longer subscribed to. The legacy `MotorMove` definition
@@ -264,6 +264,7 @@ Set in the URDF `<ros2_control>` block (`urdf/robot_arm.urdf`) and
 |------------------|--------|----------------------|------------------------|
 | `can_interface`  | string | `can0`               | SocketCAN device name  |
 | `<joint>_can_id` | int    | `0x01`–`0x06` | CAN ID per arm joint   |
+| joint `max_velocity` | float | configured per joint | Direct-speed limit in rad/s; current values are `1.0` |
 | `update_rate`    | int    | `50`                 | Control loop freq (Hz) |
 
 Controller (`config/arm_controllers.yaml`):
@@ -295,8 +296,8 @@ targets from fresh feedback before sending position commands.
 # Position control (POSITION=1), value in degrees
 ros2 topic pub --once /arm/direct_drive dcr_arm_driver/msg/DirectDrive "{id: 1, mode: 1, value: 10.0}"
 
-# Speed control (SPEED=2), CAN speed payload = value * 100
-ros2 topic pub --once /arm/direct_drive dcr_arm_driver/msg/DirectDrive "{id: 1, mode: 2, value: 20.0}"
+# Speed control (SPEED=2), value in RPM; limited by the joint's URDF max velocity
+ros2 topic pub --once /arm/direct_drive dcr_arm_driver/msg/DirectDrive "{id: 1, mode: 2, value: 5.0}"
 
 # Stop this joint while retaining direct control
 ros2 topic pub --once /arm/direct_drive dcr_arm_driver/msg/DirectDrive "{id: 1, mode: 2, value: 0.0}"
@@ -311,10 +312,13 @@ before handing control back. Unknown IDs, invalid modes, and non-finite or
 unencodable values are ignored. Commands received while inactive or while
 E-stop is asserted or its state has not yet been received are ignored.
 
-Feedback older than 250 ms causes the driver to send zero speed and clear any
-latched direct-speed command. Direct-speed commands are also suppressed when
-they would move outward within 0.02 rad of a configured joint limit; inward
-commands remain available so the joint can move away from a limit.
+Feedback older than 250 ms causes the driver to send zero speed, clear latched
+direct commands, and inhibit all controller motion. Once feedback is fresh
+again, the trajectory action must report idle before a new trajectory can
+re-enable controller motion. Direct speed commands are limited to each joint's
+configured `max_velocity` (converted to RPM) and are suppressed when they would
+move outward within 0.02 rad of a configured joint limit; inward commands remain
+available so the joint can move away from a limit.
 
 `/estop` overrides both command sources with repeated zero-speed CAN frames.
 Asserting E-stop clears latched direct modes and inhibits controller motion.

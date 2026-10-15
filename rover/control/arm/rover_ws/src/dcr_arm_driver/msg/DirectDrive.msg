@@ -4,6 +4,7 @@ uint8 POSITION=1
 uint8 SPEED=2
 uint32 id
 uint8 mode
-# POSITION: degrees; SPEED: motor speed units (CAN payload = value * 100).
+# POSITION: degrees; SPEED: RPM (CAN payload = value * 100).
+# Speed magnitude is limited by that joint's configured max_velocity.
 # Ignored for CONTROLLER.
 float64 value

@@ -32,6 +32,7 @@ class DirectDriveTest : public ::testing::Test {
     for (unsigned id = 1; id <= 2; ++id) {
       hardware_interface::ComponentInfo joint;
       joint.name = "joint_" + std::to_string(id);
+      joint.parameters["max_velocity"] = "1.0";
       params.hardware_info.joints.push_back(joint);
       params.hardware_info.hardware_parameters[joint.name + "_can_id"] =
           std::to_string(id);
@@ -53,10 +54,10 @@ class DirectDriveTest : public ::testing::Test {
     std_msgs::msg::Bool estop_clear;
     estop_clear.data = false;
     estop->publish(estop_clear);
-    release_motion_inhibit();
     publish_feedback();
     ASSERT_EQ(hardware.read(rclcpp::Time(0), rclcpp::Duration::from_seconds(0.02)),
               hardware_interface::return_type::OK);
+    release_motion_inhibit();
     auto interfaces = hardware.export_command_interfaces();
     ASSERT_TRUE(interfaces[0].set_value(0.5));
     ASSERT_TRUE(interfaces[1].set_value(1.0));
@@ -143,9 +144,9 @@ class DirectDriveTest : public ::testing::Test {
 };
 
 TEST_F(DirectDriveTest, DirectCommandsPersistAndCanReturnToController) {
-  command(DirectDrive::SPEED, 20.0);
+  command(DirectDrive::SPEED, 5.0);
   for (int i = 0; i < 3; ++i) {
-    check_write(motor.speed_control(1, 20.0));
+    check_write(motor.speed_control(1, 5.0));
   }
   command(DirectDrive::POSITION, 10.0);
   for (int i = 0; i < 3; ++i) {
@@ -156,13 +157,14 @@ TEST_F(DirectDriveTest, DirectCommandsPersistAndCanReturnToController) {
 }
 
 TEST_F(DirectDriveTest, InvalidCommandsDoNotReplaceLatchedCommand) {
-  command(DirectDrive::SPEED, 20.0);
+  command(DirectDrive::SPEED, 5.0);
   command(255, 10.0);
   command(DirectDrive::POSITION, std::numeric_limits<double>::quiet_NaN());
   command(DirectDrive::SPEED, std::numeric_limits<double>::infinity());
   command(DirectDrive::SPEED, std::numeric_limits<double>::max());
+  command(DirectDrive::SPEED, 20.0);  // Above the 1 rad/s limit.
   command(DirectDrive::POSITION, 10.0, 99);
-  check_write(motor.speed_control(1, 20.0));
+  check_write(motor.speed_control(1, 5.0));
 }
 
 TEST_F(DirectDriveTest, PositionOutsideJointLimitsIsRejected) {
@@ -173,12 +175,12 @@ TEST_F(DirectDriveTest, PositionOutsideJointLimitsIsRejected) {
 
 TEST_F(DirectDriveTest, DirectSpeedStopsAtTheJointLimit) {
   feedback_angle_raw = 8165;  // About 0.006 rad below the default upper limit.
-  command(DirectDrive::SPEED, 20.0);
+  command(DirectDrive::SPEED, 5.0);
   check_write(motor.speed_control(1, 0.0));
 }
 
 TEST_F(DirectDriveTest, StaleFeedbackStopsAndClearsLatchedDirectSpeed) {
-  command(DirectDrive::SPEED, 20.0);
+  command(DirectDrive::SPEED, 5.0);
   std::this_thread::sleep_for(300ms);
   frames.clear();
   ASSERT_EQ(hardware.write(rclcpp::Time(0), rclcpp::Duration::from_seconds(0.02)),
@@ -192,11 +194,20 @@ TEST_F(DirectDriveTest, StaleFeedbackStopsAndClearsLatchedDirectSpeed) {
   publish_feedback();
   ASSERT_EQ(hardware.read(rclcpp::Time(0), rclcpp::Duration::from_seconds(0.02)),
             hardware_interface::return_type::OK);
-  check_write(motor.position_control(1, 0.0));
+  frames.clear();
+  ASSERT_EQ(hardware.write(rclcpp::Time(0), rclcpp::Duration::from_seconds(0.02)),
+            hardware_interface::return_type::OK);
+  spin();
+  ASSERT_EQ(frames.size(), 2u);
+  EXPECT_EQ(frames[0].data, motor.position_control(1, 0.0).data);
+  EXPECT_EQ(frames[1].data, motor.position_control(2, 0.0).data);
 }
 
 TEST_F(DirectDriveTest, EstopOverridesDirectDriveAndActivationResetsIt) {
-  command(DirectDrive::SPEED, 20.0);
+  command(DirectDrive::SPEED, 5.0);
+  auto interfaces = hardware.export_command_interfaces();
+  ASSERT_TRUE(interfaces[0].set_value(0.0));
+  ASSERT_TRUE(interfaces[1].set_value(0.0));
   std_msgs::msg::Bool stop;
   stop.data = true;
   estop->publish(stop);
@@ -215,10 +226,10 @@ TEST_F(DirectDriveTest, EstopOverridesDirectDriveAndActivationResetsIt) {
   check_write(motor.position_control(1, 0.0));
   hardware.on_deactivate(rclcpp_lifecycle::State());
   hardware.on_activate(rclcpp_lifecycle::State());
-  release_motion_inhibit();
   publish_feedback();
   hardware.read(rclcpp::Time(0), rclcpp::Duration::from_seconds(0.02));
-  auto interfaces = hardware.export_command_interfaces();
+  release_motion_inhibit();
+  interfaces = hardware.export_command_interfaces();
   ASSERT_TRUE(interfaces[0].set_value(0.5));
   ASSERT_TRUE(interfaces[1].set_value(1.0));
   check_write(motor.position_control(1, 0.5 * 180 / 3.14159265));
