@@ -44,8 +44,16 @@ class DirectDriveTest : public ::testing::Test {
         "/socketcan_bridge/rx", 10);
     commands = hardware.node->create_publisher<DirectDrive>("/arm/direct_drive", 1);
     estop = hardware.node->create_publisher<std_msgs::msg::Bool>("/estop", 1);
+    trajectory_status = hardware.node->create_publisher<
+        action_msgs::msg::GoalStatusArray>(
+        "/arm_controller/follow_joint_trajectory/_action/status",
+        rclcpp::QoS(1).transient_local());
     ASSERT_EQ(hardware.on_activate(rclcpp_lifecycle::State()),
               hardware_interface::CallbackReturn::SUCCESS);
+    std_msgs::msg::Bool estop_clear;
+    estop_clear.data = false;
+    estop->publish(estop_clear);
+    release_motion_inhibit();
     publish_feedback();
     ASSERT_EQ(hardware.read(rclcpp::Time(0), rclcpp::Duration::from_seconds(0.02)),
               hardware_interface::return_type::OK);
@@ -91,6 +99,22 @@ class DirectDriveTest : public ::testing::Test {
     spin();
   }
 
+  void publish_trajectory_status(uint8_t status) {
+    action_msgs::msg::GoalStatusArray msg;
+    if (status != action_msgs::msg::GoalStatus::STATUS_UNKNOWN) {
+      action_msgs::msg::GoalStatus goal;
+      goal.status = status;
+      msg.status_list.push_back(goal);
+    }
+    trajectory_status->publish(msg);
+    spin();
+  }
+
+  void release_motion_inhibit() {
+    publish_trajectory_status(action_msgs::msg::GoalStatus::STATUS_UNKNOWN);
+    publish_trajectory_status(action_msgs::msg::GoalStatus::STATUS_EXECUTING);
+  }
+
   void check_write(const can_msgs::msg::Frame& expected) {
     publish_feedback();
     ASSERT_EQ(hardware.read(rclcpp::Time(0), rclcpp::Duration::from_seconds(0.02)),
@@ -113,6 +137,7 @@ class DirectDriveTest : public ::testing::Test {
   rclcpp::Publisher<can_msgs::msg::Frame>::SharedPtr feedback;
   rclcpp::Publisher<DirectDrive>::SharedPtr commands;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr estop;
+  rclcpp::Publisher<action_msgs::msg::GoalStatusArray>::SharedPtr trajectory_status;
   std::vector<can_msgs::msg::Frame> frames;
   uint16_t feedback_angle_raw{0};
 };
@@ -187,9 +212,10 @@ TEST_F(DirectDriveTest, EstopOverridesDirectDriveAndActivationResetsIt) {
   stop.data = false;
   estop->publish(stop);
   spin();
-  check_write(motor.speed_control(1, 20.0));
+  check_write(motor.position_control(1, 0.0));
   hardware.on_deactivate(rclcpp_lifecycle::State());
   hardware.on_activate(rclcpp_lifecycle::State());
+  release_motion_inhibit();
   publish_feedback();
   hardware.read(rclcpp::Time(0), rclcpp::Duration::from_seconds(0.02));
   auto interfaces = hardware.export_command_interfaces();

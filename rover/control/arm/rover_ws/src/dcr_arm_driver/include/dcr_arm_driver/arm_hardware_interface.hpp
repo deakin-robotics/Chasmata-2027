@@ -45,6 +45,7 @@ struct JointInfo {
   std::string fault = "";          // NEW (from MotorStat2.fault)
   double position_command = 0.0;
   double last_position_command = 0.0;
+  double estop_hold_position = 0.0;
   // Protected by lifecycle_mutex_; controller-owned position_command is untouched.
   uint8_t direct_mode = dcr_arm_driver::msg::DirectDrive::CONTROLLER;
   double direct_value = 0.0;
@@ -116,12 +117,16 @@ class ArmHardwareInterface : public hardware_interface::SystemInterface {
   rclcpp::Subscription<dcr_arm_driver::msg::DirectDrive>::SharedPtr direct_drive_sub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr estop_sub_;
   std::atomic<bool> estop_asserted_{false};
+  bool estop_state_received_{false};
+  bool motion_inhibited_{true};
+  bool trajectory_rearm_ready_{false};
   bool trajectory_goal_active_{false};
   bool home_pending_{false};
   std::vector<JointInfo> joints_;
 
   JointInfo* find_joint(uint32_t can_id);
   void ensure_estop_subscription(const rclcpp::Node::SharedPtr& node);
+  void estop_callback(const std_msgs::msg::Bool& msg);
   void deactivate_endpoints();
   void can_frame_callback(const can_msgs::msg::Frame& msg);
   void trajectory_status_callback(

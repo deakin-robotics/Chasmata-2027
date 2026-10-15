@@ -133,9 +133,13 @@ configured position limits and converts RPM to radians per second.
 |-----------------|----------------------|--------------------------------------------------|
 | `/arm/set_home` | `std_srvs/srv/Trigger` | Set motor home only when all joints are already at zero and no trajectory is active |
 
-The `/estop` subscription remains active while the hardware is inactive, so
-its state is current when the arm is activated again. Activation waits for fresh
-encoder feedback and seeds each position target from the measured position.
+The `/estop` subscription remains active while the hardware is inactive. The
+driver starts motion-inhibited and requires an explicit `/estop` state message;
+the E-stop publisher must publish its current state, including `false` when
+clear, after startup. Until that message arrives, the driver sends zero speed
+and ignores direct-drive commands.
+Activation also waits for fresh encoder feedback and seeds each position target
+from the measured position.
 
 Homing is explicit; activation does not redefine the motor coordinate frame.
 The driver rejects homing while an accepted, executing, or canceling trajectory
@@ -305,7 +309,7 @@ The controller can continue updating its target during direct drive. Returning
 to `CONTROLLER` immediately uses that target; set the intended controller target
 before handing control back. Unknown IDs, invalid modes, and non-finite or
 unencodable values are ignored. Commands received while inactive or while
-E-stop is asserted are ignored.
+E-stop is asserted or its state has not yet been received are ignored.
 
 Feedback older than 250 ms causes the driver to send zero speed and clear any
 latched direct-speed command. Direct-speed commands are also suppressed when
@@ -313,10 +317,15 @@ they would move outward within 0.02 rad of a configured joint limit; inward
 commands remain available so the joint can move away from a limit.
 
 `/estop` overrides both command sources with repeated zero-speed CAN frames.
-Clearing E-stop resumes the previously selected command, including a latched
-direct speed. Hardware deactivation, cleanup, shutdown, and error transitions
-send zero-speed frames to every joint before destroying the CAN publisher.
-Hardware reactivation resets every joint to controller mode.
+Asserting E-stop clears latched direct modes and inhibits controller motion.
+When E-stop clears, the arm holds its measured pose; it does not resume an old
+trajectory or speed command. Cancel any prior trajectory goal if it remains
+active, wait until the action status is idle, then send a new trajectory goal
+to re-enable controller motion. A new explicit
+direct position or speed command can operate a joint while controller motion is
+inhibited. Hardware deactivation, cleanup, shutdown, and error transitions send
+zero-speed frames to every joint before destroying the CAN publisher. Hardware
+reactivation returns all joints to the motion-inhibited controller state.
 
 Watch the raw CAN frames:
 

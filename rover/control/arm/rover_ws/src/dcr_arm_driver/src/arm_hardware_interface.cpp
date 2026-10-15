@@ -196,6 +196,8 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_activate(
     joint.has_position_feedback = false;
     joint.has_pending_status1 = false;
   }
+  motion_inhibited_ = true;
+  trajectory_rearm_ready_ = false;
   trajectory_goal_active_ = false;
 
   auto clear_fault_msg = motor_driver_->clr_faults();
@@ -211,9 +213,11 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_activate(
           response->message = "Arm hardware is inactive";
           return;
         }
-        if (estop_asserted_.load(std::memory_order_relaxed)) {
+        if (!estop_state_received_ ||
+            estop_asserted_.load(std::memory_order_relaxed)) {
           response->success = false;
-          response->message = "Cannot set home while E-stop is asserted";
+          response->message =
+              "Cannot set home until a clear E-stop state has been received";
           return;
         }
         if (trajectory_goal_active_) {
@@ -296,6 +300,8 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_error(
 void ArmHardwareInterface::deactivate_endpoints() {
   std::lock_guard<std::mutex> lock(lifecycle_mutex_);
   active_ = false;
+  motion_inhibited_ = true;
+  trajectory_rearm_ready_ = false;
   // Stop every motor before dropping the publisher. Direct speed commands are
   // latched by the motor, so stopping callbacks alone would leave it moving.
   if (can_pub_ && motor_driver_) {
@@ -322,12 +328,36 @@ void ArmHardwareInterface::ensure_estop_subscription(
   // changes are not missed while motion endpoints are torn down.
   estop_sub_ = node->create_subscription<std_msgs::msg::Bool>(
       "/estop", rclcpp::QoS(1), [this](const std_msgs::msg::Bool& msg) {
-        estop_asserted_.store(msg.data, std::memory_order_relaxed);
-        if (msg.data) {
-          RCLCPP_WARN(rclcpp::get_logger("ArmHardwareInterface"),
-                      "E-stop asserted; stopping arm motion");
-        }
+        this->estop_callback(msg);
       });
+}
+
+void ArmHardwareInterface::estop_callback(const std_msgs::msg::Bool& msg) {
+  std::lock_guard<std::mutex> lock(lifecycle_mutex_);
+  const bool previously_received = estop_state_received_;
+  const bool previously_asserted =
+      estop_asserted_.load(std::memory_order_relaxed);
+  estop_state_received_ = true;
+  estop_asserted_.store(msg.data, std::memory_order_relaxed);
+  if (!msg.data) {
+    if (!previously_received || previously_asserted) {
+      // Require a status update showing no active goal after the clear event;
+      // this prevents a goal submitted during E-stop from being resumed if
+      // its status callback was delayed.
+      trajectory_rearm_ready_ = false;
+    }
+    return;
+  }
+
+  motion_inhibited_ = true;
+  trajectory_rearm_ready_ = false;
+  for (auto& joint : joints_) {
+    joint.estop_hold_position = joint.position;
+    joint.direct_mode = dcr_arm_driver::msg::DirectDrive::CONTROLLER;
+    joint.direct_value = 0.0;
+  }
+  RCLCPP_WARN(rclcpp::get_logger("ArmHardwareInterface"),
+              "E-stop asserted; arm motion inhibited until a new command is issued");
 }
 
 std::vector<hardware_interface::StateInterface>
@@ -388,6 +418,11 @@ hardware_interface::return_type ArmHardwareInterface::read(
           joint.position_command = *position;
           joint.has_position_feedback = true;
         }
+        if (motion_inhibited_ &&
+            joint.direct_mode == dcr_arm_driver::msg::DirectDrive::CONTROLLER &&
+            !estop_asserted_.load(std::memory_order_relaxed)) {
+          joint.estop_hold_position = *position;
+        }
       } else {
         RCLCPP_WARN_THROTTLE(
             rclcpp::get_logger("ArmHardwareInterface"), *node_->get_clock(),
@@ -434,8 +469,18 @@ hardware_interface::return_type ArmHardwareInterface::write(
       // Repeated zero-speed commands clear any motor motion command already in
       // flight while the E-stop is active. Do not send trajectory positions.
       can_msgs::msg::Frame cmd_msg;
-      if (estop_asserted || feedback_stale) {
+      if (estop_asserted || !estop_state_received_ || feedback_stale) {
         cmd_msg = motor_driver_->speed_control(joint.can_id, 0.0f);
+      } else if (motion_inhibited_ &&
+                 joint.direct_mode ==
+                     dcr_arm_driver::msg::DirectDrive::CONTROLLER) {
+        const double hold_position =
+            std::clamp(joint.estop_hold_position, joint.position_min,
+                       joint.position_max);
+        cmd_msg = motor_driver_->position_control(
+            joint.can_id,
+            static_cast<float>(hold_position / DEGREES_TO_RADIANS));
+        joint.last_position_command = hold_position;
       } else if (joint.direct_mode == dcr_arm_driver::msg::DirectDrive::SPEED) {
         double speed_command = joint.direct_value;
         if ((speed_command > 0.0 &&
@@ -521,19 +566,35 @@ void ArmHardwareInterface::can_frame_callback(
 void ArmHardwareInterface::trajectory_status_callback(
     const action_msgs::msg::GoalStatusArray& msg) {
   std::lock_guard<std::mutex> lock(lifecycle_mutex_);
-  trajectory_goal_active_ = std::any_of(
+  const bool active_goal = std::any_of(
       msg.status_list.begin(), msg.status_list.end(),
       [](const action_msgs::msg::GoalStatus& status) {
         return status.status == action_msgs::msg::GoalStatus::STATUS_ACCEPTED ||
                status.status == action_msgs::msg::GoalStatus::STATUS_EXECUTING ||
                status.status == action_msgs::msg::GoalStatus::STATUS_CANCELING;
       });
+  if (!active_goal) {
+    trajectory_rearm_ready_ = true;
+  } else if (!estop_state_received_ ||
+             estop_asserted_.load(std::memory_order_relaxed)) {
+    // An action that remained active through E-stop must finish before a new
+    // goal can re-enable controller output.
+    trajectory_rearm_ready_ = false;
+  } else if (motion_inhibited_ && trajectory_rearm_ready_) {
+    motion_inhibited_ = false;
+    for (auto& joint : joints_) {
+      joint.direct_mode = dcr_arm_driver::msg::DirectDrive::CONTROLLER;
+      joint.direct_value = 0.0;
+    }
+  }
+  trajectory_goal_active_ = active_goal;
 }
 
 void ArmHardwareInterface::direct_drive_callback(
     const dcr_arm_driver::msg::DirectDrive& msg) {
   std::lock_guard<std::mutex> lock(lifecycle_mutex_);
-  if (!active_ || estop_asserted_.load(std::memory_order_relaxed)) {
+  if (!active_ || !estop_state_received_ ||
+      estop_asserted_.load(std::memory_order_relaxed)) {
     return;
   }
 
@@ -578,6 +639,9 @@ void ArmHardwareInterface::direct_drive_callback(
 
   joint->direct_mode = msg.mode;
   joint->direct_value = msg.value;
+  if (msg.mode == DirectDrive::CONTROLLER) {
+    joint->estop_hold_position = joint->position;
+  }
 }
 
 }  // namespace dcr_arm_driver
