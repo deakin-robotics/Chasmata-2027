@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { environment } from '../../../../environments/environment';
 import { BaseStationConnection } from '../../../core/ros/base-station-connection';
 import { RosConnection } from '../../../core/ros/ros-connection';
@@ -11,6 +11,8 @@ export class RosConnectionButton {
   private readonly roverConnection = inject(RosConnection);
   private readonly baseStationConnection = inject(BaseStationConnection);
   private readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
+  private readonly roverWasOnline = signal(false);
+  private readonly baseStationWasOnline = signal(false);
   readonly label = 'ROS Link';
   readonly checked = computed(() => {
     const roverStatus = this.roverConnection.status();
@@ -19,17 +21,41 @@ export class RosConnectionButton {
     return roverStatus !== 'disconnected' || baseStationStatus !== 'disconnected';
   });
   readonly tone = computed<ControlSwitchTone>(() => {
+    if (!this.checked()) return 'info';
+
     const roverStatus = this.roverConnection.status();
     const baseStationStatus = this.baseStationConnection.status();
+    const roverOnline = this.heartbeatMonitor.roverAvailable();
+    const baseStationOnline = this.heartbeatMonitor.baseStationAvailable();
+    const roverFailed = this.linkFailed(roverStatus, roverOnline, this.roverWasOnline());
+    const baseStationFailed = this.linkFailed(
+      baseStationStatus,
+      baseStationOnline,
+      this.baseStationWasOnline(),
+    );
 
-    if (this.heartbeatMonitor.roverAvailable() && this.heartbeatMonitor.baseStationAvailable()) {
-      return 'normal';
-    }
+    if (roverOnline && baseStationOnline) return 'normal';
+    if (roverFailed && baseStationFailed) return 'critical';
+    if (roverFailed || baseStationFailed) return 'caution';
+    return 'info';
+  });
+  readonly flashing = computed(() => this.checked() && this.tone() === 'info');
 
-    if (roverStatus === 'error' || baseStationStatus === 'error') return 'critical';
-    if (this.roverConnection.isConnecting() || this.baseStationConnection.isConnecting()) return 'info';
-    if (this.checked()) return 'caution';
-    return 'neutral';
+  private readonly onlineHistoryEffect = effect(() => {
+    const checked = this.checked();
+    const roverOnline = this.heartbeatMonitor.roverAvailable();
+    const baseStationOnline = this.heartbeatMonitor.baseStationAvailable();
+
+    untracked(() => {
+      if (!checked) {
+        this.roverWasOnline.set(false);
+        this.baseStationWasOnline.set(false);
+        return;
+      }
+
+      if (roverOnline) this.roverWasOnline.set(true);
+      if (baseStationOnline) this.baseStationWasOnline.set(true);
+    });
   });
 
   setConnected(connected: boolean): void {
@@ -39,7 +65,13 @@ export class RosConnectionButton {
       return;
     }
 
+    this.roverWasOnline.set(false);
+    this.baseStationWasOnline.set(false);
     this.roverConnection.disconnect();
     this.baseStationConnection.disconnect();
+  }
+
+  private linkFailed(status: string, online: boolean, wasOnline: boolean): boolean {
+    return status === 'error' || status === 'disconnected' || (wasOnline && !online);
   }
 }

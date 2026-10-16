@@ -3,7 +3,13 @@
   <button
     type="button"
     role="switch"
-    [class]="'tone-' + tone() + (checked() ? ' active' : '')"
+    [class]="
+      'tone-' +
+      tone() +
+      (checked() ? ' active' : '') +
+      (!checked() && offTone() ? ' toned-off tone-off-' + offTone() : '') +
+      (flashing() ? ' flashing' : '')
+    "
     [attr.aria-checked]="checked()"
     [attr.aria-label]="label()"
     [disabled]="disabled()"
