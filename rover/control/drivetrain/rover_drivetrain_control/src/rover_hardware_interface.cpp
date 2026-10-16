@@ -447,7 +447,7 @@ bool RoverHardwareInterface::parseConfiguration()
 
       long long baud = 0;
       if (!parseInteger(baud_it->second, baud) || baud != 38400) {
-        RCLCPP_ERROR(logger(), "%s must be 38400 for the v0.4 operating point. "
+        RCLCPP_ERROR(logger(), "%s must be 38400 for the current operating point. "
           "Provision ALL controllers with the vendor tool first.", baud_key.c_str());
         return false;
       }
@@ -544,7 +544,7 @@ bool RoverHardwareInterface::parseConfiguration()
     return false;
   }
 
-  // AD-12: there are NO silent defaults for safety-relevant timing.
+  // There are NO silent defaults for safety-relevant timing.
   auto required_timing = [&parameters](const char * key, double & dst) -> bool {
     auto it = parameters.find(key);
     if (it == parameters.end() || !parsePositiveDouble(it->second, dst)) {
@@ -566,7 +566,7 @@ bool RoverHardwareInterface::parseConfiguration()
     return false;
   }
   if (std::abs(timing_.update_hz - 15.0) > 0.01) {
-    RCLCPP_ERROR(logger(), "Version 0.4 requires a 15 Hz drivetrain component rate.");
+    RCLCPP_ERROR(logger(), "The drivetrain component rate must be 15 Hz.");
     return false;
   }
   const auto timing_check = core::validateTiming(timing_);

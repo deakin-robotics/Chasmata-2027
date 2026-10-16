@@ -15,7 +15,7 @@ tool write to a drive outside `ros2_control`.
     Only logged here. `commanded_valid=false` means no command is known.
   - **Measured**: what was read back from the drive (`measured_*`, `raw_*`). Each
     value has its own `*_valid` flag. Converted speed stays NaN with
-    `measured_speed_valid=false` until the register and scaling are verified (AD-23).
+    `measured_speed_valid=false` until the register and scaling are verified.
   - **Communication**: what actually happened on the wire (`last_write_result`,
     `last_read_result`, `last_error_code`, `comm_state`). `RESULT_ACKNOWLEDGED`
     means a valid Modbus reply, **not** that the wheel moved.
@@ -34,6 +34,6 @@ tool write to a drive outside `ros2_control`.
 ## Still to agree
 
 Topic name, publish rate and which node publishes in production need sign-off from
-the GUI team and Forrest (OI-04 / AD-18). Today the only publisher is the
+the GUI team and Forrest. Today the only publisher is the
 diagnostics node, which reports its own read-only probe results; the hardware plugin
 cannot be configured yet, so it publishes nothing.

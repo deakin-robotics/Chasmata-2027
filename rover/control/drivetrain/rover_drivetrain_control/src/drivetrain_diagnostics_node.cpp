@@ -73,7 +73,7 @@ public:
         response->raw_value = result.ok() ? value : 0;
         response->result_code = result.ok() ? 0 : 3;
         response->detail = result.ok() ?
-          "Raw register read ACK (units/scaling and AD-23 bench verification pending)" :
+          "Raw register read ACK (units/scaling and bench verification pending)" :
           "Modbus read failed; inspect transport and configuration";
         recordProbe(request->bus, request->address, request->register_selector, result, value,
           response->detail);

@@ -41,7 +41,7 @@ public:
     std::string joint_name;
     BusId bus{BusId::LEFT};
     std::uint8_t slave_id{0};
-    double gear_ratio{0.0};    // must be configured; currently 50:1 per v0.4
+    double gear_ratio{0.0};    // must be configured; currently expected to be 50:1
     double motor_rpm_limit{0.0};
     bool mirrored{false};
   };

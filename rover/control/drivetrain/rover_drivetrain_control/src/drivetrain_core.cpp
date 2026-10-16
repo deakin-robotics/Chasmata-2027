@@ -17,11 +17,11 @@ ValidationResult validateTiming(const TimingConfig & c)
   }
   const double period_ms = 1000.0 / c.update_hz;
   if (c.worst_bus_cycle_ms > period_ms * 0.5) {
-    return {false, "Worst-case measured bus cycle exceeds the 50% utilization requirement (SR-08)"};
+    return {false, "Worst-case measured bus cycle exceeds the 50% bus utilization limit"};
   }
   // Conservatively allocate two periods to include one missed trigger.
   if (c.upstream_timeout_ms + 2.0 * period_ms + c.stop_wire_budget_ms > c.stop_deadline_ms) {
-    return {false, "Upstream timeout + two cycle periods + bench stop budget exceeds stop deadline (SR-06)"};
+    return {false, "Upstream timeout + two cycle periods + bench stop budget exceeds stop deadline"};
   }
   if (c.late_trigger_ms > 2.0 * period_ms ||
       c.upstream_timeout_ms + c.late_trigger_ms + c.stop_wire_budget_ms > c.stop_deadline_ms) {
@@ -64,7 +64,7 @@ void WheelCycleHealth::finishCycle(bool all_ok) noexcept
   if (missed_cycles < std::numeric_limits<std::uint32_t>::max()) {
     ++missed_cycles;
   }
-  // A failed cycle may keep previously good data valid (AD-15 grace), never grant it.
+  // A failed cycle may keep previously good data valid (one-cycle grace), never grant it.
   valid = valid && missed_cycles < INVALID_AFTER_MISSED_CYCLES;
   lost = missed_cycles >= LOST_AFTER_MISSED_CYCLES;
 }
@@ -75,6 +75,14 @@ bool lateTrigger(std::int64_t prev, std::int64_t now, double allowed_ms) noexcep
     return false;
   }
   return static_cast<double>(now - prev) > allowed_ms * 1000000.0;
+}
+
+bool directCommandFresh(std::int64_t last, std::int64_t now, std::int64_t timeout_ns) noexcept
+{
+  if (last <= 0 || now < last || timeout_ns <= 0) {
+    return false;
+  }
+  return now - last < timeout_ns;
 }
 
 }  // namespace rover_drivetrain_control::core

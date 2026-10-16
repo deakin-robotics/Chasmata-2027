@@ -452,7 +452,7 @@ Bld305sDriver::Result Bld305sDriver::endCycle()
     auto & state = slave_states_[id];
     const bool good = state.success_count_cycle >= MANDATORY_EXCHANGES_PER_CYCLE &&
       !state.exchange_failed_cycle;
-    // Miss counting and the valid/lost decision live in the core (AD-15).
+    // Miss counting and the valid/lost decision live in the core.
     core::WheelCycleHealth health;
     health.missed_cycles = state.consecutive_failures;
     health.valid = state.telemetry_valid;
@@ -496,7 +496,7 @@ void Bld305sDriver::recordTransactionFailureUnlocked(
   if (cycle_active_ && isExpectedCycleSlave(slave_id)) {
     auto & state = slave_states_[slave_id];
     state.exchange_failed_cycle = true;
-    state.skip_remaining_cycle = true;  // AD-14: one wait per failed slave/cycle
+    state.skip_remaining_cycle = true;  // one timeout wait per failed slave per cycle
   }
 }
 

@@ -7,11 +7,13 @@
 -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
   <xacro:macro name="dcr_drivetrain_hardware" params="left_device right_device left_baud right_baud parity data_bits stop_bits update_hz upstream_timeout_ms stop_deadline_ms measured_stop_wire_budget_ms measured_worst_bus_cycle_ms late_trigger_ms fl_id rl_id fr_id rr_id gear_ratio motor_rpm_limit">
-    <ros2_control name="DCRDrivetrain" type="system">
+    <!-- Jazzy reads is_async and rw_rate as attributes of this tag, not as
+         <param>s (hardware_interface 4.48 component_parser). rw_rate must be a
+         positive integer; it runs the hardware at 15 Hz while the controller
+         manager runs faster. -->
+    <ros2_control name="DCRDrivetrain" type="system" is_async="true" rw_rate="${update_hz}">
       <hardware>
         <plugin>rover_drivetrain_control/RoverHardwareInterface</plugin>
-        <param name="is_async">true</param>
-        <param name="rw_rate">${update_hz}</param>
         <param name="left_serial_device">${left_device}</param>
         <param name="right_serial_device">${right_device}</param>
         <param name="left_baud_rate">${left_baud}</param>
