@@ -102,8 +102,7 @@
   }
 }
 
-.empty-state,
-.stream-overlay {
+.empty-state {
   display: grid;
   justify-items: center;
   gap: 0.5rem;
@@ -125,16 +124,6 @@
     margin: 0;
     font-size: 0.8rem;
   }
-}
-
-.stream-overlay {
-  position: absolute;
-  z-index: 1;
-  inset: 0;
-  align-content: center;
-  background: rgb(9 12 16 / 78%);
-  color: #d8dee9;
-  font-size: 0.78rem;
 }
 
 .stream-controls {
