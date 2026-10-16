@@ -13,11 +13,11 @@ browser only.
 ```powershell
 cd basestation
 copy .env.example .env
-# Configure ROVER_HOST and BASESTATION_LAN_IP.
+# Configure ROVER_HOST.
 docker compose -f docker-compose.yml up --build
 ```
 
-Open `http://<BASESTATION_LAN_IP>/driver`, `/arm`, or `/ecam`. The
+Open `http://<base-station-lan-ip>/driver`, `/arm`, or `/ecam`. The
 `basestation.local` address is optional and requires separate name resolution.
 
 ## Local development

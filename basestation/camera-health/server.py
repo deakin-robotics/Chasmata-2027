@@ -11,6 +11,7 @@ CAMERAS = ("front", "gimbal", "arm")
 API_URL = os.environ.get(
     "MEDIAMTX_API_URL", "http://media-gateway:9997/v3/paths/list"
 )
+BIND_HOST = os.environ.get("CAMERA_HEALTH_BIND_HOST", "0.0.0.0")
 ALLOWED_ORIGINS = {
     origin.strip()
     for origin in os.environ.get(
@@ -89,4 +90,4 @@ class CameraHealthHandler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    ThreadingHTTPServer(("0.0.0.0", 9998), CameraHealthHandler).serve_forever()
+    ThreadingHTTPServer((BIND_HOST, 9998), CameraHealthHandler).serve_forever()

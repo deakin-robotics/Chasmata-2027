@@ -1,9 +1,9 @@
 services:
   media-gateway:
     image: bluenviron/mediamtx:1.21.1
+    network_mode: host
     environment:
-      MTX_WEBRTCADDITIONALHOSTS: "${BASESTATION_LAN_IP:-192.168.1.10}"
-      MTX_WEBRTCALLOWORIGINS: "http://basestation.local,http://${BASESTATION_LAN_IP:-192.168.1.10}"
+      MTX_WEBRTCIPSFROMINTERFACES: "yes"
       MTX_PATHS_FRONT_SOURCE: "rtsp://${ROVER_HOST:-192.168.1.20}:8554/front"
       MTX_PATHS_GIMBAL_SOURCE: "rtsp://${ROVER_HOST:-192.168.1.20}:8554/gimbal"
       MTX_PATHS_ARM_SOURCE: "rtsp://${ROVER_HOST:-192.168.1.20}:8554/arm"
@@ -11,18 +11,14 @@ services:
       MTX_AUTHINTERNALUSERS_2_PERMISSIONS_0_ACTION: api
     volumes:
       - ./mediamtx.yml:/mediamtx.yml:ro
-    ports:
-      - "8889:8889"
-      - "8189:8189/udp"
     restart: unless-stopped
 
   camera-health:
     build: ./camera-health
+    network_mode: host
     environment:
-      MEDIAMTX_API_URL: http://media-gateway:9997/v3/paths/list
-      CAMERA_HEALTH_ALLOWED_ORIGINS: "http://basestation.local,http://${BASESTATION_LAN_IP:-192.168.1.10}"
-    ports:
-      - "127.0.0.1:9998:9998"
+      MEDIAMTX_API_URL: http://127.0.0.1:9997/v3/paths/list
+      CAMERA_HEALTH_BIND_HOST: 127.0.0.1
     depends_on:
       - media-gateway
     restart: unless-stopped

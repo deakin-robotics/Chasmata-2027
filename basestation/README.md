@@ -6,21 +6,21 @@ proxy. Driver, Arm, and ECAM stations only need a browser.
 
 ## Start
 
-For a production deployment, configure the static Rover and BaseStation IPs:
+For a production deployment, configure the static Rover IP:
 
 ```bash
 copy .env.example .env
-# Set ROVER_HOST and BASESTATION_LAN_IP in .env.
+# Set ROVER_HOST in .env.
 docker compose -f docker-compose.yml up --build
 ```
 
 Operators then open:
 
 ```text
-http://<BASESTATION_LAN_IP>/
-http://<BASESTATION_LAN_IP>/driver
-http://<BASESTATION_LAN_IP>/arm
-http://<BASESTATION_LAN_IP>/ecam
+http://<base-station-lan-ip>/
+http://<base-station-lan-ip>/driver
+http://<base-station-lan-ip>/arm
+http://<base-station-lan-ip>/ecam
 ```
 
 `basestation.local` is an optional alias when it is provided by separate name

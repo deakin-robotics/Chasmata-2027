@@ -1,22 +1,32 @@
 services:
   camera-health:
-    extends:
-      file: docker-compose.yml
-      service: camera-health
+    build: ./camera-health
     environment:
       MEDIAMTX_API_URL: http://media-gateway:9997/v3/paths/list
       CAMERA_HEALTH_ALLOWED_ORIGINS: 'http://localhost:4200,http://127.0.0.1:4200'
+    ports:
+      - "9998:9998"
+    depends_on:
+      - media-gateway
+    restart: unless-stopped
 
   media-gateway:
-    extends:
-      file: docker-compose.yml
-      service: media-gateway
+    image: bluenviron/mediamtx:1.21.1
     environment:
+      MTX_APIADDRESS: ":9997"
       MTX_WEBRTCADDITIONALHOSTS: "localhost,127.0.0.1"
       MTX_WEBRTCALLOWORIGINS: "http://localhost:4200,http://127.0.0.1:4200"
       MTX_PATHS_FRONT_SOURCE: rtsp://rover-media-gateway:8554/front
       MTX_PATHS_GIMBAL_SOURCE: rtsp://rover-media-gateway:8554/gimbal
       MTX_PATHS_ARM_SOURCE: rtsp://rover-media-gateway:8554/arm
+      MTX_AUTHINTERNALUSERS_2_USER: any
+      MTX_AUTHINTERNALUSERS_2_PERMISSIONS_0_ACTION: api
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml:ro
+    ports:
+      - "8889:8889"
+      - "8189:8189/udp"
+    restart: unless-stopped
     networks:
       default: {}
       local-media: {}

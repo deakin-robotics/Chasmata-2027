@@ -11,19 +11,18 @@ address configuration.
 | `/media/*` | BaseStation MediaMTX `:8889` | WHEP camera signalling |
 | `/camera-health/*` | Camera health `:9998` | Read-only camera readiness |
 
-MediaMTX advertises `BASESTATION_LAN_IP` for WebRTC UDP media on `8189`. Its
-browser origins are generated from that IP, with `basestation.local` also
-permitted when separate name resolution provides the alias.
+MediaMTX uses the BaseStation host network and automatically advertises its
+available interfaces for WebRTC UDP media on `8189`. Operator browsers select
+the reachable BaseStation LAN candidate.
 
 ## Required BaseStation `.env` values
 
 | Variable | Purpose |
 | --- | --- |
 | `ROVER_HOST` | Rover static LAN IP used for Fast DDS discovery, ROSbridge, and MediaMTX RTSP |
-| `BASESTATION_LAN_IP` | BaseStation static LAN IP advertised to browser WebRTC clients |
 
 The trusted club LAN remains HTTP-only for this release. Command owns static
 addresses, firewall access, and radio access between BaseStation and Rover.
-Operator PCs need access only to `http://<BASESTATION_LAN_IP>/` and its
+Operator PCs need access only to `http://<base-station-lan-ip>/` and its
 advertised WebRTC UDP port. The camera-health service is available only through
 the BaseStation web proxy.

@@ -1,6 +1,6 @@
 logLevel: info
 
-rtsp: true
+rtsp: false
 rtspTransports: [tcp]
 rtspAddress: :8554
 
@@ -9,14 +9,15 @@ webrtcEncryption: false
 webrtcAddress: :8889
 webrtcLocalUDPAddress: :8189
 webrtcLocalTCPAddress: ""
-# These development defaults can be overridden through the Compose environment.
+# Local development overrides these values through Compose. Production runs with
+# host networking and discovers the BaseStation interfaces automatically.
 webrtcAllowOrigins: ["http://localhost:4200", "http://127.0.0.1:4200"]
-webrtcIPsFromInterfaces: false
+webrtcIPsFromInterfaces: true
 webrtcAdditionalHosts: ["localhost", "127.0.0.1"]
 
 # Internal API used by the read-only camera-health service.
 api: true
-apiAddress: :9997
+apiAddress: 127.0.0.1:9997
 
 paths:
   front:
