@@ -60,7 +60,7 @@ add_executable(check_drivetrain_plugin src/check_drivetrain_plugin.cpp)
 ament_target_dependencies(check_drivetrain_plugin
   hardware_interface pluginlib)
 
-# AD-24 direct drive: forwards per-wheel speeds to wheel_velocity_controller
+# Direct drive: forwards per-wheel speeds to wheel_velocity_controller
 # (ros2_control), zeros on timeout. Never talks to the drives.
 add_executable(direct_drive_relay src/direct_drive_relay.cpp)
 ament_target_dependencies(direct_drive_relay rclcpp std_msgs)

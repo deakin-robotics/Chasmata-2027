@@ -1,9 +1,9 @@
-"""Drivetrain ros2_control stack with two command sources (AD-24).
+"""Drivetrain ros2_control stack with two command sources.
 
 robot_state_publisher and ros2_control_node with the real RoverHardwareInterface,
 all in the /drivetrain namespace, plus spawners and the direct-drive relay.
 
-The hardware refuses on_configure() until it is verified (AD-16). The controller
+The hardware refuses on_configure() until it is verified. The controller
 manager stays up with the hardware unconfigured, and the spawners that need it
 exit with an error that this launch explains instead of treating it as a crash.
 """
@@ -41,7 +41,7 @@ def _explain_spawner_exit(controller):
             return []
         return [LogInfo(msg=(
             f'[drivetrain] {controller} did not reach its requested state. Expected while '
-            'RoverHardwareInterface refuses on_configure() (AD-16): the hardware stays '
+            'RoverHardwareInterface refuses on_configure(): the hardware stays '
             'unconfigured, so no controller can activate and nothing can move. Check with: '
             f'ros2 control list_hardware_components -c {CONTROLLER_MANAGER}'))]
     return on_exit
@@ -67,7 +67,7 @@ def generate_launch_description():
     ]
 
     return LaunchDescription([
-        # No default on purpose: every hardware value must be supplied explicitly (AD-12).
+        # No default on purpose: every hardware value must be supplied explicitly.
         DeclareLaunchArgument(
             'hardware_config',
             description='YAML file with the drivetrain hardware values; '

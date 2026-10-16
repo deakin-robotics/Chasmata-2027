@@ -1,4 +1,4 @@
-// AD-24 direct drive: a second command source INTO ros2_control, never a path
+// Direct drive: a second command source INTO ros2_control, never a path
 // to the drives. Forwards per-wheel speeds to wheel_velocity_controller and
 // sends zeros once commands stop arriving, because a forward_command_controller
 // otherwise holds its last command indefinitely.

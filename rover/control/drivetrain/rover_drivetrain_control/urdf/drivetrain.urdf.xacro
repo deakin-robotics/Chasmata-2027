@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
-<!-- Minimal drivetrain description for drivetrain.launch.py (AD-24): base_link,
+<!-- Minimal drivetrain description for drivetrain.launch.py: base_link,
      four wheel joints and the real RoverHardwareInterface from
      config/ros2_control_example.xacro. Wheel placement is PLACEHOLDER geometry
      matching config/drivetrain_controllers.yaml; replace both with the team URDF.
-     hardware_config (required) is a YAML file holding every hardware value (AD-12). -->
+     hardware_config (required) is a YAML file holding every hardware value. -->
 <robot name="dcr_drivetrain" xmlns:xacro="http://www.ros.org/wiki/xacro">
   <xacro:include filename="$(find rover_drivetrain_control)/config/ros2_control_example.xacro"/>
 

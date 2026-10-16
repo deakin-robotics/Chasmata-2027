@@ -30,7 +30,7 @@
   <depend>rover_drivetrain_interfaces</depend>
   <depend>std_msgs</depend>
   <exec_depend>launch_ros</exec_depend>
-  <!-- drivetrain.launch.py (AD-24) -->
+  <!-- drivetrain.launch.py (direct drive) -->
   <exec_depend>controller_manager</exec_depend>
   <exec_depend>diff_drive_controller</exec_depend>
   <exec_depend>forward_command_controller</exec_depend>

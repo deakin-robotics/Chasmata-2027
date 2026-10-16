@@ -16,10 +16,10 @@ uint8 DIRECTION_REVERSE=3
 uint8 RESULT_NOT_ATTEMPTED=0   # nothing was sent
 uint8 RESULT_ACKNOWLEDGED=1    # valid Modbus reply received; NOT proof the wheel moved
 uint8 RESULT_FAILED=2          # sent, but no valid reply (see last_error_code)
-uint8 RESULT_SKIPPED=3         # not sent: an earlier exchange this cycle failed (AD-14)
+uint8 RESULT_SKIPPED=3         # not sent: an earlier exchange this cycle failed
 uint8 RESULT_REFUSED=4         # not sent: software gate refused it (e.g. not active)
 
-# Communication health, counted per cycle (AD-15).
+# Communication health, counted per cycle.
 uint8 COMM_UNKNOWN=0
 uint8 COMM_HEALTHY=1
 uint8 COMM_DEGRADED=2
@@ -34,11 +34,11 @@ uint8 address                  # Modbus slave ID, 1..4
 bool commanded_valid           # false: no command known; ignore the fields below
 float64 commanded_speed_rad_s  # meaningless unless commanded_valid; publishers set NaN
 uint8 commanded_direction      # DIRECTION_*
-bool commanded_raw_valid       # false until speed scaling is verified (AD-23)
+bool commanded_raw_valid       # false until speed scaling is verified
 uint16 commanded_raw_speed     # raw value written to the drive's speed register
 
 # --- Measured: read back from the drive. ------------------------------------
-bool measured_speed_valid      # false until register and scaling are verified (AD-23)
+bool measured_speed_valid      # false until register and scaling are verified
 float64 measured_speed_rad_s   # meaningless unless measured_speed_valid; publishers set NaN
 uint8 measured_direction       # DIRECTION_*; UNKNOWN unless measured
 bool measured_raw_speed_valid  # true only when the raw read below was acknowledged

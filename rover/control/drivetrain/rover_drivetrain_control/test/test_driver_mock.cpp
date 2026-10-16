@@ -75,7 +75,7 @@ int main()
   CHECK(driver.telemetryValid(1));
   CHECK(driver.controllerState(1)==Driver::ControllerState::UNKNOWN);
   // After a good cycle: DEGRADED, not LOST, for one and two failed cycles, and
-  // the good data stays valid for exactly one missed cycle (AD-15 grace).
+  // the good data stays valid for exactly one missed cycle (grace period).
   for (int cycle=1;cycle<=2;++cycle) {
     CHECK(driver.beginCycle(1,2).ok());
     fail_one=true;
