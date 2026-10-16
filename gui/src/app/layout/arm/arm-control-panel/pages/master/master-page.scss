@@ -11,7 +11,7 @@
   display: grid;
   align-content: start;
   grid-template-areas:
-    'gamepad ros . base-station camera'
+    'gamepad ros . camera .'
     'gamepad-stem ros-flow . . .'
     'gamepad-flow master . . .'
     'arm-mode arm-mode . law-override clear-faults'
