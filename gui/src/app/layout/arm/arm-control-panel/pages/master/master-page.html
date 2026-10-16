@@ -5,6 +5,20 @@
     [tone]="gamepadStatusTone()"
   />
 
+  <app-status-indicator
+    class="gamepad-copy-two"
+    label="Gamepad"
+    [status]="gamepadStatusLabel()"
+    [tone]="gamepadStatusTone()"
+  />
+
+  <app-status-indicator
+    class="gamepad-copy-three"
+    label="Gamepad"
+    [status]="gamepadStatusLabel()"
+    [tone]="gamepadStatusTone()"
+  />
+
   <app-ros-connection-button class="rover-link" />
 
   <app-control-switch
@@ -17,7 +31,11 @@
 
   <app-control-flow-connector class="gamepad-stem" variant="vertical" [tone]="gamepadFlowTone()" />
 
+  <app-control-flow-connector class="gamepad-stem-copy" variant="vertical" [tone]="gamepadFlowTone()" />
+
   <app-control-flow-connector class="gamepad-flow" variant="top-right" [tone]="gamepadFlowTone()" />
+
+  <app-control-flow-connector class="gamepad-flow-copy" variant="top-left" [tone]="gamepadFlowTone()" />
 
   <app-control-flow-connector class="ros-flow" variant="vertical" [tone]="rosFlowTone()" />
 
