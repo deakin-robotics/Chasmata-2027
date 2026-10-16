@@ -60,6 +60,10 @@ export class ArmControlModeService {
       return 'Connect to ROSbridge before enabling Arm control.';
     }
 
+    if (this.isPosition() && !this.heartbeatMonitor.baseStationAvailable()) {
+      return 'Connect to the BaseStation before enabling Position control.';
+    }
+
     if (this.controlMode.isDriverActive()) {
       return 'Release Driver control before enabling Arm control.';
     }

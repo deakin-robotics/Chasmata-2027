@@ -4,6 +4,7 @@ import { WritableSignal, signal } from '@angular/core';
 import { ArmIkCoordinator } from '../../arm/ik/arm-ik-coordinator';
 import { GamepadInput } from '../../gamepad/gamepad-input';
 import { ArmMode } from '../../fma/fma-state.service';
+import { RosHeartbeatMonitor } from '../../ros/ros-heartbeat-monitor';
 import { GimbalPriorityCommandPublisher } from '../gimbal-priority-command-publisher';
 import { ArmManualControl } from './arm-manual-control';
 import { ArmControlModeService } from './arm-control-mode';
@@ -15,6 +16,8 @@ describe('ArmControlModeService', () => {
   let setOrientationMode: ReturnType<typeof vi.fn>;
   let resynchronizeTargetFromTelemetry: ReturnType<typeof vi.fn>;
   let publishGimbalPriority: ReturnType<typeof vi.fn>;
+  let roverAvailable: WritableSignal<boolean>;
+  let baseStationAvailable: WritableSignal<boolean>;
 
   beforeEach(() => {
     orientationMode = signal<'locked' | 'unlocked'>('unlocked');
@@ -24,6 +27,8 @@ describe('ArmControlModeService', () => {
     });
     resynchronizeTargetFromTelemetry = vi.fn();
     publishGimbalPriority = vi.fn();
+    roverAvailable = signal(true);
+    baseStationAvailable = signal(true);
     TestBed.configureTestingModule({
       providers: [
         {
@@ -39,6 +44,13 @@ describe('ArmControlModeService', () => {
           provide: GimbalPriorityCommandPublisher,
           useValue: { publish: publishGimbalPriority },
         },
+        {
+          provide: RosHeartbeatMonitor,
+          useValue: {
+            roverAvailable: roverAvailable.asReadonly(),
+            baseStationAvailable: baseStationAvailable.asReadonly(),
+          },
+        },
       ],
     });
     service = TestBed.inject(ArmControlModeService);
@@ -48,6 +60,20 @@ describe('ArmControlModeService', () => {
     expect(service.mode()).toBe(ArmMode.Position);
     expect(service.isPosition()).toBe(true);
     expect(service.isManual()).toBe(false);
+  });
+
+  it('requires the BaseStation link before enabling Position control', () => {
+    baseStationAvailable.set(false);
+
+    expect(service.readiness()).toBe(
+      'Connect to the BaseStation before enabling Position control.',
+    );
+
+    service.setMode(ArmMode.Manual);
+
+    expect(service.readiness()).not.toBe(
+      'Connect to the BaseStation before enabling Position control.',
+    );
   });
 
   it('switches between Manual and Position mode', () => {

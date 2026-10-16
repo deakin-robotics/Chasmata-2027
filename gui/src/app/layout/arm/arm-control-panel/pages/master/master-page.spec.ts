@@ -67,13 +67,7 @@ describe('ArmMasterPage', () => {
     expect(button.getAttribute('aria-checked')).toBe('true');
   });
 
-  it('falls back to Manual when created while the BaseStation is unavailable', () => {
-    expect(selectArmMode).toHaveBeenCalledOnce();
-    expect(selectArmMode).toHaveBeenCalledWith(ArmMode.Manual);
-  });
-
   it('falls back to Manual and disables the mode selector until the heartbeat returns', () => {
-    selectArmMode.mockClear();
     roverAvailable.set(true);
     baseStationAvailable.set(true);
     fixture.detectChanges();

@@ -25,7 +25,12 @@
     label="Master Drive"
     [checked]="masterDriveEnabled()"
     [tone]="masterDriveTone"
-    [disabled]="!masterDriveEnabled() && (!gamepadConnected() || !rosConnected())"
+    [disabled]="
+      !masterDriveEnabled() &&
+      (!gamepadConnected() ||
+        !rosConnected() ||
+        (armMode() === ArmMode.Position && !baseStationAvailable()))
+    "
     (checkedChange)="toggleMasterDriveControl($event)"
   />
 
@@ -56,7 +61,4 @@
     (valueChange)="selectArmMode($event)"
   />
 
-  @if (readinessError(); as error) {
-    <p class="control-readiness" role="status">{{ error }}</p>
-  }
 </section>

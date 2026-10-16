@@ -79,7 +79,6 @@ export class DriverMasterPage {
     { label: DriveMode.Velocity, value: DriveMode.Velocity },
   ];
   readonly masterDriveTone: ControlSwitchTone = 'normal';
-  readonly readinessError = this.driverControl.readinessError;
   readonly rosConnected = this.heartbeatMonitor.roverAvailable;
   readonly gamepadConnected = this.gamepad.connected;
   readonly cameraFeedEnabled = this.cameraFeedControl.enabled;
