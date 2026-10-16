@@ -33,7 +33,7 @@ import {
 } from '../../../../../shared/control-mode-selector/control-mode-selector';
 
 type TopologyStatus = {
-  readonly label: 'Off' | 'Connecting' | 'Awaiting' | 'Online' | 'Lost' | 'Error';
+  readonly label: 'Off' | 'Connecting' | 'Awaiting' | 'Online' | 'Lost';
   readonly tone: StatusIndicatorTone;
 };
 
@@ -200,13 +200,13 @@ export class ArmMasterPage {
     wasAvailable: boolean,
   ): TopologyStatus {
     if (connectionStatus === 'disconnected') return { label: 'Off', tone: 'neutral' };
-    if (connectionStatus === 'error') return { label: 'Error', tone: 'critical' };
+    if (connectionStatus === 'error') return { label: 'Lost', tone: 'critical' };
     if (available) return { label: 'Online', tone: 'normal' };
     if (wasAvailable) return { label: 'Lost', tone: 'critical' };
     if (connectionStatus === 'connecting' || connectionStatus === 'reconnecting') {
       return { label: 'Connecting', tone: 'info' };
     }
 
-    return { label: 'Awaiting', tone: 'caution' };
+    return { label: 'Awaiting', tone: 'info' };
   }
 }

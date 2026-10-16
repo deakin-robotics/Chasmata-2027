@@ -17,4 +17,12 @@ describe('StatusIndicator', () => {
     expect(fixture.nativeElement.textContent).toContain('Gamepad');
     expect(fixture.nativeElement.textContent).toContain('Connected');
   });
+
+  it('replaces the dot with a spinner when requested', () => {
+    fixture.componentRef.setInput('spinner', true);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.status-spinner')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.status-dot')).toBeNull();
+  });
 });

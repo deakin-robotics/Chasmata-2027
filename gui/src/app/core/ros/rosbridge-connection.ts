@@ -4,9 +4,7 @@ import { Ros } from 'roslib';
 export type RosConnectionStatus =
   'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error';
 
-const INITIAL_RECONNECT_DELAY_MS = 1_000;
-const MAX_RECONNECT_DELAY_MS = 30_000;
-const MAX_RECONNECT_ATTEMPTS = 5;
+const RECONNECT_DELAY_MS = 3_000;
 
 /** Owns one independent ROSLIB connection to a rosbridge endpoint. */
 @Service()
@@ -138,18 +136,6 @@ export abstract class RosbridgeConnection implements OnDestroy {
   private scheduleReconnect(): void {
     if (!this.allowReconnect || this.reconnectTimer || !this.urlState()) return;
 
-    if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-      this.errorState.set(`Unable to reconnect after ${MAX_RECONNECT_ATTEMPTS} attempts.`);
-      this.allowReconnect = false;
-      this.statusState.set('error');
-      return;
-    }
-
-    const delay = Math.min(
-      INITIAL_RECONNECT_DELAY_MS * 2 ** this.reconnectAttempts,
-      MAX_RECONNECT_DELAY_MS,
-    );
-
     this.statusState.set('reconnecting');
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
@@ -158,7 +144,7 @@ export abstract class RosbridgeConnection implements OnDestroy {
 
       const currentUrl = this.urlState();
       if (currentUrl && this.allowReconnect) this.openConnection(currentUrl, true);
-    }, delay);
+    }, RECONNECT_DELAY_MS);
   }
 
   private disposeClient(): void {

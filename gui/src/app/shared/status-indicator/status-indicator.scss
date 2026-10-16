@@ -36,6 +36,21 @@
   background: currentColor;
 }
 
+.status-spinner {
+  width: 0.45rem;
+  height: 0.45rem;
+  border: 0.1rem solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .tone-info {
   color: var(--dcr-color-info);
 }

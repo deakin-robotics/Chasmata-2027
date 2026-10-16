@@ -10,6 +10,7 @@
     label="Rover"
     [status]="roverTopologyStatus().label"
     [tone]="roverTopologyStatus().tone"
+    [spinner]="roverTopologyStatus().label === 'Lost'"
   />
 
   <app-status-indicator
@@ -17,6 +18,7 @@
     label="Base Station"
     [status]="baseStationTopologyStatus().label"
     [tone]="baseStationTopologyStatus().tone"
+    [spinner]="baseStationTopologyStatus().label === 'Lost'"
   />
 
   <app-ros-connection-button class="rover-link" />

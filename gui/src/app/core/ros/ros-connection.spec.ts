@@ -104,7 +104,7 @@ describe('RosConnection and RosHeartbeatMonitor', () => {
     expect(baseStationConnection.status()).toBe('reconnecting');
     expect(service.status()).toBe('connected');
 
-    vi.advanceTimersByTime(1_000);
+    vi.advanceTimersByTime(3_000);
     TestBed.flushEffects();
     const recoveredClient = baseStationConnection.client()!;
     expect(recoveredClient).not.toBe(failedClient);
@@ -135,7 +135,7 @@ describe('RosConnection and RosHeartbeatMonitor', () => {
     expect(service.status()).toBe('reconnecting');
     expect(baseStationConnection.status()).toBe('connected');
 
-    vi.advanceTimersByTime(1_000);
+    vi.advanceTimersByTime(3_000);
     TestBed.flushEffects();
     const recoveredClient = service.client()!;
     expect(recoveredClient).not.toBe(failedClient);
@@ -147,6 +147,24 @@ describe('RosConnection and RosHeartbeatMonitor', () => {
 
     service.disconnect();
     expect(baseStationConnection.status()).toBe('connected');
+  });
+
+  it('continues retrying a failed Rover socket until it is disconnected', () => {
+    service.connect('localhost:9090');
+    let failedClient = service.client()!;
+
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      failedClient.emit('close', {} as never);
+      TestBed.flushEffects();
+
+      expect(service.status()).toBe('reconnecting');
+      vi.advanceTimersByTime(3_000);
+      TestBed.flushEffects();
+      failedClient = service.client()!;
+    }
+
+    expect(service.status()).toBe('reconnecting');
+    expect(service.reconnectAttempt()).toBe(6);
   });
 
   it('returns to a clean disconnected state', () => {
@@ -267,7 +285,7 @@ describe('RosConnection and RosHeartbeatMonitor', () => {
     expect(heartbeatMonitor.roverAvailable()).toBe(false);
     expect(unsubscribe.mock.contexts).toContain(heartbeats[0].topic);
 
-    vi.advanceTimersByTime(1_000);
+    vi.advanceTimersByTime(3_000);
     TestBed.flushEffects();
     service.client()!.emit('connection', {} as never);
     expect(heartbeatMonitor.roverStatus()).toBe('waiting-for-rover');

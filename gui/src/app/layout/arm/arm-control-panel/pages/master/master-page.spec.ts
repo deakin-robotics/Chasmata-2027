@@ -109,7 +109,7 @@ describe('ArmMasterPage', () => {
     fixture.detectChanges();
     expect(fixture.componentInstance.roverTopologyStatus()).toEqual({
       label: 'Awaiting',
-      tone: 'caution',
+      tone: 'info',
     });
 
     roverAvailable.set(true);
@@ -139,7 +139,7 @@ describe('ArmMasterPage', () => {
     fixture.detectChanges();
     expect(fixture.componentInstance.baseStationTopologyStatus()).toEqual({
       label: 'Awaiting',
-      tone: 'caution',
+      tone: 'info',
     });
 
     baseStationAvailable.set(true);
@@ -159,7 +159,7 @@ describe('ArmMasterPage', () => {
     baseStationConnectionStatus.set('error');
     fixture.detectChanges();
     expect(fixture.componentInstance.baseStationTopologyStatus()).toEqual({
-      label: 'Error',
+      label: 'Lost',
       tone: 'critical',
     });
   });

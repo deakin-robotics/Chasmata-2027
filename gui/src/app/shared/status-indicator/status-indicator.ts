@@ -12,4 +12,5 @@ export class StatusIndicator {
   readonly label = input.required<string>();
   readonly status = input.required<string>();
   readonly tone = input<StatusIndicatorTone>('neutral');
+  readonly spinner = input(false);
 }
