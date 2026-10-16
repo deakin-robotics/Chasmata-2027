@@ -77,4 +77,12 @@ bool lateTrigger(std::int64_t prev, std::int64_t now, double allowed_ms) noexcep
   return static_cast<double>(now - prev) > allowed_ms * 1000000.0;
 }
 
+bool directCommandFresh(std::int64_t last, std::int64_t now, std::int64_t timeout_ns) noexcept
+{
+  if (last <= 0 || now < last || timeout_ns <= 0) {
+    return false;
+  }
+  return now - last < timeout_ns;
+}
+
 }  // namespace rover_drivetrain_control::core

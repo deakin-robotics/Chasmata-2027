@@ -100,6 +100,59 @@ ros2 service call /drivetrain_diagnostics/read_motor_diagnostic \
 
 Selector 1 reads `0x0096`, selector 2 reads `0x00B6`, selector 3 reads `0x00C6`. The response is **raw register counts**, *not* temperature °C, ampere or voltage SI units. Do not connect this probe alongside a controller_manager controlling the same physical serial ports; only one application may own each bus.
 
+## Direct drive without the GUI (AD-24)
+
+`drivetrain.launch.py` starts the drivetrain's own `ros2_control` stack in the `/drivetrain` namespace: `robot_state_publisher`, `ros2_control_node` with the real `RoverHardwareInterface`, the controller spawners, and `direct_drive_relay`. Both ways of driving are command sources **into** `ros2_control`; nothing in this launch writes to a drive directly.
+
+| Mode | Controller | Command topic | State at launch |
+|---|---|---|---|
+| Twist (default) | `diff_drive_controller` | `/drivetrain/diff_drive_controller/cmd_vel` (`geometry_msgs/TwistStamped`) | requested active |
+| Per-wheel | `wheel_velocity_controller` (`forward_command_controller`) | `/drivetrain/direct/wheel_speeds` → `direct_drive_relay` → `/drivetrain/wheel_velocity_controller/commands` | inactive |
+
+Both controllers claim the same four wheel velocity interfaces, so `ros2_control` lets only one of them be active at a time. Both stop the wheels when commands stop for 110 ms: `diff_drive_controller` through `cmd_vel_timeout: 0.11`, and the relay by publishing zeros (`core::directCommandFresh`, unit-tested).
+
+### Launch
+
+Every hardware value must be supplied (AD-12), so `hardware_config` has no default. Copy `config/drivetrain_hardware.example.yaml`, replace every value with the confirmed one, then:
+
+```bash
+ros2 launch rover_drivetrain_control drivetrain.launch.py hardware_config:=/path/to/drivetrain_hardware.yaml
+```
+
+**Today the hardware refuses `on_configure()` (AD-16), so nothing can move.** The controller manager stays up with `DCRDrivetrain` unconfigured (`shutdown_on_initial_state_failure: false`). The `joint_state_broadcaster` and `diff_drive_controller` spawners exit with an error, and the launch logs why. Check the state with:
+
+```bash
+ros2 control list_hardware_components -c /drivetrain/controller_manager
+ros2 control list_controllers -c /drivetrain/controller_manager
+```
+
+`wheel_radius`/`wheel_separation` in `config/drivetrain_controllers.yaml` and the wheel placement in `urdf/drivetrain.urdf.xacro` are **placeholders**.
+
+### Drive with teleop_twist_keyboard (default mode)
+
+```bash
+sudo apt install ros-jazzy-teleop-twist-keyboard
+ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args \
+  -p stamped:=true -r cmd_vel:=/drivetrain/diff_drive_controller/cmd_vel
+```
+
+`stamped:=true` is required: on Jazzy `diff_drive_controller` only accepts `TwistStamped`. Hold a key to keep moving. With a 110 ms timeout the wheels stop between the first key press and the start of keyboard auto-repeat, so expect a short stutter when a key is first pressed. That is the timeout working, not a fault. For real fallback driving, a gamepad via `teleop_twist_joy` keeps publishing while the enable button is held and avoids the keyboard stutter (not set up in this package).
+
+### Switch to per-wheel mode
+
+```bash
+ros2 control switch_controllers -c /drivetrain/controller_manager --strict \
+  --deactivate diff_drive_controller --activate wheel_velocity_controller
+```
+
+Then publish four wheel speeds in rad/s, in the order `[front_left, rear_left, front_right, rear_right]`, at least every 110 ms:
+
+```bash
+ros2 topic pub -r 20 /drivetrain/direct/wheel_speeds std_msgs/msg/Float64MultiArray "{data: [1.0, 1.0, 1.0, 1.0]}"
+```
+
+Right-side mirroring is handled in the hardware interface, so positive values are meant to drive forward on both sides (right-side direction is still unverified, OI-08). The relay rejects a message that does not have exactly four finite values, and sends zeros instead. To return to Twist mode, swap the two controller names in the `switch_controllers` command.
+
 ## Robot-description integration (not a production launch)
 
 `config/ros2_control_example.xacro` shows an explicit parameter contract. It is a **macro/template**, not a standalone URDF or runnable controller manager. Supply the wheel names used by the team's actual CAD-generated URDF and confirm slave-to-wheel mapping with Forrest. The example enables `is_async=true`, `rw_rate=15`; verify their behavior against installed Jazzy. **Do not add a second controller manager to a running shared namespace** until the arm/drivetrain namespace decision OI-15 is accepted.

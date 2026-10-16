@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<!-- Minimal drivetrain description for drivetrain.launch.py (AD-24): base_link,
+     four wheel joints and the real RoverHardwareInterface from
+     config/ros2_control_example.xacro. Wheel placement is PLACEHOLDER geometry
+     matching config/drivetrain_controllers.yaml; replace both with the team URDF.
+     hardware_config (required) is a YAML file holding every hardware value (AD-12). -->
+<robot name="dcr_drivetrain" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:include filename="$(find rover_drivetrain_control)/config/ros2_control_example.xacro"/>
+
+  <xacro:property name="hw" value="${xacro.load_yaml('$(arg hardware_config)')}"/>
+  <xacro:property name="wheel_separation" value="0.5"/>  <!-- m, PLACEHOLDER -->
+  <xacro:property name="wheel_base" value="0.6"/>        <!-- m, PLACEHOLDER -->
+
+  <link name="base_link"/>
+
+  <xacro:macro name="wheel" params="name x y">
+    <link name="${name}_wheel"/>
+    <joint name="${name}_wheel_joint" type="continuous">
+      <parent link="base_link"/>
+      <child link="${name}_wheel"/>
+      <origin xyz="${x} ${y} 0" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:wheel name="front_left" x="${wheel_base / 2}" y="${wheel_separation / 2}"/>
+  <xacro:wheel name="rear_left" x="${-wheel_base / 2}" y="${wheel_separation / 2}"/>
+  <xacro:wheel name="front_right" x="${wheel_base / 2}" y="${-wheel_separation / 2}"/>
+  <xacro:wheel name="rear_right" x="${-wheel_base / 2}" y="${-wheel_separation / 2}"/>
+
+  <xacro:dcr_drivetrain_hardware
+    left_device="${hw['left_device']}" right_device="${hw['right_device']}"
+    left_baud="${hw['left_baud']}" right_baud="${hw['right_baud']}"
+    parity="${hw['parity']}" data_bits="${hw['data_bits']}" stop_bits="${hw['stop_bits']}"
+    update_hz="${hw['update_hz']}" upstream_timeout_ms="${hw['upstream_timeout_ms']}"
+    stop_deadline_ms="${hw['stop_deadline_ms']}"
+    measured_stop_wire_budget_ms="${hw['measured_stop_wire_budget_ms']}"
+    measured_worst_bus_cycle_ms="${hw['measured_worst_bus_cycle_ms']}"
+    late_trigger_ms="${hw['late_trigger_ms']}"
+    fl_id="${hw['fl_id']}" rl_id="${hw['rl_id']}" fr_id="${hw['fr_id']}" rr_id="${hw['rr_id']}"
+    gear_ratio="${hw['gear_ratio']}" motor_rpm_limit="${hw['motor_rpm_limit']}"/>
+</robot>

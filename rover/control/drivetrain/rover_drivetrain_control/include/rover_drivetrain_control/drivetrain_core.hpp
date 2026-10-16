@@ -69,5 +69,15 @@ struct BusCycleHealth
   std::int64_t previous_tick_ns, std::int64_t current_tick_ns,
   double allowed_gap_ms) noexcept;
 
+// AD-24 direct drive; matches diff_drive_controller cmd_vel_timeout (0.11 s).
+inline constexpr std::int64_t DIRECT_DRIVE_COMMAND_TIMEOUT_NS = 110'000'000;
+
+// A direct-drive command is fresh only while strictly younger than the timeout.
+// Never received (<= 0), stamped after now (clock went backwards) and a
+// non-positive timeout all count as stale, so the relay sends zeros (AD-24).
+[[nodiscard]] bool directCommandFresh(
+  std::int64_t last_command_ns, std::int64_t now_ns,
+  std::int64_t timeout_ns) noexcept;
+
 }  // namespace rover_drivetrain_control::core
 #endif

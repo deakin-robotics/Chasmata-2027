@@ -16,6 +16,7 @@ find_package(pluginlib REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 find_package(rover_drivetrain_interfaces REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBMODBUS REQUIRED IMPORTED_TARGET libmodbus)
 
@@ -59,10 +60,16 @@ add_executable(check_drivetrain_plugin src/check_drivetrain_plugin.cpp)
 ament_target_dependencies(check_drivetrain_plugin
   hardware_interface pluginlib)
 
-install(TARGETS drivetrain_diagnostics_node check_drivetrain_plugin
+# AD-24 direct drive: forwards per-wheel speeds to wheel_velocity_controller
+# (ros2_control), zeros on timeout. Never talks to the drives.
+add_executable(direct_drive_relay src/direct_drive_relay.cpp)
+ament_target_dependencies(direct_drive_relay rclcpp std_msgs)
+target_link_libraries(direct_drive_relay ${PROJECT_NAME}_core)
+
+install(TARGETS drivetrain_diagnostics_node check_drivetrain_plugin direct_drive_relay
   DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY include/ DESTINATION include)
-install(DIRECTORY launch config docs DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY launch config docs urdf DESTINATION share/${PROJECT_NAME})
 install(FILES README.md DESTINATION share/${PROJECT_NAME})
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)

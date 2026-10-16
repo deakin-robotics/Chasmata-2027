@@ -28,7 +28,16 @@
   <depend>rclcpp</depend>
   <depend>rclcpp_lifecycle</depend>
   <depend>rover_drivetrain_interfaces</depend>
+  <depend>std_msgs</depend>
   <exec_depend>launch_ros</exec_depend>
+  <!-- drivetrain.launch.py (AD-24) -->
+  <exec_depend>controller_manager</exec_depend>
+  <exec_depend>diff_drive_controller</exec_depend>
+  <exec_depend>forward_command_controller</exec_depend>
+  <exec_depend>joint_state_broadcaster</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>ros2controlcli</exec_depend>
+  <exec_depend>xacro</exec_depend>
   <test_depend>ament_cmake_test</test_depend>
 
   <!--
