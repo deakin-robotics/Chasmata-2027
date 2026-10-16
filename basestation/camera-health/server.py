@@ -2,7 +2,6 @@
 
 import json
 import os
-from base64 import b64encode
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
@@ -12,8 +11,6 @@ CAMERAS = ("front", "gimbal", "arm")
 API_URL = os.environ.get(
     "MEDIAMTX_API_URL", "http://media-gateway:9997/v3/paths/list"
 )
-API_USER = os.environ.get("MEDIAMTX_API_USER", "camera-health")
-API_PASSWORD = os.environ.get("MEDIAMTX_API_PASSWORD", "local-camera-health")
 ALLOWED_ORIGINS = {
     origin.strip()
     for origin in os.environ.get(
@@ -36,8 +33,7 @@ def extract_readiness(payload):
 
 def get_readiness():
     """Query the private MediaMTX API and reduce it to the public status shape."""
-    credential = b64encode(f"{API_USER}:{API_PASSWORD}".encode("utf-8")).decode("ascii")
-    request = Request(API_URL, headers={"Authorization": f"Basic {credential}"})
+    request = Request(API_URL)
     with urlopen(request, timeout=2) as response:
         payload = json.load(response)
     return extract_readiness(payload)

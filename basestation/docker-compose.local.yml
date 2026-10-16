@@ -5,8 +5,6 @@ services:
       service: camera-health
     environment:
       MEDIAMTX_API_URL: http://media-gateway:9997/v3/paths/list
-      MEDIAMTX_API_USER: camera-health
-      MEDIAMTX_API_PASSWORD: "${CAMERA_HEALTH_API_PASSWORD:-local-camera-health}"
       CAMERA_HEALTH_ALLOWED_ORIGINS: 'http://localhost:4200,http://127.0.0.1:4200'
 
   media-gateway:
@@ -31,7 +29,7 @@ services:
     ipc: host
     environment:
       ROS_DISCOVERY_SERVER: 127.0.0.1:11811
-      ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
+      ROS_DOMAIN_ID: "0"
       ROS_LOCALHOST_ONLY: "0"
       RMW_IMPLEMENTATION: rmw_fastrtps_cpp
 
@@ -41,7 +39,7 @@ services:
       service: rosbridge
     environment:
       ROS_DISCOVERY_SERVER: 127.0.0.1:11811
-      ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
+      ROS_DOMAIN_ID: "0"
       ROS_LOCALHOST_ONLY: "0"
       RMW_IMPLEMENTATION: rmw_fastrtps_cpp
 
@@ -51,7 +49,7 @@ services:
       service: ecam-alert-aggregator
     environment:
       ROS_DISCOVERY_SERVER: 127.0.0.1:11811
-      ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
+      ROS_DOMAIN_ID: "0"
       ROS_LOCALHOST_ONLY: "0"
       RMW_IMPLEMENTATION: rmw_fastrtps_cpp
 

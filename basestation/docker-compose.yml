@@ -2,30 +2,27 @@ services:
   media-gateway:
     image: bluenviron/mediamtx:1.21.1
     environment:
-      MTX_WEBRTCADDITIONALHOSTS: "${MEDIA_WEBRTC_ADDITIONAL_HOSTS:-localhost,127.0.0.1}"
-      MTX_WEBRTCALLOWORIGINS: "${MEDIA_WEBRTC_ALLOW_ORIGINS:-http://localhost:4200,http://127.0.0.1:4200}"
-      MTX_PATHS_FRONT_SOURCE: "rtsp://${ROVER_RTSP_HOST:-192.168.1.20}:${ROVER_RTSP_PORT:-8554}/front"
-      MTX_PATHS_GIMBAL_SOURCE: "rtsp://${ROVER_RTSP_HOST:-192.168.1.20}:${ROVER_RTSP_PORT:-8554}/gimbal"
-      MTX_PATHS_ARM_SOURCE: "rtsp://${ROVER_RTSP_HOST:-192.168.1.20}:${ROVER_RTSP_PORT:-8554}/arm"
-      MTX_AUTHINTERNALUSERS_2_USER: camera-health
-      MTX_AUTHINTERNALUSERS_2_PASS: "${CAMERA_HEALTH_API_PASSWORD:-local-camera-health}"
+      MTX_WEBRTCADDITIONALHOSTS: "${BASESTATION_LAN_IP:-192.168.1.10}"
+      MTX_WEBRTCALLOWORIGINS: "http://basestation.local,http://${BASESTATION_LAN_IP:-192.168.1.10}"
+      MTX_PATHS_FRONT_SOURCE: "rtsp://${ROVER_HOST:-192.168.1.20}:8554/front"
+      MTX_PATHS_GIMBAL_SOURCE: "rtsp://${ROVER_HOST:-192.168.1.20}:8554/gimbal"
+      MTX_PATHS_ARM_SOURCE: "rtsp://${ROVER_HOST:-192.168.1.20}:8554/arm"
+      MTX_AUTHINTERNALUSERS_2_USER: any
       MTX_AUTHINTERNALUSERS_2_PERMISSIONS_0_ACTION: api
     volumes:
       - ./mediamtx.yml:/mediamtx.yml:ro
     ports:
-      - "${MEDIA_WEBRTC_PORT:-8889}:8889"
-      - "${MEDIA_WEBRTC_UDP_PORT:-8189}:8189/udp"
+      - "8889:8889"
+      - "8189:8189/udp"
     restart: unless-stopped
 
   camera-health:
     build: ./camera-health
     environment:
       MEDIAMTX_API_URL: http://media-gateway:9997/v3/paths/list
-      MEDIAMTX_API_USER: camera-health
-      MEDIAMTX_API_PASSWORD: "${CAMERA_HEALTH_API_PASSWORD:-local-camera-health}"
-      CAMERA_HEALTH_ALLOWED_ORIGINS: "${MEDIA_WEBRTC_ALLOW_ORIGINS:-http://localhost:4200,http://127.0.0.1:4200}"
+      CAMERA_HEALTH_ALLOWED_ORIGINS: "http://basestation.local,http://${BASESTATION_LAN_IP:-192.168.1.10}"
     ports:
-      - "${CAMERA_HEALTH_PORT:-9998}:9998"
+      - "127.0.0.1:9998:9998"
     depends_on:
       - media-gateway
     restart: unless-stopped
@@ -36,8 +33,7 @@ services:
       dockerfile: basestation/operations-web/Dockerfile
     network_mode: host
     environment:
-      ROVER_ROSBRIDGE_HOST: "${ROVER_ROSBRIDGE_HOST:-rover.local}"
-      ROVER_ROSBRIDGE_PORT: "${ROVER_ROSBRIDGE_PORT:-9090}"
+      ROVER_HOST: "${ROVER_HOST:-192.168.1.20}"
     depends_on:
       - media-gateway
       - camera-health
@@ -51,10 +47,10 @@ services:
     network_mode: host
     ipc: host
     environment:
-      ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
+      ROS_DOMAIN_ID: "0"
       ROS_LOCALHOST_ONLY: "0"
       RMW_IMPLEMENTATION: rmw_fastrtps_cpp
-      ROS_DISCOVERY_SERVER: "${ROVER_DISCOVERY_SERVER:-rover.local:11811}"
+      ROS_DISCOVERY_SERVER: "${ROVER_HOST:-192.168.1.20}:11811"
 
   rosbridge:
     build:
@@ -65,10 +61,10 @@ services:
     command:
       - source /opt/ros/jazzy/setup.bash && source /workspace/install/setup.bash && ros2 run rosbridge_server rosbridge_websocket --ros-args -p port:=9091
     environment:
-      ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
+      ROS_DOMAIN_ID: "0"
       ROS_LOCALHOST_ONLY: "0"
       RMW_IMPLEMENTATION: rmw_fastrtps_cpp
-      ROS_DISCOVERY_SERVER: "${ROVER_DISCOVERY_SERVER:-rover.local:11811}"
+      ROS_DISCOVERY_SERVER: "${ROVER_HOST:-192.168.1.20}:11811"
     restart: unless-stopped
 
   ecam-alert-aggregator:
@@ -80,8 +76,8 @@ services:
     command:
       - source /opt/ros/jazzy/setup.bash && source /workspace/install/setup.bash && ros2 launch ecam_alerts ecam_alert_aggregator.launch.py role:=basestation
     environment:
-      ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
+      ROS_DOMAIN_ID: "0"
       ROS_LOCALHOST_ONLY: "0"
       RMW_IMPLEMENTATION: rmw_fastrtps_cpp
-      ROS_DISCOVERY_SERVER: "${ROVER_DISCOVERY_SERVER:-rover.local:11811}"
+      ROS_DISCOVERY_SERVER: "${ROVER_HOST:-192.168.1.20}:11811"
     restart: unless-stopped
