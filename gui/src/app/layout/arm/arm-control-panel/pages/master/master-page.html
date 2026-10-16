@@ -6,17 +6,17 @@
   />
 
   <app-status-indicator
-    class="gamepad-copy-two"
-    label="Gamepad"
-    [status]="gamepadStatusLabel()"
-    [tone]="gamepadStatusTone()"
+    class="rover-status"
+    label="Rover"
+    [status]="roverTopologyStatus().label"
+    [tone]="roverTopologyStatus().tone"
   />
 
   <app-status-indicator
-    class="gamepad-copy-three"
-    label="Gamepad"
-    [status]="gamepadStatusLabel()"
-    [tone]="gamepadStatusTone()"
+    class="base-station-status"
+    label="Base Station"
+    [status]="baseStationTopologyStatus().label"
+    [tone]="baseStationTopologyStatus().tone"
   />
 
   <app-ros-connection-button class="rover-link" />
@@ -31,13 +31,13 @@
 
   <app-control-flow-connector class="gamepad-stem" variant="vertical" [tone]="gamepadFlowTone()" />
 
-  <app-control-flow-connector class="gamepad-stem-copy" variant="vertical" [tone]="gamepadFlowTone()" />
+  <app-control-flow-connector class="base-station-stem" variant="vertical" [tone]="baseStationFlowTone()" />
 
   <app-control-flow-connector class="gamepad-flow" variant="top-right" [tone]="gamepadFlowTone()" />
 
-  <app-control-flow-connector class="gamepad-flow-copy" variant="top-left" [tone]="gamepadFlowTone()" />
+  <app-control-flow-connector class="base-station-flow" variant="top-left" [tone]="baseStationFlowTone()" />
 
-  <app-control-flow-connector class="ros-flow" variant="vertical" [tone]="rosFlowTone()" />
+  <app-control-flow-connector class="rover-flow" variant="vertical" [tone]="roverFlowTone()" />
 
   <app-control-switch
     label="Master Drive"

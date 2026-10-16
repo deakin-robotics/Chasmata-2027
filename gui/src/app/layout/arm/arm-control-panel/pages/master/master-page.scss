@@ -11,9 +11,9 @@
   display: grid;
   align-content: start;
   grid-template-areas:
-    'ros gamepad gamepad-copy-two gamepad-copy-three'
-    '. gamepad-stem ros-flow gamepad-stem-copy'
-    'camera gamepad-flow master gamepad-flow-copy'
+    'ros gamepad rover-status base-station-status'
+    '. gamepad-stem rover-flow base-station-stem'
+    'camera gamepad-flow master base-station-flow'
     'arm-mode arm-mode law-override clear-faults';
   grid-template-columns: repeat(4, minmax(0, 1fr));
   column-gap: 0.5rem;
@@ -35,21 +35,21 @@ app-status-indicator {
   grid-area: gamepad;
 }
 
-.gamepad-copy-two {
-  grid-area: gamepad-copy-two;
+.rover-status {
+  grid-area: rover-status;
 }
 
-.gamepad-copy-three {
-  grid-area: gamepad-copy-three;
+.base-station-status {
+  grid-area: base-station-status;
 }
 
-.gamepad-stem-copy {
-  grid-area: gamepad-stem-copy;
+.base-station-stem {
+  grid-area: base-station-stem;
   justify-self: center;
 }
 
-.gamepad-flow-copy {
-  grid-area: gamepad-flow-copy;
+.base-station-flow {
+  grid-area: base-station-flow;
   justify-self: center;
 }
 
@@ -89,8 +89,8 @@ app-ros-connection-button {
   justify-self: center;
 }
 
-.ros-flow {
-  grid-area: ros-flow;
+.rover-flow {
+  grid-area: rover-flow;
 }
 
 app-control-switch {
