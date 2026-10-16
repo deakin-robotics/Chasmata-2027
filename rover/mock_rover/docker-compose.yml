@@ -1,16 +1,10 @@
 services:
   media-gateway:
     image: bluenviron/mediamtx:1.21.1
-    environment:
-      MTX_WEBRTCADDITIONALHOSTS: "${ROVER_MEDIA_WEBRTC_ADDITIONAL_HOSTS:-localhost,127.0.0.1}"
-      MTX_WEBRTCALLOWORIGINS: "${MEDIA_WEBRTC_ALLOW_ORIGINS:-http://localhost:4200,http://127.0.0.1:4200}"
-      MTX_WEBRTCLOCALUDPADDRESS: :8190
     volumes:
       - ./mediamtx.yml:/mediamtx.yml:ro
     ports:
       - "8555:8554"
-      - "8890:8889"
-      - "8190:8190/udp"
     networks:
       default: {}
       local-media:

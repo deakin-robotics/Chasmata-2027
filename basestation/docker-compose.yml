@@ -30,6 +30,20 @@ services:
       - media-gateway
     restart: unless-stopped
 
+  operations-web:
+    build:
+      context: ..
+      dockerfile: basestation/operations-web/Dockerfile
+    network_mode: host
+    environment:
+      ROVER_ROSBRIDGE_HOST: "${ROVER_ROSBRIDGE_HOST:-rover.local}"
+      ROVER_ROSBRIDGE_PORT: "${ROVER_ROSBRIDGE_PORT:-9090}"
+    depends_on:
+      - media-gateway
+      - camera-health
+      - rosbridge
+    restart: unless-stopped
+
   moveit2:
     build:
       context: ..

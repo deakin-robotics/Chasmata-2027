@@ -44,8 +44,7 @@ describe('ArmMasterPage', () => {
 
   it('should render the Master page controls', () => {
     expect(fixture.nativeElement.textContent).toContain('Master Drive');
-    expect(fixture.nativeElement.textContent).toContain('Rover Link');
-    expect(fixture.nativeElement.textContent).toContain('BaseStation Link');
+    expect(fixture.nativeElement.textContent).toContain('ROS Link');
     expect(fixture.nativeElement.textContent).toContain('Camera Link');
     expect(
       fixture.nativeElement.querySelector('.camera-feed button').getAttribute('aria-checked'),

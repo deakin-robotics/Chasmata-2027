@@ -1,80 +1,46 @@
-# Base station
+# BaseStation operations appliance
 
-The base station provides these services for rover operators:
-
-- MoveIt 2 planning for Arm Position/IK mode.
-- ROSbridge access to BaseStation heartbeat and shared ECAM telemetry on port
-  `9091`.
-- MediaMTX camera playback for Driver and Arm browsers.
-
-It does not run the rover or the GUI. The rover and base-station stacks can be
-started independently.
+The BaseStation hosts the operations GUI and all BaseStation services: MoveIt,
+BaseStation ROSbridge, ECAM aggregation, MediaMTX, camera health, and the web
+proxy. Driver, Arm, and ECAM stations only need a browser.
 
 ## Start
 
-For local Windows development, enable Docker Desktop host networking in
-`Settings > Resources > Network > Enable host networking` (Docker Desktop 4.34
-or newer). Create the shared local camera network once:
-
-```bash
-docker network create chasmata-local-media
-```
-
-Then start this stack and the mock-rover stack in either order:
-
-```bash
-docker compose -f docker-compose.local.yml up --build
-```
-
-For the production-shaped stack, configure the static LAN addresses:
+For a production deployment, configure the static Rover and BaseStation values:
 
 ```bash
 copy .env.example .env
-# Edit .env with the rover and base-station static LAN IPs.
+# Set the Rover static IP and the BaseStation LAN IP in .env.
 docker compose -f docker-compose.yml up --build
 ```
 
-## Guides
+Operators then open:
 
-- [Arm MoveIt planning](docs/arm-moveit.md) — packages, Position/IK flow,
-  orientation modes, demos, and current safety boundary.
-- [Media gateway](docs/media-gateway.md) — rover RTSP input, browser playback,
-  ports, and MediaMTX configuration.
-- [Networking](docs/networking.md) — local mock setup, rover LAN setup, names,
-  and Command-team configuration.
-
-## Operator and rover connections
-
-### Controls and arm planning
-
-```mermaid
-flowchart LR
-    driver["Driver GUI"] <-->|"controls and telemetry\nrover.local :9090"| rover["Rover ROSbridge"]
-    arm["Arm GUI"] <-->|"controls, IK, and rover telemetry\nrover.local :9090"| rover
-    driver <-->|"shared ECAM telemetry\nbasestation.local :9091"| baseBridge["BaseStation ROSbridge"]
-    arm <-->|"shared ECAM telemetry\nbasestation.local :9091"| baseBridge
-    rover <-->|"arm planning and trajectories"| moveit["MoveIt + arm bridge\nBase-station PC"]
-    baseBridge <-->|"shared ROS 2 graph"| rover
+```text
+http://basestation.local/
+http://basestation.local/driver
+http://basestation.local/arm
+http://basestation.local/ecam
 ```
 
-### Camera video
+If local name resolution is unavailable, use the documented fixed BaseStation
+LAN IP in place of `basestation.local`.
 
-```mermaid
-flowchart LR
-    cameras["Rover cameras"] -->|"RTSP publish :8554"| roverMedia["MediaMTX\nRover PC"]
-    roverMedia -->|"RTSP media :8554\n(base gateway pulls)"| baseMedia["MediaMTX\nBase-station PC"]
-    baseMedia -->|"Primary WHEP :8889\nvideo UDP :8189"| driver["Driver GUI"]
-    baseMedia -->|"Primary WHEP :8889\nvideo UDP :8189"| arm["Arm GUI"]
-    roverMedia -->|"Fallback WHEP :8889\nvideo UDP :8189"| driver
-    roverMedia -->|"Fallback WHEP :8889\nvideo UDP :8189"| arm
-    driver -->|"Read-only status :9998"| health["Camera readiness\nBase station"]
-    arm -->|"Read-only status :9998"| health
-    health -->|"Private path check :9997"| api["MediaMTX API"]
+## Architecture
+
+```text
+operator browser -> BaseStation operations web -> Rover ROSbridge
+                                           -> BaseStation ROSbridge
+                                           -> BaseStation MediaMTX
+Rover cameras -> Rover MediaMTX -> BaseStation MediaMTX -> operator browser
 ```
 
-The Driver and Arm GUIs connect directly to the rover for controls, IK, rover
-heartbeat, and FMA telemetry. They also connect to BaseStation ROSbridge for
-BaseStation heartbeat and shared ECAM telemetry. Both bridges join the same ROS
-2 graph. Camera video normally comes through base-station MediaMTX; eligible
-tiles can switch directly to rover MediaMTX if the base gateway is unavailable.
-MoveIt handles Arm Position/IK planning.
+The single **ROS Link** control opens the fixed Rover and BaseStation links.
+operators do not configure endpoints. Rover controls, heartbeat, FMA, and
+Manual arm operation remain on the Rover link. BaseStation services provide
+MoveIt Position mode and shared ECAM state.
+
+BaseStation MediaMTX is the sole browser-facing camera gateway. It pulls the
+three Rover MediaMTX paths once, then serves operator WebRTC sessions locally.
+
+See [networking](docs/networking.md) for LAN ports and configuration values.

@@ -183,7 +183,11 @@ export abstract class RosbridgeConnection implements OnDestroy {
     const trimmedValue = value.trim();
     if (!trimmedValue) throw new Error('A ROSbridge URL is required.');
 
-    const candidate = /^wss?:\/\//i.test(trimmedValue) ? trimmedValue : `ws://${trimmedValue}`;
+    const candidate = trimmedValue.startsWith('/')
+      ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}${trimmedValue}`
+      : /^wss?:\/\//i.test(trimmedValue)
+        ? trimmedValue
+        : `ws://${trimmedValue}`;
     const parsedUrl = new URL(candidate);
 
     if (!['ws:', 'wss:'].includes(parsedUrl.protocol)) {

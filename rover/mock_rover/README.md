@@ -15,11 +15,8 @@ docker compose up --build
 The Compose stack runs the mock node, the Rover-primary ECAM snapshot
 aggregator, and ROSbridge on port `9090`, a rover-side
 discovery service on UDP port `11811`, rover MediaMTX, and three synthetic
-H.264 RTSP publishers. Connect the GUI normally to:
-
-```text
-ws://localhost:9090
-```
+H.264 RTSP publishers. The BaseStation stack consumes ROSbridge and camera
+streams. The hosted operator GUI connects through the BaseStation web proxy.
 
 The mock rover and base-station stacks can start in either order. The mock
 rover ROS services use host networking, so the base station can reach the
@@ -50,12 +47,9 @@ The mock rover's local gateway ports are:
 | Purpose                             | Host port  |
 | ----------------------------------- | ---------- |
 | RTSP published host port for local testing | TCP `8555` |
-| Fallback WHEP playback              | TCP `8890` |
-| Fallback WebRTC media               | UDP `8190` |
 
-The production rover gateway uses RTSP `8554`, WHEP `8889`, and ICE UDP `8189`.
-Set its WebRTC advertised host to the rover's LAN IP and permit the operator
-GUI origins before using direct fallback on the real rover.
+The production rover gateway publishes RTSP on `8554` for the BaseStation
+MediaMTX pulls.
 
 To publish synthetic feeds to a differently named rover-gateway service, set
 `MEDIA_GATEWAY_HOST` and `MEDIA_GATEWAY_RTSP_PORT`:
@@ -63,17 +57,6 @@ To publish synthetic feeds to a differently named rover-gateway service, set
 ```bash
 MEDIA_GATEWAY_HOST=media-gateway MEDIA_GATEWAY_RTSP_PORT=8554 docker compose up --build
 ```
-
-The GUI dashboards use these WHEP camera feeds automatically:
-
-```text
-Front camera:  http://localhost:8889/front/whep
-Arm camera:    http://localhost:8889/arm/whep
-Gimbal camera: http://localhost:8889/gimbal/whep
-```
-
-These are the primary base-station endpoints. The local rover fallback
-endpoints use `http://localhost:8890/{front,gimbal,arm}/whep`.
 
 The default synthetic profile is 1280×720 at 30 FPS using H.264. Override it
 with `MEDIA_WIDTH`, `MEDIA_HEIGHT`, `MEDIA_FPS`, `MEDIA_BITRATE_KBPS`,
@@ -113,7 +96,7 @@ with `MEDIA_WIDTH`, `MEDIA_HEIGHT`, `MEDIA_FPS`, `MEDIA_BITRATE_KBPS`,
 - Publishes actual arm state on `/arm/joint_states` at 10 Hz.
 - Publishes distinct synthetic H.264 RTSP feeds to rover MediaMTX's `front`,
   `gimbal`, and `arm` paths. Base-station MediaMTX pulls the same paths for
-  normal browser playback.
+  browser playback through the hosted BaseStation GUI.
 
 The default joint names match the current GUI URDF:
 

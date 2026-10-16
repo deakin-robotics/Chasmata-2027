@@ -4,7 +4,23 @@ Software and operator-interface development for the Deakin Competitive Robotics 
 
 The project is under active development. The current focus is a browser-based Mission Control interface alongside rover-side software and documentation.
 
-## Local full-stack test
+## Operations deployment
+
+The BaseStation PC is the operations appliance. It runs the GUI, ROSbridge,
+MoveIt, ECAM services, and camera gateway. Driver, Arm, and ECAM PCs open a
+browser only.
+
+```powershell
+cd basestation
+copy .env.example .env
+# Configure the Rover and BaseStation static LAN addresses.
+docker compose -f docker-compose.yml up --build
+```
+
+Open `http://basestation.local/driver`, `/arm`, or `/ecam`. Use the documented
+BaseStation fixed IP if `basestation.local` cannot be resolved.
+
+## Local development
 
 Create the shared camera network once:
 

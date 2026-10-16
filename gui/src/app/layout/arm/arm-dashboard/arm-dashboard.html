@@ -5,7 +5,6 @@
     <app-camera-stream
       label="Front camera"
       [source]="frontCamera"
-      [allowRoverFallback]="false"
       [enabled]="cameraFeedControl.enabled()"
     />
   </section>
@@ -15,7 +14,6 @@
       class="arm-camera"
       label="Arm camera"
       [source]="armCamera"
-      [allowRoverFallback]="true"
       [enabled]="cameraFeedControl.enabled()"
     />
 
@@ -23,7 +21,6 @@
       class="gimbal-camera"
       label="Gimbal camera"
       [source]="gimbalCamera"
-      [allowRoverFallback]="true"
       [enabled]="cameraFeedControl.enabled()"
     />
   </section>

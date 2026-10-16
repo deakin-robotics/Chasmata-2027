@@ -6,11 +6,9 @@ export interface CameraSource {
   readonly id: CameraId;
   readonly label: string;
   readonly whepUrl: string;
-  readonly roverWhepUrl: string;
 }
 
 export const CAMERA_GATEWAY_URL = environment.cameraGatewayUrl;
-export const ROVER_CAMERA_GATEWAY_URL = environment.roverCameraGatewayUrl;
 export const CAMERA_HEALTH_URL = environment.cameraHealthUrl;
 
 export const CAMERA_SOURCES: Readonly<Record<CameraId, CameraSource>> = {
@@ -18,18 +16,15 @@ export const CAMERA_SOURCES: Readonly<Record<CameraId, CameraSource>> = {
     id: 'front',
     label: 'Front camera',
     whepUrl: `${CAMERA_GATEWAY_URL}/front/whep`,
-    roverWhepUrl: `${ROVER_CAMERA_GATEWAY_URL}/front/whep`,
   },
   gimbal: {
     id: 'gimbal',
     label: 'Gimbal camera',
     whepUrl: `${CAMERA_GATEWAY_URL}/gimbal/whep`,
-    roverWhepUrl: `${ROVER_CAMERA_GATEWAY_URL}/gimbal/whep`,
   },
   arm: {
     id: 'arm',
     label: 'Arm camera',
     whepUrl: `${CAMERA_GATEWAY_URL}/arm/whep`,
-    roverWhepUrl: `${ROVER_CAMERA_GATEWAY_URL}/arm/whep`,
   },
 };

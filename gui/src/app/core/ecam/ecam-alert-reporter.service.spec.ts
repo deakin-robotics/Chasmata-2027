@@ -80,12 +80,9 @@ describe('EcamAlertReporterService', () => {
 
   it('exposes catalogue procedures and severity through local alerts', () => {
     service.raise('DRIVE_CONTROLLER_OFFLINE');
-    service.raise('CAMERA_ROVER_FALLBACK_ACTIVE');
 
     expect(service.localAlerts().find((alert) => alert.code === 'DRIVE_CONTROLLER_OFFLINE')?.procedure)
       .toEqual(expect.objectContaining({ steps: expect.any(Array) }));
-    expect(service.localAlerts().find((alert) => alert.code === 'CAMERA_ROVER_FALLBACK_ACTIVE'))
-      .toEqual(expect.objectContaining({ severity: 'warning', text: 'ROVER CAMERA FALLBACK ACTIVE' }));
   });
 
   it('publishes the source identity for Driver and Arm routes', () => {
