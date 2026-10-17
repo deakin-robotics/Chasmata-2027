@@ -116,6 +116,7 @@ describe('ArmMasterPage', () => {
       label: 'Connecting',
       tone: 'info',
     });
+    expect(fixture.nativeElement.querySelector('.rover-status .status-spinner')).toBeTruthy();
 
     roverConnectionStatus.set('connected');
     fixture.detectChanges();
@@ -123,6 +124,7 @@ describe('ArmMasterPage', () => {
       label: 'Awaiting',
       tone: 'info',
     });
+    expect(fixture.nativeElement.querySelector('.rover-status .status-spinner')).toBeTruthy();
 
     roverAvailable.set(true);
     roverWasAvailable.set(true);
@@ -213,6 +215,7 @@ describe('ArmMasterPage', () => {
       label: 'Awaiting',
       tone: 'info',
     });
+    expect(fixture.nativeElement.querySelector('.base-station-status .status-spinner')).toBeTruthy();
 
     baseStationAvailable.set(true);
     baseStationWasAvailable.set(true);

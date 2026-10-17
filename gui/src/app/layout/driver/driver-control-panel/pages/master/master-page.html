@@ -10,7 +10,7 @@
     label="Rover"
     [status]="roverTopologyStatus().label"
     [tone]="roverTopologyStatus().tone"
-    [spinner]="roverTopologyStatus().label === 'Lost'"
+    [spinner]="roverTopologyStatus().label !== 'Off' && roverTopologyStatus().label !== 'Online'"
   />
 
   <app-ros-connection-button class="rover-link" />

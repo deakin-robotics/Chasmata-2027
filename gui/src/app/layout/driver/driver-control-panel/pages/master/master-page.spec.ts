@@ -119,10 +119,12 @@ describe('DriverMasterPage', () => {
     roverConnectionStatus.set('connecting');
     fixture.detectChanges();
     expect(component.roverTopologyStatus()).toEqual({ label: 'Connecting', tone: 'info' });
+    expect(fixture.nativeElement.querySelector('.rover-status .status-spinner')).toBeTruthy();
 
     roverConnectionStatus.set('connected');
     fixture.detectChanges();
     expect(component.roverTopologyStatus()).toEqual({ label: 'Awaiting', tone: 'info' });
+    expect(fixture.nativeElement.querySelector('.rover-status .status-spinner')).toBeTruthy();
 
     roverAvailable.set(true);
     roverWasAvailable.set(true);
