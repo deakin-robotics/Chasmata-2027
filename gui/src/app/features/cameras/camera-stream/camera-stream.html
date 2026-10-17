@@ -1,94 +1,9 @@
 <section class="camera-stream" [attr.data-status]="status()">
-  <header class="stream-header">
-    <h2>{{ label }}</h2>
-    <span class="status" [attr.data-status]="status()" aria-live="polite">
-      <mat-icon aria-hidden="true" [class.spinning]="isConnecting()">{{ statusIcon() }}</mat-icon>
-      {{ statusLabel() }}
-    </span>
-  </header>
-
+  <header class="stream-header"><h2>{{ label }}</h2><span class="status" [attr.data-status]="status()" aria-live="polite"><mat-icon aria-hidden="true" [class.spinning]="isConnecting()">{{ statusIcon() }}</mat-icon>{{ statusLabel() }}</span></header>
   <div #streamFrame class="stream-frame" [class.fullscreen]="isFullscreen()">
-    @if (source) {
-      <video
-        #baseVideo
-        class="stream-video"
-        [class.active]="activeGateway() === 'base'"
-        [attr.aria-hidden]="activeGateway() === 'base' ? null : 'true'"
-        autoplay
-        muted
-        playsinline
-        [attr.aria-label]="activeGateway() === 'base' ? label + ' live feed' : null"
-        [style.transform]="'rotate(' + rotation() + 'deg)'"
-      ></video>
-      <video
-        #roverVideo
-        class="stream-video"
-        [class.active]="activeGateway() === 'rover'"
-        [attr.aria-hidden]="activeGateway() === 'rover' ? null : 'true'"
-        autoplay
-        muted
-        playsinline
-        [attr.aria-label]="activeGateway() === 'rover' ? label + ' live feed' : null"
-        [style.transform]="'rotate(' + rotation() + 'deg)'"
-      ></video>
-    } @else {
-      <div class="empty-state">
-        <mat-icon aria-hidden="true">videocam_off</mat-icon>
-        <p>No camera source configured</p>
-      </div>
-    }
-
-    @if (isConnecting()) {
-      <div class="stream-overlay" aria-live="polite">
-        <mat-icon class="spinning" aria-hidden="true">sync</mat-icon>
-        <span>
-          @if (status() === 'reconnecting') {
-            Reconnecting — attempt {{ retryAttempt() }}
-          } @else {
-            Connecting to camera…
-          }
-        </span>
-      </div>
-    }
-
-    <div class="stream-controls">
-      <button
-        matIconButton
-        type="button"
-        aria-label="Rotate camera left"
-        (click)="rotateCounterClockwise()"
-      >
-        <mat-icon>rotate_left</mat-icon>
-      </button>
-      <button
-        matIconButton
-        type="button"
-        aria-label="Rotate camera right"
-        (click)="rotateClockwise()"
-      >
-        <mat-icon>rotate_right</mat-icon>
-      </button>
-      <button
-        matIconButton
-        type="button"
-        [attr.aria-label]="isFullscreen() ? 'Exit fullscreen' : 'View camera fullscreen'"
-        (click)="toggleFullscreen()"
-      >
-        <mat-icon>{{ isFullscreen() ? 'fullscreen_exit' : 'fullscreen' }}</mat-icon>
-      </button>
-    </div>
-
-    @if (status() === 'unavailable' || status() === 'off') {
-      <app-unavailable-overlay
-        [label]="status() === 'off' ? label + ' feed off' : label + ' stream unavailable'"
-      />
-    }
+    @if (source) { <video #video class="stream-video active" autoplay muted playsinline [attr.aria-label]="label + ' live feed'" [style.transform]="'rotate(' + rotation() + 'deg)'"></video> } @else { <div class="empty-state"><mat-icon aria-hidden="true">videocam_off</mat-icon><p>No camera source configured</p></div> }
+    @if (streamUnavailable() || status() === 'off') { <app-unavailable-overlay [label]="label + ' feed unavailable'" /> }
+    <div class="stream-controls"><button matIconButton type="button" aria-label="Rotate camera left" (click)="rotateCounterClockwise()"><mat-icon>rotate_left</mat-icon></button><button matIconButton type="button" aria-label="Rotate camera right" (click)="rotateClockwise()"><mat-icon>rotate_right</mat-icon></button><button matIconButton type="button" [attr.aria-label]="isFullscreen() ? 'Exit fullscreen' : 'View camera fullscreen'" (click)="toggleFullscreen()"><mat-icon>{{ isFullscreen() ? 'fullscreen_exit' : 'fullscreen' }}</mat-icon></button></div>
   </div>
-
-  @if (status() === 'error') {
-    <footer class="stream-error">
-      <span>Automatic recovery stopped after {{ retryAttempt() }} retries.</span>
-      <button matButton="outlined" type="button" (click)="retry()">Retry</button>
-    </footer>
-  }
+  @if (status() === 'error') { <footer class="stream-error"><span>Automatic recovery stopped after {{ retryAttempt() }} retries.</span><button matButton="outlined" type="button" (click)="retry()">Retry</button></footer> }
 </section>

@@ -25,19 +25,15 @@ describe('DriverDashboard', () => {
     expect(fixture.nativeElement.textContent).toContain('Gimbal camera');
   });
 
-  it('allows rover fallback for Front and Gimbal, but not Arm', () => {
+  it('configures the three BaseStation camera feeds', () => {
     const policies = fixture.debugElement
       .queryAll(By.directive(CameraStream))
       .map(({ componentInstance }) => {
         const camera = componentInstance as CameraStream;
-        return [camera.label, camera.allowRoverFallback];
+        return camera.label;
       });
 
-    expect(policies).toEqual([
-      ['Arm camera', false],
-      ['Front camera', true],
-      ['Gimbal camera', true],
-    ]);
+    expect(policies).toEqual(['Arm camera', 'Front camera', 'Gimbal camera']);
   });
 
   it('uses the Camera Link switch to toggle all three dashboard tiles together', () => {

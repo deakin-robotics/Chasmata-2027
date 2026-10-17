@@ -12,6 +12,8 @@ export class ControlSwitch {
   readonly label = input.required<string>();
   readonly checked = input(false);
   readonly tone = input<ControlSwitchTone>('info');
+  readonly offTone = input<ControlSwitchTone | null>(null);
+  readonly flashing = input(false);
   readonly disabled = input(false);
   readonly checkedChange = output<boolean>();
 

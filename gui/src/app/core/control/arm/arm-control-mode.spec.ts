@@ -4,6 +4,7 @@ import { WritableSignal, signal } from '@angular/core';
 import { ArmIkCoordinator } from '../../arm/ik/arm-ik-coordinator';
 import { GamepadInput } from '../../gamepad/gamepad-input';
 import { ArmMode } from '../../fma/fma-state.service';
+import { RosHeartbeatMonitor } from '../../ros/ros-heartbeat-monitor';
 import { GimbalPriorityCommandPublisher } from '../gimbal-priority-command-publisher';
 import { ArmManualControl } from './arm-manual-control';
 import { ArmControlModeService } from './arm-control-mode';
@@ -15,6 +16,8 @@ describe('ArmControlModeService', () => {
   let setOrientationMode: ReturnType<typeof vi.fn>;
   let resynchronizeTargetFromTelemetry: ReturnType<typeof vi.fn>;
   let publishGimbalPriority: ReturnType<typeof vi.fn>;
+  let roverAvailable: WritableSignal<boolean>;
+  let baseStationAvailable: WritableSignal<boolean>;
 
   beforeEach(() => {
     orientationMode = signal<'locked' | 'unlocked'>('unlocked');
@@ -24,6 +27,8 @@ describe('ArmControlModeService', () => {
     });
     resynchronizeTargetFromTelemetry = vi.fn();
     publishGimbalPriority = vi.fn();
+    roverAvailable = signal(true);
+    baseStationAvailable = signal(true);
     TestBed.configureTestingModule({
       providers: [
         {
@@ -39,15 +44,37 @@ describe('ArmControlModeService', () => {
           provide: GimbalPriorityCommandPublisher,
           useValue: { publish: publishGimbalPriority },
         },
+        {
+          provide: RosHeartbeatMonitor,
+          useValue: {
+            roverAvailable: roverAvailable.asReadonly(),
+            baseStationAvailable: baseStationAvailable.asReadonly(),
+          },
+        },
       ],
     });
     service = TestBed.inject(ArmControlModeService);
   });
 
-  it('starts in Position mode', () => {
-    expect(service.mode()).toBe(ArmMode.Position);
-    expect(service.isPosition()).toBe(true);
-    expect(service.isManual()).toBe(false);
+  it('starts in Manual mode', () => {
+    expect(service.mode()).toBe(ArmMode.Manual);
+    expect(service.isPosition()).toBe(false);
+    expect(service.isManual()).toBe(true);
+  });
+
+  it('requires the BaseStation link before enabling Position control', () => {
+    baseStationAvailable.set(false);
+    service.setMode(ArmMode.Position);
+
+    expect(service.readiness()).toBe(
+      'Connect to the BaseStation before enabling Position control.',
+    );
+
+    service.setMode(ArmMode.Manual);
+
+    expect(service.readiness()).not.toBe(
+      'Connect to the BaseStation before enabling Position control.',
+    );
   });
 
   it('switches between Manual and Position mode', () => {
@@ -66,11 +93,11 @@ describe('ArmControlModeService', () => {
   });
 
   it('selects the matching control worker', () => {
-    expect(service.selectedControl()).toBe(TestBed.inject(ArmPositionControl));
-
-    service.setMode(ArmMode.Manual);
-
     expect(service.selectedControl()).toBe(TestBed.inject(ArmManualControl));
+
+    service.setMode(ArmMode.Position);
+
+    expect(service.selectedControl()).toBe(TestBed.inject(ArmPositionControl));
   });
 
   it('routes input to the handler selected by the current mode', () => {
@@ -79,12 +106,12 @@ describe('ArmControlModeService', () => {
     const position = vi.spyOn(TestBed.inject(ArmPositionControl), 'handle');
 
     service.route(snapshot);
-    expect(position).toHaveBeenCalledWith(snapshot);
-    expect(manual).not.toHaveBeenCalled();
-
-    service.setMode(ArmMode.Manual);
-    service.route(snapshot);
     expect(manual).toHaveBeenCalledWith(snapshot);
+    expect(position).not.toHaveBeenCalled();
+
+    service.setMode(ArmMode.Position);
+    service.route(snapshot);
+    expect(position).toHaveBeenCalledWith(snapshot);
   });
 
   it('keeps the gamepad monitor active when Arm control is disabled', () => {
@@ -102,6 +129,8 @@ describe('ArmControlModeService', () => {
       buttons: Array.from({ length: 16 }, (_, index) => (index === 10 ? 1 : 0)),
     };
     const released = { axes: [0, 0, 0, 0], buttons: Array.from({ length: 16 }, () => 0) };
+
+    service.setMode(ArmMode.Position);
 
     service.route(pressed);
     service.route(pressed);

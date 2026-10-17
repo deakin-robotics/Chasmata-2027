@@ -1,7 +1,8 @@
-<app-action-button
-  [label]="label()"
-  [actionLabel]="actionLabel()"
+<app-control-switch
+  [label]="label"
+  [checked]="checked()"
   [tone]="tone()"
-  [busy]="busy()"
-  (pressed)="openSettings()"
+  offTone="info"
+  [flashing]="flashing()"
+  (checkedChange)="setConnected($event)"
 />

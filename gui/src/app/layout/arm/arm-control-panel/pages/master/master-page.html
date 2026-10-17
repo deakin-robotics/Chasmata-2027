@@ -5,28 +5,54 @@
     [tone]="gamepadStatusTone()"
   />
 
-  <app-ros-connection-button class="rover-link" target="rover" />
-  <app-ros-connection-button class="base-station-link" target="basestation" />
+  <app-status-indicator
+    class="rover-status"
+    label="Rover"
+    [status]="roverTopologyStatus().label"
+    [tone]="roverTopologyStatus().tone"
+    [spinner]="roverTopologyStatus().label !== 'Off' && roverTopologyStatus().label !== 'Online'"
+  />
+
+  <app-status-indicator
+    class="base-station-status"
+    label="Base Station"
+    [status]="baseStationTopologyStatus().label"
+    [tone]="baseStationTopologyStatus().tone"
+    [spinner]="baseStationTopologyStatus().label !== 'Off' && baseStationTopologyStatus().label !== 'Online'"
+  />
+
+  <app-ros-connection-button class="rover-link" />
 
   <app-control-switch
     class="camera-feed"
     label="Camera Link"
     [checked]="cameraFeedEnabled()"
     [tone]="masterDriveTone"
+    offTone="info"
     (checkedChange)="setCameraFeedEnabled($event)"
   />
 
   <app-control-flow-connector class="gamepad-stem" variant="vertical" [tone]="gamepadFlowTone()" />
 
+  <app-control-flow-connector class="base-station-stem" variant="vertical" [tone]="baseStationFlowTone()" />
+
   <app-control-flow-connector class="gamepad-flow" variant="top-right" [tone]="gamepadFlowTone()" />
 
-  <app-control-flow-connector class="ros-flow" variant="vertical" [tone]="rosFlowTone()" />
+  <app-control-flow-connector class="base-station-flow" variant="top-left" [tone]="baseStationFlowTone()" />
+
+  <app-control-flow-connector class="rover-flow" variant="vertical" [tone]="roverFlowTone()" />
 
   <app-control-switch
     label="Master Drive"
     [checked]="masterDriveEnabled()"
     [tone]="masterDriveTone"
-    [disabled]="!masterDriveEnabled() && (!gamepadConnected() || !rosConnected())"
+    offTone="info"
+    [disabled]="
+      !masterDriveEnabled() &&
+      (!gamepadConnected() ||
+        !rosConnected() ||
+        (armMode() === ArmMode.Position && !baseStationAvailable()))
+    "
     (checkedChange)="toggleMasterDriveControl($event)"
   />
 
@@ -57,7 +83,4 @@
     (valueChange)="selectArmMode($event)"
   />
 
-  @if (readinessError(); as error) {
-    <p class="control-readiness" role="status">{{ error }}</p>
-  }
 </section>

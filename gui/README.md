@@ -62,14 +62,17 @@ The mission-control interface is inspired by the Airbus glass cockpit philosophy
 ```mermaid
 flowchart LR
     gamepad[Gamepad API] --> gui[Angular mission control]
-    gui -->|JSON/WebSocket| rosbridge[ROSbridge :9090]
-    rosbridge --> ros[ROS 2 nodes]
-    camera[Camera video elements] -->|WHEP/WebRTC| streams[MediaMTX on base station]
+    gui[Hosted Angular mission control] -->|same-origin WebSocket| proxy[BaseStation operations web]
+    proxy -->|/ros/rover| rover[ Rover ROSbridge :9090]
+    proxy -->|/ros/basestation| base[BaseStation ROSbridge :9091]
+    gui -->|/media WHEP/WebRTC| streams[BaseStation MediaMTX]
 ```
 
-The GUI communicates directly with the rover on its private operator network:
+In production, the GUI is served by the BaseStation and uses fixed same-origin
+paths. Operators never configure Rover or BaseStation endpoints:
 
-- Controls and telemetry use ROSLIB through ROSbridge.
+- Controls and telemetry use ROSLIB through the BaseStation proxy to Rover ROSbridge.
+- Shared ECAM state and BaseStation availability use the BaseStation ROSbridge path.
 - Camera video uses WHEP playback sessions from the base-station MediaMTX gateway.
 - Driver control publishes `sensor_msgs/Joy` on `/drive/joy`.
 - Arm control publishes remapped `sensor_msgs/Joy` on `/arm/joy`.
@@ -118,14 +121,9 @@ cd ../../basestation
 docker compose -f docker-compose.local.yml up --build
 ```
 
-Use this endpoint from the Angular GUI:
-
-```text
-ws://localhost:9090
-```
-
-The mock rover owns ROSbridge. The base-station stack joins it for MoveIt2
-planning and does not expose another GUI endpoint.
+The local development environment keeps its `localhost` endpoints in
+`src/environments/environment.ts`. The production build uses the hosted
+BaseStation paths.
 
 For local WebRTC camera development and validation, see
 [WebRTC camera stream](docs/webrtc-camera-stream.md). It covers the

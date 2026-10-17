@@ -3,7 +3,7 @@ import { Service, inject } from '@angular/core';
 import { ArmControlMode, ArmControlModeService } from './arm/arm-control-mode';
 import { ControlCommandPublisher } from './control-command-publisher';
 import { DriverControlMode, DriverControlModeService } from './drive/drive-control-mode';
-import { ArmMode, DriveMode, FmaColumn, FmaStateService } from '../fma/fma-state.service';
+import { DriveMode, FmaColumn, FmaStateService } from '../fma/fma-state.service';
 import { RosHeartbeatMonitor } from '../ros/ros-heartbeat-monitor';
 
 /** Coordinates local mode selection, connection state, and FMA mode requests. */
@@ -42,23 +42,6 @@ export class ControlModeCoordinator {
     this.commandPublisher.publishDriveMode(mode);
   }
 
-  /** Syncs the Arm selector from the first rover FMA state, or initializes it. */
-  synchronizeArmModeFromRover(): void {
-    if (!this.heartbeatMonitor.roverAvailable()) return;
-
-    const roverMode = this.currentArmModeFromRover();
-    if (roverMode) {
-      if (roverMode === ArmMode.Manual || roverMode === ArmMode.Position) {
-        this.armControlMode.setMode(roverMode);
-      }
-      return;
-    }
-
-    const mode = this.armControlMode.mode();
-    this.fmaState.requestArmMode(mode);
-    this.commandPublisher.publishArmMode(mode);
-  }
-
   /** Selects the Driver mode and requests it from the rover when connected. */
   selectDriveMode(mode: DriverControlMode): void {
     if (mode === this.driverControlMode.mode()) return;
@@ -75,6 +58,11 @@ export class ControlModeCoordinator {
   selectArmMode(mode: ArmControlMode): void {
     if (mode === this.armControlMode.mode()) return;
 
+    this.requestArmMode(mode);
+  }
+
+  /** Requests an Arm mode from the Rover even when it already matches locally. */
+  requestArmMode(mode: ArmControlMode): void {
     this.armControlMode.setMode(mode);
 
     if (!this.heartbeatMonitor.roverAvailable()) return;
@@ -93,12 +81,4 @@ export class ControlModeCoordinator {
     return column ? (column.confirmed ?? column.commanded) : null;
   }
 
-  private currentArmModeFromRover(): ArmMode | null {
-    const column = this.fmaState
-      .columns()
-      .find(
-        (candidate): candidate is Extract<FmaColumn, { label: 'ARM' }> => candidate.label === 'ARM',
-      );
-    return column ? (column.confirmed ?? column.commanded) : null;
-  }
 }

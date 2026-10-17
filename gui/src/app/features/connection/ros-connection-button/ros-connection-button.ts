@@ -1,92 +1,65 @@
-import { Component, computed, inject, input } from '@angular/core';
-import { MatDialog } from '@angular/material/dialog';
-
+import { Component, computed, inject } from '@angular/core';
+import { environment } from '../../../../environments/environment';
+import { ArmControlModeService } from '../../../core/control/arm/arm-control-mode';
+import { ArmMode } from '../../../core/fma/fma-state.service';
 import { BaseStationConnection } from '../../../core/ros/base-station-connection';
 import { RosConnection } from '../../../core/ros/ros-connection';
 import { RosHeartbeatMonitor } from '../../../core/ros/ros-heartbeat-monitor';
-import { ActionButton, ActionButtonTone } from '../../../shared/action-button/action-button';
-import { ConnectionManager } from '../connection-manager/connection-manager';
+import { ControlSwitch, ControlSwitchTone } from '../../../shared/control-switch/control-switch';
 
-export type RosConnectionTarget = 'rover' | 'basestation';
-
-@Component({
-  selector: 'app-ros-connection-button',
-  imports: [ActionButton],
-  templateUrl: './ros-connection-button.html',
-  styleUrl: './ros-connection-button.scss',
-})
+/** Connects or disconnects the fixed Rover and BaseStation ROS links together. */
+@Component({ selector: 'app-ros-connection-button', imports: [ControlSwitch], templateUrl: './ros-connection-button.html', styleUrl: './ros-connection-button.scss' })
 export class RosConnectionButton {
-  readonly target = input.required<RosConnectionTarget>();
-
   private readonly roverConnection = inject(RosConnection);
   private readonly baseStationConnection = inject(BaseStationConnection);
   private readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
-  private readonly dialog = inject(MatDialog);
+  private readonly armControlMode = inject(ArmControlModeService);
+  readonly label = 'ROS Link';
+  readonly checked = computed(() => {
+    const roverStatus = this.roverConnection.status();
+    const baseStationStatus = this.baseStationConnection.status();
 
-  readonly label = computed(() => (this.target() === 'rover' ? 'Rover Link' : 'BaseStation Link'));
-  readonly actionLabel = computed(() => {
-    if (this.target() === 'rover') {
-      switch (this.heartbeatMonitor.roverStatus()) {
-        case 'connecting':
-          return 'Connecting';
-        case 'waiting-for-rover':
-          return 'Standby';
-        case 'connected':
-          return 'Connected';
-        case 'reconnecting':
-          return 'Reconnecting';
-        case 'error':
-          return 'Retry';
-        default:
-          return 'Connect';
-      }
-    }
-
-    switch (this.baseStationConnection.status()) {
-      case 'connecting':
-        return 'Connecting';
-      case 'connected':
-        return 'Connected';
-      case 'reconnecting':
-        return 'Reconnecting';
-      case 'error':
-        return 'Retry';
-      default:
-        return 'Connect';
-    }
+    return roverStatus !== 'disconnected' || baseStationStatus !== 'disconnected';
   });
-  readonly tone = computed<ActionButtonTone>(() => {
-    if (this.target() === 'rover') {
-      switch (this.heartbeatMonitor.roverStatus()) {
-        case 'connected':
-          return 'normal';
-        case 'error':
-          return 'caution';
-        default:
-          return 'info';
-      }
-    }
+  readonly tone = computed<ControlSwitchTone>(() => {
+    if (!this.checked()) return 'info';
 
-    switch (this.baseStationConnection.status()) {
-      case 'connected':
-        return 'normal';
-      case 'error':
-        return 'caution';
-      default:
-        return 'info';
-    }
+    const roverStatus = this.roverConnection.status();
+    const baseStationStatus = this.baseStationConnection.status();
+    const roverOnline = this.heartbeatMonitor.roverAvailable();
+    const baseStationOnline = this.heartbeatMonitor.baseStationAvailable();
+    const roverFailed = this.linkFailed(
+      roverStatus,
+      roverOnline,
+      this.heartbeatMonitor.roverWasAvailable(),
+    );
+    const baseStationFailed = this.linkFailed(
+      baseStationStatus,
+      baseStationOnline,
+      this.heartbeatMonitor.baseStationWasAvailable(),
+    );
+
+    if (roverOnline && baseStationOnline) return 'normal';
+    if (roverFailed && baseStationFailed) return 'critical';
+    if (roverFailed || baseStationFailed) return 'caution';
+    return 'info';
   });
-  readonly busy = computed(() =>
-    this.target() === 'rover'
-      ? this.heartbeatMonitor.isRoverConnecting()
-      : this.baseStationConnection.isConnecting(),
-  );
+  readonly flashing = computed(() => this.checked() && this.tone() === 'info');
 
-  openSettings(): void {
-    this.dialog.open(ConnectionManager, {
-      ariaLabel: `${this.label()} connection settings`,
-      data: { target: this.target() },
-      width: 'min(100% - 2rem, 32rem)',
-    });
+  setConnected(connected: boolean): void {
+    if (connected) {
+      this.roverConnection.connect(environment.rosbridgeUrl);
+      this.baseStationConnection.connect(environment.basestationRosbridgeUrl);
+      return;
+    }
+
+    this.heartbeatMonitor.resetLinkHistory();
+    this.armControlMode.setMode(ArmMode.Manual);
+    this.roverConnection.disconnect();
+    this.baseStationConnection.disconnect();
+  }
+
+  private linkFailed(status: string, online: boolean, wasOnline: boolean): boolean {
+    return status === 'error' || status === 'disconnected' || (wasOnline && !online);
   }
 }

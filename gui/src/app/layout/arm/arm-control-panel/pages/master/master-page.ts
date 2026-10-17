@@ -9,8 +9,9 @@ import { ControlModeCoordinator } from '../../../../../core/control/control-mode
 import { ControlCommandPublisher } from '../../../../../core/control/control-command-publisher';
 import { GamepadInput } from '../../../../../core/gamepad/gamepad-input';
 import { CameraFeedControl } from '../../../../../features/cameras/camera-feed-control';
-import { ArmMode, FmaStateService } from '../../../../../core/fma/fma-state.service';
-import { RosConnection } from '../../../../../core/ros/ros-connection';
+import { ArmMode } from '../../../../../core/fma/fma-state.service';
+import { BaseStationConnection } from '../../../../../core/ros/base-station-connection';
+import { RosConnection, type RosConnectionStatus } from '../../../../../core/ros/ros-connection';
 import { RosHeartbeatMonitor } from '../../../../../core/ros/ros-heartbeat-monitor';
 import { RosConnectionButton } from '../../../../../features/connection/ros-connection-button/ros-connection-button';
 import {
@@ -31,6 +32,11 @@ import {
   ControlModeSelector,
 } from '../../../../../shared/control-mode-selector/control-mode-selector';
 
+type TopologyStatus = {
+  readonly label: 'Off' | 'Connecting' | 'Awaiting' | 'Online' | 'Lost';
+  readonly tone: StatusIndicatorTone;
+};
+
 @Component({
   selector: 'app-arm-master-page',
   imports: [
@@ -48,52 +54,43 @@ export class ArmMasterPage {
   private readonly armControlMode = inject(ArmControlModeService);
   private readonly armCommandPublisher = inject(ArmCommandPublisher);
   private readonly controlModeCoordinator = inject(ControlModeCoordinator);
-  private readonly fmaState = inject(FmaStateService);
   private readonly controlCommandPublisher = inject(ControlCommandPublisher);
   private readonly gamepad = inject(GamepadInput);
   private readonly rosConnection = inject(RosConnection);
+  private readonly baseStationConnection = inject(BaseStationConnection);
   private readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
   private readonly cameraFeedControl = inject(CameraFeedControl);
-  private armModeSynchronized = false;
+  private lastRequestedArmMode: ArmControlMode | null = null;
 
-  private readonly modeHandshakeEffect = effect(() => {
+  private readonly armModeRequestEffect = effect(() => {
     const client = this.rosConnection.client();
-    const connected = this.heartbeatMonitor.roverAvailable();
-    const hasFmaTelemetry = this.fmaState.hasFmaTelemetry();
+    const roverAvailable = this.heartbeatMonitor.roverAvailable();
+    const baseStationAvailable = this.heartbeatMonitor.baseStationAvailable();
 
     untracked(() => {
       if (client) this.controlModeCoordinator.prepareArmModeRequest();
 
-      if (!connected) {
-        this.armModeSynchronized = false;
+      if (!roverAvailable) {
+        this.lastRequestedArmMode = null;
         return;
       }
 
-      if (!hasFmaTelemetry || this.armModeSynchronized) return;
+      const targetMode = baseStationAvailable ? ArmMode.Position : ArmMode.Manual;
+      if (targetMode === this.lastRequestedArmMode) return;
 
-      this.armModeSynchronized = true;
-      this.controlModeCoordinator.synchronizeArmModeFromRover();
-    });
-  });
-
-  private readonly baseStationHeartbeatEffect = effect(() => {
-    const available = this.heartbeatMonitor.baseStationAvailable();
-
-    untracked(() => {
-      if (!available && this.armControlMode.mode() === ArmMode.Position) {
-        this.selectArmMode(ArmMode.Manual);
-      }
+      this.controlModeCoordinator.requestArmMode(targetMode);
+      this.lastRequestedArmMode = targetMode;
     });
   });
 
   readonly masterDriveEnabled = this.armControlMode.enabled;
+  readonly ArmMode = ArmMode;
   readonly armMode = this.armControlMode.mode;
   readonly armModeOptions: readonly ControlModeOption[] = [
     { label: ArmMode.Manual, value: ArmMode.Manual },
     { label: ArmMode.Position, value: ArmMode.Position },
   ];
   readonly masterDriveTone: ControlSwitchTone = 'normal';
-  readonly readinessError = this.armControlMode.readinessError;
   readonly rosConnected = this.heartbeatMonitor.roverAvailable;
   readonly baseStationAvailable = this.heartbeatMonitor.baseStationAvailable;
   readonly gamepadConnected = this.gamepad.connected;
@@ -107,16 +104,26 @@ export class ArmMasterPage {
   readonly gamepadFlowTone = computed<ControlFlowConnectorTone>(() =>
     this.gamepadConnected() ? 'normal' : 'neutral',
   );
-  readonly rosFlowTone = computed<ControlFlowConnectorTone>(() => {
-    switch (this.heartbeatMonitor.roverStatus()) {
-      case 'connected':
-        return 'normal';
-      case 'error':
-        return 'caution';
-      default:
-        return 'info';
-    }
-  });
+  readonly roverTopologyStatus = computed(() =>
+    this.topologyStatus(
+      this.rosConnection.status(),
+      this.heartbeatMonitor.roverAvailable(),
+      this.heartbeatMonitor.roverWasAvailable(),
+    ),
+  );
+  readonly baseStationTopologyStatus = computed(() =>
+    this.topologyStatus(
+      this.baseStationConnection.status(),
+      this.heartbeatMonitor.baseStationAvailable(),
+      this.heartbeatMonitor.baseStationWasAvailable(),
+    ),
+  );
+  readonly roverFlowTone = computed<ControlFlowConnectorTone>(
+    () => this.roverTopologyStatus().tone,
+  );
+  readonly baseStationFlowTone = computed<ControlFlowConnectorTone>(
+    () => this.baseStationTopologyStatus().tone,
+  );
 
   constructor() {
     this.gamepad.start();
@@ -150,5 +157,21 @@ export class ArmMasterPage {
 
   deactivateLawOverride(): void {
     this.controlCommandPublisher.disableArmOverride();
+  }
+
+  private topologyStatus(
+    connectionStatus: RosConnectionStatus,
+    available: boolean,
+    wasAvailable: boolean,
+  ): TopologyStatus {
+    if (connectionStatus === 'disconnected') return { label: 'Off', tone: 'neutral' };
+    if (connectionStatus === 'error') return { label: 'Lost', tone: 'critical' };
+    if (available) return { label: 'Online', tone: 'normal' };
+    if (wasAvailable) return { label: 'Lost', tone: 'critical' };
+    if (connectionStatus === 'connecting' || connectionStatus === 'reconnecting') {
+      return { label: 'Connecting', tone: 'info' };
+    }
+
+    return { label: 'Awaiting', tone: 'info' };
   }
 }

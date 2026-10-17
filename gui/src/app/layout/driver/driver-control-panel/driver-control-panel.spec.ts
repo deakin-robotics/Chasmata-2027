@@ -18,8 +18,8 @@ describe('DriverControlPanel', () => {
     expect(fixture.nativeElement.querySelector('app-control-switch')).toBeTruthy();
   });
 
-  it('should render the Rover Link action', () => {
-    expect(fixture.nativeElement.querySelector('app-action-button')).toBeTruthy();
+  it('should render the ROS Link control', () => {
+    expect(fixture.nativeElement.querySelector('app-ros-connection-button')).toBeTruthy();
   });
 
   it('should render the read-only Gamepad status', () => {

@@ -1,7 +1,8 @@
+const baseUrl = window.location.origin;
+
 export const environment = {
-  cameraGatewayUrl: 'http://basestation.local:8889',
-  roverCameraGatewayUrl: 'http://rover.local:8889',
-  cameraHealthUrl: 'http://basestation.local:9998/cameras/status',
-  rosbridgeUrl: 'rover.local:9090',
-  basestationRosbridgeUrl: 'basestation.local:9091',
+  cameraGatewayUrl: `${baseUrl}/media`,
+  cameraHealthUrl: `${baseUrl}/camera-health/cameras/status`,
+  rosbridgeUrl: '/ros/rover',
+  basestationRosbridgeUrl: '/ros/basestation',
 } as const;

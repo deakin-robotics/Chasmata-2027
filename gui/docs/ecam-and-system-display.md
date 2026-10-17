@@ -171,7 +171,7 @@ authority: rover
 sources:
   - source: driver
     timestamp: {sec: 123, nanosec: 456000000}
-    active_codes: [CAMERA_ROVER_FALLBACK_ACTIVE]
+    active_codes: [CAMERA_FRONT_STREAM_LOST]
   - source: arm
     timestamp: {sec: 123, nanosec: 455000000}
     active_codes: [ARM_TELEMETRY_UNAVAILABLE]

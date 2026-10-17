@@ -9,7 +9,7 @@ import { ControlModeCoordinator } from '../../../../../core/control/control-mode
 import { GamepadInput } from '../../../../../core/gamepad/gamepad-input';
 import { CameraFeedControl } from '../../../../../features/cameras/camera-feed-control';
 import { DriveMode, FmaStateService } from '../../../../../core/fma/fma-state.service';
-import { RosConnection } from '../../../../../core/ros/ros-connection';
+import { RosConnection, type RosConnectionStatus } from '../../../../../core/ros/ros-connection';
 import { RosHeartbeatMonitor } from '../../../../../core/ros/ros-heartbeat-monitor';
 import { RosConnectionButton } from '../../../../../features/connection/ros-connection-button/ros-connection-button';
 import {
@@ -28,6 +28,11 @@ import {
   ControlModeOption,
   ControlModeSelector,
 } from '../../../../../shared/control-mode-selector/control-mode-selector';
+
+type TopologyStatus = {
+  readonly label: 'Off' | 'Connecting' | 'Awaiting' | 'Online' | 'Lost';
+  readonly tone: StatusIndicatorTone;
+};
 
 @Component({
   selector: 'app-driver-master-page',
@@ -79,7 +84,6 @@ export class DriverMasterPage {
     { label: DriveMode.Velocity, value: DriveMode.Velocity },
   ];
   readonly masterDriveTone: ControlSwitchTone = 'normal';
-  readonly readinessError = this.driverControl.readinessError;
   readonly rosConnected = this.heartbeatMonitor.roverAvailable;
   readonly gamepadConnected = this.gamepad.connected;
   readonly cameraFeedEnabled = this.cameraFeedControl.enabled;
@@ -92,16 +96,16 @@ export class DriverMasterPage {
   readonly gamepadFlowTone = computed<ControlFlowConnectorTone>(() =>
     this.gamepadConnected() ? 'normal' : 'neutral',
   );
-  readonly rosFlowTone = computed<ControlFlowConnectorTone>(() => {
-    switch (this.heartbeatMonitor.roverStatus()) {
-      case 'connected':
-        return 'normal';
-      case 'error':
-        return 'caution';
-      default:
-        return 'info';
-    }
-  });
+  readonly roverTopologyStatus = computed(() =>
+    this.topologyStatus(
+      this.rosConnection.status(),
+      this.heartbeatMonitor.roverAvailable(),
+      this.heartbeatMonitor.roverWasAvailable(),
+    ),
+  );
+  readonly roverFlowTone = computed<ControlFlowConnectorTone>(
+    () => this.roverTopologyStatus().tone,
+  );
 
   constructor() {
     this.gamepad.start();
@@ -122,5 +126,21 @@ export class DriverMasterPage {
     if (mode === DriveMode.Manual || mode === DriveMode.Velocity) {
       this.controlModeCoordinator.selectDriveMode(mode as DriverControlMode);
     }
+  }
+
+  private topologyStatus(
+    connectionStatus: RosConnectionStatus,
+    available: boolean,
+    wasAvailable: boolean,
+  ): TopologyStatus {
+    if (connectionStatus === 'disconnected') return { label: 'Off', tone: 'neutral' };
+    if (connectionStatus === 'error') return { label: 'Lost', tone: 'critical' };
+    if (available) return { label: 'Online', tone: 'normal' };
+    if (wasAvailable) return { label: 'Lost', tone: 'critical' };
+    if (connectionStatus === 'connecting' || connectionStatus === 'reconnecting') {
+      return { label: 'Connecting', tone: 'info' };
+    }
+
+    return { label: 'Awaiting', tone: 'info' };
   }
 }

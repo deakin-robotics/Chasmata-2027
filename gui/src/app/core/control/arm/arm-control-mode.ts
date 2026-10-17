@@ -31,7 +31,7 @@ export class ArmControlModeService {
   private readonly armManualControl = inject(ArmManualControl);
   private readonly armPositionControl = inject(ArmPositionControl);
 
-  private readonly modeState = signal<ArmControlMode>(ArmMode.Position);
+  private readonly modeState = signal<ArmControlMode>(ArmMode.Manual);
   private readonly enabledState = signal(false);
   private readonly readinessErrorState = signal<string | null>(null);
   private publishTimer: ReturnType<typeof setInterval> | null = null;
@@ -58,6 +58,10 @@ export class ArmControlModeService {
 
     if (!this.heartbeatMonitor.roverAvailable()) {
       return 'Connect to ROSbridge before enabling Arm control.';
+    }
+
+    if (this.isPosition() && !this.heartbeatMonitor.baseStationAvailable()) {
+      return 'Connect to the BaseStation before enabling Position control.';
     }
 
     if (this.controlMode.isDriverActive()) {

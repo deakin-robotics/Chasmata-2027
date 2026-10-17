@@ -27,7 +27,7 @@ GUI target pose
 ```
 
 `/arm/target_pose` uses `base_link` coordinates. Its position targets
-`j4_pivot_link`; its orientation is the requested `ee_link` orientation.
+`j4_pivot_link` and its orientation is the requested `ee_link` orientation.
 MoveIt, not the browser FK model, is the Position mode solver. The browser
 model is display-only.
 

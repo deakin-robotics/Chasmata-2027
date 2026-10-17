@@ -84,21 +84,17 @@ describe('ControlModeCoordinator', () => {
     expect(publishArmMode).not.toHaveBeenCalled();
   });
 
-  it('adopts a rover mode instead of overwriting it', () => {
+  it('adopts a Drive rover mode instead of overwriting it', () => {
     const coordinator = TestBed.inject(ControlModeCoordinator);
     const driverControlMode = TestBed.inject(DriverControlModeService);
-    const armControlMode = TestBed.inject(ArmControlModeService);
     const fmaState = TestBed.inject(FmaStateService);
 
     connected.set(true);
     fmaState.setDriveTelemetry(DriveMode.Manual, null);
-    fmaState.setArmTelemetry(ArmMode.Manual, null);
 
     coordinator.synchronizeDriveModeFromRover();
-    coordinator.synchronizeArmModeFromRover();
 
     expect(driverControlMode.mode()).toBe(DriveMode.Manual);
-    expect(armControlMode.mode()).toBe(ArmMode.Manual);
     expect(publishDriveMode).not.toHaveBeenCalled();
     expect(publishArmMode).not.toHaveBeenCalled();
   });
@@ -109,12 +105,12 @@ describe('ControlModeCoordinator', () => {
 
     connected.set(true);
     TestBed.flushEffects();
-    coordinator.selectArmMode(ArmMode.Manual);
+    coordinator.selectArmMode(ArmMode.Position);
 
     expect(getColumn(fmaState, 'ARM')).toEqual({
       label: 'ARM',
       confirmed: null,
-      commanded: ArmMode.Manual,
+      commanded: ArmMode.Position,
     });
   });
 
@@ -127,7 +123,7 @@ describe('ControlModeCoordinator', () => {
     const initialArmRequests = publishArmMode.mock.calls.length;
 
     coordinator.selectDriveMode(DriveMode.Velocity);
-    coordinator.selectArmMode(ArmMode.Position);
+    coordinator.selectArmMode(ArmMode.Manual);
 
     expect(publishDriveMode).toHaveBeenCalledTimes(initialDriveRequests);
     expect(publishArmMode).toHaveBeenCalledTimes(initialArmRequests);
@@ -164,23 +160,16 @@ describe('ControlModeCoordinator', () => {
     });
   });
 
-  it('initializes each dashboard independently after reconnecting', () => {
+  it('requests an Arm mode after Rover reconnects', () => {
     const coordinator = TestBed.inject(ControlModeCoordinator);
     const fmaState = TestBed.inject(FmaStateService);
 
-    coordinator.selectDriveMode(DriveMode.Manual);
-    coordinator.selectArmMode(ArmMode.Manual);
     connected.set(true);
-    TestBed.flushEffects();
     connected.set(false);
-    TestBed.flushEffects();
     connected.set(true);
-    TestBed.flushEffects();
 
-    coordinator.synchronizeArmModeFromRover();
+    coordinator.requestArmMode(ArmMode.Manual);
 
-    expect(getColumn(fmaState, 'DRIVE')?.commanded).toBeNull();
-    expect(publishDriveMode).not.toHaveBeenCalled();
     expect(getColumn(fmaState, 'ARM')?.commanded).toBe(ArmMode.Manual);
     expect(publishArmMode).toHaveBeenCalledWith(ArmMode.Manual);
   });

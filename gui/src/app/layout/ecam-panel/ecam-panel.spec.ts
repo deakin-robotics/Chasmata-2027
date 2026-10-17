@@ -18,8 +18,7 @@ describe('EcamPanel', () => {
     expect(fixture.nativeElement.textContent).toContain('ECAM');
     expect(fixture.nativeElement.textContent).toContain('T/O CONFIG');
     expect(fixture.nativeElement.textContent).toContain('DRIVE');
-    expect(fixture.nativeElement.textContent).toContain('Rover Link');
-    expect(fixture.nativeElement.textContent).toContain('BaseStation Link');
+    expect(fixture.nativeElement.textContent).toContain('ROS Link');
 
     const headerControls = fixture.nativeElement.querySelector('.header-controls');
     expect(headerControls.children[0].getAttribute('aria-label')).toBe('ROS connections');

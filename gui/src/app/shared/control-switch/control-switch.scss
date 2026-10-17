@@ -12,6 +12,7 @@
   font-size: 0.7rem;
   font-weight: 800;
   letter-spacing: 0.06em;
+  text-align: center;
   text-transform: uppercase;
 }
 
@@ -52,9 +53,28 @@ button.active {
   background: color-mix(in srgb, var(--switch-color) 16%, transparent);
 }
 
+button.toned-off {
+  border-color: color-mix(in srgb, var(--off-switch-color) 75%, transparent);
+  background: color-mix(in srgb, var(--off-switch-color) 16%, transparent);
+}
+
 button.active::before {
   background: var(--switch-color);
   transform: translateX(100%);
+}
+
+button.flashing {
+  animation: flash-border 900ms ease-in-out infinite alternate;
+}
+
+@keyframes flash-border {
+  from {
+    border-color: color-mix(in srgb, var(--switch-color) 35%, transparent);
+  }
+
+  to {
+    border-color: var(--switch-color);
+  }
 }
 
 .tone-info { --switch-color: var(--dcr-color-info); }
@@ -62,6 +82,12 @@ button.active::before {
 .tone-caution { --switch-color: var(--dcr-color-caution); }
 .tone-critical { --switch-color: var(--dcr-color-critical); }
 .tone-neutral { --switch-color: var(--dcr-color-neutral); }
+
+.tone-off-info { --off-switch-color: var(--dcr-color-info); }
+.tone-off-normal { --off-switch-color: var(--dcr-color-normal); }
+.tone-off-caution { --off-switch-color: var(--dcr-color-caution); }
+.tone-off-critical { --off-switch-color: var(--dcr-color-critical); }
+.tone-off-neutral { --off-switch-color: var(--dcr-color-neutral); }
 
 button span {
   position: relative;
@@ -76,6 +102,14 @@ button.active .state-on {
 }
 
 button:disabled {
+  border-color: var(--dcr-color-offline);
+  background: color-mix(in srgb, var(--dcr-color-offline) 18%, transparent);
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button.flashing {
+    animation: none;
+  }
 }
