@@ -28,6 +28,7 @@
     label="Camera Link"
     [checked]="cameraFeedEnabled()"
     [tone]="masterDriveTone"
+    offTone="info"
     (checkedChange)="setCameraFeedEnabled($event)"
   />
 
@@ -45,6 +46,7 @@
     label="Master Drive"
     [checked]="masterDriveEnabled()"
     [tone]="masterDriveTone"
+    offTone="info"
     [disabled]="
       !masterDriveEnabled() &&
       (!gamepadConnected() ||

@@ -102,6 +102,8 @@ button.active .state-on {
 }
 
 button:disabled {
+  border-color: var(--dcr-color-offline);
+  background: color-mix(in srgb, var(--dcr-color-offline) 18%, transparent);
   cursor: not-allowed;
   opacity: 0.55;
 }
