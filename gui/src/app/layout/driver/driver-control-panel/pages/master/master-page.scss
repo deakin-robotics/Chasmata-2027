@@ -11,27 +11,16 @@
   display: grid;
   align-content: start;
   grid-template-areas:
-    'gamepad ros . camera .'
-    'gamepad-stem ros-flow . . .'
-    'gamepad-flow master . . .'
-    'drive-mode drive-mode . . .'
-    '. error error error error';
-  grid-template-columns: repeat(2, minmax(0, 1fr)) 0.4rem repeat(2, minmax(0, 1fr));
+    'ros gamepad rover-status .'
+    '. gamepad-stem rover-flow .'
+    'camera gamepad-flow master .'
+    'drive-mode drive-mode . .';
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   column-gap: 0.5rem;
   row-gap: 0.6rem;
   box-sizing: border-box;
   height: 100%;
   padding: 0.75rem;
-}
-
-.master-page::after {
-  grid-column: 3;
-  grid-row: 1 / 5;
-  justify-self: end;
-  width: 0;
-  border-right: 1px solid #303844;
-  content: '';
-  pointer-events: none;
 }
 
 app-status-indicator,
@@ -44,10 +33,6 @@ app-control-mode-selector {
 
 app-ros-connection-button {
   grid-area: ros;
-}
-
-.base-station-link {
-  grid-area: base-station;
 }
 
 .camera-feed {
@@ -64,8 +49,12 @@ app-ros-connection-button {
   justify-self: center;
 }
 
-.ros-flow {
-  grid-area: ros-flow;
+.rover-status {
+  grid-area: rover-status;
+}
+
+.rover-flow {
+  grid-area: rover-flow;
 }
 
 app-status-indicator {
@@ -78,12 +67,6 @@ app-control-switch {
 
 .drive-mode-selector {
   grid-area: drive-mode;
-}
-
-.control-readiness {
-  grid-area: error;
-  margin: 0;
-  color: var(--dcr-color-caution);
-  font-size: 0.65rem;
-  line-height: 1.2;
+  justify-self: start;
+  margin-left: 1rem;
 }

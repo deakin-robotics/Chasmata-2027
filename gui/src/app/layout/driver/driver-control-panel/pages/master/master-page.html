@@ -5,6 +5,14 @@
     [tone]="gamepadStatusTone()"
   />
 
+  <app-status-indicator
+    class="rover-status"
+    label="Rover"
+    [status]="roverTopologyStatus().label"
+    [tone]="roverTopologyStatus().tone"
+    [spinner]="roverTopologyStatus().label === 'Lost'"
+  />
+
   <app-ros-connection-button class="rover-link" />
 
   <app-control-switch
@@ -19,7 +27,7 @@
 
   <app-control-flow-connector class="gamepad-flow" variant="top-right" [tone]="gamepadFlowTone()" />
 
-  <app-control-flow-connector class="ros-flow" variant="vertical" [tone]="rosFlowTone()" />
+  <app-control-flow-connector class="rover-flow" variant="vertical" [tone]="roverFlowTone()" />
 
   <app-control-switch
     label="Master Drive"
