@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+
+<library path="rover_drivetrain_control">
+  <class
+    name="rover_drivetrain_control/RoverHardwareInterface"
+    type="rover_drivetrain_control::RoverHardwareInterface"
+    base_class_type="hardware_interface::SystemInterface">
+
+    <description>
+      ros2_control SystemInterface for the rover four-wheel drivetrain using
+      BLD-305S motor controllers over two Modbus RTU RS485 buses.
+    </description>
+  </class>
+</library>
