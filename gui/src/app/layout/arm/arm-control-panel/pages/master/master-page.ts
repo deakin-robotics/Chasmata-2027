@@ -9,7 +9,7 @@ import { ControlModeCoordinator } from '../../../../../core/control/control-mode
 import { ControlCommandPublisher } from '../../../../../core/control/control-command-publisher';
 import { GamepadInput } from '../../../../../core/gamepad/gamepad-input';
 import { CameraFeedControl } from '../../../../../features/cameras/camera-feed-control';
-import { ArmMode, FmaStateService } from '../../../../../core/fma/fma-state.service';
+import { ArmMode } from '../../../../../core/fma/fma-state.service';
 import { BaseStationConnection } from '../../../../../core/ros/base-station-connection';
 import { RosConnection, type RosConnectionStatus } from '../../../../../core/ros/ros-connection';
 import { RosHeartbeatMonitor } from '../../../../../core/ros/ros-heartbeat-monitor';
@@ -54,47 +54,34 @@ export class ArmMasterPage {
   private readonly armControlMode = inject(ArmControlModeService);
   private readonly armCommandPublisher = inject(ArmCommandPublisher);
   private readonly controlModeCoordinator = inject(ControlModeCoordinator);
-  private readonly fmaState = inject(FmaStateService);
   private readonly controlCommandPublisher = inject(ControlCommandPublisher);
   private readonly gamepad = inject(GamepadInput);
   private readonly rosConnection = inject(RosConnection);
   private readonly baseStationConnection = inject(BaseStationConnection);
   private readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
   private readonly cameraFeedControl = inject(CameraFeedControl);
-  private armModeSynchronized = false;
-  private baseStationWasAvailable = false;
+  private lastRequestedArmMode: ArmControlMode | null = null;
   private readonly roverWasAvailable = signal(false);
   private readonly baseStationWasAvailableForStatus = signal(false);
 
-  private readonly modeHandshakeEffect = effect(() => {
+  private readonly armModeRequestEffect = effect(() => {
     const client = this.rosConnection.client();
-    const connected = this.heartbeatMonitor.roverAvailable();
-    const hasFmaTelemetry = this.fmaState.hasFmaTelemetry();
+    const roverAvailable = this.heartbeatMonitor.roverAvailable();
+    const baseStationAvailable = this.heartbeatMonitor.baseStationAvailable();
 
     untracked(() => {
       if (client) this.controlModeCoordinator.prepareArmModeRequest();
 
-      if (!connected) {
-        this.armModeSynchronized = false;
+      if (!roverAvailable) {
+        this.lastRequestedArmMode = null;
         return;
       }
 
-      if (!hasFmaTelemetry || this.armModeSynchronized) return;
+      const targetMode = baseStationAvailable ? ArmMode.Position : ArmMode.Manual;
+      if (targetMode === this.lastRequestedArmMode) return;
 
-      this.armModeSynchronized = true;
-      this.controlModeCoordinator.synchronizeArmModeFromRover();
-    });
-  });
-
-  private readonly baseStationHeartbeatEffect = effect(() => {
-    const available = this.heartbeatMonitor.baseStationAvailable();
-
-    untracked(() => {
-      if (this.baseStationWasAvailable && !available) {
-        this.selectArmMode(ArmMode.Manual);
-      }
-
-      this.baseStationWasAvailable = available;
+      this.controlModeCoordinator.requestArmMode(targetMode);
+      this.lastRequestedArmMode = targetMode;
     });
   });
 

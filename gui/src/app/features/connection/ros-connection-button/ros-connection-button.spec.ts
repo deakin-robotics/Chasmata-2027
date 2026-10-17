@@ -1,6 +1,8 @@
 import { WritableSignal, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
+import { ArmControlModeService } from '../../../core/control/arm/arm-control-mode';
+import { ArmMode } from '../../../core/fma/fma-state.service';
 import { BaseStationConnection } from '../../../core/ros/base-station-connection';
 import { RosConnection, type RosConnectionStatus } from '../../../core/ros/ros-connection';
 import { RosHeartbeatMonitor } from '../../../core/ros/ros-heartbeat-monitor';
@@ -16,6 +18,7 @@ describe('RosConnectionButton', () => {
   let baseStationStatus: WritableSignal<RosConnectionStatus>;
   let roverAvailable: WritableSignal<boolean>;
   let baseStationAvailable: WritableSignal<boolean>;
+  let setArmMode: ReturnType<typeof vi.fn>;
   beforeEach(async () => {
     roverStatus = signal<RosConnectionStatus>('disconnected');
     baseStationStatus = signal<RosConnectionStatus>('disconnected');
@@ -26,6 +29,7 @@ describe('RosConnectionButton', () => {
     baseStationConnect = vi.fn();
     roverDisconnect = vi.fn();
     baseStationDisconnect = vi.fn();
+    setArmMode = vi.fn();
 
     await TestBed.configureTestingModule({
       imports: [RosConnectionButton],
@@ -55,6 +59,10 @@ describe('RosConnectionButton', () => {
             baseStationAvailable: baseStationAvailable.asReadonly(),
           },
         },
+        {
+          provide: ArmControlModeService,
+          useValue: { setMode: setArmMode },
+        },
       ],
     }).compileComponents();
     fixture = TestBed.createComponent(RosConnectionButton); fixture.detectChanges();
@@ -69,6 +77,7 @@ describe('RosConnectionButton', () => {
   it('closes both ROS links when switched off', () => {
     fixture.componentInstance.setConnected(false);
 
+    expect(setArmMode).toHaveBeenCalledWith(ArmMode.Manual);
     expect(roverDisconnect).toHaveBeenCalledOnce();
     expect(baseStationDisconnect).toHaveBeenCalledOnce();
   });

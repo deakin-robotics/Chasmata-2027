@@ -16,6 +16,7 @@ describe('ArmMasterPage', () => {
   let roverConnectionStatus: WritableSignal<RosConnectionStatus>;
   let baseStationConnectionStatus: WritableSignal<RosConnectionStatus>;
   let selectArmMode: ReturnType<typeof vi.fn>;
+  let requestArmMode: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     baseStationAvailable = signal(false);
@@ -26,6 +27,7 @@ describe('ArmMasterPage', () => {
     const isRoverConnecting = signal(false);
     const connectionInProgress = signal(false);
     selectArmMode = vi.fn();
+    requestArmMode = vi.fn();
 
     await TestBed.configureTestingModule({
       imports: [ArmMasterPage],
@@ -60,7 +62,11 @@ describe('ArmMasterPage', () => {
         },
         {
           provide: ControlModeCoordinator,
-          useValue: { selectArmMode },
+          useValue: {
+            prepareArmModeRequest: vi.fn(),
+            requestArmMode,
+            selectArmMode,
+          },
         },
       ],
     }).compileComponents();
@@ -134,6 +140,62 @@ describe('ArmMasterPage', () => {
     });
   });
 
+  it('requests Manual for a Rover-only link, then Position once BaseStation is online', () => {
+    roverAvailable.set(true);
+    fixture.detectChanges();
+
+    expect(requestArmMode).toHaveBeenCalledOnce();
+    expect(requestArmMode).toHaveBeenCalledWith(ArmMode.Manual);
+
+    baseStationAvailable.set(true);
+    fixture.detectChanges();
+
+    expect(requestArmMode).toHaveBeenLastCalledWith(ArmMode.Position);
+    expect(requestArmMode).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not repeat mode commands for unchanged link availability', () => {
+    roverAvailable.set(true);
+    fixture.detectChanges();
+    fixture.detectChanges();
+
+    expect(requestArmMode).toHaveBeenCalledOnce();
+    expect(requestArmMode).toHaveBeenCalledWith(ArmMode.Manual);
+  });
+
+  it('requests Manual after BaseStation loss and Position after recovery', () => {
+    roverAvailable.set(true);
+    baseStationAvailable.set(true);
+    fixture.detectChanges();
+
+    baseStationAvailable.set(false);
+    fixture.detectChanges();
+
+    baseStationAvailable.set(true);
+    fixture.detectChanges();
+
+    expect(requestArmMode.mock.calls).toEqual([
+      [ArmMode.Position],
+      [ArmMode.Manual],
+      [ArmMode.Position],
+    ]);
+  });
+
+  it('requests the target mode again after Rover recovers', () => {
+    roverAvailable.set(true);
+    baseStationAvailable.set(true);
+    fixture.detectChanges();
+
+    roverAvailable.set(false);
+    fixture.detectChanges();
+    roverAvailable.set(true);
+    fixture.detectChanges();
+
+    expect(requestArmMode).toHaveBeenCalledTimes(2);
+    expect(requestArmMode).toHaveBeenNthCalledWith(1, ArmMode.Position);
+    expect(requestArmMode).toHaveBeenNthCalledWith(2, ArmMode.Position);
+  });
+
   it('reports BaseStation heartbeat loss and connection errors independently', () => {
     baseStationConnectionStatus.set('connected');
     fixture.detectChanges();
@@ -180,7 +242,7 @@ describe('ArmMasterPage', () => {
     );
   });
 
-  it('falls back to Manual and disables the mode selector until the heartbeat returns', () => {
+  it('disables the mode selector when BaseStation is lost', () => {
     roverAvailable.set(true);
     baseStationAvailable.set(true);
     fixture.detectChanges();
@@ -194,14 +256,12 @@ describe('ArmMasterPage', () => {
     baseStationAvailable.set(false);
     fixture.detectChanges();
 
-    expect(selectArmMode).toHaveBeenCalledOnce();
-    expect(selectArmMode).toHaveBeenCalledWith(ArmMode.Manual);
+    expect(requestArmMode).toHaveBeenCalledWith(ArmMode.Manual);
     expect(selectorControl.getAttribute('aria-disabled')).toBe('true');
     expect([...modeButtons].every((button) => button.disabled)).toBe(true);
 
     baseStationAvailable.set(true);
     fixture.detectChanges();
-    expect(selectArmMode).toHaveBeenCalledOnce();
     expect(selectorControl.getAttribute('aria-disabled')).toBe('false');
     expect([...modeButtons].every((button) => !button.disabled)).toBe(true);
   });

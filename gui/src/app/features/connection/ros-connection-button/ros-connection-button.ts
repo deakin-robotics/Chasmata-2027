@@ -1,5 +1,7 @@
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { environment } from '../../../../environments/environment';
+import { ArmControlModeService } from '../../../core/control/arm/arm-control-mode';
+import { ArmMode } from '../../../core/fma/fma-state.service';
 import { BaseStationConnection } from '../../../core/ros/base-station-connection';
 import { RosConnection } from '../../../core/ros/ros-connection';
 import { RosHeartbeatMonitor } from '../../../core/ros/ros-heartbeat-monitor';
@@ -11,6 +13,7 @@ export class RosConnectionButton {
   private readonly roverConnection = inject(RosConnection);
   private readonly baseStationConnection = inject(BaseStationConnection);
   private readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
+  private readonly armControlMode = inject(ArmControlModeService);
   private readonly roverWasOnline = signal(false);
   private readonly baseStationWasOnline = signal(false);
   readonly label = 'ROS Link';
@@ -67,6 +70,7 @@ export class RosConnectionButton {
 
     this.roverWasOnline.set(false);
     this.baseStationWasOnline.set(false);
+    this.armControlMode.setMode(ArmMode.Manual);
     this.roverConnection.disconnect();
     this.baseStationConnection.disconnect();
   }

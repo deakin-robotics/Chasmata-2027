@@ -31,7 +31,7 @@ export class ArmControlModeService {
   private readonly armManualControl = inject(ArmManualControl);
   private readonly armPositionControl = inject(ArmPositionControl);
 
-  private readonly modeState = signal<ArmControlMode>(ArmMode.Position);
+  private readonly modeState = signal<ArmControlMode>(ArmMode.Manual);
   private readonly enabledState = signal(false);
   private readonly readinessErrorState = signal<string | null>(null);
   private publishTimer: ReturnType<typeof setInterval> | null = null;
