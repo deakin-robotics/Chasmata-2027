@@ -73,6 +73,7 @@ describe('ArmModelScene', () => {
   });
 
   it('should hide the target marker when the actual marker reaches it', () => {
+    TestBed.inject(ArmControlModeService).setMode(ArmMode.Position);
     TestBed.inject(ArmIkCoordinator).setPosition([0, 0, 0]);
 
     let distance = 0.01;
