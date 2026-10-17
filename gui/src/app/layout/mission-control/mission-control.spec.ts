@@ -13,7 +13,7 @@ describe('MissionControl', () => {
     }).compileComponents();
 
     fixture = TestBed.createComponent(MissionControl);
-    await fixture.whenStable();
+    fixture.detectChanges();
   });
 
   it('should render shared mission-control chrome', () => {
