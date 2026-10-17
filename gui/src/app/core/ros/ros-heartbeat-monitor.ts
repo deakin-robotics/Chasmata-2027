@@ -26,6 +26,8 @@ export class RosHeartbeatMonitor {
 
   private readonly roverAvailableState = signal(false);
   private readonly baseStationAvailableState = signal(false);
+  private readonly roverWasAvailableState = signal(false);
+  private readonly baseStationWasAvailableState = signal(false);
 
   readonly roverAvailable = computed(
     () => this.roverConnection.status() === 'connected' && this.roverAvailableState(),
@@ -33,6 +35,8 @@ export class RosHeartbeatMonitor {
   readonly baseStationAvailable = computed(
     () => this.baseStationConnection.status() === 'connected' && this.baseStationAvailableState(),
   );
+  readonly roverWasAvailable = this.roverWasAvailableState.asReadonly();
+  readonly baseStationWasAvailable = this.baseStationWasAvailableState.asReadonly();
   readonly roverStatus = computed<RoverConnectionStatus>(() => {
     const connectionStatus = this.roverConnection.status();
     if (connectionStatus !== 'connected') return connectionStatus;
@@ -136,6 +140,14 @@ export class RosHeartbeatMonitor {
     if (source === 'rover') this.roverTimer = timeout;
     else this.baseStationTimer = timeout;
     availableState.set(true);
+    if (source === 'rover') this.roverWasAvailableState.set(true);
+    else this.baseStationWasAvailableState.set(true);
+  }
+
+  /** Clears link history when the operator ends the shared ROS Link session. */
+  resetLinkHistory(): void {
+    this.roverWasAvailableState.set(false);
+    this.baseStationWasAvailableState.set(false);
   }
 
   private stopMonitoring(client: Ros, source: 'rover' | 'base-station'): void {

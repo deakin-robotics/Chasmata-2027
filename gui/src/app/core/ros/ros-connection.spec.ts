@@ -43,6 +43,8 @@ describe('RosConnection and RosHeartbeatMonitor', () => {
     expect(service.client()).toBeNull();
     expect(heartbeatMonitor.roverAvailable()).toBe(false);
     expect(heartbeatMonitor.baseStationAvailable()).toBe(false);
+    expect(heartbeatMonitor.roverWasAvailable()).toBe(false);
+    expect(heartbeatMonitor.baseStationWasAvailable()).toBe(false);
   });
 
   it('rejects an empty endpoint without opening a connection', () => {
@@ -211,6 +213,7 @@ describe('RosConnection and RosHeartbeatMonitor', () => {
 
     heartbeats[0].callback();
     expect(heartbeatMonitor.roverAvailable()).toBe(true);
+    expect(heartbeatMonitor.roverWasAvailable()).toBe(true);
     expect(heartbeatMonitor.baseStationAvailable()).toBe(false);
     expect(baseStationConnection.client()).toBe(connectedBaseStationClient);
     expect(heartbeatMonitor.roverStatus()).toBe('connected');
@@ -219,6 +222,7 @@ describe('RosConnection and RosHeartbeatMonitor', () => {
 
     heartbeats[1].callback();
     expect(heartbeatMonitor.baseStationAvailable()).toBe(true);
+    expect(heartbeatMonitor.baseStationWasAvailable()).toBe(true);
     vi.advanceTimersByTime(2_000);
     heartbeats[0].callback();
     vi.advanceTimersByTime(1_000);
@@ -228,6 +232,7 @@ describe('RosConnection and RosHeartbeatMonitor', () => {
 
     vi.advanceTimersByTime(2_000);
     expect(heartbeatMonitor.roverAvailable()).toBe(false);
+    expect(heartbeatMonitor.roverWasAvailable()).toBe(true);
     expect(heartbeatMonitor.roverStatus()).toBe('waiting-for-rover');
     expect(service.client()).not.toBeNull();
     TestBed.flushEffects();
@@ -291,5 +296,22 @@ describe('RosConnection and RosHeartbeatMonitor', () => {
     expect(heartbeatMonitor.roverStatus()).toBe('waiting-for-rover');
     heartbeats[1].callback();
     expect(heartbeatMonitor.roverAvailable()).toBe(true);
+  });
+
+  it('keeps link history through reconnects until ROS Link is switched off', () => {
+    service.connect('ws://localhost:9090');
+    TestBed.flushEffects();
+    const client = service.client()!;
+    client.emit('connection', {} as never);
+    heartbeats[0].callback();
+
+    client.emit('close', {} as never);
+    TestBed.flushEffects();
+    expect(heartbeatMonitor.roverAvailable()).toBe(false);
+    expect(heartbeatMonitor.roverWasAvailable()).toBe(true);
+
+    heartbeatMonitor.resetLinkHistory();
+    expect(heartbeatMonitor.roverWasAvailable()).toBe(false);
+    expect(heartbeatMonitor.baseStationWasAvailable()).toBe(false);
   });
 });

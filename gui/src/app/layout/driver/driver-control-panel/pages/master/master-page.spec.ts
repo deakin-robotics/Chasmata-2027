@@ -12,12 +12,15 @@ describe('DriverMasterPage', () => {
   let component: DriverMasterPage;
   let fixture: ComponentFixture<DriverMasterPage>;
   let roverAvailable: WritableSignal<boolean>;
+  let roverWasAvailable: WritableSignal<boolean>;
   let roverConnectionStatus: WritableSignal<RosConnectionStatus>;
 
   beforeEach(async () => {
     roverAvailable = signal(false);
+    roverWasAvailable = signal(false);
     roverConnectionStatus = signal<RosConnectionStatus>('disconnected');
     const baseStationAvailable = signal(false);
+    const baseStationWasAvailable = signal(false);
     const baseStationConnectionStatus = signal<RosConnectionStatus>('disconnected');
     const connectionInProgress = signal(false);
 
@@ -28,7 +31,10 @@ describe('DriverMasterPage', () => {
           provide: RosHeartbeatMonitor,
           useValue: {
             roverAvailable: roverAvailable.asReadonly(),
+            roverWasAvailable: roverWasAvailable.asReadonly(),
             baseStationAvailable: baseStationAvailable.asReadonly(),
+            baseStationWasAvailable: baseStationWasAvailable.asReadonly(),
+            resetLinkHistory: vi.fn(),
           },
         },
         {
@@ -119,6 +125,7 @@ describe('DriverMasterPage', () => {
     expect(component.roverTopologyStatus()).toEqual({ label: 'Awaiting', tone: 'info' });
 
     roverAvailable.set(true);
+    roverWasAvailable.set(true);
     fixture.detectChanges();
     expect(component.roverTopologyStatus()).toEqual({ label: 'Online', tone: 'normal' });
 

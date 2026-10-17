@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, computed, effect, inject, untracked } from '@angular/core';
 
 import {
   ArmControlMode,
@@ -61,8 +61,6 @@ export class ArmMasterPage {
   private readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
   private readonly cameraFeedControl = inject(CameraFeedControl);
   private lastRequestedArmMode: ArmControlMode | null = null;
-  private readonly roverWasAvailable = signal(false);
-  private readonly baseStationWasAvailableForStatus = signal(false);
 
   private readonly armModeRequestEffect = effect(() => {
     const client = this.rosConnection.client();
@@ -82,26 +80,6 @@ export class ArmMasterPage {
 
       this.controlModeCoordinator.requestArmMode(targetMode);
       this.lastRequestedArmMode = targetMode;
-    });
-  });
-
-  private readonly roverTopologyEffect = effect(() => {
-    const status = this.rosConnection.status();
-    const available = this.heartbeatMonitor.roverAvailable();
-
-    untracked(() => {
-      if (status === 'disconnected') this.roverWasAvailable.set(false);
-      else if (available) this.roverWasAvailable.set(true);
-    });
-  });
-
-  private readonly baseStationTopologyEffect = effect(() => {
-    const status = this.baseStationConnection.status();
-    const available = this.heartbeatMonitor.baseStationAvailable();
-
-    untracked(() => {
-      if (status === 'disconnected') this.baseStationWasAvailableForStatus.set(false);
-      else if (available) this.baseStationWasAvailableForStatus.set(true);
     });
   });
 
@@ -130,14 +108,14 @@ export class ArmMasterPage {
     this.topologyStatus(
       this.rosConnection.status(),
       this.heartbeatMonitor.roverAvailable(),
-      this.roverWasAvailable(),
+      this.heartbeatMonitor.roverWasAvailable(),
     ),
   );
   readonly baseStationTopologyStatus = computed(() =>
     this.topologyStatus(
       this.baseStationConnection.status(),
       this.heartbeatMonitor.baseStationAvailable(),
-      this.baseStationWasAvailableForStatus(),
+      this.heartbeatMonitor.baseStationWasAvailable(),
     ),
   );
   readonly roverFlowTone = computed<ControlFlowConnectorTone>(

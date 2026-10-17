@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, computed, effect, inject, untracked } from '@angular/core';
 
 import { DriverControl } from '../../../../../core/control/drive/driver-control';
 import {
@@ -56,7 +56,6 @@ export class DriverMasterPage {
   private readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
   private readonly cameraFeedControl = inject(CameraFeedControl);
   private driveModeSynchronized = false;
-  private readonly roverWasAvailable = signal(false);
 
   private readonly modeHandshakeEffect = effect(() => {
     const client = this.rosConnection.client();
@@ -75,16 +74,6 @@ export class DriverMasterPage {
 
       this.driveModeSynchronized = true;
       this.controlModeCoordinator.synchronizeDriveModeFromRover();
-    });
-  });
-
-  private readonly roverTopologyEffect = effect(() => {
-    const status = this.rosConnection.status();
-    const available = this.heartbeatMonitor.roverAvailable();
-
-    untracked(() => {
-      if (status === 'disconnected') this.roverWasAvailable.set(false);
-      else if (available) this.roverWasAvailable.set(true);
     });
   });
 
@@ -111,7 +100,7 @@ export class DriverMasterPage {
     this.topologyStatus(
       this.rosConnection.status(),
       this.heartbeatMonitor.roverAvailable(),
-      this.roverWasAvailable(),
+      this.heartbeatMonitor.roverWasAvailable(),
     ),
   );
   readonly roverFlowTone = computed<ControlFlowConnectorTone>(

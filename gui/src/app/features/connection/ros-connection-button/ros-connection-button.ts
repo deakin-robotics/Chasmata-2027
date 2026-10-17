@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { environment } from '../../../../environments/environment';
 import { ArmControlModeService } from '../../../core/control/arm/arm-control-mode';
 import { ArmMode } from '../../../core/fma/fma-state.service';
@@ -14,8 +14,6 @@ export class RosConnectionButton {
   private readonly baseStationConnection = inject(BaseStationConnection);
   private readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
   private readonly armControlMode = inject(ArmControlModeService);
-  private readonly roverWasOnline = signal(false);
-  private readonly baseStationWasOnline = signal(false);
   readonly label = 'ROS Link';
   readonly checked = computed(() => {
     const roverStatus = this.roverConnection.status();
@@ -30,11 +28,15 @@ export class RosConnectionButton {
     const baseStationStatus = this.baseStationConnection.status();
     const roverOnline = this.heartbeatMonitor.roverAvailable();
     const baseStationOnline = this.heartbeatMonitor.baseStationAvailable();
-    const roverFailed = this.linkFailed(roverStatus, roverOnline, this.roverWasOnline());
+    const roverFailed = this.linkFailed(
+      roverStatus,
+      roverOnline,
+      this.heartbeatMonitor.roverWasAvailable(),
+    );
     const baseStationFailed = this.linkFailed(
       baseStationStatus,
       baseStationOnline,
-      this.baseStationWasOnline(),
+      this.heartbeatMonitor.baseStationWasAvailable(),
     );
 
     if (roverOnline && baseStationOnline) return 'normal';
@@ -44,23 +46,6 @@ export class RosConnectionButton {
   });
   readonly flashing = computed(() => this.checked() && this.tone() === 'info');
 
-  private readonly onlineHistoryEffect = effect(() => {
-    const checked = this.checked();
-    const roverOnline = this.heartbeatMonitor.roverAvailable();
-    const baseStationOnline = this.heartbeatMonitor.baseStationAvailable();
-
-    untracked(() => {
-      if (!checked) {
-        this.roverWasOnline.set(false);
-        this.baseStationWasOnline.set(false);
-        return;
-      }
-
-      if (roverOnline) this.roverWasOnline.set(true);
-      if (baseStationOnline) this.baseStationWasOnline.set(true);
-    });
-  });
-
   setConnected(connected: boolean): void {
     if (connected) {
       this.roverConnection.connect(environment.rosbridgeUrl);
@@ -68,8 +53,7 @@ export class RosConnectionButton {
       return;
     }
 
-    this.roverWasOnline.set(false);
-    this.baseStationWasOnline.set(false);
+    this.heartbeatMonitor.resetLinkHistory();
     this.armControlMode.setMode(ArmMode.Manual);
     this.roverConnection.disconnect();
     this.baseStationConnection.disconnect();

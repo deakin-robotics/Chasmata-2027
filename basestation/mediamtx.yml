@@ -9,9 +9,8 @@ webrtcEncryption: false
 webrtcAddress: :8889
 webrtcLocalUDPAddress: :8189
 webrtcLocalTCPAddress: ""
-# Local development overrides these values through Compose. Production runs with
-# host networking and discovers the BaseStation interfaces automatically.
-webrtcAllowOrigins: ["http://localhost:4200", "http://127.0.0.1:4200"]
+# Local development overrides this permissive trusted-LAN setting through Compose.
+webrtcAllowOrigins: ["*"]
 webrtcIPsFromInterfaces: true
 webrtcAdditionalHosts: ["localhost", "127.0.0.1"]
 

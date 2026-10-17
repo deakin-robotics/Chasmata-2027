@@ -18,6 +18,9 @@ describe('RosConnectionButton', () => {
   let baseStationStatus: WritableSignal<RosConnectionStatus>;
   let roverAvailable: WritableSignal<boolean>;
   let baseStationAvailable: WritableSignal<boolean>;
+  let roverWasAvailable: WritableSignal<boolean>;
+  let baseStationWasAvailable: WritableSignal<boolean>;
+  let resetLinkHistory: ReturnType<typeof vi.fn>;
   let setArmMode: ReturnType<typeof vi.fn>;
   beforeEach(async () => {
     roverStatus = signal<RosConnectionStatus>('disconnected');
@@ -25,6 +28,12 @@ describe('RosConnectionButton', () => {
     const connectionInProgress = signal(false);
     roverAvailable = signal(false);
     baseStationAvailable = signal(false);
+    roverWasAvailable = signal(false);
+    baseStationWasAvailable = signal(false);
+    resetLinkHistory = vi.fn(() => {
+      roverWasAvailable.set(false);
+      baseStationWasAvailable.set(false);
+    });
     roverConnect = vi.fn();
     baseStationConnect = vi.fn();
     roverDisconnect = vi.fn();
@@ -57,6 +66,9 @@ describe('RosConnectionButton', () => {
           useValue: {
             roverAvailable: roverAvailable.asReadonly(),
             baseStationAvailable: baseStationAvailable.asReadonly(),
+            roverWasAvailable: roverWasAvailable.asReadonly(),
+            baseStationWasAvailable: baseStationWasAvailable.asReadonly(),
+            resetLinkHistory,
           },
         },
         {
@@ -78,6 +90,7 @@ describe('RosConnectionButton', () => {
     fixture.componentInstance.setConnected(false);
 
     expect(setArmMode).toHaveBeenCalledWith(ArmMode.Manual);
+    expect(resetLinkHistory).toHaveBeenCalledOnce();
     expect(roverDisconnect).toHaveBeenCalledOnce();
     expect(baseStationDisconnect).toHaveBeenCalledOnce();
   });
@@ -96,12 +109,14 @@ describe('RosConnectionButton', () => {
 
     roverStatus.set('connected');
     roverAvailable.set(true);
+    roverWasAvailable.set(true);
     fixture.detectChanges();
     expect(fixture.componentInstance.tone()).toBe('info');
     expect(fixture.componentInstance.flashing()).toBe(true);
 
     baseStationStatus.set('connected');
     baseStationAvailable.set(true);
+    baseStationWasAvailable.set(true);
     fixture.detectChanges();
     expect(fixture.componentInstance.tone()).toBe('normal');
     expect(fixture.componentInstance.flashing()).toBe(false);
@@ -112,6 +127,8 @@ describe('RosConnectionButton', () => {
     baseStationStatus.set('connected');
     roverAvailable.set(true);
     baseStationAvailable.set(true);
+    roverWasAvailable.set(true);
+    baseStationWasAvailable.set(true);
     fixture.detectChanges();
 
     roverAvailable.set(false);

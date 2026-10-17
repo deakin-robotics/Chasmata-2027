@@ -13,6 +13,8 @@ describe('ArmMasterPage', () => {
   let fixture: ComponentFixture<ArmMasterPage>;
   let baseStationAvailable: ReturnType<typeof signal<boolean>>;
   let roverAvailable: ReturnType<typeof signal<boolean>>;
+  let baseStationWasAvailable: ReturnType<typeof signal<boolean>>;
+  let roverWasAvailable: ReturnType<typeof signal<boolean>>;
   let roverConnectionStatus: WritableSignal<RosConnectionStatus>;
   let baseStationConnectionStatus: WritableSignal<RosConnectionStatus>;
   let selectArmMode: ReturnType<typeof vi.fn>;
@@ -21,6 +23,8 @@ describe('ArmMasterPage', () => {
   beforeEach(async () => {
     baseStationAvailable = signal(false);
     roverAvailable = signal(false);
+    baseStationWasAvailable = signal(false);
+    roverWasAvailable = signal(false);
     roverConnectionStatus = signal<RosConnectionStatus>('disconnected');
     baseStationConnectionStatus = signal<RosConnectionStatus>('disconnected');
     const roverStatus = signal('disconnected');
@@ -37,6 +41,8 @@ describe('ArmMasterPage', () => {
           useValue: {
             baseStationAvailable: baseStationAvailable.asReadonly(),
             roverAvailable: roverAvailable.asReadonly(),
+            baseStationWasAvailable: baseStationWasAvailable.asReadonly(),
+            roverWasAvailable: roverWasAvailable.asReadonly(),
             roverStatus: roverStatus.asReadonly(),
             isRoverConnecting: isRoverConnecting.asReadonly(),
           },
@@ -119,6 +125,7 @@ describe('ArmMasterPage', () => {
     });
 
     roverAvailable.set(true);
+    roverWasAvailable.set(true);
     fixture.detectChanges();
     expect(fixture.componentInstance.roverTopologyStatus()).toEqual({
       label: 'Online',
@@ -148,6 +155,7 @@ describe('ArmMasterPage', () => {
     expect(requestArmMode).toHaveBeenCalledWith(ArmMode.Manual);
 
     baseStationAvailable.set(true);
+    baseStationWasAvailable.set(true);
     fixture.detectChanges();
 
     expect(requestArmMode).toHaveBeenLastCalledWith(ArmMode.Position);
@@ -166,12 +174,14 @@ describe('ArmMasterPage', () => {
   it('requests Manual after BaseStation loss and Position after recovery', () => {
     roverAvailable.set(true);
     baseStationAvailable.set(true);
+    baseStationWasAvailable.set(true);
     fixture.detectChanges();
 
     baseStationAvailable.set(false);
     fixture.detectChanges();
 
     baseStationAvailable.set(true);
+    baseStationWasAvailable.set(true);
     fixture.detectChanges();
 
     expect(requestArmMode.mock.calls).toEqual([
@@ -205,6 +215,7 @@ describe('ArmMasterPage', () => {
     });
 
     baseStationAvailable.set(true);
+    baseStationWasAvailable.set(true);
     fixture.detectChanges();
     expect(fixture.componentInstance.baseStationTopologyStatus()).toEqual({
       label: 'Online',
