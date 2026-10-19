@@ -1,0 +1,43 @@
+FROM rust:1.83-bookworm AS plugin-builder
+
+ARG GST_PLUGINS_RS_VERSION=0.14.2
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    git \
+    pkg-config \
+    libgstreamer1.0-dev \
+    libgstreamer-plugins-base1.0-dev \
+    libgstreamer-plugins-bad1.0-dev \
+    libnice-dev \
+    libsoup-3.0-dev \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git clone --depth 1 --branch "${GST_PLUGINS_RS_VERSION}" \
+    https://github.com/GStreamer/gst-plugins-rs.git /src/gst-plugins-rs
+
+WORKDIR /src/gst-plugins-rs
+
+RUN cargo build --release --package gst-plugin-webrtc --no-default-features --features whip
+
+FROM ubuntu:24.04
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    gstreamer1.0-tools \
+    gstreamer1.0-plugins-base \
+    gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-bad \
+    gstreamer1.0-plugins-ugly \
+    gstreamer1.0-nice \
+    libnice10 \
+    libsoup-3.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=plugin-builder /src/gst-plugins-rs/target/release/libgstrswebrtc.so \
+    /opt/gstreamer-plugins/libgstrswebrtc.so
+
+ENV GST_PLUGIN_PATH=/opt/gstreamer-plugins
+
+ENTRYPOINT ["/bin/sh"]

@@ -16,9 +16,6 @@ services:
       MTX_APIADDRESS: ":9997"
       MTX_WEBRTCADDITIONALHOSTS: "localhost,127.0.0.1"
       MTX_WEBRTCALLOWORIGINS: "http://localhost:4200,http://127.0.0.1:4200"
-      MTX_PATHS_FRONT_SOURCE: rtsp://rover-media-gateway:8554/front
-      MTX_PATHS_GIMBAL_SOURCE: rtsp://rover-media-gateway:8554/gimbal
-      MTX_PATHS_ARM_SOURCE: rtsp://rover-media-gateway:8554/arm
       MTX_AUTHINTERNALUSERS_2_USER: any
       MTX_AUTHINTERNALUSERS_2_PERMISSIONS_0_ACTION: api
     volumes:

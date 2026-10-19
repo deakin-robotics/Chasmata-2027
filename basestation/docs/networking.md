@@ -15,11 +15,15 @@ MediaMTX uses the BaseStation host network and automatically advertises its
 available interfaces for WebRTC UDP media on `8189`. Operator browsers select
 the reachable BaseStation LAN candidate.
 
+Rover camera publishers connect directly to BaseStation MediaMTX using WHIP on
+TCP `8889`; WebRTC media uses UDP `8189`. Command owns radio access between
+Rover and BaseStation and must permit both flows.
+
 ## Required BaseStation `.env` values
 
 | Variable | Purpose |
 | --- | --- |
-| `ROVER_HOST` | Rover static LAN IP used for Fast DDS discovery, ROSbridge, and MediaMTX RTSP |
+| `ROVER_HOST` | Rover static LAN IP used for Fast DDS discovery and ROSbridge |
 
 The trusted club LAN remains HTTP-only for this release. Command owns static
 addresses, firewall access, and radio access between BaseStation and Rover.

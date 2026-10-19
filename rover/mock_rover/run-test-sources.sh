@@ -7,8 +7,8 @@ set -eu
 : "${MEDIA_BITRATE_KBPS:=2500}"
 : "${MEDIA_BUFFER_KBPS:=5000}"
 : "${MEDIA_KEYFRAME_INTERVAL:=30}"
-: "${MEDIA_GATEWAY_HOST:=media-gateway}"
-: "${MEDIA_GATEWAY_RTSP_PORT:=8554}"
+: "${BASE_STATION_MEDIA_HOST:=media-gateway}"
+: "${BASE_STATION_MEDIA_PORT:=8889}"
 
 pids=""
 
@@ -23,36 +23,25 @@ trap cleanup INT TERM EXIT
 
 publish_stream() {
   name="$1"
-  filter="$2"
+  pattern="$2"
+  horizontal_speed="$3"
+  buffer_ms=$((MEDIA_BUFFER_KBPS * 1000 / MEDIA_BITRATE_KBPS))
 
-  ffmpeg \
-    -hide_banner \
-    -loglevel warning \
-    -re \
-    -f lavfi \
-    -i "testsrc2=size=${MEDIA_WIDTH}x${MEDIA_HEIGHT}:rate=${MEDIA_FPS}" \
-    -vf "$filter" \
-    -an \
-    -c:v libx264 \
-    -profile:v baseline \
-    -level 3.1 \
-    -preset ultrafast \
-    -tune zerolatency \
-    -pix_fmt yuv420p \
-    -b:v "${MEDIA_BITRATE_KBPS}k" \
-    -maxrate "${MEDIA_BITRATE_KBPS}k" \
-    -bufsize "${MEDIA_BUFFER_KBPS}k" \
-    -g "$MEDIA_KEYFRAME_INTERVAL" \
-    -bf 0 \
-    -f rtsp \
-    -rtsp_transport tcp \
-    "rtsp://${MEDIA_GATEWAY_HOST}:${MEDIA_GATEWAY_RTSP_PORT}/${name}" &
+  gst-launch-1.0 -q \
+    videotestsrc is-live=true pattern="$pattern" horizontal-speed="$horizontal_speed" \
+    ! "video/x-raw,width=${MEDIA_WIDTH},height=${MEDIA_HEIGHT},framerate=${MEDIA_FPS}/1" \
+    ! videoconvert \
+    ! x264enc bitrate="$MEDIA_BITRATE_KBPS" speed-preset=ultrafast tune=zerolatency \
+        key-int-max="$MEDIA_KEYFRAME_INTERVAL" bframes=0 vbv-buf-capacity="$buffer_ms" \
+    ! "video/x-h264,profile=baseline" \
+    ! whipclientsink congestion-control=disabled \
+        signaller::whip-endpoint="http://${BASE_STATION_MEDIA_HOST}:${BASE_STATION_MEDIA_PORT}/${name}/whip" &
 
   pids="$pids $!"
 }
 
-publish_stream front 'null'
-publish_stream gimbal 'hue=h=90'
-publish_stream arm 'hue=h=180'
+publish_stream front smpte 1
+publish_stream gimbal smpte75 -2
+publish_stream arm ball 0
 
 wait $pids

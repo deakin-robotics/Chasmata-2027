@@ -13,10 +13,10 @@ docker compose up --build
 ```
 
 The Compose stack runs the mock node, the Rover-primary ECAM snapshot
-aggregator, and ROSbridge on port `9090`, a rover-side
-discovery service on UDP port `11811`, rover MediaMTX, and three synthetic
-H.264 RTSP publishers. The BaseStation stack consumes ROSbridge and camera
-streams. The hosted operator GUI connects through the BaseStation web proxy.
+aggregator, and ROSbridge on port `9090`, a rover-side discovery service on UDP
+port `11811`, and three synthetic H.264 WebRTC publishers. The BaseStation
+stack consumes ROSbridge and camera streams. The hosted operator GUI connects
+through the BaseStation web proxy.
 
 The mock rover and base-station stacks can start in either order. The mock
 rover ROS services use host networking, so the base station can reach the
@@ -28,40 +28,29 @@ The ROS containers also share host IPC. Fast DDS uses shared memory between
 containers it detects on the same host; host networking without shared IPC can
 leave ROSbridge unable to receive topics from another container.
 
-For camera RTSP between the two local Compose stacks, create their shared
-Docker network once before starting either stack:
+For direct WebRTC camera publishing between the two local Compose stacks,
+create their shared Docker network once before starting either stack:
 
 ```bash
 docker network create chasmata-local-media
 ```
 
-The synthetic publishers target the rover MediaMTX Compose service at
-`media-gateway:8554`. The base-station MediaMTX pulls those feeds over RTSP.
-the local base-station gateway reaches the rover gateway at
-`rover-media-gateway:8554` over the shared Docker network. When running the
-mock rover stack on a separate PC, the base-station RTSP source must use that
-PC's address.
+The synthetic publishers connect directly to Base station MediaMTX over the
+shared Docker network. When the mock rover runs on a separate PC, set
+`BASE_STATION_MEDIA_HOST` to the Base station's static radio/LAN IP. WHIP
+signalling uses TCP `8889` and WebRTC media uses UDP `8189`.
 
-The mock rover's local gateway ports are:
-
-| Purpose                             | Host port  |
-| ----------------------------------- | ---------- |
-| RTSP published host port for local testing | TCP `8555` |
-
-The production rover gateway publishes RTSP on `8554` for the BaseStation
-MediaMTX pulls.
-
-To publish synthetic feeds to a differently named rover-gateway service, set
-`MEDIA_GATEWAY_HOST` and `MEDIA_GATEWAY_RTSP_PORT`:
+To publish synthetic feeds to a differently named Base station media service,
+set `BASE_STATION_MEDIA_HOST` and `BASE_STATION_MEDIA_PORT`:
 
 ```bash
-MEDIA_GATEWAY_HOST=media-gateway MEDIA_GATEWAY_RTSP_PORT=8554 docker compose up --build
+BASE_STATION_MEDIA_HOST=media-gateway BASE_STATION_MEDIA_PORT=8889 docker compose up --build
 ```
 
 The default synthetic profile is 1280×720 at 30 FPS using H.264. Override it
 with `MEDIA_WIDTH`, `MEDIA_HEIGHT`, `MEDIA_FPS`, `MEDIA_BITRATE_KBPS`,
-`MEDIA_BUFFER_KBPS`, `MEDIA_KEYFRAME_INTERVAL`, `MEDIA_GATEWAY_HOST`, and
-`MEDIA_GATEWAY_RTSP_PORT`.
+`MEDIA_BUFFER_KBPS`, `MEDIA_KEYFRAME_INTERVAL`, `BASE_STATION_MEDIA_HOST`, and
+`BASE_STATION_MEDIA_PORT`.
 
 ## Simulated behaviour
 
@@ -94,9 +83,9 @@ with `MEDIA_WIDTH`, `MEDIA_HEIGHT`, `MEDIA_FPS`, `MEDIA_BITRATE_KBPS`,
   it applies only the J4-J6 wrist input. Partial trajectory execution
   preserves the other joints.
 - Publishes actual arm state on `/arm/joint_states` at 10 Hz.
-- Publishes distinct synthetic H.264 RTSP feeds to rover MediaMTX's `front`,
-  `gimbal`, and `arm` paths. Base-station MediaMTX pulls the same paths for
-  browser playback through the hosted BaseStation GUI.
+- Publishes distinct synthetic H.264 WHIP/WebRTC feeds directly to Base station
+  MediaMTX's `front`, `gimbal`, and `arm` paths for browser playback through
+  the hosted BaseStation GUI.
 
 The default joint names match the current GUI URDF:
 
