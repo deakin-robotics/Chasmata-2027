@@ -31,7 +31,6 @@ services:
     entrypoint: ["/bin/sh", "/run-test-sources.sh"]
     environment:
       BASE_STATION_MEDIA_HOST: "${BASE_STATION_MEDIA_HOST:-media-gateway}"
-      BASE_STATION_MEDIA_PORT: "${BASE_STATION_MEDIA_PORT:-8889}"
       MEDIA_WIDTH: "${MEDIA_WIDTH:-1280}"
       MEDIA_HEIGHT: "${MEDIA_HEIGHT:-720}"
       MEDIA_FPS: "${MEDIA_FPS:-30}"

@@ -8,7 +8,6 @@ set -eu
 : "${MEDIA_BUFFER_KBPS:=5000}"
 : "${MEDIA_KEYFRAME_INTERVAL:=30}"
 : "${BASE_STATION_MEDIA_HOST:=media-gateway}"
-: "${BASE_STATION_MEDIA_PORT:=8889}"
 
 pids=""
 
@@ -35,7 +34,7 @@ publish_stream() {
         key-int-max="$MEDIA_KEYFRAME_INTERVAL" bframes=0 vbv-buf-capacity="$buffer_ms" \
     ! "video/x-h264,profile=baseline" \
     ! whipclientsink congestion-control=disabled \
-        signaller::whip-endpoint="http://${BASE_STATION_MEDIA_HOST}:${BASE_STATION_MEDIA_PORT}/${name}/whip" &
+        signaller::whip-endpoint="http://${BASE_STATION_MEDIA_HOST}:8889/${name}/whip" &
 
   pids="$pids $!"
 }

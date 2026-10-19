@@ -28,29 +28,12 @@ The ROS containers also share host IPC. Fast DDS uses shared memory between
 containers it detects on the same host; host networking without shared IPC can
 leave ROSbridge unable to receive topics from another container.
 
-For direct WebRTC camera publishing between the two local Compose stacks,
-create their shared Docker network once before starting either stack:
-
-```bash
-docker network create chasmata-local-media
-```
-
-The synthetic publishers connect directly to Base station MediaMTX over the
-shared Docker network. When the mock rover runs on a separate PC, set
-`BASE_STATION_MEDIA_HOST` to the Base station's static radio/LAN IP. WHIP
-signalling uses TCP `8889` and WebRTC media uses UDP `8189`.
-
-To publish synthetic feeds to a differently named Base station media service,
-set `BASE_STATION_MEDIA_HOST` and `BASE_STATION_MEDIA_PORT`:
-
-```bash
-BASE_STATION_MEDIA_HOST=media-gateway BASE_STATION_MEDIA_PORT=8889 docker compose up --build
-```
+See the shared [networking documentation](../../docs/networking.md) for the
+camera endpoint, required ports, and hostname setup.
 
 The default synthetic profile is 1280×720 at 30 FPS using H.264. Override it
 with `MEDIA_WIDTH`, `MEDIA_HEIGHT`, `MEDIA_FPS`, `MEDIA_BITRATE_KBPS`,
-`MEDIA_BUFFER_KBPS`, `MEDIA_KEYFRAME_INTERVAL`, `BASE_STATION_MEDIA_HOST`, and
-`BASE_STATION_MEDIA_PORT`.
+`MEDIA_BUFFER_KBPS`, `MEDIA_KEYFRAME_INTERVAL`, and `BASE_STATION_MEDIA_HOST`.
 
 ## Simulated behaviour
 

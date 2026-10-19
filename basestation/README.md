@@ -43,4 +43,5 @@ MoveIt Position mode and shared ECAM state.
 BaseStation MediaMTX receives the three rover WHIP/WebRTC camera streams, then
 serves operator WebRTC sessions locally.
 
-See [networking](docs/networking.md) for LAN ports and configuration values.
+See the shared [networking documentation](../docs/networking.md) for addresses,
+ports, and service flows.
