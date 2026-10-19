@@ -1,17 +1,4 @@
 services:
-  media-gateway:
-    image: bluenviron/mediamtx:1.21.1
-    volumes:
-      - ./mediamtx.yml:/mediamtx.yml:ro
-    ports:
-      - "8555:8554"
-    networks:
-      default: {}
-      local-media:
-        aliases:
-          - rover-media-gateway
-    restart: unless-stopped
-
   discovery:
     build:
       context: ../..
@@ -38,11 +25,12 @@ services:
     restart: unless-stopped
 
   media-source:
-    image: bluenviron/mediamtx:1.21.1-ffmpeg
+    build:
+      context: .
+      dockerfile: Dockerfile.media-source
     entrypoint: ["/bin/sh", "/run-test-sources.sh"]
     environment:
-      MEDIA_GATEWAY_HOST: "${MEDIA_GATEWAY_HOST:-media-gateway}"
-      MEDIA_GATEWAY_RTSP_PORT: "${MEDIA_GATEWAY_RTSP_PORT:-8554}"
+      BASE_STATION_MEDIA_HOST: "${BASE_STATION_MEDIA_HOST:-media-gateway}"
       MEDIA_WIDTH: "${MEDIA_WIDTH:-1280}"
       MEDIA_HEIGHT: "${MEDIA_HEIGHT:-720}"
       MEDIA_FPS: "${MEDIA_FPS:-30}"
@@ -51,8 +39,8 @@ services:
       MEDIA_KEYFRAME_INTERVAL: "${MEDIA_KEYFRAME_INTERVAL:-30}"
     volumes:
       - ./run-test-sources.sh:/run-test-sources.sh:ro
-    depends_on:
-      - media-gateway
+    networks:
+      local-media: {}
     restart: unless-stopped
 
 networks:

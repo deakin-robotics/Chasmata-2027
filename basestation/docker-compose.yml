@@ -4,9 +4,6 @@ services:
     network_mode: host
     environment:
       MTX_WEBRTCIPSFROMINTERFACES: "yes"
-      MTX_PATHS_FRONT_SOURCE: "rtsp://${ROVER_HOST:-192.168.1.20}:8554/front"
-      MTX_PATHS_GIMBAL_SOURCE: "rtsp://${ROVER_HOST:-192.168.1.20}:8554/gimbal"
-      MTX_PATHS_ARM_SOURCE: "rtsp://${ROVER_HOST:-192.168.1.20}:8554/arm"
       MTX_AUTHINTERNALUSERS_2_USER: any
       MTX_AUTHINTERNALUSERS_2_PERMISSIONS_0_ACTION: api
     volumes:

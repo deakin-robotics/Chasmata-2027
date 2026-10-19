@@ -1,8 +1,6 @@
 logLevel: info
 
 rtsp: false
-rtspTransports: [tcp]
-rtspAddress: :8554
 
 webrtc: true
 webrtcEncryption: false
@@ -21,10 +19,7 @@ apiAddress: 127.0.0.1:9997
 paths:
   front:
     source: publisher
-    rtspTransport: tcp
   gimbal:
     source: publisher
-    rtspTransport: tcp
   arm:
     source: publisher
-    rtspTransport: tcp
