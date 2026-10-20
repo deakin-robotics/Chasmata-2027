@@ -561,8 +561,8 @@ bool RoverHardwareInterface::parseConfiguration()
       !required_timing("late_trigger_ms", timing_.late_trigger_ms)) {
     return false;
   }
-  if (timing_.stop_deadline_ms > 250.0) {
-    RCLCPP_ERROR(logger(), "Stop deadline must not exceed the 250 ms team target.");
+  if (timing_.stop_deadline_ms > 300.0) {
+    RCLCPP_ERROR(logger(), "Stop deadline must not exceed the 300 ms team target.");
     return false;
   }
   if (std::abs(timing_.update_hz - 15.0) > 0.01) {

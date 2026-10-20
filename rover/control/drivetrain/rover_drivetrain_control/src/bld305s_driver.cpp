@@ -443,7 +443,7 @@ Bld305sDriver::Result Bld305sDriver::endCycle()
   if (!cycle_active_) {
     return {ErrorCode::INVALID_CYCLE_STATE, 0, 0};
   }
-  // V0.4 minimum mandatory cycle: speed setpoint, actual-speed read, fault read.
+  // Minimum mandatory cycle: speed setpoint, actual-speed read, fault read.
   // Diagnostics are additional rotating reads and do not relax these.
   // KNOWN PROBLEM: readFaultRaw() returns UNSUPPORTED (fault register unknown),
   // so no real cycle can reach this count yet. Only the mock does, via diagnostic reads.

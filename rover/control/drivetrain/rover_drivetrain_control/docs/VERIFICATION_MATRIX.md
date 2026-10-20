@@ -11,7 +11,7 @@ This is a tracked artifact, **not** an acceptance certificate.
 | Wheel speed translated to motor speed and direction | `core::translateWheelSpeed` handles wheel rad/s, 50:1 configurable ratio, mirror direction | Unit tested; raw Modbus speed scaling/control words **UNVERIFIED** |
 | 15 Hz drivetrain rate at 38,400 baud | 15 Hz parameter required, 38,400 baud required | Arithmetic only; worker schedule not yet implemented, bus timing not measured |
 | Per-wheel telemetry (speed, faults) | `WheelTelemetry` message and raw telemetry methods; diagnostics node publishes probe results | No plugin publisher; actual speed 0x005F and fault register unverified |
-| Wheels stop within the 250 ms target after commands stop | `core::validateTiming` checks two periods + upstream + stop wire budget <= explicit stop deadline | **NO** stop-ACK implementation/test; watchdog missing |
+| Wheels stop within the 300 ms target after commands stop | `core::validateTiming` checks two periods + upstream + stop wire budget <= explicit stop deadline | **NO** stop-ACK implementation/test; watchdog missing |
 | No automatic re-arming after a stop or fault | Current plugin cannot activate | Deliberately fail-closed; no re-arming implemented |
 | Worst-case bus utilization at most 50% | `core::validateTiming` refuses >50% worst-case bus utilization | Requires measured `worst_bus_cycle_ms` |
 | Communication health counted per cycle: data invalid after two missed cycles, drive lost after three | `beginCycle`/`endCycle`, per-slave cycle counters, `telemetryValid()`, mock tests | Implemented but **NOT connected to live worker**; true bus failure vs two silent slaves unresolved |
@@ -44,7 +44,7 @@ This is a tracked artifact, **not** an acceptance certificate.
 - [ ] Fault mapping and message contract signed by Forrest and GUI team
 - [ ] Independent physical enable-line watchdog agreed and tested
 - [ ] Actual wheel/gearbox geometry, wheel-to-slave mapping, forward sign check
-- [ ] 250 ms end-to-end last-valid-command -> four **acknowledged** stops including skipped cycle
+- [ ] 300 ms end-to-end last-valid-command -> four **acknowledged** stops including skipped cycle
 - [ ] Before powered tests: verify E-stop, wheel off ground, current limit, power-cut watcher
 
 **Stop criterion:** A successful `colcon build` and a plugin that loads do **not** establish motor readiness or the physical stop requirement.

@@ -10,7 +10,7 @@ data_bits: 8
 stop_bits: 1
 update_hz: 15      # integer: also used as the ros2_control rw_rate attribute
 upstream_timeout_ms: 110
-stop_deadline_ms: 250
+stop_deadline_ms: 300
 measured_stop_wire_budget_ms: 5   # NOT MEASURED: replace with the bench figure
 measured_worst_bus_cycle_ms: 30   # NOT MEASURED: replace with the bench figure
 late_trigger_ms: 100

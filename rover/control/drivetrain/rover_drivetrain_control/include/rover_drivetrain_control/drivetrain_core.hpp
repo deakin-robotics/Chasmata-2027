@@ -13,7 +13,7 @@ struct TimingConfig
 {
   double update_hz{0.0};               // required; target 15 Hz
   double upstream_timeout_ms{0.0};     // required; owned upstream
-  double stop_deadline_ms{0.0};        // required; team target 250 ms
+  double stop_deadline_ms{0.0};        // required; team target 300 ms
   double stop_wire_budget_ms{0.0};     // required; MEASURE on bench
   double worst_bus_cycle_ms{0.0};      // required; MEASURE on bench
   double late_trigger_ms{0.0};         // required; no safety default

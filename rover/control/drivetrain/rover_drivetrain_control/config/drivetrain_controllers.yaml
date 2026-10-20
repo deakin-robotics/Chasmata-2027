@@ -6,7 +6,7 @@
 /drivetrain/controller_manager:
   ros__parameters:
     # 100 Hz so diff_drive's cmd_vel_timeout fires within 10 ms of 110 ms, keeping
-    # the 250 ms stop target. The hardware itself still reads and writes
+    # the 300 ms stop target. The hardware itself still reads and writes
     # at 15 Hz (rw_rate in the ros2_control tag).
     update_rate: 100
 

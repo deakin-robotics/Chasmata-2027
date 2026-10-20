@@ -155,7 +155,7 @@ Right-side mirroring is handled in the hardware interface, so positive values ar
 
 ## Robot-description integration (not a production launch)
 
-`config/ros2_control_example.xacro` shows an explicit parameter contract. It is a **macro/template**, not a standalone URDF or runnable controller manager. Supply the wheel names used by the team's actual CAD-generated URDF and confirm slave-to-wheel mapping with Forrest. The example enables `is_async=true`, `rw_rate=15`; verify their behavior against installed Jazzy. **Do not add a second controller manager to a running shared namespace** until the arm/drivetrain namespace decision is agreed.
+`config/ros2_control_example.xacro` shows an explicit parameter contract. It is a **macro/template**, not a standalone URDF or runnable controller manager. Supply the wheel names used by the team's actual CAD-generated URDF and confirm slave-to-wheel mapping with Forrest. The example enables `is_async=true`, `rw_rate=15`; verify their behavior against installed Jazzy. The arm and the drivetrain each have their own controller manager and robot description (agreed with Forrest). The drivetrain's runs in `/drivetrain`; don't start a second controller manager in that namespace.
 
 Current hardware parameters include `left/right_serial_device`, `left/right_baud_rate`, `left/right_parity`, `left/right_data_bits`, `left/right_stop_bits`, optional per-bus `*_response_timeout_ms` (provisional 30 ms), and REQUIRED `update_hz`, `upstream_timeout_ms`, `stop_deadline_ms`, `measured_stop_wire_budget_ms`, `measured_worst_bus_cycle_ms`, and `late_trigger_ms`. Wheel params: `bus`, `slave_id`, `gear_ratio`, `mirrored`, and `motor_rpm_limit`.
 
@@ -168,12 +168,12 @@ The production wrapper **intentionally refuses** `on_configure()`, `on_activate(
 3. **Register verification:** Raw actual speed `0x005F`, speed scaling, right-side direction and `0x0136/0x0116` initialization are not verified under the manual-page-plus-bench criterion. Do not claim odometry accuracy or start motors.
 4. **Faults:** Fault register and fault-code response are unresolved. The `readFaultRaw()` operation returns `UNSUPPORTED`. The intended stop-all behavior needs agreement with Forrest.
 5. **Telemetry contract:** The telemetry messages are read-only and logging-only (confirmed by Forrest), but topic name, rate and production publisher are not yet agreed with the GUI team. The hardware plugin publishes nothing yet; only the diagnostics node publishes its probe results.
-6. **Stop timing:** The upstream `/joy` converter and command arrival timeout are owned upstream; 250 ms is a team target, not a cited competition rule. An end-to-end timed stop-ACK test is mandatory.
+6. **Stop timing:** The upstream `/joy` converter and command arrival timeout are owned upstream; 300 ms is a team target, not a cited competition rule. An end-to-end timed stop-ACK test is mandatory.
 7. **Bus timing:** Measure real bus/adapter exchanges. A late USB adapter could invalidate the 15 Hz/50% bus budget even at 38,400 baud.
-8. **Namespaces:** Separate controller managers/namespaces are proposed, **not agreed** with Forrest.
+8. **Namespaces:** Agreed with Forrest: the arm and the drivetrain each have their own controller manager and robot description. The drivetrain's runs in `/drivetrain`.
 9. Verify Jazzy `on_init()` signature, interface export behavior after failed init, `read/write ERROR` effect, `on_deactivate ERROR` behavior, pluginlib registration, and `is_async` schedule with *actual installed* ROS 2. A successful compile is not proof of these runtime details.
 
-Forrest's four requests are addressed structurally; motor motion, physical watchdog and the 250 ms requirement are **not** delivered or claimed.
+Forrest's four requests are addressed structurally; motor motion, physical watchdog and the 300 ms requirement are **not** delivered or claimed.
 
 ## Review items awaiting team decisions (not silently fixed)
 
