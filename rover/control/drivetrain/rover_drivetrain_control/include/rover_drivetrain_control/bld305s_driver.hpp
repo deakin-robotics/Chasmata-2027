@@ -20,7 +20,7 @@ public:
   struct RtuConfig
   {
     std::string device;
-    int baud_rate{0};  // REQUIRED: 38400 design target; provision with vendor tool
+    int baud_rate{0};  // REQUIRED: 38400 target; provision with vendor tool
     char parity{'\0'};
     int data_bits{0};
     int stop_bits{0};
@@ -76,7 +76,7 @@ public:
   {
     CommunicationState communication{CommunicationState::UNKNOWN};
     ControllerState controller{ControllerState::UNKNOWN};
-    std::uint32_t consecutive_failures{0};  // consecutive FAILED CYCLES, AD-15
+    std::uint32_t consecutive_failures{0};  // consecutive FAILED CYCLES, not exchanges
     bool telemetry_valid{false};
     bool skip_remaining_cycle{false};
     bool exchange_failed_cycle{false};
@@ -84,7 +84,7 @@ public:
     std::uint8_t success_count_cycle{0};
   };
 
-  static constexpr int DESIGN_BAUD_RATE = 38400;  // AD-07, bench-gated
+  static constexpr int TARGET_BAUD_RATE = 38400;  // target baud, bench-gated
 
   explicit Bld305sDriver(RtuConfig config);
   ~Bld305sDriver();
@@ -97,7 +97,7 @@ public:
   [[nodiscard]] Result open();
 
   // Explicit per-cycle accounting, required to distinguish three failed
-  // exchanges inside one cycle from three consecutive failed cycles (AD-15).
+  // exchanges inside one cycle from three consecutive failed cycles.
   // Caller MUST invoke beginCycle/endCycle once per 15 Hz control cycle.
   // Any failed transaction skips this slave's remaining exchanges this cycle.
   [[nodiscard]] Result beginCycle(std::uint8_t first_id, std::uint8_t second_id);
@@ -109,7 +109,7 @@ public:
     std::uint8_t slave_id,
     std::uint16_t raw_speed);
 
-  // Reading a command SETPOINT is not a speed measurement (OI-17).
+  // Reading a command SETPOINT is not a speed measurement.
   // This is retained only for raw investigation and should never feed odometry.
   [[nodiscard]] Result readSpeedRaw(
     std::uint8_t slave_id,
@@ -120,7 +120,7 @@ public:
     std::uint16_t raw_control);
 
   // 0x005F is a provisional ACTUAL speed address from software sources only.
-  // Raw value is never converted to rad/s without verification (AD-23).
+  // Raw value is never converted to rad/s without verification against the manual and a bench read-back.
   [[nodiscard]] Result readActualSpeedRaw(
     std::uint8_t slave_id, std::uint16_t & raw_speed);
 
@@ -163,7 +163,7 @@ private:
   // UNVERIFIED — cross-check against manual
   static constexpr std::uint16_t CONTROL_REGISTER = 0x0066;
 
-  // UNVERIFIED — actual speed register; OI-17 / AD-23
+  // UNVERIFIED — actual speed register; needs manual and bench confirmation
   static constexpr std::uint16_t ACTUAL_SPEED_REGISTER = 0x005F;
 
   // UNVERIFIED — cross-check against manual

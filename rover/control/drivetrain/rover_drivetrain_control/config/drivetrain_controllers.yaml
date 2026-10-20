@@ -1,0 +1,48 @@
+# Drivetrain controller manager in its own namespace (/drivetrain).
+# Both drive controllers claim the same four wheel velocity command interfaces,
+# so ros2_control allows only one of them to be active at a time:
+#   diff_drive_controller      default; teleop on /drivetrain/diff_drive_controller/cmd_vel
+#   wheel_velocity_controller  per-wheel; fed by direct_drive_relay; starts inactive
+/drivetrain/controller_manager:
+  ros__parameters:
+    # 100 Hz so diff_drive's cmd_vel_timeout fires within 10 ms of 110 ms, keeping
+    # the 300 ms stop target. The hardware itself still reads and writes
+    # at 15 Hz (rw_rate in the ros2_control tag).
+    update_rate: 100
+
+    hardware_components_initial_state:
+      # The hardware refuses on_configure() today, until it is verified.
+      # Unconfigured hardware cannot be activated, so no controller can claim the
+      # wheels and staying up is safe. It also keeps the controller manager
+      # running so the failure can be inspected instead of the launch exiting.
+      shutdown_on_initial_state_failure: false
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+    diff_drive_controller:
+      type: diff_drive_controller/DiffDriveController
+    wheel_velocity_controller:
+      type: forward_command_controller/ForwardCommandController
+
+/drivetrain/diff_drive_controller:
+  ros__parameters:
+    left_wheel_names: [front_left_wheel_joint, rear_left_wheel_joint]
+    right_wheel_names: [front_right_wheel_joint, rear_right_wheel_joint]
+    wheel_radius: 0.1      # m, PLACEHOLDER: measure on the rover
+    wheel_separation: 0.5  # m, PLACEHOLDER: measure on the rover
+    cmd_vel_timeout: 0.11  # s; stop when cmd_vel goes quiet
+    position_feedback: false  # the hardware exports velocity state only
+    base_frame_id: base_link
+    odom_frame_id: odom
+    enable_odom_tf: false  # odometry is unverified (actual speed register unconfirmed); publish no TF
+    publish_rate: 15.0
+
+/drivetrain/wheel_velocity_controller:
+  ros__parameters:
+    # Also the order of /drivetrain/direct/wheel_speeds (rad/s).
+    joints:
+      - front_left_wheel_joint
+      - rear_left_wheel_joint
+      - front_right_wheel_joint
+      - rear_right_wheel_joint
+    interface_name: velocity
