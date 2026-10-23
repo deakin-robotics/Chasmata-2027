@@ -4,6 +4,7 @@ install/
 log/
 .devcontainer/
 old_code/
+/tmp/
 
 # Python bytecode caches
 __pycache__/

@@ -127,7 +127,7 @@ BaseStation paths.
 
 For local WebRTC camera development and validation, see
 [WebRTC camera stream](docs/webrtc-camera-stream.md). It covers the
-base-station MediaMTX gateway, mock-rover RTSP publishers, WHEP endpoints,
+base-station MediaMTX gateway, mock-rover WHIP/WebRTC publishers, WHEP endpoints,
 video configuration, and smoke testing.
 
 ## 🏗️ Architecture
