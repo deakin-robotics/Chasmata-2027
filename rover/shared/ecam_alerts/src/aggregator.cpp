@@ -212,7 +212,7 @@ void EcamAlertAggregator::publish_next_replay_snapshot()
 void EcamAlertAggregator::publish_combined()
 {
   telemetry_interfaces::msg::EcamAlerts message;
-  message.timestamp = get_clock()->now().to_msg();
+  message.timestamp = get_clock()->now();
   message.authority = role_;
   for (const auto & source_snapshot : source_state_.snapshots()) {
     telemetry_interfaces::msg::EcamAlertSourceSnapshot snapshot;

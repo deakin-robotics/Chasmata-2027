@@ -90,7 +90,7 @@ void EcamAlertSource::publish_snapshot()
 {
   telemetry_interfaces::msg::EcamAlertSourceSnapshot message;
   message.source = source_;
-  message.timestamp = node_.get_clock()->now().to_msg();
+  message.timestamp = node_.get_clock()->now();
   message.active_codes = active_codes_;
   last_snapshot_timestamp_ = message.timestamp;
   publisher_->publish(message);

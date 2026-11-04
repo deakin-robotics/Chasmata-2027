@@ -72,14 +72,14 @@ protected:
 
 TEST_F(EcamAggregationTest, RoverPrimaryFailsOverAndHandsBackReflectedSources)
 {
-  auto rover = std::make_shared<ecam_alerts::EcamAlertAggregator>("rover", 0.25, "test_rover");
-  auto base = std::make_shared<ecam_alerts::EcamAlertAggregator>("basestation", 0.25, "test_base");
+  auto rover = std::make_shared<ecam_alerts::EcamAlertAggregator>("rover", 0.6, "test_rover");
+  auto base = std::make_shared<ecam_alerts::EcamAlertAggregator>("basestation", 0.6, "test_base");
   auto source_node = std::make_shared<rclcpp::Node>("test_ecam_source");
   ecam_alerts::EcamAlertSource driver(*source_node, "driver");
   ecam_alerts::EcamAlertSource arm(*source_node, "arm");
   auto heartbeat = source_node->create_publisher<std_msgs::msg::Empty>(
     ecam_alerts::kRoverHeartbeatTopic, rclcpp::QoS(1));
-  auto heartbeat_timer = source_node->create_wall_timer(50ms, [&heartbeat]() {
+  auto heartbeat_timer = source_node->create_wall_timer(100ms, [&heartbeat]() {
     heartbeat->publish(std_msgs::msg::Empty{});
   });
   std::vector<telemetry_interfaces::msg::EcamAlerts> observed;
@@ -90,12 +90,18 @@ TEST_F(EcamAggregationTest, RoverPrimaryFailsOverAndHandsBackReflectedSources)
   executor_.add_node(base);
   executor_.add_node(source_node);
 
+  // Establish the heartbeat and transient-local subscriptions before testing failover.
+  spin_for(300ms);
+
   driver.raise_alert("TEST_DRIVER_ALERT");
   ASSERT_TRUE(wait_for([&observed] {
     return std::any_of(observed.rbegin(), observed.rend(), [](const auto & message) {
       return has_code(message, "rover", "driver", "TEST_DRIVER_ALERT");
     });
   }, 1s));
+
+  // Let BaseStation consume Rover's combined snapshot before Rover is withdrawn.
+  spin_for(200ms);
 
   heartbeat_timer->cancel();
   ASSERT_TRUE(wait_for([&observed] {
@@ -173,3 +179,5 @@ TEST_F(EcamAggregationTest, BaseStationRaisesAndClearsHeartbeatLost)
   executor_.remove_node(base);
   executor_.remove_node(heartbeat_node);
 }
+
+}  // namespace
