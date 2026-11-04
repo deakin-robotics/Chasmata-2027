@@ -1,10 +1,10 @@
 # Shared ECAM alert snapshots
 
-`ecam_alerts` is a C++17 ROS 2 package for complete ECAM source snapshots and
-Rover/BaseStation aggregation. The ROS contract remains `/ecam/alerts/source`,
+`ecam_alerts` provides complete ECAM source snapshots and Rover/BaseStation
+aggregation. The ROS contract is `/ecam/alerts/source`,
 `/ecam/alerts`, and `/rover/heartbeat` using the existing telemetry messages.
 
-Use `EcamAlertSource` from a C++ node to publish a retained complete source
+Use `EcamAlertSource` from a node to publish a retained complete source
 snapshot whenever its alerts change:
 
 ```cpp
