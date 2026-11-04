@@ -17,9 +17,9 @@
 #include <telemetry_interfaces/msg/fma_mode_state.hpp>
 #include <telemetry_interfaces/msg/fma_state.hpp>
 
-#include "rover_bringup/rover_control_node.hpp"
+#include "prod_rover/rover_control_node.hpp"
 
-namespace rover_bringup
+namespace prod_rover
 {
 namespace
 {
@@ -198,4 +198,4 @@ std::shared_ptr<rclcpp::Node> make_rover_control_node()
 {
   return std::make_shared<RoverControlNode>();
 }
-}  // namespace rover_bringup
+}  // namespace prod_rover

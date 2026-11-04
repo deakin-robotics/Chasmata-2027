@@ -33,7 +33,7 @@ Then run each stack in its own PowerShell terminal:
 **Mock rover**
 
 ```powershell
-cd rover/rover_bringup
+cd rover/rover_mode_switch
 docker compose --profile dev up --build
 ```
 

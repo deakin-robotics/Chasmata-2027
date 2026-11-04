@@ -10,7 +10,7 @@
 #include <std_msgs/msg/string.hpp>
 #include <telemetry_interfaces/msg/fma_state.hpp>
 
-#include "rover_bringup/rover_control_node.hpp"
+#include "prod_rover/rover_control_node.hpp"
 
 namespace
 {
@@ -23,15 +23,16 @@ protected:
   static void TearDownTestSuite() { rclcpp::shutdown(); }
   void SetUp() override
   {
-    control_ = rover_bringup::make_rover_control_node();
+    control_ = prod_rover::make_rover_control_node();
     client_ = std::make_shared<rclcpp::Node>("rover_control_test_client");
     arm_request_ = client_->create_publisher<std_msgs::msg::String>("/fma/arm/request", 10);
     override_request_ = client_->create_publisher<std_msgs::msg::String>("/arm/override/request", 10);
     gimbal_request_ = client_->create_publisher<std_msgs::msg::String>("/fma/gimbal/request", 10);
     fma_ = client_->create_subscription<telemetry_interfaces::msg::FmaState>("/fma/state",
-      rclcpp::QoS(1).reliable().transient_local(), [this](auto message) { states_.push_back(*message); });
+      rclcpp::QoS(1).reliable().transient_local(),
+      [this](telemetry_interfaces::msg::FmaState::SharedPtr message) { states_.push_back(*message); });
     heartbeat_ = client_->create_subscription<std_msgs::msg::Empty>("/rover/heartbeat", 10,
-      [this](auto) { ++heartbeats_; });
+      [this](std_msgs::msg::Empty::SharedPtr) { ++heartbeats_; });
     executor_.add_node(control_); executor_.add_node(client_);
     ASSERT_TRUE(wait_for([this] { return !states_.empty() && heartbeats_ > 0; }, 2s));
   }

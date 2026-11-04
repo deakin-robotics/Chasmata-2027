@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(rover_bringup)
+project(prod_rover)
 
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
@@ -29,7 +29,6 @@ install(TARGETS rover_control_node rover_control
   EXPORT export_${PROJECT_NAME}
   ARCHIVE DESTINATION lib LIBRARY DESTINATION lib RUNTIME DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY include/ DESTINATION include)
-install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch)
 install(FILES README.md DESTINATION share/${PROJECT_NAME})
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)

@@ -4,7 +4,7 @@
 
 #include <rclcpp/node.hpp>
 
-namespace rover_bringup
+namespace prod_rover
 {
 std::shared_ptr<rclcpp::Node> make_rover_control_node();
-}  // namespace rover_bringup
+}  // namespace prod_rover
