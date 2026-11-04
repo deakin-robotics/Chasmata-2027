@@ -1,38 +1,30 @@
 # Shared ECAM alert snapshots
 
-`EcamAlertSource` is a small Python API for ROS 2 participants. Create it with
-an existing node and one of `driver`, `ecam`, `arm`, `basestation`, or `rover`,
-then call `raise_alert(code)` and `clear(code)`. It publishes the complete
-active-code set on `/ecam/alerts/source` whenever that set changes. Its retained
-snapshot is available to late-joining aggregators.
+`ecam_alerts` is a C++17 ROS 2 package for complete ECAM source snapshots and
+Rover/BaseStation aggregation. The ROS contract remains `/ecam/alerts/source`,
+`/ecam/alerts`, and `/rover/heartbeat` using the existing telemetry messages.
 
-```python
-from ecam_alerts.source import EcamAlertSource
+Use `EcamAlertSource` from a C++ node to publish a retained complete source
+snapshot whenever its alerts change:
 
-self.ecam_alerts = EcamAlertSource(self, 'rover')
-self.ecam_alerts.raise_alert('ARM_CAN_FAULT')
-self.ecam_alerts.clear('ARM_CAN_FAULT')
+```cpp
+#include <ecam_alerts/source.hpp>
+
+ecam_alerts::EcamAlertSource alerts(*this, "rover");
+alerts.raise_alert("ARM_CAN_FAULT");
+alerts.clear("ARM_CAN_FAULT");
 ```
 
-Run the combined-state node on Rover as primary:
+Allowed source names are `driver`, `ecam`, `arm`, `basestation`, and `rover`.
+Codes are trimmed, deduplicated, and published in lexical order with reliable,
+transient-local QoS.
 
-```sh
-ros2 launch ecam_alerts ecam_alert_aggregator.launch.py role:=rover
+```bash
+ros2 launch ecam_alerts ecam_alert_aggregator.launch.xml role:=rover
+ros2 launch ecam_alerts ecam_alert_aggregator.launch.xml role:=basestation
 ```
 
-Run it on BaseStation as standby/failover:
-
-```sh
-ros2 launch ecam_alerts ecam_alert_aggregator.launch.py role:=basestation
-```
-
-BaseStation listens to `/rover/heartbeat` and starts combining after three
-seconds without a heartbeat. Once Rover returns, BaseStation republishes its
-latest non-Rover source snapshots and waits for a Rover-authority combined
-snapshot to reflect them before returning to relay-only operation.
-
-Run snapshot and ROS aggregation tests in the package workspace with:
-
-```sh
-python3 -m unittest discover -s test -v
-```
+Rover is authoritative while its heartbeat is present. After three seconds
+without `/rover/heartbeat`, BaseStation combines snapshots and raises
+`ROVER_HEARTBEAT_LOST`; once Rover returns, BaseStation paces replay of its
+non-Rover sources and yields authority after Rover reflects them.

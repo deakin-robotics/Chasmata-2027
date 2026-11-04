@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="role" default="rover"/>
+  <node pkg="ecam_alerts" exec="ecam_alert_aggregator"
+        name="ecam_alert_aggregator_$(var role)" output="screen">
+    <param name="role" value="$(var role)"/>
+  </node>
+</launch>
