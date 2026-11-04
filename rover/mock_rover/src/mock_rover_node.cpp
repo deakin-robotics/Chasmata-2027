@@ -27,6 +27,7 @@
 #include <telemetry_interfaces/msg/fma_state.hpp>
 
 #include "mock_rover/joint_simulator.hpp"
+#include "mock_rover/mock_rover_node.hpp"
 
 namespace mock_rover
 {
@@ -361,10 +362,7 @@ private:
 };
 }  // namespace mock_rover
 
-int main(int argc, char * argv[])
+std::shared_ptr<rclcpp::Node> mock_rover::make_mock_rover_node()
 {
-  rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<mock_rover::MockRoverNode>());
-  rclcpp::shutdown();
-  return 0;
+  return std::make_shared<MockRoverNode>();
 }

@@ -75,6 +75,7 @@ TEST_F(EcamAggregationTest, RoverPrimaryFailsOverAndHandsBackReflectedSources)
   auto rover = std::make_shared<ecam_alerts::EcamAlertAggregator>("rover", 0.6, "test_rover");
   auto base = std::make_shared<ecam_alerts::EcamAlertAggregator>("basestation", 0.6, "test_base");
   auto source_node = std::make_shared<rclcpp::Node>("test_ecam_source");
+  auto observer_node = std::make_shared<rclcpp::Node>("test_ecam_observer");
   ecam_alerts::EcamAlertSource driver(*source_node, "driver");
   ecam_alerts::EcamAlertSource arm(*source_node, "arm");
   auto heartbeat = source_node->create_publisher<std_msgs::msg::Empty>(
@@ -83,12 +84,13 @@ TEST_F(EcamAggregationTest, RoverPrimaryFailsOverAndHandsBackReflectedSources)
     heartbeat->publish(std_msgs::msg::Empty{});
   });
   std::vector<telemetry_interfaces::msg::EcamAlerts> observed;
-  auto observer = source_node->create_subscription<telemetry_interfaces::msg::EcamAlerts>(
+  auto observer = observer_node->create_subscription<telemetry_interfaces::msg::EcamAlerts>(
     ecam_alerts::kCombinedTopic, ecam_alerts::combined_qos(),
     [&observed](telemetry_interfaces::msg::EcamAlerts::SharedPtr message) { observed.push_back(*message); });
   executor_.add_node(rover);
   executor_.add_node(base);
   executor_.add_node(source_node);
+  executor_.add_node(observer_node);
 
   // Establish the heartbeat and transient-local subscriptions before testing failover.
   spin_for(300ms);
@@ -104,6 +106,15 @@ TEST_F(EcamAggregationTest, RoverPrimaryFailsOverAndHandsBackReflectedSources)
   spin_for(200ms);
 
   heartbeat_timer->cancel();
+  executor_.remove_node(rover);
+  rover.reset();
+  ASSERT_TRUE(wait_for([&observed] {
+    return std::any_of(observed.rbegin(), observed.rend(), [](const auto & message) {
+      return has_code(message, "basestation", "basestation", ecam_alerts::kRoverHeartbeatLost);
+    });
+  }, 1s));
+  // Reassert the complete source state after authority transfer, as a live source does.
+  driver.publish_snapshot();
   ASSERT_TRUE(wait_for([&observed] {
     return std::any_of(observed.rbegin(), observed.rend(), [](const auto & message) {
       return has_code(message, "basestation", "driver", "TEST_DRIVER_ALERT");
@@ -116,8 +127,6 @@ TEST_F(EcamAggregationTest, RoverPrimaryFailsOverAndHandsBackReflectedSources)
     });
   }, 1s));
 
-  executor_.remove_node(rover);
-  rover.reset();
   heartbeat_timer->reset();
   spin_for(100ms);
   rover = std::make_shared<ecam_alerts::EcamAlertAggregator>("rover", 0.25, "test_rover_returned");
@@ -135,6 +144,7 @@ TEST_F(EcamAggregationTest, RoverPrimaryFailsOverAndHandsBackReflectedSources)
   executor_.remove_node(rover);
   executor_.remove_node(base);
   executor_.remove_node(source_node);
+  executor_.remove_node(observer_node);
 }
 
 TEST_F(EcamAggregationTest, BaseStationRaisesAndClearsHeartbeatLost)

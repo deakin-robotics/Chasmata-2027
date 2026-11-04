@@ -32,3 +32,12 @@ TEST(JointSimulator, SupportsImmediateAndMeasuredPositions)
   EXPECT_DOUBLE_EQ(simulator.positions().at("shoulder_joint"), 0.5);
   EXPECT_DOUBLE_EQ(simulator.velocities().at("base_joint"), 0.7);
 }
+
+TEST(JointSimulator, StopsAtTargetWithoutOvershoot)
+{
+  auto simulator = make_simulator();
+  simulator.set_target({{"base_joint", 0.3}});
+  simulator.step(1.0);
+  EXPECT_DOUBLE_EQ(simulator.positions().at("base_joint"), 0.3);
+  EXPECT_DOUBLE_EQ(simulator.velocities().at("base_joint"), 0.0);
+}

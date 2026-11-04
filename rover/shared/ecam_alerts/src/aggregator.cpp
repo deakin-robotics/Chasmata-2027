@@ -96,10 +96,14 @@ void EcamAlertAggregator::on_combined_snapshot(const telemetry_interfaces::msg::
     source_replay_queue_.clear();
     RCLCPP_INFO(get_logger(), "Rover combined snapshot reflects BaseStation source state");
   }
+  bool changed = false;
   for (const auto & snapshot : message->sources) {
     if (is_valid_source(snapshot.source)) {
-      source_state_.update(snapshot.source, snapshot.timestamp, snapshot.active_codes);
+      changed = source_state_.update(snapshot.source, snapshot.timestamp, snapshot.active_codes) || changed;
     }
+  }
+  if (taking_over_ && changed) {
+    publish_combined();
   }
 }
 
