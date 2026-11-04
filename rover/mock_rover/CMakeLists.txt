@@ -37,7 +37,7 @@ ament_target_dependencies(mock_rover rclcpp)
 
 install(TARGETS mock_rover_simulation mock_rover_node mock_rover
   EXPORT export_${PROJECT_NAME}
-  ARCHIVE DESTINATION lib LIBRARY DESTINATION lib RUNTIME DESTINATION bin)
+  ARCHIVE DESTINATION lib LIBRARY DESTINATION lib RUNTIME DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY include/ DESTINATION include)
 install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch)
 install(FILES README.md DESTINATION share/${PROJECT_NAME})
