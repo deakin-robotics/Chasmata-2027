@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="mode" default="dev" description="Rover mode: dev or prod"/>
+
+  <node pkg="rover_bringup" exec="rover_control" name="rover_control" output="screen">
+    <param name="mode" value="$(var mode)"/>
+  </node>
+  <node pkg="ecam_alerts" exec="ecam_alert_aggregator" name="ecam_alert_aggregator_rover" output="screen">
+    <param name="role" value="rover"/>
+  </node>
+  <node pkg="rosbridge_server" exec="rosbridge_websocket" name="rosbridge_websocket" output="screen">
+    <param name="port" value="9090"/>
+  </node>
+  <group if="$(eval &quot;'$(var mode)' == 'dev'&quot;)">
+    <node pkg="mock_rover" exec="mock_rover" name="mock_rover" output="screen"/>
+  </group>
+</launch>

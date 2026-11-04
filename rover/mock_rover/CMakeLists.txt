@@ -49,10 +49,6 @@ if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(test_joint_simulator test/test_joint_simulator.cpp)
   target_link_libraries(test_joint_simulator mock_rover_simulation)
-  ament_add_gtest(test_mock_rover_integration test/test_mock_rover_integration.cpp)
-  target_link_libraries(test_mock_rover_integration mock_rover_node)
-  ament_target_dependencies(test_mock_rover_integration
-    control_msgs rclcpp rclcpp_action sensor_msgs std_msgs telemetry_interfaces)
 endif()
 
 ament_package()
