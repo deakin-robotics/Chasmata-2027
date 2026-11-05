@@ -109,6 +109,7 @@ protected:
   size_t heartbeats_{0};
 };
 
+// The node publishes heartbeat and joint states, applies limits, and acknowledges or rejects FMA requests.
 TEST_F(MockRoverIntegrationTest, PublishesHeartbeatJointStateAndFmaAcknowledgement)
 {
   EXPECT_EQ(latest_joints().name, std::vector<std::string>({"base_joint", "shoulder_joint", "elbow_joint", "yaw_joint", "pitch_joint", "roll_joint"}));
@@ -126,6 +127,7 @@ TEST_F(MockRoverIntegrationTest, PublishesHeartbeatJointStateAndFmaAcknowledgeme
   ASSERT_TRUE(wait_for([this] { return latest_fma().arm.rejected == "INVALID"; }, 1s));
 }
 
+// Manual joystick input moves the arm; Position wrist input works only when orientation is unlocked.
 TEST_F(MockRoverIntegrationTest, AppliesManualAndUnlockedPositionJoystickMappings)
 {
   request_arm_mode("MANUAL");
@@ -155,6 +157,7 @@ TEST_F(MockRoverIntegrationTest, AppliesManualAndUnlockedPositionJoystickMapping
   EXPECT_DOUBLE_EQ(joint(latest_joints(), "yaw_joint"), locked_yaw);
 }
 
+// Trajectories provide feedback, complete or cancel, and reject partial goals when orientation is locked.
 TEST_F(MockRoverIntegrationTest, ValidatesExecutesAndCancelsTrajectories)
 {
   auto make_goal = [](double seconds, double target) {

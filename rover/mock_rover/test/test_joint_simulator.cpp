@@ -11,6 +11,7 @@ mock_rover::JointSimulator make_simulator()
 }
 }
 
+// Targets outside joint limits are clamped, and movement respects the configured speed.
 TEST(JointSimulator, ClampsTargetsAndMovesAtConfiguredSpeed)
 {
   auto simulator = make_simulator();
@@ -21,6 +22,7 @@ TEST(JointSimulator, ClampsTargetsAndMovesAtConfiguredSpeed)
   EXPECT_DOUBLE_EQ(simulator.velocities().at("base_joint"), 1.0);
 }
 
+// Immediate targets and measured positions update telemetry, including velocity and limits.
 TEST(JointSimulator, SupportsImmediateAndMeasuredPositions)
 {
   auto simulator = make_simulator();
@@ -33,6 +35,7 @@ TEST(JointSimulator, SupportsImmediateAndMeasuredPositions)
   EXPECT_DOUBLE_EQ(simulator.velocities().at("base_joint"), 0.7);
 }
 
+// A joint settles at its target without overshooting and reports zero velocity.
 TEST(JointSimulator, StopsAtTargetWithoutOvershoot)
 {
   auto simulator = make_simulator();
