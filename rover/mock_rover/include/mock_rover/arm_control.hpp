@@ -4,7 +4,7 @@
 
 #include <rclcpp/node.hpp>
 
-namespace prod_rover
+namespace mock_rover
 {
 std::shared_ptr<rclcpp::Node> make_arm_control_node();
-}  // namespace prod_rover
+}  // namespace mock_rover

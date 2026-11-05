@@ -37,13 +37,6 @@ cd rover/mock_rover
 docker compose up --build
 ```
 
-**Production rover**
-
-```powershell
-cd rover/prod_rover
-docker compose up --build
-```
-
 **Base station**
 
 ```powershell

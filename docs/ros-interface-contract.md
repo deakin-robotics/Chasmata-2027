@@ -266,9 +266,7 @@ effort: []
 
 The current GUI has no publisher for /arm/joint_commands. The mock clamps known
 joints to its configured limits and immediately mirrors accepted targets into
-/arm/joint_states. Production arm Position control uses
-`/arm_controller/follow_joint_trajectory`; it does not subscribe to this mock
-compatibility endpoint.
+/arm/joint_states.
 
 ### Arm orientation lock
 
