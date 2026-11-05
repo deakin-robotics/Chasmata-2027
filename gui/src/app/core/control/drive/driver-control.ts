@@ -29,7 +29,7 @@ export class DriverControl {
   readonly gamepadConnected = this.gamepad.connected;
   readonly gamepadName = this.gamepad.name;
   readonly canDrive = computed(
-    () => this.enabledState() && this.publisher.canPublish(),
+    () => this.enabledState() && this.gamepad.connected() && this.publisher.canPublish(),
   );
 
   /** Returns the reason Driver control cannot be enabled, or null when ready. */
@@ -90,7 +90,8 @@ export class DriverControl {
     const snapshot = this.gamepad.snapshot();
 
     if (!this.heartbeatMonitor.roverAvailable() || !this.gamepad.connected()) {
-      this.disable();
+      if (this.heartbeatMonitor.roverAvailable()) this.publisher.publishStop();
+      this.rightStickClickPressed = false;
       return;
     }
 

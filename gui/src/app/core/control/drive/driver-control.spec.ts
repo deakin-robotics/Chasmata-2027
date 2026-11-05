@@ -16,6 +16,7 @@ describe('DriverControl', () => {
   let controlModeState: WritableSignal<'none' | 'driver'>;
   let publishStop: ReturnType<typeof vi.fn>;
   let releaseDriverControl: ReturnType<typeof vi.fn>;
+  let publish: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     rosConnected = signal(false);
@@ -23,6 +24,7 @@ describe('DriverControl', () => {
     gamepadSnapshot = signal<GamepadSnapshot | null>(null);
     controlModeState = signal<'none' | 'driver'>('none');
     publishStop = vi.fn();
+    publish = vi.fn();
     releaseDriverControl = vi.fn(() => controlModeState.set('none'));
 
     TestBed.configureTestingModule({
@@ -58,7 +60,7 @@ describe('DriverControl', () => {
           provide: DriveCommandPublisher,
           useValue: {
             canPublish: vi.fn(() => rosConnected() && controlModeState() === 'driver'),
-            publish: vi.fn(),
+            publish,
             publishStop,
             releaseDriverControl,
           },
@@ -123,7 +125,7 @@ describe('DriverControl', () => {
     expect(releaseDriverControl).not.toHaveBeenCalled();
   });
 
-  it('disables Driver when the gamepad disconnects', () => {
+  it('retains Driver authority, stops and resumes when the gamepad reconnects', () => {
     vi.useFakeTimers();
     rosConnected.set(true);
     gamepadConnected.set(true);
@@ -134,11 +136,18 @@ describe('DriverControl', () => {
     gamepadConnected.set(false);
     vi.advanceTimersByTime(20);
 
-    expect(service.enabled()).toBe(false);
-    expect(releaseDriverControl).toHaveBeenCalledOnce();
+    expect(service.enabled()).toBe(true);
+    expect(service.canDrive()).toBe(false);
+    expect(publishStop).toHaveBeenCalledOnce();
+    expect(publish).not.toHaveBeenCalled();
+    expect(releaseDriverControl).not.toHaveBeenCalled();
+    gamepadConnected.set(true);
+    vi.advanceTimersByTime(20);
+    expect(service.canDrive()).toBe(true);
+    expect(publish).toHaveBeenCalledOnce();
   });
 
-  it('disables Driver when ROS disconnects', () => {
+  it('retains Driver authority and resumes after ROS reconnects', () => {
     vi.useFakeTimers();
     rosConnected.set(true);
     gamepadConnected.set(true);
@@ -149,7 +158,30 @@ describe('DriverControl', () => {
     rosConnected.set(false);
     vi.advanceTimersByTime(20);
 
+    expect(service.enabled()).toBe(true);
+    expect(service.canDrive()).toBe(false);
+    expect(publishStop).not.toHaveBeenCalled();
+    expect(publish).not.toHaveBeenCalled();
+    expect(releaseDriverControl).not.toHaveBeenCalled();
+    rosConnected.set(true);
+    vi.advanceTimersByTime(20);
+    expect(service.canDrive()).toBe(true);
+    expect(publish).toHaveBeenCalledOnce();
+  });
+
+  it('does not resume when switched off during an interruption', () => {
+    vi.useFakeTimers();
+    rosConnected.set(true);
+    gamepadConnected.set(true);
+    gamepadSnapshot.set({ axes: [1, 0, 0, 0], buttons: [] });
+    expect(service.enable()).toBe(true);
+    rosConnected.set(false);
+    vi.advanceTimersByTime(20);
+    service.disable();
+    rosConnected.set(true);
+    vi.advanceTimersByTime(40);
     expect(service.enabled()).toBe(false);
+    expect(publish).not.toHaveBeenCalled();
     expect(releaseDriverControl).toHaveBeenCalledOnce();
   });
 });

@@ -19,7 +19,7 @@
     class="camera-feed"
     label="Camera Link"
     [checked]="cameraFeedEnabled()"
-    [tone]="masterDriveTone"
+    tone="normal"
     offTone="info"
     (checkedChange)="setCameraFeedEnabled($event)"
   />
@@ -33,7 +33,7 @@
   <app-control-switch
     label="Master Drive"
     [checked]="masterDriveEnabled()"
-    [tone]="masterDriveTone"
+    [tone]="masterDriveTone()"
     offTone="info"
     [disabled]="!masterDriveEnabled() && (!gamepadConnected() || !rosConnected())"
     (checkedChange)="toggleMasterDriveControl($event)"

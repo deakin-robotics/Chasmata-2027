@@ -90,7 +90,12 @@ export class ArmMasterPage {
     { label: ArmMode.Manual, value: ArmMode.Manual },
     { label: ArmMode.Position, value: ArmMode.Position },
   ];
-  readonly masterDriveTone: ControlSwitchTone = 'normal';
+  readonly masterDriveTone = computed<ControlSwitchTone>(() => {
+    if (!this.masterDriveEnabled()) return 'normal';
+    if (!this.heartbeatMonitor.roverAvailable() || !this.gamepad.connected()) return 'critical';
+    if (!this.heartbeatMonitor.baseStationAvailable()) return 'caution';
+    return this.armControlMode.canControlArm() ? 'normal' : 'critical';
+  });
   readonly rosConnected = this.heartbeatMonitor.roverAvailable;
   readonly baseStationAvailable = this.heartbeatMonitor.baseStationAvailable;
   readonly gamepadConnected = this.gamepad.connected;
