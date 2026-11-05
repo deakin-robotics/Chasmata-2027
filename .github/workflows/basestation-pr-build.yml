@@ -17,7 +17,7 @@ defaults:
 jobs:
   # Validate camera-health responses, arm model configuration, and Compose files.
   test-config:
-    name: Test BaseStation configuration and health
+    name: Test BaseStation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,7 +39,7 @@ jobs:
 
   # Exercise the MoveIt bridge against the mock rover and shared ECAM failover tests.
   test-ros:
-    name: Test BaseStation ROS integration
+    name: Test BaseStation ROS
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -67,7 +67,7 @@ jobs:
 
   # Verify hosted web routes, camera availability, and recovery after a gateway restart.
   test-hosted:
-    name: Test BaseStation hosted routes and cameras
+    name: Test BaseStation Interfaces
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:

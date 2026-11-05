@@ -9,7 +9,7 @@ on:
 jobs:
   # Check the mock simulator, ROS interfaces, and ECAM aggregation and failover.
   test-rover:
-    name: Build and test mock rover and ECAM
+    name: Test Rover
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -55,7 +55,7 @@ jobs:
 
   # Check that all mock camera publishers recover after a gateway restart.
   test-camera:
-    name: Build and test mock camera recovery
+    name: Test Rover Cameras
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
