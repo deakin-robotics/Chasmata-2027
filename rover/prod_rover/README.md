@@ -1,11 +1,12 @@
 # Production rover
 
-`prod_rover` owns the production Rover Control implementation. It has no
-dependency on `mock_rover`.
+`prod_rover` is the production Rover implementation. It currently preserves the
+mock Rover behaviour while real hardware components are introduced incrementally.
+
+Run the local stack with:
 
 ```bash
-ros2 run prod_rover rover_control
+ros2 launch rover_mode_switch rover.launch.xml mode:=prod
 ```
 
-Its FMA acknowledgement remains the temporary development behavior until real
-arm and drivetrain mode transitions are integrated.
+The synthetic camera publisher remains the existing shell/GStreamer helper.

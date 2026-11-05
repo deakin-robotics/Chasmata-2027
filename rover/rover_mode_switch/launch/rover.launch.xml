@@ -2,9 +2,7 @@
 <launch>
   <arg name="mode" default="dev" description="Rover mode: dev or prod"/>
   <group if="$(eval &quot;'$(var mode)' == 'prod'&quot;)">
-    <node pkg="prod_rover" exec="rover_control" name="prod_rover" output="screen">
-      <param name="mode" value="prod"/>
-    </node>
+    <node pkg="prod_rover" exec="prod_rover" name="prod_rover" output="screen"/>
   </group>
   <node pkg="ecam_alerts" exec="ecam_alert_aggregator" name="ecam_alert_aggregator_rover" output="screen"><param name="role" value="rover"/></node>
   <node pkg="rosbridge_server" exec="rosbridge_websocket" name="rosbridge_websocket" output="screen"><param name="port" value="9090"/></node>

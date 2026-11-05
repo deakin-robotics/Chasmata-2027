@@ -1,11 +1,11 @@
 #include <rclcpp/rclcpp.hpp>
 
-#include "prod_rover/rover_control_node.hpp"
+#include "mock_rover/mock_rover_node.hpp"
 
 int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
-  rclcpp::spin(prod_rover::make_rover_control_node());
+  rclcpp::spin(mock_rover::make_mock_rover_node());
   rclcpp::shutdown();
   return 0;
 }
