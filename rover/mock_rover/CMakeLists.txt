@@ -23,7 +23,11 @@ target_include_directories(mock_rover_simulation PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 
-add_library(mock_rover_node SHARED src/mock_rover_node.cpp)
+add_library(mock_rover_node SHARED
+  src/mock_rover_node.cpp
+  src/fma_control.cpp
+  src/arm_control.cpp
+  src/trajectory.cpp)
 target_link_libraries(mock_rover_node mock_rover_simulation)
 target_include_directories(mock_rover_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
