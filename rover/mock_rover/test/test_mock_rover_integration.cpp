@@ -8,7 +8,7 @@
 
 #include <control_msgs/action/follow_joint_trajectory.hpp>
 #include <gtest/gtest.h>
-#include <rclcpp/executors/multi_threaded_executor.hpp>
+#include <rclcpp/executors/single_threaded_executor.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <sensor_msgs/msg/joy.hpp>
@@ -18,8 +18,7 @@
 #include <telemetry_interfaces/msg/fma_state.hpp>
 #include <trajectory_msgs/msg/joint_trajectory_point.hpp>
 
-#include "mock_rover/arm_control.hpp"
-#include "mock_rover/rover_control.hpp"
+#include "mock_rover/mock_rover_node.hpp"
 
 namespace
 {
@@ -39,8 +38,7 @@ protected:
 
   void SetUp() override
   {
-    rover_control_ = mock_rover::make_rover_control_node();
-    arm_control_ = mock_rover::make_arm_control_node();
+    rover_ = mock_rover::make_mock_rover_node();
     client_ = std::make_shared<rclcpp::Node>("mock_rover_integration_client");
     command_publisher_ = client_->create_publisher<sensor_msgs::msg::JointState>("/arm/joint_commands", 10);
     joy_publisher_ = client_->create_publisher<sensor_msgs::msg::Joy>("/arm/joy", 10);
@@ -55,8 +53,7 @@ protected:
     heartbeat_subscription_ = client_->create_subscription<std_msgs::msg::Empty>("/rover/heartbeat", 10,
       [this](std_msgs::msg::Empty::SharedPtr) { ++heartbeats_; });
     trajectory_client_ = rclcpp_action::create_client<Trajectory>(client_, "/arm_controller/follow_joint_trajectory");
-    executor_.add_node(rover_control_);
-    executor_.add_node(arm_control_);
+    executor_.add_node(rover_);
     executor_.add_node(client_);
     ASSERT_TRUE(wait_for([this] { return !fma_.empty() && !joints_.empty() && heartbeats_ > 0; }, 2s));
     ASSERT_TRUE(trajectory_client_->wait_for_action_server(2s));
@@ -65,11 +62,9 @@ protected:
   void TearDown() override
   {
     executor_.remove_node(client_);
-    executor_.remove_node(arm_control_);
-    executor_.remove_node(rover_control_);
+    executor_.remove_node(rover_);
     client_.reset();
-    arm_control_.reset();
-    rover_control_.reset();
+    rover_.reset();
   }
 
   bool wait_for(const std::function<bool()> & predicate, std::chrono::milliseconds timeout)
@@ -99,8 +94,8 @@ protected:
     arm_mode_publisher_->publish(message);
   }
 
-  rclcpp::executors::MultiThreadedExecutor executor_;
-  std::shared_ptr<rclcpp::Node> rover_control_, arm_control_, client_;
+  rclcpp::executors::SingleThreadedExecutor executor_;
+  std::shared_ptr<rclcpp::Node> rover_, client_;
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr command_publisher_;
   rclcpp::Publisher<sensor_msgs::msg::Joy>::SharedPtr joy_publisher_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr lock_publisher_;
