@@ -2,17 +2,17 @@ services:
   discovery:
     build:
       context: ../..
-      dockerfile: rover/mock_rover/Dockerfile
+      dockerfile: rover/prod_rover/Dockerfile
     network_mode: host
     ipc: host
     command:
       - source /opt/ros/jazzy/setup.bash && exec fastdds discovery -i 0 -l 0.0.0.0 -p 11811
     restart: unless-stopped
 
-  mock-rover:
+  prod-rover:
     build:
       context: ../..
-      dockerfile: rover/mock_rover/Dockerfile
+      dockerfile: rover/prod_rover/Dockerfile
     network_mode: host
     ipc: host
     environment:

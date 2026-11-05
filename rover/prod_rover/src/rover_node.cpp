@@ -26,10 +26,10 @@
 #include <telemetry_interfaces/msg/fma_mode_state.hpp>
 #include <telemetry_interfaces/msg/fma_state.hpp>
 
-#include "mock_rover/joint_simulator.hpp"
-#include "mock_rover/mock_rover_node.hpp"
+#include "prod_rover/joint_simulator.hpp"
+#include "prod_rover/rover_node.hpp"
 
-namespace mock_rover
+namespace prod_rover
 {
 namespace
 {
@@ -61,10 +61,10 @@ double seconds(const builtin_interfaces::msg::Duration & duration)
 }
 }  // namespace
 
-class MockRoverNode : public rclcpp::Node
+class ProductionRoverNode : public rclcpp::Node
 {
 public:
-  MockRoverNode()
+  ProductionRoverNode()
   : Node("prod_rover"), joints_(std::vector<std::string>(kJointNames.begin(), kJointNames.end()), kJointLimits, 1.0)
   {
     declare_parameter<double>("publish_rate_hz", 10.0);
@@ -79,7 +79,7 @@ public:
       rclcpp::QoS(rclcpp::KeepLast(1)).reliable());
 
     subscriptions_.push_back(create_subscription<sensor_msgs::msg::JointState>("/arm/joint_commands", 10,
-      std::bind(&MockRoverNode::on_joint_command, this, std::placeholders::_1)));
+      std::bind(&ProductionRoverNode::on_joint_command, this, std::placeholders::_1)));
     subscriptions_.push_back(create_subscription<sensor_msgs::msg::Joy>("/drive/joy", 10,
       [this](sensor_msgs::msg::Joy::SharedPtr message) { on_joy("drive", *message, 4, 5); }));
     subscriptions_.push_back(create_subscription<sensor_msgs::msg::Joy>("/arm/joy", 10,
@@ -97,11 +97,11 @@ public:
 
     trajectory_server_ = rclcpp_action::create_server<FollowJointTrajectory>(this,
       "/arm_controller/follow_joint_trajectory",
-      std::bind(&MockRoverNode::handle_goal, this, std::placeholders::_1, std::placeholders::_2),
-      std::bind(&MockRoverNode::handle_cancel, this, std::placeholders::_1),
-      std::bind(&MockRoverNode::handle_accepted, this, std::placeholders::_1));
+      std::bind(&ProductionRoverNode::handle_goal, this, std::placeholders::_1, std::placeholders::_2),
+      std::bind(&ProductionRoverNode::handle_cancel, this, std::placeholders::_1),
+      std::bind(&ProductionRoverNode::handle_accepted, this, std::placeholders::_1));
     tick_timer_ = create_wall_timer(std::chrono::duration<double>(1.0 / rate),
-      std::bind(&MockRoverNode::tick, this));
+      std::bind(&ProductionRoverNode::tick, this));
     heartbeat_timer_ = create_wall_timer(std::chrono::seconds(1), [this]() { publish_heartbeat(); });
     publish_fma();
     publish_joint_state();
@@ -360,9 +360,9 @@ private:
   rclcpp_action::Server<FollowJointTrajectory>::SharedPtr trajectory_server_;
   rclcpp::TimerBase::SharedPtr tick_timer_, heartbeat_timer_;
 };
-}  // namespace mock_rover
+}  // namespace prod_rover
 
-std::shared_ptr<rclcpp::Node> mock_rover::make_mock_rover_node()
+std::shared_ptr<rclcpp::Node> prod_rover::make_prod_rover_node()
 {
-  return std::make_shared<MockRoverNode>();
+  return std::make_shared<ProductionRoverNode>();
 }

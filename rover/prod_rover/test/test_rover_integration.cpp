@@ -18,14 +18,14 @@
 #include <telemetry_interfaces/msg/fma_state.hpp>
 #include <trajectory_msgs/msg/joint_trajectory_point.hpp>
 
-#include "mock_rover/mock_rover_node.hpp"
+#include "prod_rover/rover_node.hpp"
 
 namespace
 {
 using namespace std::chrono_literals;
 using Trajectory = control_msgs::action::FollowJointTrajectory;
 
-class MockRoverIntegrationTest : public ::testing::Test
+class ProductionRoverIntegrationTest : public ::testing::Test
 {
 protected:
   static void SetUpTestSuite()
@@ -38,8 +38,8 @@ protected:
 
   void SetUp() override
   {
-    rover_ = mock_rover::make_mock_rover_node();
-    client_ = std::make_shared<rclcpp::Node>("mock_rover_integration_client");
+    rover_ = prod_rover::make_prod_rover_node();
+    client_ = std::make_shared<rclcpp::Node>("prod_rover_integration_client");
     command_publisher_ = client_->create_publisher<sensor_msgs::msg::JointState>("/arm/joint_commands", 10);
     joy_publisher_ = client_->create_publisher<sensor_msgs::msg::Joy>("/arm/joy", 10);
     lock_publisher_ = client_->create_publisher<std_msgs::msg::Bool>("/arm/orientation_lock", 10);
@@ -109,7 +109,7 @@ protected:
   size_t heartbeats_{0};
 };
 
-TEST_F(MockRoverIntegrationTest, PublishesHeartbeatJointStateAndFmaAcknowledgement)
+TEST_F(ProductionRoverIntegrationTest, PublishesHeartbeatJointStateAndFmaAcknowledgement)
 {
   EXPECT_EQ(latest_joints().name, std::vector<std::string>({"base_joint", "shoulder_joint", "elbow_joint", "yaw_joint", "pitch_joint", "roll_joint"}));
   sensor_msgs::msg::JointState command;
@@ -126,7 +126,7 @@ TEST_F(MockRoverIntegrationTest, PublishesHeartbeatJointStateAndFmaAcknowledgeme
   ASSERT_TRUE(wait_for([this] { return latest_fma().arm.rejected == "INVALID"; }, 1s));
 }
 
-TEST_F(MockRoverIntegrationTest, AppliesManualAndUnlockedPositionJoystickMappings)
+TEST_F(ProductionRoverIntegrationTest, AppliesManualAndUnlockedPositionJoystickMappings)
 {
   request_arm_mode("MANUAL");
   ASSERT_TRUE(wait_for([this] { return latest_fma().arm.confirmed == "MANUAL"; }, 1s));
@@ -155,7 +155,7 @@ TEST_F(MockRoverIntegrationTest, AppliesManualAndUnlockedPositionJoystickMapping
   EXPECT_DOUBLE_EQ(joint(latest_joints(), "yaw_joint"), locked_yaw);
 }
 
-TEST_F(MockRoverIntegrationTest, ValidatesExecutesAndCancelsTrajectories)
+TEST_F(ProductionRoverIntegrationTest, ValidatesExecutesAndCancelsTrajectories)
 {
   auto make_goal = [](double seconds, double target) {
     Trajectory::Goal goal;

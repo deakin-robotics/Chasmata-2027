@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <launch>
-  <node pkg="mock_rover" exec="mock_rover" name="mock_rover" output="screen"/>
+  <node pkg="prod_rover" exec="prod_rover" name="prod_rover" output="screen"/>
   <node pkg="ecam_alerts" exec="ecam_alert_aggregator" name="ecam_alert_aggregator_rover" output="screen">
     <param name="role" value="rover"/>
   </node>

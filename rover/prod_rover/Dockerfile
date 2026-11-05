@@ -16,10 +16,10 @@ RUN apt-get update \
 WORKDIR /workspace
 COPY interfaces/telemetry_interfaces /workspace/src/telemetry_interfaces
 COPY rover/shared/ecam_alerts /workspace/src/ecam_alerts
-COPY rover/mock_rover /workspace/src/mock_rover
+COPY rover/prod_rover /workspace/src/prod_rover
 
 RUN source /opt/ros/jazzy/setup.bash \
     && colcon build --symlink-install
 
 ENTRYPOINT ["/bin/bash", "-lc"]
-CMD ["source /opt/ros/jazzy/setup.bash && source /workspace/install/setup.bash && ros2 launch mock_rover mock_rover.launch.xml"]
+CMD ["source /opt/ros/jazzy/setup.bash && source /workspace/install/setup.bash && ros2 launch prod_rover rover.launch.xml"]

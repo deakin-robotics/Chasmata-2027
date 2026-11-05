@@ -6,7 +6,7 @@ mock Rover behaviour while real hardware components are introduced incrementally
 Run the local stack with:
 
 ```bash
-ros2 launch rover_mode_switch rover.launch.xml mode:=prod
+ros2 launch prod_rover rover.launch.xml
 ```
 
 The synthetic camera publisher remains the existing shell/GStreamer helper.

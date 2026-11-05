@@ -5,7 +5,7 @@
 #include <utility>
 #include <vector>
 
-namespace mock_rover
+namespace prod_rover
 {
 class JointSimulator
 {
@@ -29,4 +29,4 @@ private:
   JointValues targets_;
   JointValues velocities_;
 };
-}  // namespace mock_rover
+}  // namespace prod_rover
