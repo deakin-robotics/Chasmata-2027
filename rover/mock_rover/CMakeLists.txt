@@ -18,16 +18,16 @@ find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(telemetry_interfaces REQUIRED)
 
-add_library(mock_rover_simulation SHARED src/joint_simulator.cpp)
+add_library(mock_rover_simulation SHARED src/arm/joint_simulator.cpp)
 target_include_directories(mock_rover_simulation PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 
 add_library(mock_rover_node SHARED
-  src/mock_rover_node.cpp
-  src/fma_control.cpp
-  src/arm_control.cpp
-  src/trajectory.cpp)
+  src/rover/mock_rover_node.cpp
+  src/rover/fma_control.cpp
+  src/arm/arm_control.cpp
+  src/arm/trajectory.cpp)
 target_link_libraries(mock_rover_node mock_rover_simulation)
 target_include_directories(mock_rover_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -35,7 +35,7 @@ target_include_directories(mock_rover_node PUBLIC
 ament_target_dependencies(mock_rover_node
   control_msgs rclcpp rclcpp_action sensor_msgs std_msgs telemetry_interfaces)
 
-add_executable(mock_rover src/mock_rover_main.cpp)
+add_executable(mock_rover src/rover/mock_rover_main.cpp)
 target_link_libraries(mock_rover mock_rover_node)
 ament_target_dependencies(mock_rover rclcpp)
 

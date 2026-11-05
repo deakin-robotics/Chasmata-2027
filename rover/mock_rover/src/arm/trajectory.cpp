@@ -1,4 +1,4 @@
-#include "mock_rover_node_impl.hpp"
+#include "../rover/mock_rover_node_impl.hpp"
 
 namespace mock_rover
 {

@@ -21,6 +21,10 @@ WORKDIR /src/gst-plugins-rs
 
 RUN cargo build --release --package gst-plugin-webrtc --no-default-features --features whip
 
+COPY src/camera/camera_supervisor.cpp /tmp/camera_supervisor.cpp
+RUN g++ -std=c++17 -Wall -Wextra -O2 /tmp/camera_supervisor.cpp \
+    -o /tmp/camera-supervisor $(pkg-config --cflags --libs gstreamer-1.0 glib-2.0)
+
 FROM ubuntu:24.04
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -37,6 +41,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=plugin-builder /src/gst-plugins-rs/target/release/libgstrswebrtc.so \
     /opt/gstreamer-plugins/libgstrswebrtc.so
+COPY --from=plugin-builder /tmp/camera-supervisor /usr/local/bin/camera-supervisor
 
 ENV GST_PLUGIN_PATH=/opt/gstreamer-plugins
 
