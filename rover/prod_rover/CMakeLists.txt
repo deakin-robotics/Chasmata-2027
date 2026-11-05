@@ -11,31 +11,39 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
-find_package(control_msgs REQUIRED)
+find_package(controller_manager_msgs REQUIRED)
+find_package(dcr_arm_driver REQUIRED)
+find_package(ecam_alerts REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(rclcpp_action REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(telemetry_interfaces REQUIRED)
+find_package(builtin_interfaces REQUIRED)
 
-add_library(prod_rover_simulation SHARED src/joint_simulator.cpp)
-target_include_directories(prod_rover_simulation PUBLIC
+rosidl_generate_interfaces(${PROJECT_NAME} "srv/SetArmControlMode.srv")
+rosidl_get_typesupport_target(prod_rover_typesupport ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+add_library(prod_rover_control SHARED src/rover_control.cpp)
+target_link_libraries(prod_rover_control "${prod_rover_typesupport}")
+target_include_directories(prod_rover_control PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
+ament_target_dependencies(prod_rover_control rclcpp std_msgs telemetry_interfaces)
 
-add_library(prod_rover_node SHARED src/rover_node.cpp)
-target_link_libraries(prod_rover_node prod_rover_simulation)
-target_include_directories(prod_rover_node PUBLIC
+add_library(arm_control SHARED src/arm_control.cpp)
+target_link_libraries(arm_control "${prod_rover_typesupport}" ecam_alerts::ecam_alerts)
+target_include_directories(arm_control PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-ament_target_dependencies(prod_rover_node
-  control_msgs rclcpp rclcpp_action sensor_msgs std_msgs telemetry_interfaces)
+ament_target_dependencies(arm_control controller_manager_msgs dcr_arm_driver rclcpp sensor_msgs std_msgs telemetry_interfaces)
 
-add_executable(prod_rover src/main.cpp)
-target_link_libraries(prod_rover prod_rover_node)
-ament_target_dependencies(prod_rover rclcpp)
+add_executable(prod_rover_main src/main.cpp)
+set_target_properties(prod_rover_main PROPERTIES OUTPUT_NAME prod_rover)
+target_link_libraries(prod_rover_main prod_rover_control arm_control)
+ament_target_dependencies(prod_rover_main rclcpp)
 
-install(TARGETS prod_rover_simulation prod_rover_node prod_rover
+install(TARGETS prod_rover_control arm_control prod_rover_main
   EXPORT export_${PROJECT_NAME}
   ARCHIVE DESTINATION lib LIBRARY DESTINATION lib RUNTIME DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY include/ DESTINATION include)
@@ -44,15 +52,5 @@ install(FILES README.md DESTINATION share/${PROJECT_NAME})
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_include_directories(include)
-
-if(BUILD_TESTING)
-  find_package(ament_cmake_gtest REQUIRED)
-  ament_add_gtest(test_joint_simulator test/test_joint_simulator.cpp)
-  target_link_libraries(test_joint_simulator prod_rover_simulation)
-  ament_add_gtest(test_rover_integration test/test_rover_integration.cpp)
-  target_link_libraries(test_rover_integration prod_rover_node)
-  ament_target_dependencies(test_rover_integration
-    control_msgs rclcpp rclcpp_action sensor_msgs std_msgs telemetry_interfaces)
-endif()
 
 ament_package()

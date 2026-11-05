@@ -18,6 +18,7 @@ find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(action_msgs REQUIRED)
 find_package(urdf REQUIRED)
+find_package(telemetry_interfaces REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -59,6 +60,7 @@ ament_target_dependencies(
   std_srvs
   action_msgs
   urdf
+  telemetry_interfaces
 )
 target_link_libraries(arm_hardware_interface dcr_arm_driver_lib "${direct_drive_typesupport}")
 

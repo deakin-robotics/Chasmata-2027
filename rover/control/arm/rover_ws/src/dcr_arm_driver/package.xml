@@ -21,6 +21,7 @@
   <depend>std_srvs</depend>
   <depend>action_msgs</depend>
   <depend>urdf</depend>
+  <depend>telemetry_interfaces</depend>
   <depend>hardware_interface</depend>
   <depend>pluginlib</depend>
   <depend>joint_state_broadcaster</depend>

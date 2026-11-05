@@ -21,6 +21,7 @@
 #include <std_msgs/msg/bool.hpp>
 #include <std_srvs/srv/trigger.hpp>
 #include <action_msgs/msg/goal_status_array.hpp>
+#include <telemetry_interfaces/msg/arm_control_status.hpp>
 
 #include "dcr_arm_driver/motor.hpp"
 
@@ -114,6 +115,7 @@ class ArmHardwareInterface : public hardware_interface::SystemInterface {
   // Telemetry exposed from arm_interfaces (everything except the end effector)
   rclcpp::Publisher<arm_interfaces::msg::MotorStat1>::SharedPtr stat1_pub_;
   rclcpp::Publisher<arm_interfaces::msg::MotorStat2>::SharedPtr stat2_pub_;
+  rclcpp::Publisher<telemetry_interfaces::msg::ArmControlStatus>::SharedPtr status_pub_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr set_home_service_;
   rclcpp::Subscription<action_msgs::msg::GoalStatusArray>::SharedPtr
       trajectory_status_sub_;
@@ -139,6 +141,7 @@ class ArmHardwareInterface : public hardware_interface::SystemInterface {
   void direct_drive_callback(const dcr_arm_driver::msg::DirectDrive& msg);
   bool all_feedback_fresh(std::chrono::steady_clock::time_point now) const;
   bool all_motor_status_safe(std::chrono::steady_clock::time_point now) const;
+  void publish_status();
 };
 
 }  // namespace dcr_arm_driver

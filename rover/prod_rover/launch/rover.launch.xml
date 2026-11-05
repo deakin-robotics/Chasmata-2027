@@ -1,6 +1,20 @@
 <?xml version="1.0"?>
 <launch>
-  <node pkg="prod_rover" exec="prod_rover" name="prod_rover" output="screen"/>
+  <node pkg="nobleo_socketcan_bridge" exec="socketcan_bridge" name="socketcan_bridge" output="screen">
+    <param name="interface" value="can0"/>
+  </node>
+  <node pkg="robot_state_publisher" exec="robot_state_publisher" name="arm_robot_state_publisher" output="screen">
+    <param name="robot_description" value="$(command 'cat $(find-pkg-share dcr_arm_driver)/urdf/robot_arm.urdf')"/>
+    <remap from="joint_states" to="/arm/joint_states"/>
+  </node>
+  <node pkg="controller_manager" exec="ros2_control_node" name="controller_manager" output="screen">
+    <param name="robot_description" value="$(command 'cat $(find-pkg-share dcr_arm_driver)/urdf/robot_arm.urdf')"/>
+    <param from="$(find-pkg-share dcr_arm_driver)/config/arm_controllers.yaml"/>
+    <remap from="joint_states" to="/arm/joint_states"/>
+  </node>
+  <node pkg="controller_manager" exec="spawner" name="joint_state_broadcaster_spawner" output="screen" args="joint_state_broadcaster"/>
+  <node pkg="controller_manager" exec="spawner" name="arm_controller_spawner" output="screen" args="arm_controller"/>
+  <node pkg="prod_rover" exec="prod_rover" name="rover_control_stack" output="screen"/>
   <node pkg="ecam_alerts" exec="ecam_alert_aggregator" name="ecam_alert_aggregator_rover" output="screen">
     <param name="role" value="rover"/>
   </node>
