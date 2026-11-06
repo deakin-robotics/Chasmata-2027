@@ -182,10 +182,12 @@ TEST_F(MockRoverIntegrationTest, ValidatesExecutesAndCancelsTrajectories)
   EXPECT_EQ(result_future.get().code, rclcpp_action::ResultCode::SUCCEEDED);
   EXPECT_GT(feedback_count, 0U);
 
-  auto long_goal = trajectory_client_->async_send_goal(make_goal(2.0, 0.6));
+  auto long_goal = trajectory_client_->async_send_goal(make_goal(4.0, 0.6));
   ASSERT_TRUE(wait_for([&long_goal] { return long_goal.wait_for(0s) == std::future_status::ready; }, 1s));
   auto long_handle = long_goal.get();
   ASSERT_NE(long_handle, nullptr);
+  const auto heartbeat_count = heartbeats_;
+  ASSERT_TRUE(wait_for([this, heartbeat_count] { return heartbeats_ > heartbeat_count; }, 2s));
   auto cancel_future = trajectory_client_->async_cancel_goal(long_handle);
   ASSERT_TRUE(wait_for([&cancel_future] { return cancel_future.wait_for(0s) == std::future_status::ready; }, 1s));
   auto cancelled_result = trajectory_client_->async_get_result(long_handle);

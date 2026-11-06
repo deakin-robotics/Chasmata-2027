@@ -61,8 +61,11 @@ void MockRoverNode::execute_trajectory(const std::shared_ptr<GoalHandleTrajector
   }
   if (previous_time <= 0.0) { abort(goal_handle, FollowJointTrajectory::Result::INVALID_GOAL, "The trajectory must have a positive duration."); return; }
   auto result = std::make_shared<FollowJointTrajectory::Result>();
-  std::lock_guard<std::recursive_mutex> joints_lock(joints_mutex_);
-  auto previous_positions = joints_.positions();
+  JointSimulator::JointValues previous_positions;
+  {
+    std::lock_guard<std::recursive_mutex> joints_lock(joints_mutex_);
+    previous_positions = joints_.positions();
+  }
   std::vector<double> previous;
   for (const auto & name : names) previous.push_back(previous_positions.at(name));
   const auto started = std::chrono::steady_clock::now();
@@ -82,8 +85,11 @@ void MockRoverNode::execute_trajectory(const std::shared_ptr<GoalHandleTrajector
         velocities[names[index]] = segment <= 0.0 ? 0.0 : (point.positions[index] - previous[index]) / segment;
         actual.push_back(value);
       }
-      joints_.set_actual_positions(values, velocities);
-      publish_joint_state();
+      {
+        std::lock_guard<std::recursive_mutex> joints_lock(joints_mutex_);
+        joints_.set_actual_positions(values, velocities);
+        publish_joint_state();
+      }
       auto feedback = std::make_shared<FollowJointTrajectory::Feedback>();
       feedback->joint_names = names;
       feedback->actual.positions = actual;
