@@ -2,6 +2,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { WritableSignal, signal } from '@angular/core';
 
 import { DriverControlModeService } from '../../../../../core/control/drive/drive-control-mode';
+import { DriverControl } from '../../../../../core/control/drive/driver-control';
+import { GamepadInput } from '../../../../../core/gamepad/gamepad-input';
 import { DriveMode, FmaStateService } from '../../../../../core/fma/fma-state.service';
 import { BaseStationConnection } from '../../../../../core/ros/base-station-connection';
 import { RosConnection, type RosConnectionStatus } from '../../../../../core/ros/ros-connection';
@@ -14,12 +16,15 @@ describe('DriverMasterPage', () => {
   let roverAvailable: WritableSignal<boolean>;
   let roverWasAvailable: WritableSignal<boolean>;
   let roverConnectionStatus: WritableSignal<RosConnectionStatus>;
+  let gamepadConnected: WritableSignal<boolean>;
+  let baseStationAvailable: WritableSignal<boolean>;
 
   beforeEach(async () => {
     roverAvailable = signal(false);
     roverWasAvailable = signal(false);
     roverConnectionStatus = signal<RosConnectionStatus>('disconnected');
-    const baseStationAvailable = signal(false);
+    gamepadConnected = signal(true);
+    baseStationAvailable = signal(false);
     const baseStationWasAvailable = signal(false);
     const baseStationConnectionStatus = signal<RosConnectionStatus>('disconnected');
     const connectionInProgress = signal(false);
@@ -27,6 +32,11 @@ describe('DriverMasterPage', () => {
     await TestBed.configureTestingModule({
       imports: [DriverMasterPage],
       providers: [
+        { provide: GamepadInput, useValue: {
+          start: vi.fn(), stop: vi.fn(), connected: gamepadConnected.asReadonly(),
+          snapshot: signal({ axes: [0, 0, 0, 0], buttons: [] }).asReadonly(),
+          name: signal<string | null>(null).asReadonly(),
+        } },
         {
           provide: RosHeartbeatMonitor,
           useValue: {
@@ -94,6 +104,35 @@ describe('DriverMasterPage', () => {
 
     expect(component.cameraFeedEnabled()).toBe(true);
     expect(button.getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('keeps Master Drive on and changes its ring during connection loss', () => {
+    roverAvailable.set(true);
+    baseStationAvailable.set(true);
+    expect(TestBed.inject(DriverControl).enable()).toBe(true);
+    fixture.detectChanges();
+    const button = fixture.nativeElement.querySelector('button[aria-label="Master Drive"]') as HTMLButtonElement;
+    expect(button.getAttribute('aria-checked')).toBe('true');
+    expect(button.classList.contains('tone-normal')).toBe(true);
+    baseStationAvailable.set(false);
+    fixture.detectChanges();
+    expect(button.getAttribute('aria-checked')).toBe('true');
+    expect(button.classList.contains('tone-caution')).toBe(true);
+    baseStationAvailable.set(true);
+    roverAvailable.set(false);
+    fixture.detectChanges();
+    expect(button.getAttribute('aria-checked')).toBe('true');
+    expect(button.disabled).toBe(false);
+    expect(button.classList.contains('tone-critical')).toBe(true);
+    roverAvailable.set(true);
+    gamepadConnected.set(false);
+    fixture.detectChanges();
+    expect(button.classList.contains('tone-critical')).toBe(true);
+    gamepadConnected.set(true);
+    fixture.detectChanges();
+    expect(button.classList.contains('tone-normal')).toBe(true);
+    button.click();
+    expect(TestBed.inject(DriverControl).enabled()).toBe(false);
   });
 
   it('should disable mode selection without ROS connection', () => {

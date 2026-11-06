@@ -1,0 +1,91 @@
+name: BaseStation Pull Request Build
+
+on:
+  pull_request:
+    paths:
+      - 'basestation/**'
+      - 'interfaces/**'
+      - 'gui/**'
+      - 'rover/mock_rover/**'
+      - 'rover/shared/ecam_alerts/**'
+      - '.github/workflows/basestation-pr-build.yml'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Validate camera-health responses, arm model configuration, and Compose files.
+  test-config:
+    name: Test BaseStation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run BaseStation unit tests
+        run: |
+          mkdir -p "$RUNNER_TEMP/basestation-test-results"
+          python3 -m unittest discover -s basestation/test -v 2>&1 | tee "$RUNNER_TEMP/basestation-test-results/unit-tests.log"
+      - name: Validate Compose configurations
+        run: |
+          docker compose -f basestation/docker-compose.yml config --quiet
+          docker compose -f basestation/docker-compose.local.yml config --quiet
+      - name: Upload unit test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: basestation-unit-test-results
+          path: ${{ runner.temp }}/basestation-test-results/
+          if-no-files-found: ignore
+
+  # Exercise the MoveIt bridge against the mock rover and shared ECAM failover tests.
+  test-ros:
+    name: Test BaseStation ROS
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build BaseStation image
+        run: docker build -f basestation/Dockerfile -t basestation-ci .
+      - name: Build mock rover image
+        run: docker build -f rover/mock_rover/Dockerfile -t rover-ci .
+      - name: Run shared ECAM aggregation tests in an isolated ROS domain
+        run: |
+          mkdir -p "$RUNNER_TEMP/basestation-test-results"
+          docker run --rm --network none -e ROS_DOMAIN_ID=148 --entrypoint /bin/bash rover-ci -lc \
+            'source /opt/ros/jazzy/setup.bash && source /workspace/install/setup.bash && cd /workspace && colcon test --packages-select ecam_alerts && colcon test-result --verbose' 2>&1 | tee "$RUNNER_TEMP/basestation-test-results/ecam-tests.log"
+      - name: Run MoveIt and mock rover integration tests
+        run: |
+          mkdir -p "$RUNNER_TEMP/basestation-test-results"
+          bash basestation/test/run_ros_integration.sh 2>&1 | tee "$RUNNER_TEMP/basestation-test-results/ros-integration.log"
+      - name: Upload ROS test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: basestation-ros-test-results
+          path: ${{ runner.temp }}/basestation-test-results/
+          if-no-files-found: ignore
+
+  # Verify hosted web routes, camera availability, and recovery after a gateway restart.
+  test-hosted:
+    name: Test BaseStation Interfaces
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build hosted web image
+        run: docker build -f basestation/operations-web/Dockerfile -t basestation-web-ci .
+      - name: Build camera health image
+        run: docker build -t basestation-camera-health-ci basestation/camera-health
+      - name: Build mock camera image
+        run: docker build -f rover/mock_rover/Dockerfile.media-source -t rover-camera-ci rover/mock_rover
+      - name: Run hosted integration tests
+        run: |
+          mkdir -p "$RUNNER_TEMP/basestation-test-results"
+          bash basestation/test/run_hosted_integration.sh 2>&1 | tee "$RUNNER_TEMP/basestation-test-results/hosted-integration.log"
+      - name: Upload hosted test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: basestation-hosted-test-results
+          path: ${{ runner.temp }}/basestation-test-results/
+          if-no-files-found: ignore

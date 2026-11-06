@@ -49,7 +49,9 @@ export class ArmControlModeService {
   readonly gamepadConnected = this.gamepad.connected;
   readonly gamepadName = this.gamepad.name;
   readonly canControlArm = computed(
-    () => this.enabledState() && this.heartbeatMonitor.roverAvailable() && this.controlMode.isArmActive(),
+    () => this.enabledState() && this.heartbeatMonitor.roverAvailable() &&
+      this.gamepad.connected() && this.controlMode.isArmActive() &&
+      (!this.isPosition() || this.heartbeatMonitor.baseStationAvailable()),
   );
 
   /** Returns the reason Arm control cannot be enabled, or null when ready. */
@@ -158,9 +160,14 @@ export class ArmControlModeService {
     if (
       !this.heartbeatMonitor.roverAvailable() ||
       !this.gamepad.connected() ||
-      !this.controlMode.isArmActive()
+      !this.controlMode.isArmActive() ||
+      (this.isPosition() && !this.heartbeatMonitor.baseStationAvailable())
     ) {
-      this.disable();
+      if (this.heartbeatMonitor.roverAvailable() && this.controlMode.isArmActive()) {
+        this.armCommandPublisher.publishStop();
+      }
+      this.leftStickClickPressed = false;
+      this.rightStickClickPressed = false;
       return;
     }
 

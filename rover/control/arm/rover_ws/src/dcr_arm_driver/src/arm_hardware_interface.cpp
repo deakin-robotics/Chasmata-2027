@@ -7,7 +7,7 @@
 
 #include <pluginlib/class_list_macros.hpp>
 #include <rclcpp/rclcpp.hpp>
-#include <urdf/urdf/model.h>
+#include <urdf/model.h>
 
 namespace dcr_arm_driver {
 namespace {
@@ -210,6 +210,8 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_activate(
       "/motor_stat_1", rclcpp::QoS(100));
   stat2_pub_ = node->create_publisher<arm_interfaces::msg::MotorStat2>(
       "/motor_stat_2", rclcpp::QoS(100));
+  status_pub_ = node->create_publisher<telemetry_interfaces::msg::ArmControlStatus>(
+      "/arm/control/status", rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local());
 
   // Direct commands are latched per joint and sent by write(), so controller
   // positions cannot overwrite them on the next control iteration.
@@ -230,6 +232,7 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_activate(
   motion_inhibited_ = true;
   trajectory_rearm_ready_ = false;
   trajectory_goal_active_ = false;
+  publish_status();
 
   // Motors retain their last speed command if this process exits abruptly.
   // Stop them before the control loop starts; do not clear a motor fault here.
@@ -503,6 +506,7 @@ hardware_interface::return_type ArmHardwareInterface::write(
     const rclcpp::Time& /*time*/, const rclcpp::Duration& /*period*/) {
   std::lock_guard<std::mutex> lock(lifecycle_mutex_);
   if (!active_ || !can_pub_) {
+    publish_status();
     return hardware_interface::return_type::OK;
   }
   const bool estop_asserted = estop_asserted_.load(std::memory_order_relaxed);
@@ -596,7 +600,28 @@ hardware_interface::return_type ArmHardwareInterface::write(
     }
   }
 
+  publish_status();
+
   return hardware_interface::return_type::OK;
+}
+
+void ArmHardwareInterface::publish_status() {
+  if (!status_pub_) return;
+  const auto now = std::chrono::steady_clock::now();
+  telemetry_interfaces::msg::ArmControlStatus status;
+  status.hardware_active = active_ && static_cast<bool>(can_pub_);
+  status.estop_clear = estop_state_received_ && !estop_asserted_.load(std::memory_order_relaxed);
+  status.feedback_fresh = all_feedback_fresh(now);
+  status.motor_status_safe = all_motor_status_safe(now);
+  status.motion_inhibited = motion_inhibited_;
+  status.controller_ready = trajectory_rearm_ready_;
+  if (!status.hardware_active) status.reason = "arm hardware inactive";
+  else if (!status.estop_clear) status.reason = "e-stop active or unknown";
+  else if (!status.feedback_fresh) status.reason = "joint feedback stale";
+  else if (!status.motor_status_safe) status.reason = "motor status unsafe";
+  else if (status.motion_inhibited) status.reason = "motion inhibited";
+  else status.reason = "ready";
+  status_pub_->publish(status);
 }
 
 JointInfo* ArmHardwareInterface::find_joint(uint32_t can_id) {

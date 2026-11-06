@@ -67,7 +67,7 @@ services:
     network_mode: host
     ipc: host
     command:
-      - source /opt/ros/jazzy/setup.bash && source /workspace/install/setup.bash && ros2 launch ecam_alerts ecam_alert_aggregator.launch.py role:=basestation
+      - source /opt/ros/jazzy/setup.bash && source /workspace/install/setup.bash && ros2 launch ecam_alerts ecam_alert_aggregator.launch.xml role:=basestation
     environment:
       ROS_DOMAIN_ID: "0"
       ROS_LOCALHOST_ONLY: "0"

@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<launch>
+  <node pkg="mock_rover" exec="mock_rover" name="mock_rover" output="screen"/>
+  <node pkg="ecam_alerts" exec="ecam_alert_aggregator" name="ecam_alert_aggregator_rover" output="screen">
+    <param name="role" value="rover"/>
+  </node>
+  <node pkg="rosbridge_server" exec="rosbridge_websocket" name="rosbridge_websocket" output="screen">
+    <param name="port" value="9090"/>
+  </node>
+</launch>

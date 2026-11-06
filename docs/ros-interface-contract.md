@@ -264,9 +264,9 @@ velocity: []
 effort: []
 ```
 
-The current GUI has no publisher for /arm/joint_commands.
-The mock clamps known joints to its configured limits and immediately mirrors
-accepted targets into /arm/joint_states.
+The current GUI has no publisher for /arm/joint_commands. The mock clamps known
+joints to its configured limits and immediately mirrors accepted targets into
+/arm/joint_states.
 
 ### Arm orientation lock
 

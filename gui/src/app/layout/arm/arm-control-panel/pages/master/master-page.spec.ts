@@ -3,6 +3,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 
 import { ControlModeCoordinator } from '../../../../../core/control/control-mode-coordinator';
+import { ArmControlModeService } from '../../../../../core/control/arm/arm-control-mode';
+import { GamepadInput } from '../../../../../core/gamepad/gamepad-input';
 import { ArmMode } from '../../../../../core/fma/fma-state.service';
 import { BaseStationConnection } from '../../../../../core/ros/base-station-connection';
 import { RosConnection, type RosConnectionStatus } from '../../../../../core/ros/ros-connection';
@@ -19,6 +21,7 @@ describe('ArmMasterPage', () => {
   let baseStationConnectionStatus: WritableSignal<RosConnectionStatus>;
   let selectArmMode: ReturnType<typeof vi.fn>;
   let requestArmMode: ReturnType<typeof vi.fn>;
+  let gamepadConnected: WritableSignal<boolean>;
 
   beforeEach(async () => {
     baseStationAvailable = signal(false);
@@ -32,10 +35,16 @@ describe('ArmMasterPage', () => {
     const connectionInProgress = signal(false);
     selectArmMode = vi.fn();
     requestArmMode = vi.fn();
+    gamepadConnected = signal(true);
 
     await TestBed.configureTestingModule({
       imports: [ArmMasterPage],
       providers: [
+        { provide: GamepadInput, useValue: {
+          start: vi.fn(), stop: vi.fn(), connected: gamepadConnected.asReadonly(),
+          snapshot: signal({ axes: [0, 0, 0, 0], buttons: [] }).asReadonly(),
+          name: signal<string | null>(null).asReadonly(),
+        } },
         {
           provide: RosHeartbeatMonitor,
           useValue: {
@@ -107,6 +116,35 @@ describe('ArmMasterPage', () => {
 
     expect(fixture.componentInstance.cameraFeedEnabled()).toBe(true);
     expect(button.getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('keeps Master Drive on and changes its ring during connection loss', () => {
+    roverAvailable.set(true);
+    baseStationAvailable.set(true);
+    expect(TestBed.inject(ArmControlModeService).enable()).toBe(true);
+    fixture.detectChanges();
+    const button = fixture.nativeElement.querySelector('button[aria-label="Master Drive"]') as HTMLButtonElement;
+    expect(button.getAttribute('aria-checked')).toBe('true');
+    expect(button.classList.contains('tone-normal')).toBe(true);
+    baseStationAvailable.set(false);
+    fixture.detectChanges();
+    expect(button.getAttribute('aria-checked')).toBe('true');
+    expect(button.classList.contains('tone-caution')).toBe(true);
+    baseStationAvailable.set(true);
+    roverAvailable.set(false);
+    fixture.detectChanges();
+    expect(button.getAttribute('aria-checked')).toBe('true');
+    expect(button.disabled).toBe(false);
+    expect(button.classList.contains('tone-critical')).toBe(true);
+    roverAvailable.set(true);
+    gamepadConnected.set(false);
+    fixture.detectChanges();
+    expect(button.classList.contains('tone-critical')).toBe(true);
+    gamepadConnected.set(true);
+    fixture.detectChanges();
+    expect(button.classList.contains('tone-normal')).toBe(true);
+    button.click();
+    expect(TestBed.inject(ArmControlModeService).enabled()).toBe(false);
   });
 
   it('reports the Rover lifecycle from connecting through a lost heartbeat', () => {

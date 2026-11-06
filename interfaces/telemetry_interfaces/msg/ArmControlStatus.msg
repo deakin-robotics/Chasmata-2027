@@ -1,0 +1,7 @@
+bool hardware_active
+bool estop_clear
+bool feedback_fresh
+bool motor_status_safe
+bool motion_inhibited
+bool controller_ready
+string reason

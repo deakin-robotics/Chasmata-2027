@@ -1,0 +1,69 @@
+name: Rover Pull Request Build
+
+on:
+  pull_request:
+    paths:
+      - 'rover/**'
+      - 'interfaces/**'
+
+jobs:
+  # Check the mock simulator, ROS interfaces, and ECAM aggregation and failover.
+  test-rover:
+    name: Test Rover
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build mock rover image
+        run: docker build -f rover/mock_rover/Dockerfile -t rover-ci .
+
+      # Run the package suites and fail the job if either the runner or a test fails.
+      - name: Run ROS tests
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/rover-test-results"
+          docker run --name rover-ci-tests rover-ci 'set +e
+          source /opt/ros/jazzy/setup.bash
+          source /workspace/install/setup.bash
+          cd /workspace
+          colcon test --packages-select telemetry_interfaces ecam_alerts mock_rover --event-handlers console_direct+
+          test_status=$?
+          colcon test-result --verbose
+          result_status=$?
+          if [ "$test_status" -ne 0 ] || [ "$result_status" -ne 0 ]; then exit 1; fi'
+
+      - name: Collect test results
+        if: always()
+        shell: bash
+        run: |
+          if docker container inspect rover-ci-tests >/dev/null 2>&1; then
+            for package in telemetry_interfaces ecam_alerts mock_rover; do
+              mkdir -p "$RUNNER_TEMP/rover-test-results/$package"
+              docker cp "rover-ci-tests:/workspace/build/$package/test_results/." "$RUNNER_TEMP/rover-test-results/$package/" 2>/dev/null || true
+            done
+          fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rover-test-results
+          path: ${{ runner.temp }}/rover-test-results/**
+          if-no-files-found: ignore
+
+  # Check that all mock camera publishers recover after a gateway restart.
+  test-camera:
+    name: Test Rover Cameras
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build mock camera image
+        run: docker build -f rover/mock_rover/Dockerfile.media-source -t rover-camera-ci rover/mock_rover
+
+      - name: Verify camera recovery after gateway restart
+        run: bash .github/scripts/test-mock-camera-recovery.sh

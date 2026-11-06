@@ -20,8 +20,7 @@ services:
       ROS_LOCALHOST_ONLY: "0"
       RMW_IMPLEMENTATION: rmw_fastrtps_cpp
       ROS_DISCOVERY_SERVER: "127.0.0.1:11811"
-    depends_on:
-      - discovery
+    depends_on: [discovery]
     restart: unless-stopped
 
   media-source:
@@ -37,10 +36,8 @@ services:
       MEDIA_BITRATE_KBPS: "${MEDIA_BITRATE_KBPS:-2500}"
       MEDIA_BUFFER_KBPS: "${MEDIA_BUFFER_KBPS:-5000}"
       MEDIA_KEYFRAME_INTERVAL: "${MEDIA_KEYFRAME_INTERVAL:-30}"
-    volumes:
-      - ./run-test-sources.sh:/run-test-sources.sh:ro
-    networks:
-      local-media: {}
+    volumes: ["./run-test-sources.sh:/run-test-sources.sh:ro"]
+    networks: {local-media: {}}
     restart: unless-stopped
 
 networks:

@@ -83,7 +83,12 @@ export class DriverMasterPage {
     { label: DriveMode.Manual, value: DriveMode.Manual },
     { label: DriveMode.Velocity, value: DriveMode.Velocity },
   ];
-  readonly masterDriveTone: ControlSwitchTone = 'normal';
+  readonly masterDriveTone = computed<ControlSwitchTone>(() => {
+    if (!this.masterDriveEnabled()) return 'normal';
+    if (!this.heartbeatMonitor.roverAvailable() || !this.gamepad.connected()) return 'critical';
+    if (!this.heartbeatMonitor.baseStationAvailable()) return 'caution';
+    return this.driverControl.canDrive() ? 'normal' : 'critical';
+  });
   readonly rosConnected = this.heartbeatMonitor.roverAvailable;
   readonly gamepadConnected = this.gamepad.connected;
   readonly cameraFeedEnabled = this.cameraFeedControl.enabled;
