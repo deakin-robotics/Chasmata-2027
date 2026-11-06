@@ -62,7 +62,7 @@ protected:
   void TearDown() override
   {
     executor_.remove_node(client_);
-    executor_.remove_node(rover_);
+    if (rover_) executor_.remove_node(rover_);
     client_.reset();
     rover_.reset();
   }
@@ -181,6 +181,12 @@ TEST_F(MockRoverIntegrationTest, ValidatesExecutesAndCancelsTrajectories)
   ASSERT_TRUE(wait_for([&result_future] { return result_future.wait_for(0s) == std::future_status::ready; }, 2s));
   EXPECT_EQ(result_future.get().code, rclcpp_action::ResultCode::SUCCEEDED);
   EXPECT_GT(feedback_count, 0U);
+  ASSERT_TRUE(wait_for([this] {
+    const auto & state = latest_joints();
+    return joint(state, "base_joint") == 0.3 &&
+      state.velocity.size() == state.name.size() &&
+      state.velocity[0] == 0.0 && state.velocity[1] == 0.0 && state.velocity[2] == 0.0;
+  }, 1s));
 
   auto long_goal = trajectory_client_->async_send_goal(make_goal(4.0, 0.6));
   ASSERT_TRUE(wait_for([&long_goal] { return long_goal.wait_for(0s) == std::future_status::ready; }, 1s));
@@ -193,6 +199,11 @@ TEST_F(MockRoverIntegrationTest, ValidatesExecutesAndCancelsTrajectories)
   auto cancelled_result = trajectory_client_->async_get_result(long_handle);
   ASSERT_TRUE(wait_for([&cancelled_result] { return cancelled_result.wait_for(0s) == std::future_status::ready; }, 2s));
   EXPECT_EQ(cancelled_result.get().code, rclcpp_action::ResultCode::CANCELED);
+  ASSERT_TRUE(wait_for([this] {
+    const auto & state = latest_joints();
+    return state.velocity.size() == state.name.size() &&
+      state.velocity[0] == 0.0 && state.velocity[1] == 0.0 && state.velocity[2] == 0.0;
+  }, 1s));
 
   std_msgs::msg::Bool locked;
   locked.data = true;
@@ -204,5 +215,27 @@ TEST_F(MockRoverIntegrationTest, ValidatesExecutesAndCancelsTrajectories)
   auto invalid_result = trajectory_client_->async_get_result(invalid_handle);
   ASSERT_TRUE(wait_for([&invalid_result] { return invalid_result.wait_for(0s) == std::future_status::ready; }, 1s));
   EXPECT_EQ(invalid_result.get().code, rclcpp_action::ResultCode::ABORTED);
+}
+
+// Destroying the node stops active and queued trajectory workers promptly.
+TEST_F(MockRoverIntegrationTest, StopsTrajectoryWorkersWhenNodeIsDestroyed)
+{
+  Trajectory::Goal goal;
+  goal.trajectory.joint_names = {"base_joint"};
+  trajectory_msgs::msg::JointTrajectoryPoint point;
+  point.positions = {0.6};
+  point.time_from_start.sec = 30;
+  goal.trajectory.points.push_back(point);
+  auto first = trajectory_client_->async_send_goal(goal);
+  ASSERT_TRUE(wait_for([&first] { return first.wait_for(0s) == std::future_status::ready; }, 2s));
+  ASSERT_NE(first.get(), nullptr);
+  auto second = trajectory_client_->async_send_goal(goal);
+  ASSERT_TRUE(wait_for([&second] { return second.wait_for(0s) == std::future_status::ready; }, 2s));
+  ASSERT_NE(second.get(), nullptr);
+  ASSERT_TRUE(wait_for([this] { return joint(latest_joints(), "base_joint") > 0.0; }, 2s));
+  executor_.remove_node(rover_);
+  const auto start = std::chrono::steady_clock::now();
+  rover_.reset();
+  EXPECT_LT(std::chrono::steady_clock::now() - start, 2s);
 }
 }  // namespace

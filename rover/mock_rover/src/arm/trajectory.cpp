@@ -21,7 +21,33 @@ rclcpp_action::CancelResponse MockRoverNode::handle_cancel(const std::shared_ptr
 }
 void MockRoverNode::handle_accepted(const std::shared_ptr<GoalHandleTrajectory> goal_handle)
 {
-  std::thread([this, goal_handle]() { execute_trajectory(goal_handle); }).detach();
+  for (auto it = trajectory_workers_.begin(); it != trajectory_workers_.end();) {
+    if (it->finished->load()) {
+      it->thread.join();
+      it = trajectory_workers_.erase(it);
+    } else {
+      ++it;
+    }
+  }
+  auto finished = std::make_shared<std::atomic<bool>>(false);
+  trajectory_workers_.push_back({std::thread([this, goal_handle, finished]() {
+    try {
+      execute_trajectory(goal_handle);
+    } catch (const std::exception & error) {
+      if (rclcpp::ok(get_node_base_interface()->get_context()) && !stopping_) {
+        RCLCPP_ERROR(get_logger(), "Trajectory execution failed: %s", error.what());
+      }
+    }
+    finished->store(true);
+  }), finished});
+}
+
+MockRoverNode::~MockRoverNode()
+{
+  stopping_ = true;
+  for (auto & worker : trajectory_workers_) {
+    if (worker.thread.joinable()) worker.thread.join();
+  }
 }
 
 void MockRoverNode::abort(const std::shared_ptr<GoalHandleTrajectory> & goal_handle, int32_t code, const std::string & message)
@@ -35,6 +61,7 @@ void MockRoverNode::abort(const std::shared_ptr<GoalHandleTrajectory> & goal_han
 void MockRoverNode::execute_trajectory(const std::shared_ptr<GoalHandleTrajectory> & goal_handle)
 {
   std::lock_guard<std::mutex> execution_lock(trajectory_mutex_);
+  if (stopping_ || !rclcpp::ok(get_node_base_interface()->get_context())) return;
   const auto trajectory = goal_handle->get_goal()->trajectory;
   const auto names = trajectory.joint_names;
   const std::set<std::string> name_set(names.begin(), names.end());
@@ -68,13 +95,22 @@ void MockRoverNode::execute_trajectory(const std::shared_ptr<GoalHandleTrajector
   }
   std::vector<double> previous;
   for (const auto & name : names) previous.push_back(previous_positions.at(name));
+  const auto stop_joints = [this, &names]() {
+    std::lock_guard<std::recursive_mutex> joints_lock(joints_mutex_);
+    const auto positions = joints_.positions();
+    JointSimulator::JointValues executed_positions;
+    for (const auto & name : names) executed_positions[name] = positions.at(name);
+    joints_.set_actual_positions(executed_positions);
+    publish_joint_state();
+  };
   const auto started = std::chrono::steady_clock::now();
   double previous_point = 0.0;
   for (const auto & point : trajectory.points) {
     const auto target_time = seconds(point.time_from_start);
     const auto segment = target_time - previous_point;
     while (true) {
-      if (goal_handle->is_canceling()) { result->error_code = FollowJointTrajectory::Result::INVALID_GOAL; result->error_string = "The trajectory was cancelled during execution."; goal_handle->canceled(result); return; }
+      if (stopping_ || !rclcpp::ok(get_node_base_interface()->get_context())) return;
+      if (goal_handle->is_canceling()) { stop_joints(); result->error_code = FollowJointTrajectory::Result::INVALID_GOAL; result->error_string = "The trajectory was cancelled during execution."; goal_handle->canceled(result); return; }
       const auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
       const auto fraction = segment <= 0.0 ? 1.0 : std::clamp((elapsed - previous_point) / segment, 0.0, 1.0);
       JointSimulator::JointValues values, velocities;
@@ -101,6 +137,8 @@ void MockRoverNode::execute_trajectory(const std::shared_ptr<GoalHandleTrajector
     previous_point = target_time;
     previous.assign(point.positions.begin(), point.positions.end());
   }
+  if (stopping_ || !rclcpp::ok(get_node_base_interface()->get_context())) return;
+  stop_joints();
   result->error_code = FollowJointTrajectory::Result::SUCCESSFUL;
   goal_handle->succeed(result);
 }

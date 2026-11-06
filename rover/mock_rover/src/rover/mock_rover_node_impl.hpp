@@ -49,6 +49,7 @@ class MockRoverNode : public rclcpp::Node
 {
 public:
   MockRoverNode();
+  ~MockRoverNode() override;
 
 private:
   struct Pending { std::string value; std::chrono::steady_clock::time_point due; };
@@ -74,6 +75,9 @@ private:
   JointSimulator joints_;
   std::recursive_mutex joints_mutex_;
   std::mutex trajectory_mutex_;
+  struct TrajectoryWorker { std::thread thread; std::shared_ptr<std::atomic<bool>> finished; };
+  std::vector<TrajectoryWorker> trajectory_workers_;
+  std::atomic<bool> stopping_{false};
   double ack_delay_{0.15}; std::atomic<bool> orientation_locked_{false};
   std::string drive_mode_, arm_mode_, law_{"NORMAL"}, override_state_{"INACTIVE"}, gimbal_priority_;
   bool rover_protection_{true}; uint64_t sequence_{0}; std::chrono::steady_clock::time_point last_fma_{std::chrono::steady_clock::now()};
