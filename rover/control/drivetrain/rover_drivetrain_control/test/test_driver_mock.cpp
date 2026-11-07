@@ -1,35 +1,52 @@
 #include "rover_drivetrain_control/bld305s_driver.hpp"
 #include <modbus/modbus.h>
-#include <cassert>
+#include <array>
 #include <stdexcept>
 #define CHECK(e) do { if (!(e)) throw std::runtime_error(#e); } while(false)
 #include <cerrno>
 #include <cstdint>
 #include <iostream>
-#include <memory>
-#include <string>
 
 struct _modbus {
   int slave{0};
   bool connected{false};
 };
 
-static bool fail_one{false};
+static _modbus * shared_context{nullptr};
+static unsigned contexts_created{0};
+static std::array<bool, 5> fail_slave{};
+static std::array<unsigned, 5> read_attempts{};
 extern "C" {
-modbus_t * modbus_new_rtu(const char *, int, char, int, int) {return new _modbus;}
+modbus_t * modbus_new_rtu(const char *, int, char, int, int)
+{
+  CHECK(shared_context == nullptr);
+  ++contexts_created;
+  shared_context = new _modbus;
+  return shared_context;
+}
 int modbus_set_response_timeout(modbus_t *, std::uint32_t, std::uint32_t) {return 0;}
 int modbus_connect(modbus_t * m) {m->connected=true;return 0;}
 void modbus_close(modbus_t * m) {m->connected=false;}
-void modbus_free(modbus_t * m) {delete m;}
-int modbus_set_slave(modbus_t * m, int slave) {m->slave=slave;return 0;}
+void modbus_free(modbus_t * m) {CHECK(m==shared_context);delete m;shared_context=nullptr;}
+int modbus_set_slave(modbus_t * m, int slave)
+{
+  CHECK(m==shared_context && m->connected);
+  CHECK(slave>=1 && slave<=4);
+  m->slave=slave;
+  return 0;
+}
 int modbus_read_registers(modbus_t * m, int, int n, std::uint16_t * out)
 {
-  if (m->slave==1 && fail_one) {errno=ETIMEDOUT;return -1;}
-  *out=123;return n;
+  CHECK(m==shared_context && m->connected);
+  ++read_attempts[m->slave];
+  if (fail_slave[m->slave]) {errno=ETIMEDOUT;return -1;}
+  *out=static_cast<std::uint16_t>(100+m->slave);
+  return n;
 }
 int modbus_write_register(modbus_t * m, int, const std::uint16_t)
 {
-  if (m->slave==1 && fail_one) {errno=ETIMEDOUT;return -1;}
+  CHECK(m==shared_context && m->connected);
+  if (fail_slave[m->slave]) {errno=ETIMEDOUT;return -1;}
   return 1;
 }
 }
@@ -37,59 +54,94 @@ int modbus_write_register(modbus_t * m, int, const std::uint16_t)
 int main()
 {
   using Driver = rover_drivetrain_control::Bld305sDriver;
+  const Driver::SlaveIds ids{1,2,3,4};
   Driver::RtuConfig cfg;
   cfg.device="mock"; cfg.baud_rate=38400; cfg.parity='N';
   cfg.data_bits=8; cfg.stop_bits=1;
   Driver driver(cfg);
   CHECK(driver.open().ok());
+  CHECK(contexts_created==1);
+  CHECK(driver.beginCycle({1,2,3,3}).code==Driver::ErrorCode::INVALID_CYCLE_STATE);
+  CHECK(driver.beginCycle({0,2,3,4}).code==Driver::ErrorCode::INVALID_CYCLE_STATE);
+  CHECK(driver.beginCycle({1,2,3,248}).code==Driver::ErrorCode::INVALID_CYCLE_STATE);
+  CHECK(!driver.allSlavesLost({1,2,3,3}));
+
   std::uint16_t value=0;
-  for (int cycle=1;cycle<=3;++cycle) {
-    CHECK(driver.beginCycle(1,2).ok());
-    fail_one=true;
+  auto read_good = [&](std::uint8_t id) {
+      CHECK(driver.readTemperatureRaw(id,value).ok());
+      CHECK(value==100+id);  // verifies the selected slave for each transaction
+      CHECK(driver.readCurrentRaw(id,value).ok());
+      CHECK(driver.readVoltageRaw(id,value).ok());
+    };
+  // One timeout skips only the failed slave; all three peers stay healthy.
+  fail_slave[1]=true;
+  for (unsigned cycle=1;cycle<=3;++cycle) {
+    CHECK(driver.beginCycle(ids).ok());
+    CHECK(driver.beginCycle(ids).code==Driver::ErrorCode::INVALID_CYCLE_STATE);
+    const auto before=read_attempts[1];
     CHECK(!driver.readTemperatureRaw(1,value).ok());
-    const auto skipped=driver.readCurrentRaw(1,value);
-    CHECK(skipped.code==Driver::ErrorCode::SKIPPED_THIS_CYCLE);
-    fail_one=false;
-    CHECK(driver.readTemperatureRaw(2,value).ok());
-    CHECK(driver.readCurrentRaw(2,value).ok());
-    CHECK(driver.readVoltageRaw(2,value).ok());
+    CHECK(driver.readCurrentRaw(1,value).code==Driver::ErrorCode::SKIPPED_THIS_CYCLE);
+    CHECK(driver.writeSpeedRaw(1,0).code==Driver::ErrorCode::SKIPPED_THIS_CYCLE);
+    CHECK(read_attempts[1]==before+1);
+    for (std::uint8_t id=2;id<=4;++id) read_good(id);
     CHECK(driver.endCycle().ok());
-    CHECK(driver.consecutiveFailures(1)==static_cast<unsigned>(cycle));
-    CHECK(driver.consecutiveFailures(2)==0);
-    CHECK(driver.communicationState(2)==Driver::CommunicationState::HEALTHY);
-    CHECK(driver.telemetryValid(2));
+    CHECK(driver.consecutiveFailures(1)==cycle);
     CHECK(!driver.telemetryValid(1));
-    CHECK(!driver.bothSlavesLost(1, 2));
+    CHECK(!driver.allSlavesLost(ids));
+    for (std::uint8_t id=2;id<=4;++id) {
+      CHECK(driver.consecutiveFailures(id)==0);
+      CHECK(driver.communicationState(id)==Driver::CommunicationState::HEALTHY);
+      CHECK(driver.telemetryValid(id));
+    }
   }
   CHECK(driver.communicationState(1)==Driver::CommunicationState::LOST);
   CHECK(driver.controllerState(1)==Driver::ControllerState::UNKNOWN);
-  CHECK(driver.beginCycle(1,2).ok());
-  CHECK(driver.readTemperatureRaw(1,value).ok());
-  CHECK(driver.readCurrentRaw(1,value).ok());
-  CHECK(driver.readVoltageRaw(1,value).ok());
-  CHECK(driver.readTemperatureRaw(2,value).ok());
-  CHECK(driver.readCurrentRaw(2,value).ok());
-  CHECK(driver.readVoltageRaw(2,value).ok());
+  fail_slave[1]=false;
+  CHECK(driver.beginCycle({4,2,1,3}).ok());  // wheel mapping order is configurable
+  for (auto id : ids) read_good(id);
   CHECK(driver.endCycle().ok());
-  CHECK(driver.communicationState(1)==Driver::CommunicationState::HEALTHY);
   CHECK(driver.telemetryValid(1));
+  CHECK(driver.communicationState(1)==Driver::CommunicationState::HEALTHY);
   CHECK(driver.controllerState(1)==Driver::ControllerState::UNKNOWN);
-  // After a good cycle: DEGRADED, not LOST, for one and two failed cycles, and
-  // the good data stays valid for exactly one missed cycle (grace period).
-  for (int cycle=1;cycle<=2;++cycle) {
-    CHECK(driver.beginCycle(1,2).ok());
-    fail_one=true;
-    CHECK(!driver.readTemperatureRaw(1,value).ok());
-    fail_one=false;
-    CHECK(driver.readTemperatureRaw(2,value).ok());
-    CHECK(driver.readCurrentRaw(2,value).ok());
-    CHECK(driver.readVoltageRaw(2,value).ok());
+
+  // Exercise failures for a drive that used to be on the other adapter.
+  fail_slave[3]=true;
+  for (unsigned cycle=1;cycle<=3;++cycle) {
+    CHECK(driver.beginCycle(ids).ok());
+    for (auto id : ids) {
+      if (id==3) {
+        CHECK(!driver.readTemperatureRaw(id,value).ok());
+        CHECK(driver.readCurrentRaw(id,value).code==Driver::ErrorCode::SKIPPED_THIS_CYCLE);
+      } else {
+        read_good(id);
+      }
+    }
     CHECK(driver.endCycle().ok());
-    CHECK(driver.consecutiveFailures(1)==static_cast<unsigned>(cycle));
-    CHECK(driver.communicationState(1)==Driver::CommunicationState::DEGRADED);
-    CHECK(driver.telemetryValid(1)==(cycle==1));
-    CHECK(driver.communicationState(2)==Driver::CommunicationState::HEALTHY);
+    CHECK(driver.consecutiveFailures(3)==cycle);
+    CHECK(driver.telemetryValid(3)==(cycle==1));
+    CHECK(driver.communicationState(3)==(cycle<3 ?
+      Driver::CommunicationState::DEGRADED : Driver::CommunicationState::LOST));
+    CHECK(!driver.allSlavesLost(ids));
   }
+
+  // Missing work for any of the four drives counts as a missed cycle.
+  fail_slave[3]=false;
+  CHECK(driver.beginCycle(ids).ok());
+  for (std::uint8_t id=1;id<=3;++id) read_good(id);
+  CHECK(driver.endCycle().ok());
+  CHECK(driver.consecutiveFailures(4)==1);
+  CHECK(driver.communicationState(4)==Driver::CommunicationState::DEGRADED);
+
+  // Correlated silence requires all four drives, not just one side.
+  for (auto id : ids) fail_slave[id]=true;
+  for (int cycle=0;cycle<3;++cycle) {
+    CHECK(driver.beginCycle(ids).ok());
+    for (auto id : ids) CHECK(!driver.readTemperatureRaw(id,value).ok());
+    CHECK(driver.endCycle().ok());
+  }
+  CHECK(driver.allSlavesLost(ids));
+  CHECK(contexts_created==1);
   driver.close();
-  std::cout<<"mock libmodbus driver per-cycle tests passed\n";
+  CHECK(shared_context==nullptr);
+  std::cout<<"mock shared-bus four-drive per-cycle tests passed\n";
 }

@@ -54,7 +54,7 @@ struct WheelCycleHealth
 
 struct BusCycleHealth
 {
-  bool both_wheels_missed{false};
+  bool all_wheels_missed{false};
   bool adapter_failure_observed{false};
   // Correlation alone is not proof of an adapter fault.
   [[nodiscard]] bool confirmed_bus_failure() const noexcept

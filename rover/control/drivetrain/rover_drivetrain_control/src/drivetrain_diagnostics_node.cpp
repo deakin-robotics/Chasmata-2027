@@ -50,12 +50,11 @@ public:
         response->result_code = 1;
         response->detail = "Read-only probing is disabled (enable_readonly_probe=false).";
         if (!enable_readonly_) return;
-        dcr::Bld305sDriver * driver = nullptr;
-        if (request->bus == "left") driver = left_.get();
-        if (request->bus == "right") driver = right_.get();
-        if (!driver || request->address < 1 || request->address > 4) {
+        auto * driver = driver_.get();
+        if (request->bus != "drivetrain" || !driver ||
+            request->address < 1 || request->address > 4) {
           response->result_code = 2;
-          response->detail = "Invalid bus, slave ID, or serial connection unavailable";
+          response->detail = "Expected bus 'drivetrain', slave ID 1..4, and an open serial connection";
           return;
         }
         std::uint16_t value = 0;
@@ -80,40 +79,32 @@ public:
       });
 
     if (enable_readonly_) {
-      const auto left_device = declare_parameter<std::string>("left_serial_device", "");
-      const auto right_device = declare_parameter<std::string>("right_serial_device", "");
-      const auto left_baud = declare_parameter<int>("left_baud_rate", 0);
-      const auto right_baud = declare_parameter<int>("right_baud_rate", 0);
+      const auto device = declare_parameter<std::string>("serial_device", "");
+      const auto baud = declare_parameter<int>("baud_rate", 0);
       const auto parity = declare_parameter<std::string>("parity", "");
       const auto data_bits = declare_parameter<int>("data_bits", 0);
       const auto stop_bits = declare_parameter<int>("stop_bits", 0);
       const auto timeout_ms = declare_parameter<int>("response_timeout_ms", 30);
-      if (left_device.empty() || right_device.empty() || left_device == right_device ||
-          left_baud <= 0 || right_baud <= 0 || parity.size() != 1 ||
+      if (device.empty() || baud <= 0 || parity.size() != 1 ||
           (parity != "N" && parity != "E" && parity != "O") ||
           data_bits < 5 || data_bits > 8 || (stop_bits != 1 && stop_bits != 2) ||
           timeout_ms <= 0) {
-        RCLCPP_ERROR(get_logger(), "Read-only probe refused: explicit, separate bus devices, positive baud rates and serial framing required.");
+        RCLCPP_ERROR(get_logger(), "Read-only probe refused: explicit serial device, positive baud rate and serial framing required.");
         return;
       }
       dcr::Bld305sDriver::RtuConfig config{};
-      config.baud_rate = left_baud;
+      config.baud_rate = baud;
       config.parity = parity[0];
       config.data_bits = data_bits;
       config.stop_bits = stop_bits;
       config.response_timeout = std::chrono::milliseconds(timeout_ms);
-      config.device = left_device;
-      left_ = std::make_unique<dcr::Bld305sDriver>(config);
-      config.device = right_device;
-      config.baud_rate = right_baud;
-      right_ = std::make_unique<dcr::Bld305sDriver>(config);
-      const auto l = left_->open();
-      const auto r = right_->open();
-      if (!l || !r) {
-        RCLCPP_ERROR(get_logger(), "Read-only probe could not open both buses; no motion will be attempted.");
-        left_.reset(); right_.reset();
+      config.device = device;
+      driver_ = std::make_unique<dcr::Bld305sDriver>(config);
+      if (!driver_->open()) {
+        RCLCPP_ERROR(get_logger(), "Read-only probe could not open the shared bus; no motion will be attempted.");
+        driver_.reset();
       } else {
-        RCLCPP_WARN(get_logger(), "Read-only transports open. A Modbus ACK proves transport, not drive calibration or motion readiness.");
+        RCLCPP_WARN(get_logger(), "Read-only shared transport open. A Modbus ACK proves transport, not drive calibration or motion readiness.");
       }
     }
   }
@@ -164,8 +155,7 @@ private:
   }
 
   bool enable_readonly_{false};
-  std::unique_ptr<dcr::Bld305sDriver> left_;
-  std::unique_ptr<dcr::Bld305sDriver> right_;
+  std::unique_ptr<dcr::Bld305sDriver> driver_;
   std::map<std::pair<std::string, std::uint8_t>, msg::WheelTelemetry> records_;
   rclcpp::Publisher<msg::DrivetrainTelemetry>::SharedPtr telemetry_pub_;
   rclcpp::TimerBase::SharedPtr telemetry_timer_;

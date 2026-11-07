@@ -85,7 +85,7 @@ RoverHardwareInterface::on_init(
   configuration_valid_ = false;
   previous_read_tick_ns_ = 0;
   late_trigger_detected_ = false;
-  transports_open_ = false;
+  transport_open_ = false;
   operationally_ready_ = false;
   active_ = false;
 
@@ -99,13 +99,7 @@ RoverHardwareInterface::on_init(
     return hardware_interface::CallbackReturn::ERROR;
   }
 
-  drivers_[busIndex(BusId::LEFT)] =
-    std::make_unique<Bld305sDriver>(
-    bus_configs_[busIndex(BusId::LEFT)]);
-
-  drivers_[busIndex(BusId::RIGHT)] =
-    std::make_unique<Bld305sDriver>(
-    bus_configs_[busIndex(BusId::RIGHT)]);
+  driver_ = std::make_unique<Bld305sDriver>(bus_config_);
 
   configuration_valid_ = true;
 
@@ -135,47 +129,35 @@ RoverHardwareInterface::on_configure(
     return hardware_interface::CallbackReturn::ERROR;
   }
 
-  closeDrivers();
+  closeDriver();
   resetInterfaceStorage();
 
-  for (std::size_t bus = 0; bus < BUS_COUNT; ++bus) {
-    if (!drivers_[bus]) {
-      RCLCPP_ERROR(
-        logger(),
-        "Cannot configure drivetrain: RS485 bus %zu has no driver instance.",
-        bus);
-
-      closeDrivers();
-      return hardware_interface::CallbackReturn::ERROR;
-    }
-
-    const Bld305sDriver::Result result =
-      drivers_[bus]->open();
-
-    if (!result) {
-      RCLCPP_ERROR(
-        logger(),
-        "Failed to open RS485 bus %zu. "
-        "Driver error=%u libmodbus_rc=%d errno=%d",
-        bus,
-        static_cast<unsigned int>(result.code),
-        result.libmodbus_return_code,
-        result.system_errno);
-
-      closeDrivers();
-      return hardware_interface::CallbackReturn::ERROR;
-    }
+  if (!driver_) {
+    RCLCPP_ERROR(logger(), "Cannot configure drivetrain: shared RS485 driver is missing.");
+    return hardware_interface::CallbackReturn::ERROR;
   }
 
-  transports_open_ = true;
+  const Bld305sDriver::Result result = driver_->open();
+  if (!result) {
+    RCLCPP_ERROR(
+      logger(),
+      "Failed to open shared RS485 bus. Driver error=%u libmodbus_rc=%d errno=%d",
+      static_cast<unsigned int>(result.code),
+      result.libmodbus_return_code,
+      result.system_errno);
+    closeDriver();
+    return hardware_interface::CallbackReturn::ERROR;
+  }
+
+  transport_open_ = true;
 
   RCLCPP_ERROR(
     logger(),
-    "Both Modbus transports opened successfully, but the verified BLD-305S "
+    "Shared Modbus transport opened successfully, but the verified BLD-305S "
     "initialization sequence and velocity conversion are not implemented. "
     "Refusing to mark the drivetrain configured for motion.");
 
-  closeDrivers();
+  closeDriver();
   operationally_ready_ = false;
 
   return hardware_interface::CallbackReturn::ERROR;
@@ -197,10 +179,10 @@ RoverHardwareInterface::on_activate(
     return hardware_interface::CallbackReturn::ERROR;
   }
 
-  if (!transports_open_) {
+  if (!transport_open_) {
     RCLCPP_ERROR(
       logger(),
-      "Refusing drivetrain activation: Modbus transports are not open.");
+      "Refusing drivetrain activation: shared Modbus transport is not open.");
 
     return hardware_interface::CallbackReturn::ERROR;
   }
@@ -253,7 +235,7 @@ RoverHardwareInterface::on_cleanup(
   active_ = false;
   operationally_ready_ = false;
 
-  closeDrivers();
+  closeDriver();
   resetInterfaceStorage();
 
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -390,15 +372,14 @@ bool RoverHardwareInterface::parseConfiguration()
 
   auto parse_bus_configuration =
     [&parameters](
-      const std::string & prefix,
       Bld305sDriver::RtuConfig & config) -> bool
     {
-      const std::string device_key = prefix + "_serial_device";
-      const std::string baud_key = prefix + "_baud_rate";
-      const std::string parity_key = prefix + "_parity";
-      const std::string data_bits_key = prefix + "_data_bits";
-      const std::string stop_bits_key = prefix + "_stop_bits";
-      const std::string timeout_key = prefix + "_response_timeout_ms";
+      const std::string device_key = "serial_device";
+      const std::string baud_key = "baud_rate";
+      const std::string parity_key = "parity";
+      const std::string data_bits_key = "data_bits";
+      const std::string stop_bits_key = "stop_bits";
+      const std::string timeout_key = "response_timeout_ms";
 
       const auto device_it = parameters.find(device_key);
       const auto baud_it = parameters.find(baud_key);
@@ -415,8 +396,7 @@ bool RoverHardwareInterface::parseConfiguration()
       {
         RCLCPP_ERROR(
           logger(),
-          "Missing required serial configuration for '%s' RS485 bus.",
-          prefix.c_str());
+          "Missing required serial configuration for the shared RS485 bus.");
 
         return false;
       }
@@ -521,26 +501,7 @@ bool RoverHardwareInterface::parseConfiguration()
       return true;
     };
 
-  if (
-    !parse_bus_configuration(
-      "left",
-      bus_configs_[busIndex(BusId::LEFT)]))
-  {
-    return false;
-  }
-
-  if (
-    !parse_bus_configuration(
-      "right",
-      bus_configs_[busIndex(BusId::RIGHT)]))
-  {
-    return false;
-  }
-
-  // Two contexts pointing at the same device do not represent two buses.
-  if (bus_configs_[busIndex(BusId::LEFT)].device ==
-      bus_configs_[busIndex(BusId::RIGHT)].device) {
-    RCLCPP_ERROR(logger(), "Left and right RS485 devices must be different.");
+  if (!parse_bus_configuration(bus_config_)) {
     return false;
   }
 
@@ -623,32 +584,15 @@ bool RoverHardwareInterface::parseWheelConfiguration(
   const auto & joint =
     hardware_info_.joints[wheel_index];
 
-  const auto bus_it =
-    joint.parameters.find("bus");
-
   const auto slave_it =
     joint.parameters.find("slave_id");
 
-  if (
-    bus_it == joint.parameters.end() ||
-    slave_it == joint.parameters.end())
+  if (slave_it == joint.parameters.end())
   {
     RCLCPP_ERROR(
       logger(),
-      "Joint '%s' requires both 'bus' and 'slave_id' parameters.",
+      "Joint '%s' requires a 'slave_id' parameter on the shared RS485 bus.",
       joint.name.c_str());
-
-    return false;
-  }
-
-  BusId bus{};
-
-  if (!parseBusId(bus_it->second, bus)) {
-    RCLCPP_ERROR(
-      logger(),
-      "Joint '%s' has invalid bus '%s'. Expected 'left' or 'right'.",
-      joint.name.c_str(),
-      bus_it->second.c_str());
 
     return false;
   }
@@ -684,17 +628,12 @@ bool RoverHardwareInterface::parseWheelConfiguration(
       joint.name.c_str());
     return false;
   }
-  if ((bus == BusId::RIGHT) != (mirror_it->second == "true")) {
-    RCLCPP_ERROR(logger(), "Joint '%s' mirror flag must match right-side bus topology.",
-      joint.name.c_str());
-    return false;
-  }
+  // Mirroring describes the wheel mounting, independently of the shared bus.
   wheels_[wheel_index].gear_ratio = gear;
   wheels_[wheel_index].motor_rpm_limit = rpm;
   wheels_[wheel_index].mirrored = mirror_it->second == "true";
 
   wheels_[wheel_index].joint_name = joint.name;
-  wheels_[wheel_index].bus = bus;
   wheels_[wheel_index].slave_id =
     static_cast<std::uint8_t>(slave_id);
 
@@ -705,10 +644,6 @@ bool RoverHardwareInterface::validateWheelMapping() const
 {
   std::array<bool, 5> seen_slave_ids{
     false, false, false, false, false
-  };
-
-  std::array<std::size_t, BUS_COUNT> bus_counts{
-    0, 0
   };
 
   for (std::size_t wheel = 0; wheel < WHEEL_COUNT; ++wheel) {
@@ -735,15 +670,6 @@ bool RoverHardwareInterface::validateWheelMapping() const
     }
 
     seen_slave_ids[slave_id] = true;
-
-    const std::size_t bus_index =
-      busIndex(wheels_[wheel].bus);
-
-    if (bus_index >= BUS_COUNT) {
-      return false;
-    }
-
-    ++bus_counts[bus_index];
   }
 
   for (std::uint8_t id = 1; id <= 4; ++id) {
@@ -755,20 +681,6 @@ bool RoverHardwareInterface::validateWheelMapping() const
 
       return false;
     }
-  }
-
-  if (
-    bus_counts[busIndex(BusId::LEFT)] != 2 ||
-    bus_counts[busIndex(BusId::RIGHT)] != 2)
-  {
-    RCLCPP_ERROR(
-      logger(),
-      "Expected exactly two wheels on each RS485 bus. "
-      "Configured counts: left=%zu right=%zu.",
-      bus_counts[busIndex(BusId::LEFT)],
-      bus_counts[busIndex(BusId::RIGHT)]);
-
-    return false;
   }
 
   for (std::size_t i = 0; i < WHEEL_COUNT; ++i) {
@@ -787,23 +699,6 @@ bool RoverHardwareInterface::validateWheelMapping() const
   return true;
 }
 
-bool RoverHardwareInterface::parseBusId(
-  const std::string & value,
-  BusId & bus)
-{
-  if (value == "left") {
-    bus = BusId::LEFT;
-    return true;
-  }
-
-  if (value == "right") {
-    bus = BusId::RIGHT;
-    return true;
-  }
-
-  return false;
-}
-
 Bld305sDriver *
 RoverHardwareInterface::driverForWheel(
   std::size_t wheel_index) noexcept
@@ -812,14 +707,7 @@ RoverHardwareInterface::driverForWheel(
     return nullptr;
   }
 
-  const std::size_t bus_index =
-    busIndex(wheels_[wheel_index].bus);
-
-  if (bus_index >= BUS_COUNT) {
-    return nullptr;
-  }
-
-  return drivers_[bus_index].get();
+  return driver_.get();
 }
 
 const Bld305sDriver *
@@ -830,14 +718,7 @@ RoverHardwareInterface::driverForWheel(
     return nullptr;
   }
 
-  const std::size_t bus_index =
-    busIndex(wheels_[wheel_index].bus);
-
-  if (bus_index >= BUS_COUNT) {
-    return nullptr;
-  }
-
-  return drivers_[bus_index].get();
+  return driver_.get();
 }
 
 void RoverHardwareInterface::updateIoHeartbeat() noexcept
@@ -886,15 +767,13 @@ void RoverHardwareInterface::resetInterfaceStorage() noexcept
     std::memory_order_release);
 }
 
-void RoverHardwareInterface::closeDrivers() noexcept
+void RoverHardwareInterface::closeDriver() noexcept
 {
-  for (auto & driver : drivers_) {
-    if (driver) {
-      driver->close();
-    }
+  if (driver_) {
+    driver_->close();
   }
 
-  transports_open_ = false;
+  transport_open_ = false;
 }
 
 }  // namespace rover_drivetrain_control

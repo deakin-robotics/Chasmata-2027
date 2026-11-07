@@ -28,18 +28,10 @@ class RoverHardwareInterface : public hardware_interface::SystemInterface
 {
 public:
   static constexpr std::size_t WHEEL_COUNT = 4;
-  static constexpr std::size_t BUS_COUNT = 2;
-
-  enum class BusId : std::uint8_t
-  {
-    LEFT = 0,
-    RIGHT = 1
-  };
 
   struct WheelConfig
   {
     std::string joint_name;
-    BusId bus{BusId::LEFT};
     std::uint8_t slave_id{0};
     double gear_ratio{0.0};    // must be configured; currently expected to be 50:1
     double motor_rpm_limit{0.0};
@@ -90,16 +82,6 @@ private:
   [[nodiscard]] bool parseWheelConfiguration(std::size_t wheel_index);
   [[nodiscard]] bool validateWheelMapping() const;
 
-  [[nodiscard]] static bool parseBusId(
-    const std::string & value,
-    BusId & bus);
-
-  [[nodiscard]] static constexpr std::size_t busIndex(
-    BusId bus) noexcept
-  {
-    return static_cast<std::size_t>(bus);
-  }
-
   [[nodiscard]] Bld305sDriver * driverForWheel(
     std::size_t wheel_index) noexcept;
 
@@ -109,13 +91,14 @@ private:
   void updateIoHeartbeat() noexcept;
   [[nodiscard]] static std::int64_t steadyNowNs() noexcept;
   void resetInterfaceStorage() noexcept;
-  void closeDrivers() noexcept;
+  void closeDriver() noexcept;
 
   hardware_interface::HardwareInfo hardware_info_{};
 
   std::array<WheelConfig, WHEEL_COUNT> wheels_{};
-  std::array<std::unique_ptr<Bld305sDriver>, BUS_COUNT> drivers_{};
-  std::array<Bld305sDriver::RtuConfig, BUS_COUNT> bus_configs_{};
+  // All four slave IDs share one USB-to-RS485 adapter and transaction mutex.
+  std::unique_ptr<Bld305sDriver> driver_;
+  Bld305sDriver::RtuConfig bus_config_{};
 
   std::array<double, WHEEL_COUNT> command_velocity_rad_s_{};
   std::array<double, WHEEL_COUNT> state_velocity_rad_s_{};
@@ -135,7 +118,7 @@ private:
   std::atomic<bool> write_blocked_logged_{false};
 
   bool configuration_valid_{false};
-  bool transports_open_{false};
+  bool transport_open_{false};
   bool operationally_ready_{false};
   bool active_{false};
 

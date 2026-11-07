@@ -29,8 +29,7 @@
   <xacro:wheel name="rear_right" x="${-wheel_base / 2}" y="${-wheel_separation / 2}"/>
 
   <xacro:dcr_drivetrain_hardware
-    left_device="${hw['left_device']}" right_device="${hw['right_device']}"
-    left_baud="${hw['left_baud']}" right_baud="${hw['right_baud']}"
+    serial_device="${hw['serial_device']}" baud_rate="${hw['baud_rate']}"
     parity="${hw['parity']}" data_bits="${hw['data_bits']}" stop_bits="${hw['stop_bits']}"
     update_hz="${hw['update_hz']}" upstream_timeout_ms="${hw['upstream_timeout_ms']}"
     stop_deadline_ms="${hw['stop_deadline_ms']}"

@@ -3,6 +3,7 @@
 
 #include <modbus/modbus.h>
 
+#include <algorithm>
 #include <cerrno>
 #include <cstdint>
 #include <limits>
@@ -206,14 +207,15 @@ bool Bld305sDriver::telemetryValid(std::uint8_t slave_id) const
   return slave_states_[slave_id].telemetry_valid;
 }
 
-bool Bld305sDriver::bothSlavesLost(std::uint8_t first_id, std::uint8_t second_id) const
+bool Bld305sDriver::allSlavesLost(const SlaveIds & slave_ids) const
 {
-  if (!isValidSlaveId(first_id) || !isValidSlaveId(second_id) || first_id == second_id) {
+  if (!validSlaveIds(slave_ids)) {
     return false;
   }
   std::lock_guard<std::mutex> lock(transaction_mutex_);
-  return slave_states_[first_id].communication == CommunicationState::LOST &&
-         slave_states_[second_id].communication == CommunicationState::LOST;
+  return std::all_of(slave_ids.begin(), slave_ids.end(), [this](std::uint8_t id) {
+    return slave_states_[id].communication == CommunicationState::LOST;
+  });
 }
 
 const std::string & Bld305sDriver::device() const noexcept
@@ -414,18 +416,28 @@ Bld305sDriver::Result Bld305sDriver::writeSingleRegister(
 
 bool Bld305sDriver::isExpectedCycleSlave(std::uint8_t id) const noexcept
 {
-  return id == cycle_slaves_[0] || id == cycle_slaves_[1];
+  return std::find(cycle_slaves_.begin(), cycle_slaves_.end(), id) != cycle_slaves_.end();
 }
 
-Bld305sDriver::Result Bld305sDriver::beginCycle(
-  std::uint8_t first_id, std::uint8_t second_id)
+bool Bld305sDriver::validSlaveIds(const SlaveIds & slave_ids) noexcept
+{
+  std::array<bool, 248> seen{};
+  for (auto id : slave_ids) {
+    if (!isValidSlaveId(id) || seen[id]) {
+      return false;
+    }
+    seen[id] = true;
+  }
+  return true;
+}
+
+Bld305sDriver::Result Bld305sDriver::beginCycle(const SlaveIds & slave_ids)
 {
   std::lock_guard<std::mutex> lock(transaction_mutex_);
-  if (cycle_active_ || !isValidSlaveId(first_id) || !isValidSlaveId(second_id) ||
-      first_id == second_id) {
+  if (cycle_active_ || !validSlaveIds(slave_ids)) {
     return {ErrorCode::INVALID_CYCLE_STATE, 0, 0};
   }
-  cycle_slaves_ = {{first_id, second_id}};
+  cycle_slaves_ = slave_ids;
   cycle_active_ = true;
   for (auto id : cycle_slaves_) {
     auto & state = slave_states_[id];
@@ -475,7 +487,7 @@ Bld305sDriver::Result Bld305sDriver::endCycle()
     state.success_count_cycle = 0;
   }
   cycle_active_ = false;
-  cycle_slaves_ = {{0, 0}};
+  cycle_slaves_ = {};
   return {ErrorCode::OK, 0, 0};
 }
 
@@ -553,7 +565,7 @@ void Bld305sDriver::closeUnlocked() noexcept
 
   connected_.store(false, std::memory_order_release);
   cycle_active_ = false;
-  cycle_slaves_ = {{0, 0}};
+  cycle_slaves_ = {};
   markTransportClosedUnlocked();
 }
 

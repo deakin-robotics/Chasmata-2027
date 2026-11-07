@@ -7,7 +7,7 @@
 - `rover_drivetrain_control` — BLD-305S Modbus RTU library, ROS 2 `SystemInterface`, testable C++ translation/timing/health core, read-only diagnostics node, launch, config example and unit tests.
 - `rover_drivetrain_interfaces` — **read-only** telemetry messages for GUI logging, plus the read-only diagnostic probe service. Forrest confirmed the address/speed/direction/result fields are for logging, not commanding. **All motor commands go through `ros2_control`; there is no separate motor-command service.** Topic name, rate and publisher still need GUI-team sign-off.
 
-The production architecture is **four separate wheel drives**, slave IDs **1–4 used once**, on **two physical RS485 buses**, two controllers per side. Wheel assignment is read from URDF parameters, not compiled in.
+The production architecture is **four separate wheel drives**, slave IDs **1–4 used once**, on **one shared RS485 bus through a single USB-to-RS485 adapter**. One driver connection serializes transactions to all four controllers. Wheel assignment and right-side mirroring are read from URDF parameters, not inferred from the serial connection.
 
 ## Implementation status
 
@@ -79,26 +79,33 @@ The topic publishes `DrivetrainTelemetry` at 1 Hz with `hardware_active: false`.
 
 ### Optional raw READ-only hardware probe
 
-To open physical serial ports, you must explicitly configure each bus device, each baud rate and serial framing. A bus must not also be owned by a running controller_manager or another probe. Example run directly as a node (replace all sample device names with your machine's actual paths and confirm the settings first):
+To open the physical serial port, explicitly configure the adapter device, baud rate and serial framing. All four controllers must use the same framing and baud rate, with unique slave IDs. The bus must not also be owned by a running controller_manager or another probe. Example run directly as a node (replace the sample device name with your machine's actual path and confirm the settings first):
 
 ```bash
 ros2 run rover_drivetrain_control drivetrain_diagnostics_node --ros-args \
   -p enable_readonly_probe:=true \
-  -p left_serial_device:=/dev/ttyUSB0 -p right_serial_device:=/dev/ttyUSB1 \
-  -p left_baud_rate:=9600 -p right_baud_rate:=9600 \
-  -p parity:=N -p data_bits:=8 -p stop_bits:=1 \
+  -p serial_device:=/dev/ttyUSB0 -p baud_rate:=9600 \
+  -p parity:="'N'" -p data_bits:=8 -p stop_bits:=1 \
   -p response_timeout_ms:=30
 ```
 
-`8N1` above is an **example**; verify the real controllers' framing first. The 38,400-baud **production** target presumes all drives were individually provisioned with the vendor tool; the read-only probe allows other explicitly configured baud rates, including 9,600 on unprovisioned drives. It does not change stored settings, and the example 9,600 values are NOT confirmation of the real device settings. The default launch **does not** enable probing. To request raw temperature:
+`8N1` above is an **example**; verify the real controllers' framing first. Keep the nested quotes around `'N'` when passing a ROS parameter directly: ROS parses a bare `N` as a boolean. The 38,400-baud **production** target presumes all drives were individually provisioned with the vendor tool; the read-only probe allows other explicitly configured baud rates, including 9,600 on unprovisioned drives. It does not change stored settings, and the example 9,600 values are NOT confirmation of the real device settings. The default launch **does not** enable probing. The launch also accepts the shared serial settings:
+
+```bash
+ros2 launch rover_drivetrain_control diagnostics.launch.py \
+  enable_readonly_probe:=true serial_device:=/dev/ttyUSB0 \
+  baud_rate:=9600 parity:=N data_bits:=8 stop_bits:=1 response_timeout_ms:=30
+```
+
+To request raw temperature:
 
 ```bash
 ros2 service call /drivetrain_diagnostics/read_motor_diagnostic \
   rover_drivetrain_interfaces/srv/ReadMotorDiagnostic \
-  "{bus: left, address: 1, register_selector: 1}"
+  "{bus: drivetrain, address: 1, register_selector: 1}"
 ```
 
-Selector 1 reads `0x0096`, selector 2 reads `0x00B6`, selector 3 reads `0x00C6`. The response is **raw register counts**, *not* temperature °C, ampere or voltage SI units. Do not connect this probe alongside a controller_manager controlling the same physical serial ports; only one application may own each bus.
+Selector 1 reads `0x0096`, selector 2 reads `0x00B6`, selector 3 reads `0x00C6`. The response is **raw register counts**, *not* temperature °C, ampere or voltage SI units. Use `bus: drivetrain` for every address (1–4); telemetry uses that same bus name. Do not connect this probe alongside a controller_manager controlling the same physical serial port; only one application may own the bus.
 
 ## Direct drive without the GUI
 
@@ -157,7 +164,9 @@ Right-side mirroring is handled in the hardware interface, so positive values ar
 
 `config/ros2_control_example.xacro` shows an explicit parameter contract. It is a **macro/template**, not a standalone URDF or runnable controller manager. Supply the wheel names used by the team's actual CAD-generated URDF and confirm slave-to-wheel mapping with Forrest. The example enables `is_async=true`, `rw_rate=15`; verify their behavior against installed Jazzy. The arm and the drivetrain each have their own controller manager and robot description (agreed with Forrest). The drivetrain's runs in `/drivetrain`; don't start a second controller manager in that namespace.
 
-Current hardware parameters include `left/right_serial_device`, `left/right_baud_rate`, `left/right_parity`, `left/right_data_bits`, `left/right_stop_bits`, optional per-bus `*_response_timeout_ms` (provisional 30 ms), and REQUIRED `update_hz`, `upstream_timeout_ms`, `stop_deadline_ms`, `measured_stop_wire_budget_ms`, `measured_worst_bus_cycle_ms`, and `late_trigger_ms`. Wheel params: `bus`, `slave_id`, `gear_ratio`, `mirrored`, and `motor_rpm_limit`.
+Current hardware parameters include `serial_device`, `baud_rate`, `parity`, `data_bits`, `stop_bits`, optional `response_timeout_ms` (provisional 30 ms), and REQUIRED `update_hz`, `upstream_timeout_ms`, `stop_deadline_ms`, `measured_stop_wire_budget_ms`, `measured_worst_bus_cycle_ms`, and `late_trigger_ms`. Wheel params: `slave_id`, `gear_ratio`, `mirrored`, and `motor_rpm_limit`. There is no per-wheel bus selection: all wheels use the same connection, and IDs 1–4 must each appear exactly once.
+
+When migrating a local hardware YAML, replace `left_device`/`right_device` with one `serial_device`, and `left_baud`/`right_baud` with one `baud_rate`. For a custom ros2_control description, remove the `left_`/`right_` prefixes from serial settings and remove the wheel `bus` parameters. Update diagnostic clients from `bus: left`/`bus: right` to `bus: drivetrain`; addresses and wheel mirroring stay unchanged.
 
 The production wrapper **intentionally refuses** `on_configure()`, `on_activate()`, `read()` and `write()` until verified initialization, stop sequence, fault decoding and unit conversion are implemented. It is not a working drivetrain. The example uses param names provisionally and must be confirmed with the installed Jazzy interfaces.
 
@@ -169,7 +178,7 @@ The production wrapper **intentionally refuses** `on_configure()`, `on_activate(
 4. **Faults:** Fault register and fault-code response are unresolved. The `readFaultRaw()` operation returns `UNSUPPORTED`. The intended stop-all behavior needs agreement with Forrest.
 5. **Telemetry contract:** The telemetry messages are read-only and logging-only (confirmed by Forrest), but topic name, rate and production publisher are not yet agreed with the GUI team. The hardware plugin publishes nothing yet; only the diagnostics node publishes its probe results.
 6. **Stop timing:** The upstream `/joy` converter and command arrival timeout are owned upstream; 300 ms is a team target, not a cited competition rule. An end-to-end timed stop-ACK test is mandatory.
-7. **Bus timing:** Measure real bus/adapter exchanges. A late USB adapter could invalidate the 15 Hz/50% bus budget even at 38,400 baud.
+7. **Bus timing:** Re-measure the complete four-drive cycle and all four stop ACKs on the single adapter. All traffic now shares one serial link; measurements for two independent buses cannot be reused. The example budgets are unmeasured placeholders, and 15 Hz/50% bus utilization at 38,400 baud remains unverified. Do not compensate by weakening the timing checks.
 8. **Namespaces:** Agreed with Forrest: the arm and the drivetrain each have their own controller manager and robot description. The drivetrain's runs in `/drivetrain`.
 9. Verify Jazzy `on_init()` signature, interface export behavior after failed init, `read/write ERROR` effect, `on_deactivate ERROR` behavior, pluginlib registration, and `is_async` schedule with *actual installed* ROS 2. A successful compile is not proof of these runtime details.
 
@@ -178,5 +187,5 @@ Forrest's four requests are addressed structurally; motor motion, physical watch
 ## Review items awaiting team decisions (not silently fixed)
 
 - **GUI direct-command service:** resolved. Forrest confirmed the GUI fields are for logging. `MotorCommand.msg`, `MotorCommand.srv` and `MotorResult.msg` were removed, along with the always-rejecting `motor_command` service. All motor commands go through `ros2_control`.
-- **Full cycle health:** `endCycle()` still assumes three required successful operations per drive. The fault register is unverified and `readFaultRaw()` returns UNSUPPORTED, so a production 15 Hz cycle cannot yet be declared fully healthy. The standalone mock uses three diagnostic reads to test per-cycle counters, which is **not** proof of production-cycle coverage. Decide verified mandatory operations before wiring the scheduler.
+- **Full cycle health:** `beginCycle({fl_id, rl_id, fr_id, rr_id})` / `endCycle()` account for all four drives on the shared connection; `allSlavesLost()` requires all four to be lost before reporting correlated silence. `endCycle()` still assumes three required successful operations per drive. The fault register is unverified and `readFaultRaw()` returns UNSUPPORTED, so a production 15 Hz cycle cannot yet be declared fully healthy. The standalone mock uses three diagnostic reads to test per-cycle counters, which is **not** proof of production-cycle coverage. Decide verified mandatory operations before wiring the scheduler.
 - **Single source of truth for cycle health:** `endCycle()` now delegates miss counting and the valid/lost decision to `core::WheelCycleHealth::finishCycle()`. The driver still decides whether a cycle was good (three successful mandatory exchanges, no failure); see the item above.

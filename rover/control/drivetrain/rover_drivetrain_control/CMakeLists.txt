@@ -89,6 +89,13 @@ if(BUILD_TESTING)
   target_link_libraries(test_driver_mock ${PROJECT_NAME}_core)
   add_test(NAME drivetrain_modbus_mock COMMAND test_driver_mock)
 
+  # One serial configuration must accept all four wheels without per-side buses.
+  add_executable(test_hardware_configuration test/test_hardware_configuration.cpp)
+  ament_target_dependencies(test_hardware_configuration
+    hardware_interface rclcpp rclcpp_lifecycle)
+  target_link_libraries(test_hardware_configuration ${PROJECT_NAME})
+  add_test(NAME drivetrain_hardware_configuration COMMAND test_hardware_configuration)
+
   # Unpopulated telemetry must never claim success or valid data.
   add_executable(test_telemetry_defaults test/test_telemetry_defaults.cpp)
   ament_target_dependencies(test_telemetry_defaults rover_drivetrain_interfaces)

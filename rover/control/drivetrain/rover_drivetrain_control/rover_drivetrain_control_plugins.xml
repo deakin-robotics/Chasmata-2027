@@ -8,7 +8,7 @@
 
     <description>
       ros2_control SystemInterface for the rover four-wheel drivetrain using
-      BLD-305S motor controllers over two Modbus RTU RS485 buses.
+      BLD-305S motor controllers over one shared Modbus RTU RS485 bus.
     </description>
   </class>
 </library>
