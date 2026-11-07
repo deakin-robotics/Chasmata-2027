@@ -85,6 +85,7 @@ public:
   };
 
   static constexpr int TARGET_BAUD_RATE = 38400;  // target baud, bench-gated
+  using SlaveIds = std::array<std::uint8_t, 4>;
 
   explicit Bld305sDriver(RtuConfig config);
   ~Bld305sDriver();
@@ -100,7 +101,8 @@ public:
   // exchanges inside one cycle from three consecutive failed cycles.
   // Caller MUST invoke beginCycle/endCycle once per 15 Hz control cycle.
   // Any failed transaction skips this slave's remaining exchanges this cycle.
-  [[nodiscard]] Result beginCycle(std::uint8_t first_id, std::uint8_t second_id);
+  // Supply all four wheel IDs, in any order, once for the shared bus.
+  [[nodiscard]] Result beginCycle(const SlaveIds & slave_ids);
   [[nodiscard]] Result endCycle();
   void close();
   [[nodiscard]] bool isOpen() const noexcept;
@@ -152,7 +154,7 @@ public:
   [[nodiscard]] bool telemetryValid(std::uint8_t slave_id) const;
 
   // Correlated silence is a SUSPECTED bus outage, not proof of a failed adapter.
-  [[nodiscard]] bool bothSlavesLost(std::uint8_t first_id, std::uint8_t second_id) const;
+  [[nodiscard]] bool allSlavesLost(const SlaveIds & slave_ids) const;
 
   [[nodiscard]] const std::string & device() const noexcept;
 
@@ -200,7 +202,8 @@ private:
   void closeUnlocked() noexcept;
 
   bool cycle_active_{false};
-  std::array<std::uint8_t, 2> cycle_slaves_{{0, 0}};
+  SlaveIds cycle_slaves_{};
+  [[nodiscard]] static bool validSlaveIds(const SlaveIds & slave_ids) noexcept;
   [[nodiscard]] bool isExpectedCycleSlave(std::uint8_t slave_id) const noexcept;
 
   RtuConfig config_;

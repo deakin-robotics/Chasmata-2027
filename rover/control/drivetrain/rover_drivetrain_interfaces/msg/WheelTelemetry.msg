@@ -27,7 +27,7 @@ uint8 COMM_LOST=3
 
 # --- Identity --------------------------------------------------------------
 string joint_name              # empty if the publisher does not know the mapping
-string bus                     # "left" or "right"
+string bus                     # "drivetrain": the single shared RS485 bus
 uint8 address                  # Modbus slave ID, 1..4
 
 # --- Commanded: what ros2_control asked for. Logged here, never sent from here.
