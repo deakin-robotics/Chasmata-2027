@@ -8,24 +8,24 @@ This is a tracked artifact, **not** an acceptance certificate.
 | Forrest: launch | `launch/diagnostics.launch.py` starts diagnostics-only node and accepts one serial configuration | Default-disabled launch and opt-in four-address probe passed with one simulated serial adapter |
 | Forrest: README | `README.md` covers build, launch and limits | Delivered |
 | Forrest: GUI message (address, speed, direction, result) | Read-only `WheelTelemetry` / `DrivetrainTelemetry`, separating commanded, measured and communication result; no motor-command interface | Logging-only intent confirmed by Forrest; topic name, rate and publisher **not signed off** by operator interface team |
-| Wheel speed translated to motor speed and direction | `core::translateWheelSpeed` handles wheel rad/s, 50:1 configurable ratio, mirror direction | Unit tested; raw Modbus speed scaling/control words **UNVERIFIED** |
-| 15 Hz drivetrain rate at 38,400 baud | 15 Hz parameter required, 38,400 baud required | Arithmetic only; worker schedule not yet implemented, bus timing not measured |
-| Per-wheel telemetry (speed, faults) | `WheelTelemetry` message and raw telemetry methods; diagnostics node publishes probe results | No plugin publisher; actual speed 0x005F and fault register unverified |
-| Wheels stop within the 300 ms target after commands stop | `core::validateTiming` checks two periods + upstream + stop wire budget <= explicit stop deadline | **NO** stop-ACK implementation/test; watchdog missing |
-| No automatic re-arming after a stop or fault | Current plugin cannot activate | Deliberately fail-closed; no re-arming implemented |
+| Wheel speed translated to motor speed and direction | `core::translateWheelSpeed` handles wheel rad/s, configurable ratio, mirror direction; motor cycle uses the BLD-305S manual's RPM and control registers | Simulated Modbus tested; physical response requires bench verification |
+| 15 Hz drivetrain rate at 38,400 baud | 15 Hz parameter required, 38,400 baud required; async hardware write executes the shared-bus cycle | Real scheduling and bus timing not measured |
+| Per-wheel telemetry (speed, faults) | `WheelTelemetry` message and raw telemetry methods; the motor cycle reads speed and faults | No plugin telemetry publisher; measured register values still require bench verification |
+| Wheels stop within the 300 ms target after commands stop | Relay zeros stale commands; the motor cycle sends individually acknowledged brake writes | Simulated command timeout tested; physical stop timing and independent watchdog remain unverified |
+| No automatic re-arming after a stop or fault | A motor-cycle failure returns an error to controller manager | Controller-manager recovery behaviour requires verification |
 | Worst-case bus utilization at most 50% | `core::validateTiming` refuses >50% worst-case bus utilization | Requires measured `worst_bus_cycle_ms` |
-| Communication health counted per cycle: data invalid after two missed cycles, drive lost after three | Four-slave `beginCycle`/`endCycle`, per-slave cycle counters, `telemetryValid()`, mock tests | Implemented but **NOT connected to live worker**; four silent slaves alone do not prove adapter failure |
-| A drive that misses an exchange is skipped for the rest of that cycle | Driver suppresses further exchanges for a slave after first wire transaction failure in its cycle; other three slaves remain reachable | Mock-tested on one shared context; live scheduler missing |
+| Communication health counted per cycle: data invalid after two missed cycles, drive lost after three | Four-slave `beginCycle`/`endCycle`, per-slave cycle counters, `telemetryValid()`, mock tests | Used by the motor cycle; physical communication failures require bench verification |
+| A drive that misses an exchange is skipped for the rest of that cycle | Driver suppresses further exchanges for a slave after first wire transaction failure in its cycle; the motor cycle then attempts to brake all four | Mock-tested on one shared context; physical bus remains unverified |
 | Liveness heartbeat from a monotonic clock | Monotonic raw heartbeat updated before `read` and `write` | No external heartbeat sink; no hardware watchdog |
 | No blocking Modbus I/O in the controller loop | Plugin no blocking Modbus read/write in ACTIVE path; example `is_async=true` | Actual worker callback dispatch in Jazzy **NOT tested** |
 | No silent defaults for safety settings | Required safety params, one serial configuration, unique ID mapping and timing validation | Actual configuration/adapter bench validation pending |
-| Drive faults detected and acted on | Fault reads return `UNSUPPORTED` | Fault register and response unresolved |
+| Drive faults detected and acted on | Motor cycle reads manual register `0x0076` and attempts to brake all wheels on fault | Simulated Modbus tested; verify on bench |
 | Never change the drives' stored baud rate | No writes to baud register 0x00F6 | Code inspection pass; vendor provisioning required |
-| Only verified stop commands are sent | No unsupported stop command issued | Bench coast/brake and stop command validation required |
+| Only verified stop commands are sent | Motor cycle uses the manual's active-brake command | Bench braking and stop command validation required |
 | One owner per serial bus | Standalone diagnostic node owns serial port only when explicitly enabled; no mode arbitration | Must not run alongside production hardware instance |
 | Testable without the rover | Provides hardware plugin shape and xacro template | Simulation stand-in not created; same controller config demonstration missing |
 | Core logic independent of ROS and hardware | Pure core C++17 tests without ROS/hardware | Tested with g++ here |
-| Actual speed read from a measurement register, never the setpoint | `readActualSpeedRaw(0x005F)` distinctly named, never converts to rad/s | Register address **UNVERIFIED**, must cross-check against the manual and bench-test |
+| Actual speed read from a measurement register, never the setpoint | `readActualSpeedRaw(0x005F)` and motor-direction status feed wheel velocity | Register documented in the BLD-305S manual; scaling and direction require bench verification |
 | One USB-to-RS485 adapter for all four drives | One driver/context in hardware and diagnostics; YAML/xacro use one serial device and baud rate; unique IDs 1–4 | Mock verifies four-address traffic through one context; physical adapter test pending |
 | Copilot: failed deactivation | On failure, leaves `active_` unchanged | Static inspection; controller_manager reaction unknown |
 | Pluginlib discovery | plugin XML + CMake export | `check_drivetrain_plugin` discovered and loaded the plugin in the Jazzy development container |
@@ -36,7 +36,7 @@ This is a tracked artifact, **not** an acceptance certificate.
 - All four CTest tests passed: core logic, four-drive Modbus mock, single-bus hardware configuration and telemetry defaults.
 - Xacro expansion from the example YAML produced one serial configuration and four unique slave IDs, with right-side mirroring preserved.
 - A local integration check launched diagnostics with probing disabled, then enabled probing against one pseudo terminal emulating IDs 1–4. All four reads and their telemetry passed; invalid bus names, addresses and selectors produced no wire exchange. Only simulated hardware was used.
-- Real shared-bus cycle time, all-four stop ACK time and motion readiness remain unverified. The existing lifecycle refusal remains in place.
+- Real shared-bus cycle time, all-four stop ACK time and motion readiness remain unverified.
 
 ## Runtime verification list (do not assume)
 

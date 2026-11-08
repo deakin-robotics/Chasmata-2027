@@ -29,6 +29,7 @@ target_include_directories(${PROJECT_NAME}_core PUBLIC
 
 add_library(${PROJECT_NAME} SHARED
   src/bld305s_driver.cpp
+  src/drive_cycle.cpp
   src/rover_hardware_interface.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -84,16 +85,18 @@ if(BUILD_TESTING)
 
   # Mock all wire functions: verifies per-slave, per-cycle failure accounting
   # without opening any real serial ports or sending motor commands.
-  add_executable(test_driver_mock test/test_driver_mock.cpp src/bld305s_driver.cpp)
+  add_executable(test_driver_mock test/test_driver_mock.cpp src/bld305s_driver.cpp src/drive_cycle.cpp)
   target_include_directories(test_driver_mock PRIVATE include ${LIBMODBUS_INCLUDE_DIRS})
   target_link_libraries(test_driver_mock ${PROJECT_NAME}_core)
   add_test(NAME drivetrain_modbus_mock COMMAND test_driver_mock)
 
   # One serial configuration must accept all four wheels without per-side buses.
-  add_executable(test_hardware_configuration test/test_hardware_configuration.cpp)
+  add_executable(test_hardware_configuration test/test_hardware_configuration.cpp
+    src/rover_hardware_interface.cpp src/bld305s_driver.cpp src/drive_cycle.cpp)
+  target_include_directories(test_hardware_configuration PRIVATE include ${LIBMODBUS_INCLUDE_DIRS})
   ament_target_dependencies(test_hardware_configuration
-    hardware_interface rclcpp rclcpp_lifecycle)
-  target_link_libraries(test_hardware_configuration ${PROJECT_NAME})
+    hardware_interface pluginlib rclcpp rclcpp_lifecycle)
+  target_link_libraries(test_hardware_configuration ${PROJECT_NAME}_core)
   add_test(NAME drivetrain_hardware_configuration COMMAND test_hardware_configuration)
 
   # Unpopulated telemetry must never claim success or valid data.

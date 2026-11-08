@@ -11,10 +11,7 @@
     update_rate: 100
 
     hardware_components_initial_state:
-      # The hardware refuses on_configure() today, until it is verified.
-      # Unconfigured hardware cannot be activated, so no controller can claim the
-      # wheels and staying up is safe. It also keeps the controller manager
-      # running so the failure can be inspected instead of the launch exiting.
+      # Keep the manager available for diagnostics if hardware startup fails.
       shutdown_on_initial_state_failure: false
 
     joint_state_broadcaster:

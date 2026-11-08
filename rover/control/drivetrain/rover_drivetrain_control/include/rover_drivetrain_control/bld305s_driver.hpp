@@ -84,7 +84,7 @@ public:
     std::uint8_t success_count_cycle{0};
   };
 
-  static constexpr int TARGET_BAUD_RATE = 38400;  // target baud, bench-gated
+  static constexpr int TARGET_BAUD_RATE = 38400;  // target operating point
   using SlaveIds = std::array<std::uint8_t, 4>;
 
   explicit Bld305sDriver(RtuConfig config);
@@ -121,8 +121,10 @@ public:
     std::uint8_t slave_id,
     std::uint16_t raw_control);
 
-  // 0x005F is a provisional ACTUAL speed address from software sources only.
-  // Raw value is never converted to rad/s without verification against the manual and a bench read-back.
+  [[nodiscard]] Result setInternalMode(std::uint8_t slave_id);
+  [[nodiscard]] Result readControlRaw(std::uint8_t slave_id, std::uint16_t & value);
+
+  // 0x005F is the manual's actual-speed register; physical read-back still needs bench verification.
   [[nodiscard]] Result readActualSpeedRaw(
     std::uint8_t slave_id, std::uint16_t & raw_speed);
 
@@ -159,13 +161,14 @@ public:
   [[nodiscard]] const std::string & device() const noexcept;
 
 private:
-  // UNVERIFIED — cross-check against manual
+  // BLD-305S manual, section 8: motor speed setting in RPM.
   static constexpr std::uint16_t SPEED_REGISTER = 0x0056;
 
-  // UNVERIFIED — cross-check against manual
+  // BLD-305S manual, section 8: stop, forward, reverse, brake.
   static constexpr std::uint16_t CONTROL_REGISTER = 0x0066;
+  static constexpr std::uint16_t FAULT_REGISTER = 0x0076;
 
-  // UNVERIFIED — actual speed register; needs manual and bench confirmation
+  // BLD-305S manual, section 8: actual motor speed.
   static constexpr std::uint16_t ACTUAL_SPEED_REGISTER = 0x005F;
 
   // UNVERIFIED — cross-check against manual

@@ -1,6 +1,6 @@
 ﻿# Rover drivetrain control
 
-ROS 2 Jazzy development package for four BLD-305S wheel drives. All drives share one USB-to-RS485 adapter and Modbus RTU connection; slave IDs 1–4 must be unique. This package is **not validated for motion**: the hardware lifecycle gate remains closed until controller initialization, feedback, stop behavior, and timing are verified.
+ROS 2 Jazzy development package for four BLD-305S wheel drives. All drives share one USB-to-RS485 adapter and Modbus RTU connection; slave IDs 1–4 must be unique. The motor path has not yet been validated on hardware.
 
 ## How it works
 
@@ -44,6 +44,11 @@ colcon test-result --verbose
 ros2 run rover_drivetrain_control check_drivetrain_plugin
 ```
 
+The production image also contains `test/test_manual_ros_control.sh`, which
+checks the Rover Manual request, wheel commands and timeout through a controller
+manager using simulated hardware. Run it in an isolated container; it does not
+connect to motor controllers.
+
 ## Read-only diagnostics
 
 The launch defaults to probing disabled and does not open a serial port:
@@ -82,7 +87,18 @@ ros2 launch rover_drivetrain_control drivetrain.launch.py \
 
 The config has one `serial_device` and `baud_rate`, shared serial framing, required timing values, and one unique slave ID per wheel. The example adapter path, timings, gearing, and RPM limits are placeholders. The launch runs in `/drivetrain`; twist drive and per-wheel drive share the same wheel interfaces, so only one controller can be active at a time. Per-wheel commands use `[front_left, rear_left, front_right, rear_right]` in rad/s.
 
-The hardware interface currently refuses configuration and activation for motion. Do not remove that gate based on a successful build or a read-only Modbus reply. Before motion can be enabled, verify register meanings and scaling against the manufacturer manual and bench readings, confirm fault and stop behavior, add an independent hardware watchdog, and measure the full four-drive bus cycle and four stop acknowledgements. The example timing budgets are unmeasured; remeasure them on this single shared bus.
+The motor cycle implements internal-mode selection, RPM and direction commands,
+active braking, actual-speed and fault reads using the BLD-305S manual. It is
+covered by a simulated Modbus test. Configure the drivetrain using the
+team's hardware values before physical bench verification.
+Confirm the wheel-to-slave mapping, motor direction, gear ratio, speed scaling,
+stop behaviour and fault responses; measure the full four-drive bus cycle and
+all four stop acknowledgements, and verify the independent hardware watchdog.
+The example timing budgets are unmeasured and must be replaced with bench values.
+
+The rover's Manual backend scales full trigger input to 800 motor RPM using
+the YAML gear ratio. Its `motor_rpm_limit` must be at least 800; the YAML also
+supplies the serial device, baud/framing, unique slave IDs and timing budgets.
 
 Wheel geometry in `config/drivetrain_controllers.yaml` and `urdf/drivetrain.urdf.xacro` is also placeholder data. Diagnostics telemetry and interfaces are read-only and intended for logging; production publisher details still need agreement with the GUI team.
 

@@ -16,14 +16,14 @@ docker compose up --build
 ```
 
 For the production stack, copy `.env.drive.example` to `.env` and set the
-verified `DRIVE_MAX_WHEEL_SPEED` in rad/s, the path to the verified
-`DRIVE_HARDWARE_CONFIG` YAML, and `DRIVE_SERIAL_DEVICE` to the same serial
+path to the verified `DRIVE_HARDWARE_CONFIG` YAML, and `DRIVE_SERIAL_DEVICE` to the same serial
 device path specified in that YAML. Then run:
 
 ```bash
 docker compose up --build prod
 ```
 
-Production uses the real drivetrain backend and the arm simulator. The
-drivetrain hardware activation gate remains in place. Synthetic camera feeds
+Production uses the real drivetrain backend and the arm simulator. Synthetic camera feeds
 run in development; the production stack does not yet start cameras.
+Full trigger input requests 800 motor RPM, converted using the YAML gear ratio;
+the configured motor RPM limit must be at least 800.

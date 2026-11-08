@@ -100,6 +100,12 @@ RoverHardwareInterface::on_init(
   }
 
   driver_ = std::make_unique<Bld305sDriver>(bus_config_);
+  DriveCycle::Wheels drive_wheels{};
+  for (std::size_t i = 0; i < WHEEL_COUNT; ++i) {
+    drive_wheels[i] = {wheels_[i].slave_id, wheels_[i].gear_ratio,
+      wheels_[i].motor_rpm_limit, wheels_[i].mirrored};
+  }
+  drive_cycle_ = std::make_unique<DriveCycle>(*driver_, drive_wheels);
 
   configuration_valid_ = true;
 
@@ -150,17 +156,8 @@ RoverHardwareInterface::on_configure(
   }
 
   transport_open_ = true;
-
-  RCLCPP_ERROR(
-    logger(),
-    "Shared Modbus transport opened successfully, but the verified BLD-305S "
-    "initialization sequence and velocity conversion are not implemented. "
-    "Refusing to mark the drivetrain configured for motion.");
-
-  closeDriver();
-  operationally_ready_ = false;
-
-  return hardware_interface::CallbackReturn::ERROR;
+  operationally_ready_ = true;
+  return hardware_interface::CallbackReturn::SUCCESS;
 }
 
 hardware_interface::CallbackReturn
@@ -190,12 +187,18 @@ RoverHardwareInterface::on_activate(
   if (!operationally_ready_) {
     RCLCPP_ERROR(
       logger(),
-      "Refusing drivetrain activation: verified controller initialization "
-      "and velocity conversion have not been established.");
+      "Refusing drivetrain activation: configuration has not completed.");
 
     return hardware_interface::CallbackReturn::ERROR;
   }
 
+  if (!drive_cycle_ || !drive_cycle_->initialize()) {
+    RCLCPP_ERROR(logger(), "Failed to initialize and brake all drivetrain motors.");
+    return hardware_interface::CallbackReturn::ERROR;
+  }
+  previous_read_tick_ns_ = 0;
+  late_trigger_detected_ = false;
+  command_velocity_rad_s_.fill(0.0);
   active_ = true;
 
   read_blocked_logged_.store(false, std::memory_order_release);
@@ -211,14 +214,10 @@ RoverHardwareInterface::on_deactivate(
   (void)previous_state;
 
   if (active_) {
-    // A failed transition must NOT falsely change local lifecycle state.
-    // Motion remains unverified; do not assert that the motor has stopped.
-    RCLCPP_ERROR(
-      logger(),
-      "Cannot deactivate safely because the verified motor-stop sequence "
-      "is not implemented. Active state remains unchanged.");
-
-    return hardware_interface::CallbackReturn::ERROR;
+    if (!drive_cycle_ || !drive_cycle_->brakeAll()) {
+      RCLCPP_ERROR(logger(), "Could not acknowledge braking on all drivetrain motors.");
+      return hardware_interface::CallbackReturn::ERROR;
+    }
   }
 
   active_ = false;
@@ -297,6 +296,7 @@ RoverHardwareInterface::read(
   updateIoHeartbeat();
 
   if (!active_ || !operationally_ready_ || late_trigger_detected_) {
+    if (active_ && late_trigger_detected_ && drive_cycle_) (void)drive_cycle_->brakeAll();
     bool expected = false;
 
     if (
@@ -314,7 +314,7 @@ RoverHardwareInterface::read(
     return hardware_interface::return_type::ERROR;
   }
 
-  return hardware_interface::return_type::ERROR;
+  return hardware_interface::return_type::OK;
 }
 
 hardware_interface::return_type
@@ -345,7 +345,12 @@ RoverHardwareInterface::write(
     return hardware_interface::return_type::ERROR;
   }
 
-  return hardware_interface::return_type::ERROR;
+  if (late_trigger_detected_ || !drive_cycle_ ||
+    !drive_cycle_->update(command_velocity_rad_s_, state_velocity_rad_s_)) {
+    if (drive_cycle_) (void)drive_cycle_->brakeAll();
+    return hardware_interface::return_type::ERROR;
+  }
+  return hardware_interface::return_type::OK;
 }
 
 std::int64_t

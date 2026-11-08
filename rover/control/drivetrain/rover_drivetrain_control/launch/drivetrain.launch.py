@@ -3,9 +3,7 @@
 robot_state_publisher and ros2_control_node with the real RoverHardwareInterface,
 all in the /drivetrain namespace, plus spawners and the direct-drive relay.
 
-The hardware refuses on_configure() until it is verified. The controller
-manager stays up with the hardware unconfigured, and the spawners that need it
-exit with an error that this launch explains instead of treating it as a crash.
+The controller manager and spawners report hardware and controller failures.
 """
 
 from launch import LaunchDescription
@@ -40,9 +38,7 @@ def _explain_spawner_exit(controller):
         if event.returncode == 0:
             return []
         return [LogInfo(msg=(
-            f'[drivetrain] {controller} did not reach its requested state. Expected while '
-            'RoverHardwareInterface refuses on_configure(): the hardware stays '
-            'unconfigured, so no controller can activate and nothing can move. Check with: '
+            f'[drivetrain] {controller} did not reach its requested state. Check with: '
             f'ros2 control list_hardware_components -c {CONTROLLER_MANAGER}'))]
     return on_exit
 

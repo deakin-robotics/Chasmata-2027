@@ -1,6 +1,7 @@
 #include "rover_drivetrain_control/drivetrain_core.hpp"
 
 #include <cmath>
+#include <algorithm>
 #include <limits>
 
 namespace rover_drivetrain_control::core
@@ -43,11 +44,11 @@ ValidationResult translateWheelSpeed(
   }
   constexpr double pi = 3.14159265358979323846;
   const double signed_motor_rpm = rad_s * (60.0 / (2.0 * pi)) * gear_ratio * (mirror ? -1.0 : 1.0);
-  if (!std::isfinite(signed_motor_rpm) || std::abs(signed_motor_rpm) > rpm_limit) {
+  if (!std::isfinite(signed_motor_rpm) || std::abs(signed_motor_rpm) > rpm_limit + 1e-9) {
     return {false, "Motor RPM exceeds explicitly configured limit"};
   }
   MotorSetpoint candidate{};
-  candidate.rpm = std::abs(signed_motor_rpm);
+  candidate.rpm = std::min(std::abs(signed_motor_rpm), rpm_limit);
   candidate.direction = signed_motor_rpm > 0.0 ? 1 : signed_motor_rpm < 0.0 ? 2 : 0;
   output = candidate;
   return {true, "Motor-side RPM calculated; Modbus encoding remains unverified"};

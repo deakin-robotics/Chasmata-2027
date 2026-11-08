@@ -103,7 +103,6 @@ Bld305sDriver::Result Bld305sDriver::writeSpeedRaw(
   std::uint8_t slave_id,
   std::uint16_t raw_speed)
 {
-  // UNVERIFIED — cross-check against manual
   return writeSingleRegister(slave_id, SPEED_REGISTER, raw_speed);
 }
 
@@ -111,7 +110,6 @@ Bld305sDriver::Result Bld305sDriver::readSpeedRaw(
   std::uint8_t slave_id,
   std::uint16_t & raw_speed)
 {
-  // UNVERIFIED — cross-check against manual
   return readHoldingRegister(slave_id, SPEED_REGISTER, raw_speed);
 }
 
@@ -119,14 +117,22 @@ Bld305sDriver::Result Bld305sDriver::writeControlRaw(
   std::uint8_t slave_id,
   std::uint16_t raw_control)
 {
-  // UNVERIFIED — cross-check against manual
   return writeSingleRegister(slave_id, CONTROL_REGISTER, raw_control);
+}
+
+Bld305sDriver::Result Bld305sDriver::setInternalMode(std::uint8_t slave_id)
+{
+  return writeSingleRegister(slave_id, INIT_REGISTER_0136, 1);
+}
+
+Bld305sDriver::Result Bld305sDriver::readControlRaw(std::uint8_t slave_id, std::uint16_t & value)
+{
+  return readHoldingRegister(slave_id, CONTROL_REGISTER, value);
 }
 
 Bld305sDriver::Result Bld305sDriver::readActualSpeedRaw(
   std::uint8_t slave_id, std::uint16_t & raw_speed)
 {
-  // UNVERIFIED — 0x005F is an actual-speed candidate, NOT validated on hardware.
   return readHoldingRegister(slave_id, ACTUAL_SPEED_REGISTER, raw_speed);
 }
 
@@ -158,13 +164,7 @@ Bld305sDriver::Result Bld305sDriver::readFaultRaw(
   std::uint8_t slave_id,
   std::uint16_t & raw_fault)
 {
-  (void)raw_fault;
-
-  if (!isValidSlaveId(slave_id)) {
-    return {ErrorCode::INVALID_SLAVE_ID, 0, 0};
-  }
-
-  return {ErrorCode::UNSUPPORTED, 0, 0};
+  return readHoldingRegister(slave_id, FAULT_REGISTER, raw_fault);
 }
 
 Bld305sDriver::CommunicationState Bld305sDriver::communicationState(
@@ -457,8 +457,6 @@ Bld305sDriver::Result Bld305sDriver::endCycle()
   }
   // Minimum mandatory cycle: speed setpoint, actual-speed read, fault read.
   // Diagnostics are additional rotating reads and do not relax these.
-  // KNOWN PROBLEM: readFaultRaw() returns UNSUPPORTED (fault register unknown),
-  // so no real cycle can reach this count yet. Only the mock does, via diagnostic reads.
   constexpr std::uint8_t MANDATORY_EXCHANGES_PER_CYCLE = 3;
   for (auto id : cycle_slaves_) {
     auto & state = slave_states_[id];

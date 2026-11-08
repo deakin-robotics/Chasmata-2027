@@ -3,7 +3,6 @@
      Do not include this unchanged into a real robot: serial device, mapping,
      gearbox, RPM limit, timings and measurements must be supplied explicitly.
      Intended integration with existing team-generated URDF (not replacing it).
-     The plugin WILL REFUSE on_configure() pending hardware verification.
 -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
   <xacro:macro name="dcr_drivetrain_hardware" params="serial_device baud_rate parity data_bits stop_bits update_hz upstream_timeout_ms stop_deadline_ms measured_stop_wire_budget_ms measured_worst_bus_cycle_ms late_trigger_ms fl_id rl_id fr_id rr_id gear_ratio motor_rpm_limit">

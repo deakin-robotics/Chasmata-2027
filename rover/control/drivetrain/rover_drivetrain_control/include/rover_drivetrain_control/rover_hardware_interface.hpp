@@ -3,6 +3,7 @@
 
 #include "rover_drivetrain_control/bld305s_driver.hpp"
 #include "rover_drivetrain_control/drivetrain_core.hpp"
+#include "rover_drivetrain_control/drive_cycle.hpp"
 
 #include <hardware_interface/hardware_info.hpp>
 #include <hardware_interface/system_interface.hpp>
@@ -98,6 +99,7 @@ private:
   std::array<WheelConfig, WHEEL_COUNT> wheels_{};
   // All four slave IDs share one USB-to-RS485 adapter and transaction mutex.
   std::unique_ptr<Bld305sDriver> driver_;
+  std::unique_ptr<DriveCycle> drive_cycle_;
   Bld305sDriver::RtuConfig bus_config_{};
 
   std::array<double, WHEEL_COUNT> command_velocity_rad_s_{};

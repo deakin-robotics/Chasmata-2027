@@ -1,11 +1,15 @@
 #include "rover_drivetrain_control/bld305s_driver.hpp"
+#include "rover_drivetrain_control/drive_cycle.hpp"
 #include <modbus/modbus.h>
 #include <array>
+#include <cmath>
 #include <stdexcept>
 #define CHECK(e) do { if (!(e)) throw std::runtime_error(#e); } while(false)
 #include <cerrno>
 #include <cstdint>
 #include <iostream>
+#include <tuple>
+#include <vector>
 
 struct _modbus {
   int slave{0};
@@ -16,6 +20,9 @@ static _modbus * shared_context{nullptr};
 static unsigned contexts_created{0};
 static std::array<bool, 5> fail_slave{};
 static std::array<unsigned, 5> read_attempts{};
+static bool motion_test{false};
+static std::array<std::array<std::uint16_t, 0x140>, 5> registers{};
+static std::vector<std::tuple<int, int, std::uint16_t>> writes;
 extern "C" {
 modbus_t * modbus_new_rtu(const char *, int, char, int, int)
 {
@@ -35,18 +42,23 @@ int modbus_set_slave(modbus_t * m, int slave)
   m->slave=slave;
   return 0;
 }
-int modbus_read_registers(modbus_t * m, int, int n, std::uint16_t * out)
+int modbus_read_registers(modbus_t * m, int address, int n, std::uint16_t * out)
 {
   CHECK(m==shared_context && m->connected);
   ++read_attempts[m->slave];
   if (fail_slave[m->slave]) {errno=ETIMEDOUT;return -1;}
-  *out=static_cast<std::uint16_t>(100+m->slave);
+  *out=motion_test ? registers[m->slave].at(address) : static_cast<std::uint16_t>(100+m->slave);
   return n;
 }
-int modbus_write_register(modbus_t * m, int, const std::uint16_t)
+int modbus_write_register(modbus_t * m, int address, const std::uint16_t value)
 {
   CHECK(m==shared_context && m->connected);
   if (fail_slave[m->slave]) {errno=ETIMEDOUT;return -1;}
+  if (motion_test) {
+    writes.emplace_back(m->slave, address, value);
+    registers[m->slave].at(address) = value;
+    if (address == 0x0056) registers[m->slave][0x005f] = value;
+  }
   return 1;
 }
 }
@@ -141,6 +153,48 @@ int main()
   }
   CHECK(driver.allSlavesLost(ids));
   CHECK(contexts_created==1);
+
+  // The documented motor command path runs on all four addresses and brakes on faults.
+  fail_slave.fill(false);
+  motion_test = true;
+  using Cycle = rover_drivetrain_control::DriveCycle;
+  Cycle cycle(driver, {{{1,50,2000,false},{2,50,2000,false},{3,50,2000,true},{4,50,2000,true}}});
+  registers[2][0x0076] = 1;
+  CHECK(!cycle.initialize());
+  for (auto id : ids) CHECK(registers[id][0x0066] == 3);
+  registers[2][0x0076] = 0;
+  CHECK(cycle.initialize());
+  for (auto id : ids) {
+    CHECK(registers[id][0x0136] == 1);
+    CHECK(registers[id][0x0066] == 3);
+  }
+  constexpr double wheel_speed = 800.0 * 2.0 * 3.14159265358979323846 / (60.0 * 50.0);
+  Cycle::Values measured{};
+  CHECK(cycle.update({wheel_speed, 0, wheel_speed, -wheel_speed}, measured));
+  CHECK(registers[1][0x0056] == 800 && registers[1][0x0066] == 1);
+  CHECK(registers[2][0x0066] == 3);
+  CHECK(registers[3][0x0056] == 800 && registers[3][0x0066] == 2);
+  CHECK(registers[4][0x0056] == 800 && registers[4][0x0066] == 1);
+  CHECK(std::abs(measured[0] - wheel_speed) < 1e-9);
+  CHECK(std::abs(measured[2] - wheel_speed) < 1e-9);
+  CHECK(std::abs(measured[3] + wheel_speed) < 1e-9);
+  writes.clear();
+  CHECK(cycle.update({-wheel_speed, 0, wheel_speed, -wheel_speed}, measured));
+  CHECK(writes.size() >= 3);
+  CHECK((writes[0] == std::make_tuple(1, 0x0066, std::uint16_t{0})));
+  CHECK((writes[1] == std::make_tuple(1, 0x0056, std::uint16_t{800})));
+  CHECK((writes[2] == std::make_tuple(1, 0x0066, std::uint16_t{2})));
+  CHECK(cycle.update({0,0,0,0}, measured));
+  for (auto id : ids) CHECK(registers[id][0x0066] == 3);
+  registers[3][0x0076] = 1;
+  writes.clear();
+  CHECK(!cycle.update({wheel_speed,wheel_speed,wheel_speed,wheel_speed}, measured));
+  for (const auto & write : writes) CHECK(std::get<1>(write) != 0x0056);
+  for (auto id : ids) CHECK(registers[id][0x0066] == 3);
+  registers[3][0x0076] = 0;
+  fail_slave[2] = true;
+  CHECK(!cycle.update({0,0,0,0}, measured));
+  fail_slave[2] = false;
   driver.close();
   CHECK(shared_context==nullptr);
   std::cout<<"mock shared-bus four-drive per-cycle tests passed\n";
