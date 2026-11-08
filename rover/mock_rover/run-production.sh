@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DRIVE_MAX_WHEEL_SPEED=$(python3 - <<'PY'
+DRIVE_LIMITS=$(python3 - <<'PY'
 import math
 import os
 import stat
@@ -21,15 +21,20 @@ try:
         raise ValueError('serial_device must be a USB serial device (ttyACM or ttyUSB)')
     ratio = float(config['gear_ratio'])
     limit = float(config['motor_rpm_limit'])
+    radius = float(config['wheel_radius'])
+    separation = float(config['wheel_separation'])
     if not math.isfinite(ratio) or ratio <= 0 or not math.isfinite(limit) or limit < 800:
         raise ValueError('gear_ratio must be positive and motor_rpm_limit must be at least 800 RPM')
-    print(800 * 2 * math.pi / (60 * ratio))
+    if not math.isfinite(radius) or radius <= 0 or not math.isfinite(separation) or separation <= 0:
+        raise ValueError('wheel_radius and wheel_separation must be positive finite metres')
+    print(800 * 2 * math.pi / (60 * ratio), radius, separation)
 except (OSError, KeyError, TypeError, ValueError, yaml.YAMLError) as error:
     print(f'Invalid drivetrain configuration: {error}', file=sys.stderr)
     sys.exit(1)
 PY
 )
-export DRIVE_MAX_WHEEL_SPEED
+read -r DRIVE_MAX_WHEEL_SPEED DRIVE_WHEEL_RADIUS DRIVE_WHEEL_SEPARATION <<< "$DRIVE_LIMITS"
+export DRIVE_MAX_WHEEL_SPEED DRIVE_WHEEL_RADIUS DRIVE_WHEEL_SEPARATION
 
 set +u
 source /opt/ros/jazzy/setup.bash

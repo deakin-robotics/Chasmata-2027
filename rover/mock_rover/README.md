@@ -26,5 +26,6 @@ docker compose up --build prod
 Production uses the real drivetrain backend and the arm simulator. Synthetic camera feeds
 run in development; the production stack does not yet start cameras.
 Full trigger input requests 800 motor RPM, converted using the YAML gear ratio;
-the configured motor RPM limit must be at least 800.
+the configured motor RPM limit must be at least 800. Velocity mode uses the
+wheel radius and separation from the same YAML to interpret left-stick input.
 The serial device in the YAML must be a USB serial device (`ttyUSB` or `ttyACM`).

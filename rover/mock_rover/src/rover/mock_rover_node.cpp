@@ -12,12 +12,15 @@ MockRoverNode::MockRoverNode(std::unique_ptr<DriveBackend> drive_backend)
   declare_parameter<double>("mode_ack_delay_ms", 150.0);
   declare_parameter<std::string>("drive_backend", "mock");
   declare_parameter<double>("drive_max_wheel_speed", 0.0);
+  declare_parameter<double>("drive_wheel_radius", 0.0);
+  declare_parameter<double>("drive_wheel_separation", 0.0);
   const auto rate = std::max(get_parameter("publish_rate_hz").as_double(), 1.0);
   ack_delay_ = std::max(get_parameter("mode_ack_delay_ms").as_double() / 1000.0, 0.0);
   if (!drive_backend_) {
     const auto backend = get_parameter("drive_backend").as_string();
     if (backend == "mock") drive_backend_ = std::make_unique<MockDriveBackend>(ack_delay_);
-    else if (backend == "real") drive_backend_ = std::make_unique<RealDriveBackend>(*this, get_parameter("drive_max_wheel_speed").as_double());
+    else if (backend == "real") drive_backend_ = std::make_unique<RealDriveBackend>(*this, get_parameter("drive_max_wheel_speed").as_double(),
+      get_parameter("drive_wheel_radius").as_double(), get_parameter("drive_wheel_separation").as_double());
     else throw std::invalid_argument("drive_backend must be mock or real");
   }
 

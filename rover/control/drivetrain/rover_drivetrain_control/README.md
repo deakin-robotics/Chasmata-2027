@@ -85,7 +85,7 @@ ros2 launch rover_drivetrain_control drivetrain.launch.py \
   hardware_config:=/path/to/drivetrain_hardware.yaml
 ```
 
-The config has one `serial_device` and `baud_rate`, shared serial framing, required timing values, and one unique slave ID per wheel. The example adapter path, timings, gearing, and RPM limits are placeholders. The launch runs in `/drivetrain`; twist drive and per-wheel drive share the same wheel interfaces, so only one controller can be active at a time. Per-wheel commands use `[front_left, rear_left, front_right, rear_right]` in rad/s.
+The config has one `serial_device` and `baud_rate`, shared serial framing, required timing values, wheel radius and separation, and one unique slave ID per wheel. The example adapter path, timings, geometry, gearing, and RPM limits are placeholders. The launch runs in `/drivetrain`; twist drive and per-wheel drive share the same wheel interfaces, so only one controller can be active at a time. Per-wheel commands use `[front_left, rear_left, front_right, rear_right]` in rad/s.
 
 The motor cycle implements internal-mode selection, RPM and direction commands,
 active braking, actual-speed and fault reads using the BLD-305S manual. It is
@@ -100,6 +100,6 @@ The rover's Manual backend scales full trigger input to 800 motor RPM using
 the YAML gear ratio. Its `motor_rpm_limit` must be at least 800; the YAML also
 supplies the serial device, baud/framing, unique slave IDs and timing budgets.
 
-Wheel geometry in `config/drivetrain_controllers.yaml` and `urdf/drivetrain.urdf.xacro` is also placeholder data. Diagnostics telemetry and interfaces are read-only and intended for logging; production publisher details still need agreement with the GUI team.
+The hardware YAML supplies the controller's wheel geometry. Wheel placement in `urdf/drivetrain.urdf.xacro` is still placeholder data. Diagnostics telemetry and interfaces are read-only and intended for logging; production publisher details still need agreement with the GUI team.
 
 See [`docs/VERIFICATION_MATRIX.md`](docs/VERIFICATION_MATRIX.md) for verification results and remaining checks.

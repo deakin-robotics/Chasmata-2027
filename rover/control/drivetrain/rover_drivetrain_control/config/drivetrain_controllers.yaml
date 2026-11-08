@@ -25,8 +25,7 @@
   ros__parameters:
     left_wheel_names: [front_left_wheel_joint, rear_left_wheel_joint]
     right_wheel_names: [front_right_wheel_joint, rear_right_wheel_joint]
-    wheel_radius: 0.1      # m, PLACEHOLDER: measure on the rover
-    wheel_separation: 0.5  # m, PLACEHOLDER: measure on the rover
+    # Geometry is supplied from drivetrain_hardware.yaml at launch.
     cmd_vel_timeout: 0.11  # s; stop when cmd_vel goes quiet
     position_feedback: false  # the hardware exports velocity state only
     base_frame_id: base_link

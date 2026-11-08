@@ -1,5 +1,6 @@
 #include <chrono>
 #include <functional>
+#include <limits>
 #include <thread>
 
 #include <gtest/gtest.h>
@@ -37,14 +38,22 @@ protected:
       });
     switch_service_ = driver_->create_service<Switch>("/drivetrain/controller_manager/switch_controller",
       [this](const std::shared_ptr<Switch::Request> request, std::shared_ptr<Switch::Response> response) {
-        EXPECT_EQ(request->activate_controllers, std::vector<std::string>({"wheel_velocity_controller"}));
-        EXPECT_EQ(request->deactivate_controllers, std::vector<std::string>({"diff_drive_controller"}));
+        EXPECT_EQ(request->activate_controllers.size(), 1U);
+        EXPECT_EQ(request->deactivate_controllers.size(), 1U);
+        if (fail_after_apply_) {
+          manual_active_ = request->activate_controllers.at(0) == "wheel_velocity_controller";
+          fail_after_apply_ = false;
+          response->ok = false;
+          return;
+        }
         response->ok = switch_ok_;
-        if (switch_ok_) manual_active_ = true;
+        if (switch_ok_) manual_active_ = request->activate_controllers.at(0) == "wheel_velocity_controller";
       });
     commands_ = driver_->create_subscription<std_msgs::msg::Float64MultiArray>("/drivetrain/direct/wheel_speeds", 10,
       [this](std_msgs::msg::Float64MultiArray::SharedPtr message) { received_ = message->data; ++command_count_; });
-    backend_ = std::make_unique<mock_rover::RealDriveBackend>(*rover_, 2.0);
+    velocity_commands_ = driver_->create_subscription<geometry_msgs::msg::TwistStamped>("/drivetrain/diff_drive_controller/cmd_vel", 10,
+      [this](geometry_msgs::msg::TwistStamped::SharedPtr message) { velocity_ = *message; ++velocity_count_; });
+    backend_ = std::make_unique<mock_rover::RealDriveBackend>(*rover_, 2.0, 0.1, 0.5);
     executor_.add_node(rover_); executor_.add_node(driver_);
     wait([this] { return commands_->get_publisher_count() > 0; }, 2s);
   }
@@ -76,10 +85,13 @@ protected:
   rclcpp::Service<Controllers>::SharedPtr controller_service_;
   rclcpp::Service<Switch>::SharedPtr switch_service_;
   rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr commands_;
+  rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr velocity_commands_;
   std::unique_ptr<mock_rover::RealDriveBackend> backend_;
-  bool hardware_active_{true}, manual_active_{false}, switch_ok_{true};
+  bool hardware_active_{true}, manual_active_{false}, switch_ok_{true}, fail_after_apply_{false};
   size_t command_count_{0};
+  size_t velocity_count_{0};
   std::vector<double> received_;
+  geometry_msgs::msg::TwistStamped velocity_;
 };
 
 // Manual handoff activates the wheel controller and maps triggers and direction safely.
@@ -102,14 +114,14 @@ TEST_F(RealDriveTest, RejectsUnavailableHardwareFailedSwitchAndUnsupportedModes)
   EXPECT_EQ(request("MANUAL"), std::optional<bool>(false));
   hardware_active_ = true; switch_ok_ = false;
   EXPECT_EQ(request("MANUAL"), std::optional<bool>(false));
-  EXPECT_EQ(request("VELOCITY"), std::optional<bool>(false));
   EXPECT_EQ(request("MANAGED"), std::optional<bool>(false));
 }
 
 // Real driving cannot start without an explicitly configured positive speed limit.
 TEST_F(RealDriveTest, RequiresWheelSpeedLimit)
 {
-  EXPECT_THROW(mock_rover::RealDriveBackend(*rover_, 0.0), std::invalid_argument);
+  EXPECT_THROW(mock_rover::RealDriveBackend(*rover_, 0.0, 0.1, 0.5), std::invalid_argument);
+  EXPECT_THROW(mock_rover::RealDriveBackend(*rover_, 2.0, 0.0, 0.5), std::invalid_argument);
 }
 
 // FMA confirms real Manual only after the controller handoff and retains it on rejection.
@@ -132,7 +144,69 @@ TEST_F(RealDriveTest, RoverFmaReflectsRealBackendHandoff)
   ASSERT_TRUE(wait([&] { return latest.drive.confirmed == "MANUAL"; }, 3s));
   EXPECT_TRUE(manual_active_);
   message.data = "VELOCITY"; publisher->publish(message);
-  ASSERT_TRUE(wait([&] { return latest.drive.rejected == "VELOCITY"; }, 2s));
+  ASSERT_TRUE(wait([&] { return latest.drive.pending == "VELOCITY"; }, 2s));
   EXPECT_EQ(latest.drive.confirmed, "MANUAL");
+  ASSERT_TRUE(wait([&] { return latest.drive.confirmed == "VELOCITY"; }, 3s));
+  switch_ok_ = false;
+  message.data = "MANUAL"; publisher->publish(message);
+  ASSERT_TRUE(wait([&] { return latest.drive.rejected == "MANUAL"; }, 3s));
+  EXPECT_EQ(latest.drive.confirmed, "VELOCITY");
+  message.data = "MANAGED"; publisher->publish(message);
+  ASSERT_TRUE(wait([&] { return latest.drive.rejected == "MANAGED"; }, 2s));
+  EXPECT_EQ(latest.drive.confirmed, "VELOCITY");
   executor_.remove_node(node);
+}
+
+// Velocity maps the left stick to bounded linear/angular commands and switches back to Manual.
+TEST_F(RealDriveTest, SwitchesModesAndScalesVelocityCommands)
+{
+  ASSERT_EQ(request("MANUAL"), std::optional<bool>(true));
+  ASSERT_EQ(request("VELOCITY"), std::optional<bool>(true));
+  EXPECT_FALSE(manual_active_);
+  sensor_msgs::msg::Joy joy; joy.axes = {1.0F, -1.0F, 0, 0, 0, 0};
+  auto count = velocity_count_;
+  backend_->on_joy(joy);
+  ASSERT_TRUE(wait([&] { return velocity_count_ > count; }, 1s));
+  EXPECT_NEAR(velocity_.twist.linear.x, 0.1, 1e-9);
+  EXPECT_NEAR(velocity_.twist.angular.z, -0.4, 1e-9);
+  joy.axes[0] = 0; joy.axes[1] = 1;
+  count = velocity_count_; backend_->on_joy(joy);
+  ASSERT_TRUE(wait([&] { return velocity_count_ > count; }, 1s));
+  EXPECT_NEAR(velocity_.twist.linear.x, -0.2, 1e-9);
+  EXPECT_DOUBLE_EQ(velocity_.twist.angular.z, 0.0);
+  joy.axes[0] = 0; joy.axes[1] = 0;
+  count = velocity_count_; backend_->on_joy(joy);
+  ASSERT_TRUE(wait([&] { return velocity_count_ > count; }, 1s));
+  EXPECT_DOUBLE_EQ(velocity_.twist.linear.x, 0.0);
+  joy.axes[0] = std::numeric_limits<float>::quiet_NaN();
+  count = velocity_count_; backend_->on_joy(joy);
+  ASSERT_TRUE(wait([&] { return velocity_count_ > count; }, 1s));
+  EXPECT_DOUBLE_EQ(velocity_.twist.linear.x, 0.0);
+  EXPECT_DOUBLE_EQ(velocity_.twist.angular.z, 0.0);
+  ASSERT_EQ(request("MANUAL"), std::optional<bool>(true));
+  EXPECT_TRUE(manual_active_);
+}
+
+// A rejected controller switch leaves the previously active controller selected.
+TEST_F(RealDriveTest, FailedSwitchKeepsPreviousMode)
+{
+  ASSERT_EQ(request("MANUAL"), std::optional<bool>(true));
+  switch_ok_ = false;
+  EXPECT_EQ(request("VELOCITY"), std::optional<bool>(false));
+  EXPECT_TRUE(manual_active_);
+  switch_ok_ = true;
+  ASSERT_EQ(request("VELOCITY"), std::optional<bool>(true));
+  switch_ok_ = false;
+  EXPECT_EQ(request("MANUAL"), std::optional<bool>(false));
+  EXPECT_FALSE(manual_active_);
+}
+
+// A partially applied failed switch restores the previously confirmed controller.
+TEST_F(RealDriveTest, RestoresPreviousControllerAfterPartialFailure)
+{
+  ASSERT_EQ(request("MANUAL"), std::optional<bool>(true));
+  fail_after_apply_ = true;
+  EXPECT_EQ(request("VELOCITY"), std::optional<bool>(false));
+  EXPECT_TRUE(manual_active_);
+  EXPECT_TRUE(backend_->confirmed_mode_valid());
 }

@@ -21,7 +21,10 @@ void MockRoverNode::request_mode(const std::string & subsystem, const std::strin
   const auto mode = upper_trimmed(raw_mode);
   const auto & valid = subsystem == "drive" ? drive_modes_ : arm_modes_;
   if (valid.count(mode) == 0) {
-    if (subsystem == "drive") drive_backend_->cancel_mode_request();
+    if (subsystem == "drive") {
+      drive_backend_->cancel_mode_request();
+      if (!drive_backend_->confirmed_mode_valid()) drive_mode_.clear();
+    }
     rejected_modes_[subsystem] = mode;
     pending_modes_.erase(subsystem);
     rejection_clear_[subsystem] = std::chrono::steady_clock::now() + std::chrono::milliseconds(500);
@@ -70,6 +73,7 @@ void MockRoverNode::tick()
       if (!result) continue;
       if (*result) drive_mode_ = pending->second.value;
       else {
+        if (!drive_backend_->confirmed_mode_valid()) drive_mode_.clear();
         rejected_modes_[subsystem] = pending->second.value;
         rejection_clear_[subsystem] = now + std::chrono::milliseconds(500);
       }

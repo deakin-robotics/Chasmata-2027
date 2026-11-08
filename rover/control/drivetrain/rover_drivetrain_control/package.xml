@@ -30,6 +30,8 @@
   <depend>rover_drivetrain_interfaces</depend>
   <depend>std_msgs</depend>
   <exec_depend>launch_ros</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
   <!-- drivetrain.launch.py (direct drive) -->
   <exec_depend>controller_manager</exec_depend>
   <exec_depend>diff_drive_controller</exec_depend>

@@ -18,3 +18,5 @@ fr_id: 3
 rr_id: 4
 gear_ratio: 50          # PLACEHOLDER
 motor_rpm_limit: 2000   # PLACEHOLDER
+wheel_radius: 0.1       # metres; PLACEHOLDER
+wheel_separation: 0.5   # metres between left and right wheels; PLACEHOLDER
