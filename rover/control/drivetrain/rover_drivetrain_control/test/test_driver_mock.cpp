@@ -115,6 +115,15 @@ static void testProbeSelectors(Driver & driver)
   // 8: actual speed stays raw (manual example 0x0BB8), never converted.
   checkProbe(driver,8,0x005F,0x0BB8,"= 3000 (0x0BB8): raw");
 
+  // 9: motor pole pairs (manual default 5)
+  checkProbe(driver,9,0x0116,5,"= 5 (0x0005): matches manual default of 5");
+  checkProbe(driver,9,0x0116,2,"= 2 (0x0002): differs from manual default of 5");
+
+  // 10: control mode
+  checkProbe(driver,10,0x0136,1,"manual: internal");
+  checkProbe(driver,10,0x0136,0,"manual: external");
+  checkProbe(driver,10,0x0136,4,"no meaning listed in manual");
+
   // A failed read reports no value and still writes nothing.
   fail_slave[2]=true;
   const auto writes_before=write_calls;
@@ -125,7 +134,7 @@ static void testProbeSelectors(Driver & driver)
   fail_slave[2]=false;
 
   // Any other selector is rejected before any bus exchange.
-  for (int selector : {0, 9, 10, 128, 255}) {
+  for (int selector : {0, 11, 128, 255}) {
     const auto calls_before=bus_calls;
     CHECK(findProbeSelector(static_cast<std::uint8_t>(selector))==nullptr);
     CHECK(!readProbe(driver,1,static_cast<std::uint8_t>(selector)));

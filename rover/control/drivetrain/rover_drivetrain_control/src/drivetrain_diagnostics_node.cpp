@@ -63,7 +63,7 @@ public:
           *driver, request->address, request->register_selector);
         if (!read) {
           response->result_code = 2;
-          response->detail = "Only read-only selectors 1..8 are permitted";
+          response->detail = "Only read-only selectors 1..10 are permitted";
           return;
         }
         response->success = read->result.ok();
@@ -144,7 +144,7 @@ private:
         wheel.measured_raw_speed_valid = ok;
         wheel.measured_raw_speed = ok ? value : 0;
         break;
-      default: break;  // 4, 5, 7: no telemetry field; reported in detail only
+      default: break;  // 4, 5, 7, 9, 10: no telemetry field; reported in detail only
     }
     wheel.last_read_result = readResultFor(result);
     if (!ok) {

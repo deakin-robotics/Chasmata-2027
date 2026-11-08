@@ -137,6 +137,13 @@ public:
   [[nodiscard]] Result readBaudCodeRaw(
     std::uint8_t slave_id, std::uint16_t & raw_baud_code);
 
+  [[nodiscard]] Result readPolePairsRaw(
+    std::uint8_t slave_id, std::uint16_t & raw_pole_pairs);
+
+  // The manual lists 0x0136 for FC 06 only; a read may return an exception.
+  [[nodiscard]] Result readControlModeRaw(
+    std::uint8_t slave_id, std::uint16_t & raw_mode);
+
   [[nodiscard]] Result readTemperatureRaw(
     std::uint8_t slave_id,
     std::uint16_t & raw_temperature);
@@ -196,6 +203,9 @@ private:
   static constexpr std::uint16_t DRIVE_ADDRESS_REGISTER = 0x00A6;
   // Never write: changing the stored baud code drops the drive off the bus.
   static constexpr std::uint16_t BAUD_CODE_REGISTER = 0x00F6;
+  // Same addresses as INIT_REGISTER_0116/0136; these names are read-only.
+  static constexpr std::uint16_t POLE_PAIRS_REGISTER = 0x0116;
+  static constexpr std::uint16_t CONTROL_MODE_REGISTER = 0x0136;
 
   static constexpr std::uint8_t MIN_SLAVE_ID = 1;
   static constexpr std::uint8_t MAX_SLAVE_ID = 247;

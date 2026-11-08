@@ -11,7 +11,7 @@ namespace
 
 using Driver = Bld305sDriver;
 
-constexpr std::array<ProbeSelector, 8> SELECTORS{{
+constexpr std::array<ProbeSelector, 10> SELECTORS{{
   {1, 0x0096, "driver internal temperature", &Driver::readTemperatureRaw},
   {2, 0x00B6, "actual motor current", &Driver::readCurrentRaw},
   {3, 0x00C6, "actual motor voltage", &Driver::readVoltageRaw},
@@ -20,6 +20,8 @@ constexpr std::array<ProbeSelector, 8> SELECTORS{{
   {6, 0x0076, "fault code", &Driver::readFaultRaw},
   {7, 0x0066, "running status", &Driver::readRunningStatusRaw},
   {8, 0x005F, "actual motor speed", &Driver::readActualSpeedRaw},
+  {9, 0x0116, "motor pole pairs", &Driver::readPolePairsRaw},
+  {10, 0x0136, "control mode", &Driver::readControlModeRaw},
 }};
 
 // Baud codes as listed in the manual's 0x00F6 table.
@@ -90,6 +92,12 @@ std::string meaningFor(std::uint8_t selector, std::uint8_t slave_id, std::uint16
       return meaning ? std::string("manual: ") + meaning : "no meaning listed in manual";
     case 8:
       return "raw; manual pole-pair correction not applied";
+    case 9:
+      return raw == 5 ? "matches manual default of 5" : "differs from manual default of 5";
+    case 10:
+      if (raw == 1) return "manual: internal";
+      if (raw == 0) return "manual: external";
+      return "no meaning listed in manual";
     default:
       return "raw counts; manual gives no scaling";
   }

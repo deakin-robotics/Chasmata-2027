@@ -148,6 +148,18 @@ Bld305sDriver::Result Bld305sDriver::readBaudCodeRaw(
   return readHoldingRegister(slave_id, BAUD_CODE_REGISTER, raw_baud_code);
 }
 
+Bld305sDriver::Result Bld305sDriver::readPolePairsRaw(
+  std::uint8_t slave_id, std::uint16_t & raw_pole_pairs)
+{
+  return readHoldingRegister(slave_id, POLE_PAIRS_REGISTER, raw_pole_pairs);
+}
+
+Bld305sDriver::Result Bld305sDriver::readControlModeRaw(
+  std::uint8_t slave_id, std::uint16_t & raw_mode)
+{
+  return readHoldingRegister(slave_id, CONTROL_MODE_REGISTER, raw_mode);
+}
+
 Bld305sDriver::Result Bld305sDriver::readTemperatureRaw(
   std::uint8_t slave_id,
   std::uint16_t & raw_temperature)

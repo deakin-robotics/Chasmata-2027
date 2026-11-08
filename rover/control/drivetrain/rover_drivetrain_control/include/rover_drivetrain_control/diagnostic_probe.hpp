@@ -28,7 +28,7 @@ struct ProbeRead
   std::string detail;
 };
 
-// Returns nullptr for any selector other than 1..8.
+// Returns nullptr for any selector other than 1..10.
 [[nodiscard]] const ProbeSelector * findProbeSelector(std::uint8_t selector) noexcept;
 
 // std::nullopt means the selector was rejected and nothing was sent.

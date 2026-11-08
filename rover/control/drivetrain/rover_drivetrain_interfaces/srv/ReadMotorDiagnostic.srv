@@ -6,7 +6,8 @@ uint8 address
 uint8 register_selector    # 1 temp (0x0096), 2 current (0x00B6), 3 voltage (0x00C6),
                            # 4 drive address (0x00A6), 5 baud code (0x00F6),
                            # 6 fault code (0x0076), 7 running status (0x0066),
-                           # 8 actual speed (0x005F)
+                           # 8 actual speed (0x005F), 9 motor pole pairs (0x0116),
+                           # 10 control mode (0x0136)
 ---
 bool success
 uint16 raw_value           # raw register value; never unit-converted

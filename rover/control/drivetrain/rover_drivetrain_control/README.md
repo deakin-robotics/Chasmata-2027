@@ -63,6 +63,8 @@ ros2 launch rover_drivetrain_control diagnostics.launch.py \
 
 Every drive ships as address 1. Until the IDs are set to 1–4, connect and probe one drive at a time, because several drives at the same address will answer together and corrupt the reply.
 
+Last year’s rover used shared addresses (1 = right side, 2 = left side), so drives may be saved at address 1 or 2. Probe both, with one drive connected at a time.
+
 Probe a drive by slave ID; `bus` must be `drivetrain`:
 
 ```bash
@@ -83,6 +85,8 @@ Every selector is a function code 03 read. The service returns the raw register 
 | 6 | `0x0076` | Fault code | Manual-cited, bench check pending |
 | 7 | `0x0066` | Running status (`0` stop, `1` forward, `2` reverse, `3` brake) | Manual-cited, bench check pending |
 | 8 | `0x005F` | Actual speed (raw) | Manual-cited, bench check pending |
+| 9 | `0x0116` | Motor pole pairs (manual default 5) | Manual-cited, bench check pending |
+| 10 | `0x0136` | Control mode (`1` = internal, `0` = external) | Manual-cited, bench check pending; the manual lists this register for writes only |
 
 The response `detail` can name the manual meaning of a value, such as a fault name, but `raw_value` is always the raw register. Selectors 6 and 8 also fill `raw_fault` and `measured_raw_speed` in the diagnostics telemetry. See [`docs/BLD305S_REGISTERS.md`](docs/BLD305S_REGISTERS.md) for every register the package touches, with manual page references. Running code must never write the baud register `0x00F6` or the save register `0x80FF`.
 
