@@ -12,6 +12,7 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(control_msgs REQUIRED)
+find_package(controller_manager_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(sensor_msgs REQUIRED)
@@ -27,6 +28,7 @@ add_library(mock_rover_node SHARED
   src/rover/mock_rover_node.cpp
   src/rover/fma_control.cpp
   src/drive/mock_drive_backend.cpp
+  src/drive/real_drive_backend.cpp
   src/arm/arm_control.cpp
   src/arm/trajectory.cpp)
 target_link_libraries(mock_rover_node mock_rover_simulation)
@@ -34,7 +36,7 @@ target_include_directories(mock_rover_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 ament_target_dependencies(mock_rover_node
-  control_msgs rclcpp rclcpp_action sensor_msgs std_msgs telemetry_interfaces)
+  control_msgs controller_manager_msgs rclcpp rclcpp_action sensor_msgs std_msgs telemetry_interfaces)
 
 add_executable(mock_rover src/rover/mock_rover_main.cpp)
 target_link_libraries(mock_rover mock_rover_node)
@@ -58,6 +60,10 @@ if(BUILD_TESTING)
   target_link_libraries(test_mock_rover_integration mock_rover_node)
   ament_target_dependencies(test_mock_rover_integration
     control_msgs rclcpp rclcpp_action sensor_msgs std_msgs telemetry_interfaces)
+  ament_add_gtest(test_real_drive_backend test/test_real_drive_backend.cpp)
+  target_include_directories(test_real_drive_backend PRIVATE src/drive)
+  target_link_libraries(test_real_drive_backend mock_rover_node)
+  ament_target_dependencies(test_real_drive_backend controller_manager_msgs rclcpp sensor_msgs std_msgs telemetry_interfaces)
 endif()
 
 ament_package()

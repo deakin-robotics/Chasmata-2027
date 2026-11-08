@@ -8,6 +8,7 @@ RUN apt-get update \
         python3-colcon-common-extensions \
         ros-jazzy-ament-cmake-gtest \
         ros-jazzy-control-msgs \
+        ros-jazzy-controller-manager-msgs \
         ros-jazzy-launch-xml \
         ros-jazzy-rosbridge-server \
         ros-jazzy-rosidl-default-generators \

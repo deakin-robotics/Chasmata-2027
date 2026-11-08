@@ -8,6 +8,7 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <depend>control_msgs</depend>
+  <depend>controller_manager_msgs</depend>
   <depend>ecam_alerts</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_action</depend>

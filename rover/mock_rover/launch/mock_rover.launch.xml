@@ -1,6 +1,11 @@
 <?xml version="1.0"?>
 <launch>
-  <node pkg="mock_rover" exec="mock_rover" name="mock_rover" output="screen"/>
+  <arg name="drive_backend" default="mock"/>
+  <arg name="drive_max_wheel_speed" default="$(env DRIVE_MAX_WHEEL_SPEED 0.0)"/>
+  <node pkg="mock_rover" exec="mock_rover" name="mock_rover" output="screen">
+    <param name="drive_backend" value="$(var drive_backend)"/>
+    <param name="drive_max_wheel_speed" value="$(var drive_max_wheel_speed)" type="float"/>
+  </node>
   <node pkg="ecam_alerts" exec="ecam_alert_aggregator" name="ecam_alert_aggregator_rover" output="screen">
     <param name="role" value="rover"/>
   </node>
