@@ -15,9 +15,9 @@ Run the development stack with:
 docker compose up --build
 ```
 
-For the production stack, copy `.env.drive.example` to `.env` and set the
-path to the verified `DRIVE_HARDWARE_CONFIG` YAML, and `DRIVE_SERIAL_DEVICE` to the same serial
-device path specified in that YAML. Then run:
+For the production stack, copy `drivetrain_hardware.example.yaml` to
+`drivetrain_hardware.yaml` in the drivetrain driver's `config` directory and
+fill in the rover's hardware values. Then run:
 
 ```bash
 docker compose up --build prod
@@ -27,3 +27,4 @@ Production uses the real drivetrain backend and the arm simulator. Synthetic cam
 run in development; the production stack does not yet start cameras.
 Full trigger input requests 800 motor RPM, converted using the YAML gear ratio;
 the configured motor RPM limit must be at least 800.
+The serial device in the YAML must be a USB serial device (`ttyUSB` or `ttyACM`).

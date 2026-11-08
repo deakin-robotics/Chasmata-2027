@@ -35,17 +35,15 @@ services:
       ROS_LOCALHOST_ONLY: "0"
       RMW_IMPLEMENTATION: rmw_fastrtps_cpp
       ROS_DISCOVERY_SERVER: "127.0.0.1:11811"
-      DRIVE_HARDWARE_CONFIG: "${DRIVE_HARDWARE_CONFIG:-}"
-      DRIVE_SERIAL_DEVICE: "${DRIVE_SERIAL_DEVICE:-}"
     volumes:
       - type: bind
-        source: "${DRIVE_HARDWARE_CONFIG:-../control/drivetrain/rover_drivetrain_control/config/drivetrain_hardware.example.yaml}"
-        target: /etc/rover/drivetrain-hardware.yaml
+        source: ../control/drivetrain/rover_drivetrain_control/config
+        target: /etc/rover/drivetrain
         read_only: true
-        bind:
-          create_host_path: false
-    devices:
-      - "${DRIVE_SERIAL_DEVICE:-/dev/null}:${DRIVE_SERIAL_DEVICE:-/dev/null}"
+      - /dev:/dev
+    device_cgroup_rules:
+      - 'c 166:* rwm'
+      - 'c 188:* rwm'
     depends_on: [discovery]
     restart: "no"
 

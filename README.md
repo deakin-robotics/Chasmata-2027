@@ -20,8 +20,8 @@ docker compose -f docker-compose.yml up --build
 Open `http://<base-station-lan-ip>/driver`, `/arm`, or `/ecam`. The
 `basestation.local` address is optional and requires separate name resolution.
 
-On the Rover PC, configure `rover/mock_rover/.env` from `.env.drive.example`
-with the verified drivetrain settings and run:
+On the Rover PC, copy the drivetrain driver's `config/drivetrain_hardware.example.yaml`
+to `config/drivetrain_hardware.yaml`, fill in the hardware settings and run:
 
 ```bash
 cd rover/mock_rover

@@ -1,20 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${DRIVE_HARDWARE_CONFIG:?Set DRIVE_HARDWARE_CONFIG to the verified drivetrain YAML path}"
-: "${DRIVE_SERIAL_DEVICE:?Set DRIVE_SERIAL_DEVICE to the drivetrain serial device path}"
-test -c "$DRIVE_SERIAL_DEVICE" || { printf 'Drivetrain serial device is not available: %s\n' "$DRIVE_SERIAL_DEVICE" >&2; exit 1; }
 DRIVE_MAX_WHEEL_SPEED=$(python3 - <<'PY'
 import math
 import os
+import stat
 import sys
 import yaml
 
 try:
-    with open('/etc/rover/drivetrain-hardware.yaml', encoding='utf-8') as config_file:
+    with open('/etc/rover/drivetrain/drivetrain_hardware.yaml', encoding='utf-8') as config_file:
         config = yaml.safe_load(config_file)
-    if not isinstance(config, dict) or config.get('serial_device') != os.environ['DRIVE_SERIAL_DEVICE']:
-        raise ValueError('DRIVE_SERIAL_DEVICE must match serial_device in the hardware YAML')
+    if not isinstance(config, dict) or not isinstance(config.get('serial_device'), str):
+        raise ValueError('serial_device must be set in drivetrain_hardware.yaml')
+    device = os.path.realpath(config['serial_device'])
+    if not device.startswith('/dev/'):
+        raise ValueError('serial_device must resolve to a device under /dev')
+    info = os.stat(device)
+    if not stat.S_ISCHR(info.st_mode) or os.major(info.st_rdev) not in (166, 188):
+        raise ValueError('serial_device must be a USB serial device (ttyACM or ttyUSB)')
     ratio = float(config['gear_ratio'])
     limit = float(config['motor_rpm_limit'])
     if not math.isfinite(ratio) or ratio <= 0 or not math.isfinite(limit) or limit < 800:
@@ -31,7 +35,7 @@ set +u
 source /opt/ros/jazzy/setup.bash
 source /workspace/install/setup.bash
 set -u
-ros2 launch rover_drivetrain_control drivetrain.launch.py hardware_config:=/etc/rover/drivetrain-hardware.yaml &
+ros2 launch rover_drivetrain_control drivetrain.launch.py hardware_config:=/etc/rover/drivetrain/drivetrain_hardware.yaml &
 drivetrain_pid=$!
 ros2 launch mock_rover mock_rover.launch.xml drive_backend:=real &
 rover_pid=$!
