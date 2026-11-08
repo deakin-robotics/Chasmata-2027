@@ -46,7 +46,8 @@ pluginlib_export_plugin_description_file(hardware_interface
   rover_drivetrain_control_plugins.xml)
 
 # Diagnostic-only node. Motion service always REJECTS motion commands.
-add_executable(drivetrain_diagnostics_node src/drivetrain_diagnostics_node.cpp)
+add_executable(drivetrain_diagnostics_node
+  src/drivetrain_diagnostics_node.cpp src/diagnostic_probe.cpp)
 ament_target_dependencies(drivetrain_diagnostics_node
   rclcpp rover_drivetrain_interfaces)
 target_link_libraries(drivetrain_diagnostics_node ${PROJECT_NAME})
@@ -84,7 +85,8 @@ if(BUILD_TESTING)
 
   # Mock all wire functions: verifies per-slave, per-cycle failure accounting
   # without opening any real serial ports or sending motor commands.
-  add_executable(test_driver_mock test/test_driver_mock.cpp src/bld305s_driver.cpp)
+  add_executable(test_driver_mock test/test_driver_mock.cpp src/bld305s_driver.cpp
+    src/diagnostic_probe.cpp)
   target_include_directories(test_driver_mock PRIVATE include ${LIBMODBUS_INCLUDE_DIRS})
   target_link_libraries(test_driver_mock ${PROJECT_NAME}_core)
   add_test(NAME drivetrain_modbus_mock COMMAND test_driver_mock)

@@ -61,6 +61,10 @@ ros2 launch rover_drivetrain_control diagnostics.launch.py \
   baud_rate:=9600 parity:=N data_bits:=8 stop_bits:=1 response_timeout_ms:=30
 ```
 
+Every drive ships as address 1. Until the IDs are set to 1–4, connect and probe one drive at a time, because several drives at the same address will answer together and corrupt the reply.
+
+Last year’s rover used shared addresses (1 = right side, 2 = left side), so drives may be saved at address 1 or 2. Probe both, with one drive connected at a time.
+
 Probe a drive by slave ID; `bus` must be `drivetrain`:
 
 ```bash
@@ -69,7 +73,22 @@ ros2 service call /drivetrain_diagnostics/read_motor_diagnostic \
   "{bus: drivetrain, address: 1, register_selector: 1}"
 ```
 
-Selectors 1, 2, and 3 return raw temperature (`0x0096`), current (`0x00B6`), and voltage (`0x00C6`) register values. They are not converted to physical units.
+Every selector is a function code 03 read. The service returns the raw register value, never converted to physical units. Any other selector is rejected before anything is sent on the bus.
+
+| Selector | Register | Meaning | Status |
+|---|---|---|---|
+| 1 | `0x0096` | Driver internal temperature | Manual-cited, bench check pending |
+| 2 | `0x00B6` | Actual motor current | Manual-cited, bench check pending |
+| 3 | `0x00C6` | Actual motor voltage | Manual-cited, bench check pending |
+| 4 | `0x00A6` | Drive address | Manual-cited, bench check pending |
+| 5 | `0x00F6` | Baud code (`01` = 9600, `04` = 38400) | Manual-cited, bench check pending |
+| 6 | `0x0076` | Fault code | Manual-cited, bench check pending |
+| 7 | `0x0066` | Running status (`0` stop, `1` forward, `2` reverse, `3` brake) | Manual-cited, bench check pending |
+| 8 | `0x005F` | Actual speed (raw) | Manual-cited, bench check pending |
+| 9 | `0x0116` | Motor pole pairs (manual default 5) | Manual-cited, bench check pending |
+| 10 | `0x0136` | Control mode (`1` = internal, `0` = external) | Manual-cited, bench check pending; the manual lists this register for writes only |
+
+The response `detail` can name the manual meaning of a value, such as a fault name, but `raw_value` is always the raw register. Selectors 6 and 8 also fill `raw_fault` and `measured_raw_speed` in the diagnostics telemetry. See [`docs/BLD305S_REGISTERS.md`](docs/BLD305S_REGISTERS.md) for every register the package touches, with manual page references. Running code must never write the baud register `0x00F6` or the save register `0x80FF`.
 
 ## ros2_control configuration
 
