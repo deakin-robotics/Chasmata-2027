@@ -21,6 +21,7 @@ void MockRoverNode::request_mode(const std::string & subsystem, const std::strin
   const auto mode = upper_trimmed(raw_mode);
   const auto & valid = subsystem == "drive" ? drive_modes_ : arm_modes_;
   if (valid.count(mode) == 0) {
+    if (subsystem == "drive") drive_backend_->cancel_mode_request();
     rejected_modes_[subsystem] = mode;
     pending_modes_.erase(subsystem);
     rejection_clear_[subsystem] = std::chrono::steady_clock::now() + std::chrono::milliseconds(500);
@@ -29,6 +30,7 @@ void MockRoverNode::request_mode(const std::string & subsystem, const std::strin
     rejection_clear_.erase(subsystem);
     pending_modes_[subsystem] = Pending{mode, std::chrono::steady_clock::now() +
       std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(ack_delay_))};
+    if (subsystem == "drive") drive_backend_->request_mode(mode);
   }
   publish_fma();
 }
@@ -62,8 +64,18 @@ void MockRoverNode::tick()
   const auto now = std::chrono::steady_clock::now();
   for (const auto & subsystem : {std::string("drive"), std::string("arm")}) {
     const auto pending = pending_modes_.find(subsystem);
-    if (pending != pending_modes_.end() && pending->second.due <= now) {
-      if (subsystem == "drive") drive_mode_ = pending->second.value; else arm_mode_ = pending->second.value;
+    if (pending == pending_modes_.end()) continue;
+    if (subsystem == "drive") {
+      const auto result = drive_backend_->take_mode_result();
+      if (!result) continue;
+      if (*result) drive_mode_ = pending->second.value;
+      else {
+        rejected_modes_[subsystem] = pending->second.value;
+        rejection_clear_[subsystem] = now + std::chrono::milliseconds(500);
+      }
+      pending_modes_.erase(pending); publish_fma();
+    } else if (pending->second.due <= now) {
+      arm_mode_ = pending->second.value;
       pending_modes_.erase(pending); publish_fma();
     }
   }

@@ -26,7 +26,7 @@ void MockRoverNode::on_joy(const std::string & subsystem, const sensor_msgs::msg
     if (!std::isfinite(axis) || axis < 0.0 || axis > 1.0) return;
   }
   if (std::any_of(message.buttons.begin(), message.buttons.end(), [](int32_t value) { return value != 0 && value != 1; })) return;
-  if (subsystem != "arm") return;
+  if (subsystem == "drive") { drive_backend_->on_joy(message); return; }
   if (arm_mode_ == "MANUAL") {
     const bool gimbal_held = message.buttons.size() > 4 && message.buttons[4] > 0;
     apply_deltas({{"base_joint", message.axes[0]}, {"shoulder_joint", message.axes[1]},

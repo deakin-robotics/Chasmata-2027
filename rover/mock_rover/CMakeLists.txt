@@ -26,6 +26,7 @@ target_include_directories(mock_rover_simulation PUBLIC
 add_library(mock_rover_node SHARED
   src/rover/mock_rover_node.cpp
   src/rover/fma_control.cpp
+  src/drive/mock_drive_backend.cpp
   src/arm/arm_control.cpp
   src/arm/trajectory.cpp)
 target_link_libraries(mock_rover_node mock_rover_simulation)

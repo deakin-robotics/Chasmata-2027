@@ -4,6 +4,11 @@
 FMA acknowledgement behavior, arm joint simulation, trajectory action,
 heartbeat, Rover ECAM aggregation, and ROSbridge launch.
 
+Drive mode requests and validated joystick input use a drive backend. The default
+backend confirms valid mode requests after the configured mock delay. C++ callers
+can inject another `DriveBackend` through `make_mock_rover_node`; its mode result
+determines whether Rover Control confirms or rejects the pending request.
+
 Run the local stack with:
 
 ```bash

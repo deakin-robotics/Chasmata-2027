@@ -19,6 +19,7 @@
 #include <trajectory_msgs/msg/joint_trajectory_point.hpp>
 
 #include "mock_rover/mock_rover_node.hpp"
+#include "mock_rover/drive_backend.hpp"
 
 namespace
 {
@@ -38,12 +39,14 @@ protected:
 
   void SetUp() override
   {
-    rover_ = mock_rover::make_mock_rover_node();
+    rover_ = make_rover();
     client_ = std::make_shared<rclcpp::Node>("mock_rover_integration_client");
     command_publisher_ = client_->create_publisher<sensor_msgs::msg::JointState>("/arm/joint_commands", 10);
     joy_publisher_ = client_->create_publisher<sensor_msgs::msg::Joy>("/arm/joy", 10);
     lock_publisher_ = client_->create_publisher<std_msgs::msg::Bool>("/arm/orientation_lock", 10);
     arm_mode_publisher_ = client_->create_publisher<std_msgs::msg::String>("/fma/arm/request", 10);
+    drive_mode_publisher_ = client_->create_publisher<std_msgs::msg::String>("/fma/drive/request", 10);
+    drive_joy_publisher_ = client_->create_publisher<sensor_msgs::msg::Joy>("/drive/joy", 10);
     fma_subscription_ = client_->create_subscription<telemetry_interfaces::msg::FmaState>("/fma/state",
       rclcpp::QoS(1).reliable().transient_local(), [this](telemetry_interfaces::msg::FmaState::SharedPtr message) {
         fma_.push_back(*message);
@@ -58,6 +61,8 @@ protected:
     ASSERT_TRUE(wait_for([this] { return !fma_.empty() && !joints_.empty() && heartbeats_ > 0; }, 2s));
     ASSERT_TRUE(trajectory_client_->wait_for_action_server(2s));
   }
+
+  virtual std::shared_ptr<rclcpp::Node> make_rover() { return mock_rover::make_mock_rover_node(); }
 
   void TearDown() override
   {
@@ -100,6 +105,8 @@ protected:
   rclcpp::Publisher<sensor_msgs::msg::Joy>::SharedPtr joy_publisher_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr lock_publisher_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr arm_mode_publisher_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr drive_mode_publisher_;
+  rclcpp::Publisher<sensor_msgs::msg::Joy>::SharedPtr drive_joy_publisher_;
   rclcpp::Subscription<telemetry_interfaces::msg::FmaState>::SharedPtr fma_subscription_;
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_subscription_;
   rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr heartbeat_subscription_;
@@ -108,6 +115,94 @@ protected:
   std::vector<sensor_msgs::msg::JointState> joints_;
   size_t heartbeats_{0};
 };
+
+// The default drive backend retains pending, delayed confirmation, and rejection behavior.
+TEST_F(MockRoverIntegrationTest, DriveModesPreserveMockAcknowledgementAndRejection)
+{
+  std_msgs::msg::String request;
+  request.data = " manual ";
+  const auto start = std::chrono::steady_clock::now();
+  drive_mode_publisher_->publish(request);
+  ASSERT_TRUE(wait_for([this] { return latest_fma().drive.pending == "MANUAL"; }, 1s));
+  EXPECT_TRUE(latest_fma().drive.confirmed.empty());
+  ASSERT_TRUE(wait_for([this] { return latest_fma().drive.confirmed == "MANUAL"; }, 1s));
+  EXPECT_GE(std::chrono::steady_clock::now() - start, 150ms);
+  EXPECT_TRUE(latest_fma().drive.pending.empty());
+
+  request.data = "INVALID";
+  drive_mode_publisher_->publish(request);
+  ASSERT_TRUE(wait_for([this] { return latest_fma().drive.rejected == "INVALID"; }, 1s));
+  EXPECT_EQ(latest_fma().drive.confirmed, "MANUAL");
+  ASSERT_TRUE(wait_for([this] { return latest_fma().drive.rejected.empty(); }, 1s));
+
+  request.data = "VELOCITY";
+  drive_mode_publisher_->publish(request);
+  ASSERT_TRUE(wait_for([this] { return latest_fma().drive.pending == "VELOCITY"; }, 1s));
+  request.data = "INVALID";
+  drive_mode_publisher_->publish(request);
+  ASSERT_TRUE(wait_for([this] { return latest_fma().drive.rejected == "INVALID"; }, 1s));
+  wait_for([] { return false; }, 300ms);
+  EXPECT_EQ(latest_fma().drive.confirmed, "MANUAL");
+  EXPECT_TRUE(latest_fma().drive.pending.empty());
+}
+
+class TestDriveBackend : public mock_rover::DriveBackend
+{
+public:
+  void request_mode(const std::string & mode) override { requested = mode; result.reset(); }
+  void cancel_mode_request() override { requested.clear(); result.reset(); }
+  std::optional<bool> take_mode_result() override { auto value = result; result.reset(); return value; }
+  void on_joy(const sensor_msgs::msg::Joy & joy) override { last_joy = joy; ++joy_count; }
+  std::string requested;
+  std::optional<bool> result;
+  sensor_msgs::msg::Joy last_joy;
+  size_t joy_count{0};
+};
+
+class InjectedDriveIntegrationTest : public MockRoverIntegrationTest
+{
+protected:
+  std::shared_ptr<rclcpp::Node> make_rover() override
+  {
+    auto backend = std::make_unique<TestDriveBackend>();
+    drive_ = backend.get();
+    return mock_rover::make_mock_rover_node(std::move(backend));
+  }
+  TestDriveBackend * drive_{};
+};
+
+// Rover Control routes validated input and waits for the injected backend's result.
+TEST_F(InjectedDriveIntegrationTest, RoutesRequestsAndJoyAndHandlesBackendResults)
+{
+  std_msgs::msg::String request;
+  request.data = "MANUAL";
+  drive_mode_publisher_->publish(request);
+  ASSERT_TRUE(wait_for([this] { return latest_fma().drive.pending == "MANUAL"; }, 1s));
+  EXPECT_EQ(drive_->requested, "MANUAL");
+  wait_for([] { return false; }, 250ms);
+  EXPECT_TRUE(latest_fma().drive.confirmed.empty());
+  drive_->result = true;
+  ASSERT_TRUE(wait_for([this] { return latest_fma().drive.confirmed == "MANUAL"; }, 1s));
+
+  sensor_msgs::msg::Joy joy;
+  joy.axes = {0.5F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F};
+  joy.buttons = {0, 1};
+  drive_joy_publisher_->publish(joy);
+  ASSERT_TRUE(wait_for([this] { return drive_->joy_count == 1; }, 1s));
+  EXPECT_EQ(drive_->last_joy.axes, joy.axes);
+  joy.axes[4] = -1.0F;
+  drive_joy_publisher_->publish(joy);
+  wait_for([] { return false; }, 200ms);
+  EXPECT_EQ(drive_->joy_count, 1U);
+
+  request.data = "VELOCITY";
+  drive_mode_publisher_->publish(request);
+  ASSERT_TRUE(wait_for([this] { return latest_fma().drive.pending == "VELOCITY"; }, 1s));
+  drive_->result = false;
+  ASSERT_TRUE(wait_for([this] { return latest_fma().drive.rejected == "VELOCITY"; }, 1s));
+  EXPECT_EQ(latest_fma().drive.confirmed, "MANUAL");
+  EXPECT_TRUE(latest_fma().drive.pending.empty());
+}
 
 // The node publishes heartbeat and joint states, applies limits, and acknowledges or rejects FMA requests.
 TEST_F(MockRoverIntegrationTest, PublishesHeartbeatJointStateAndFmaAcknowledgement)

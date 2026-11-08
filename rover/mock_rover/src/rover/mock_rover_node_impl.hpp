@@ -30,6 +30,7 @@
 #include <telemetry_interfaces/msg/fma_state.hpp>
 
 #include "mock_rover/joint_simulator.hpp"
+#include "mock_rover/drive_backend.hpp"
 #include "mock_rover/mock_rover_node.hpp"
 
 namespace mock_rover
@@ -48,7 +49,7 @@ inline const JointSimulator::JointLimits kJointLimits{
 class MockRoverNode : public rclcpp::Node
 {
 public:
-  MockRoverNode();
+  explicit MockRoverNode(std::unique_ptr<DriveBackend> drive_backend);
   ~MockRoverNode() override;
 
 private:
@@ -73,6 +74,7 @@ private:
   void publish_heartbeat();
 
   JointSimulator joints_;
+  std::unique_ptr<DriveBackend> drive_backend_;
   std::recursive_mutex joints_mutex_;
   std::mutex trajectory_mutex_;
   struct TrajectoryWorker { std::thread thread; std::shared_ptr<std::atomic<bool>> finished; };

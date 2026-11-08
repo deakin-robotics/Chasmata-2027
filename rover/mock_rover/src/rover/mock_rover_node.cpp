@@ -1,14 +1,17 @@
 #include "mock_rover_node_impl.hpp"
+#include "../drive/mock_drive_backend.hpp"
 
 namespace mock_rover
 {
-MockRoverNode::MockRoverNode()
-: Node("mock_rover"), joints_(std::vector<std::string>(kJointNames.begin(), kJointNames.end()), kJointLimits, 1.0)
+MockRoverNode::MockRoverNode(std::unique_ptr<DriveBackend> drive_backend)
+: Node("mock_rover"), joints_(std::vector<std::string>(kJointNames.begin(), kJointNames.end()), kJointLimits, 1.0),
+  drive_backend_(std::move(drive_backend))
 {
   declare_parameter<double>("publish_rate_hz", 10.0);
   declare_parameter<double>("mode_ack_delay_ms", 150.0);
   const auto rate = std::max(get_parameter("publish_rate_hz").as_double(), 1.0);
   ack_delay_ = std::max(get_parameter("mode_ack_delay_ms").as_double() / 1000.0, 0.0);
+  if (!drive_backend_) drive_backend_ = std::make_unique<MockDriveBackend>(ack_delay_);
 
   const auto retained = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
   fma_publisher_ = create_publisher<telemetry_interfaces::msg::FmaState>("/fma/state", retained);
@@ -59,5 +62,10 @@ void MockRoverNode::publish_heartbeat() { heartbeat_publisher_->publish(std_msgs
 
 std::shared_ptr<rclcpp::Node> mock_rover::make_mock_rover_node()
 {
-  return std::make_shared<MockRoverNode>();
+  return std::make_shared<MockRoverNode>(nullptr);
+}
+
+std::shared_ptr<rclcpp::Node> mock_rover::make_mock_rover_node(std::unique_ptr<DriveBackend> drive_backend)
+{
+  return std::make_shared<MockRoverNode>(std::move(drive_backend));
 }
