@@ -3,6 +3,8 @@ build/
 install/
 log/
 .devcontainer/
+rover/mock_rover/.env
+rover/mock_rover/.env.drive
 old_code/
 
 # Python bytecode caches

@@ -20,6 +20,14 @@ docker compose -f docker-compose.yml up --build
 Open `http://<base-station-lan-ip>/driver`, `/arm`, or `/ecam`. The
 `basestation.local` address is optional and requires separate name resolution.
 
+On the Rover PC, configure `rover/mock_rover/.env` from `.env.drive.example`
+with the verified drivetrain settings and run:
+
+```bash
+cd rover/mock_rover
+docker compose up --build prod
+```
+
 ## Local development
 
 Create the shared camera network once:

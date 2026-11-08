@@ -23,6 +23,33 @@ services:
     depends_on: [discovery]
     restart: unless-stopped
 
+  prod:
+    profiles: [prod]
+    build:
+      context: ../..
+      dockerfile: rover/mock_rover/Dockerfile.prod
+    network_mode: host
+    ipc: host
+    environment:
+      ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
+      ROS_LOCALHOST_ONLY: "0"
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
+      ROS_DISCOVERY_SERVER: "127.0.0.1:11811"
+      DRIVE_MAX_WHEEL_SPEED: "${DRIVE_MAX_WHEEL_SPEED:-}"
+      DRIVE_HARDWARE_CONFIG: "${DRIVE_HARDWARE_CONFIG:-}"
+      DRIVE_SERIAL_DEVICE: "${DRIVE_SERIAL_DEVICE:-}"
+    volumes:
+      - type: bind
+        source: "${DRIVE_HARDWARE_CONFIG:-../control/drivetrain/rover_drivetrain_control/config/drivetrain_hardware.example.yaml}"
+        target: /etc/rover/drivetrain-hardware.yaml
+        read_only: true
+        bind:
+          create_host_path: false
+    devices:
+      - "${DRIVE_SERIAL_DEVICE:-/dev/null}:${DRIVE_SERIAL_DEVICE:-/dev/null}"
+    depends_on: [discovery]
+    restart: "no"
+
   media-source:
     build:
       context: .
