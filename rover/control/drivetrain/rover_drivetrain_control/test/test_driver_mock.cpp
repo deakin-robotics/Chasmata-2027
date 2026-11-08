@@ -23,6 +23,10 @@ static int last_read_address{-1};
 static unsigned bus_calls{0};    // slave selects, reads and writes
 static unsigned write_calls{0};  // function code 06
 static std::map<int, std::uint16_t> register_values;  // per-address override
+static int broadcast_errno{ETIMEDOUT};  // what libmodbus reports for a write to address 0
+static int last_write_slave{-1};
+static int last_write_address{-1};
+static std::uint16_t last_write_value{0xFFFF};
 extern "C" {
 modbus_t * modbus_new_rtu(const char *, int, char, int, int)
 {
@@ -38,7 +42,7 @@ void modbus_free(modbus_t * m) {CHECK(m==shared_context);delete m;shared_context
 int modbus_set_slave(modbus_t * m, int slave)
 {
   CHECK(m==shared_context && m->connected);
-  CHECK(slave>=1 && slave<=4);
+  CHECK(slave>=0 && slave<=4);  // 0 = broadcast
   ++bus_calls;
   m->slave=slave;
   return 0;
@@ -54,11 +58,17 @@ int modbus_read_registers(modbus_t * m, int addr, int n, std::uint16_t * out)
   *out=it!=register_values.end() ? it->second : static_cast<std::uint16_t>(100+m->slave);
   return n;
 }
-int modbus_write_register(modbus_t * m, int, const std::uint16_t)
+int modbus_write_register(modbus_t * m, int addr, const std::uint16_t value)
 {
   CHECK(m==shared_context && m->connected);
   ++bus_calls;
   ++write_calls;
+  last_write_slave=m->slave; last_write_address=addr; last_write_value=value;
+  if (m->slave==0) {
+    // Drives never answer address 0; libmodbus 3.1.10 still waits and times out.
+    if (broadcast_errno!=0) {errno=broadcast_errno;return -1;}
+    return 1;
+  }
   if (fail_slave[m->slave]) {errno=ETIMEDOUT;return -1;}
   return 1;
 }
@@ -143,6 +153,51 @@ static void testProbeSelectors(Driver & driver)
   CHECK(write_calls==0);
 }
 
+// Broadcast stop: address 0, 0x0066 = 0. No drive replies to a broadcast, so
+// the timeout libmodbus reports counts as sent. A real send error does not.
+static void testBroadcastStop(Driver & driver, const Driver::SlaveIds & ids)
+{
+  broadcast_errno=ETIMEDOUT;
+  auto r=driver.broadcastStop();
+  CHECK(r.ok());
+  CHECK(last_write_slave==0 && last_write_address==0x0066 && last_write_value==0);
+
+  // If a drive did reply (libmodbus quirk mode), that is also sent.
+  broadcast_errno=0;
+  CHECK(driver.broadcastStop().ok());
+
+  // Any other error means it may not have gone out.
+  broadcast_errno=EIO;
+  r=driver.broadcastStop();
+  CHECK(r.code==Driver::ErrorCode::MODBUS_ERROR && r.system_errno==EIO);
+  broadcast_errno=ETIMEDOUT;
+
+  // The next unicast exchange addresses its own drive again, not address 0.
+  std::uint16_t value=0;
+  CHECK(driver.readFaultRaw(2,value).ok());
+  CHECK(value==102);
+
+  // A broadcast timeout inside a cycle is not a missed exchange for any drive.
+  CHECK(driver.beginCycle(ids).ok());
+  CHECK(driver.broadcastStop().ok());
+  for (auto id : ids) {  // the default three mandatory exchanges per drive
+    CHECK(driver.readFaultRaw(id,value).ok());
+    CHECK(driver.readTemperatureRaw(id,value).ok());
+    CHECK(driver.readCurrentRaw(id,value).ok());
+  }
+  CHECK(driver.endCycle().ok());
+  for (auto id : ids) CHECK(driver.consecutiveFailures(id)==0);
+
+  // A broadcast is refused, not sent, while the bus is closed.
+  Driver::RtuConfig closed_cfg;
+  closed_cfg.device="mock-closed"; closed_cfg.baud_rate=9600; closed_cfg.parity='N';
+  closed_cfg.data_bits=8; closed_cfg.stop_bits=1;
+  Driver closed(closed_cfg);
+  const auto before=write_calls;
+  CHECK(closed.broadcastStop().code==Driver::ErrorCode::NOT_CONNECTED);
+  CHECK(write_calls==before);
+}
+
 int main()
 {
   const Driver::SlaveIds ids{1,2,3,4};
@@ -197,6 +252,7 @@ int main()
 
   // Diagnostics probe selectors, outside any cycle.
   testProbeSelectors(driver);
+  testBroadcastStop(driver, ids);
 
   // Exercise failures for a drive that used to be on the other adapter.
   fail_slave[3]=true;

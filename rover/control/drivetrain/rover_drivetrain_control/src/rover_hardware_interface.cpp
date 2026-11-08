@@ -88,6 +88,8 @@ RoverHardwareInterface::on_init(
   transport_open_ = false;
   operationally_ready_ = false;
   active_ = false;
+  bench_configured_ = false;
+  bench_stop_latched_ = false;
 
   resetInterfaceStorage();
 
@@ -100,6 +102,11 @@ RoverHardwareInterface::on_init(
   }
 
   driver_ = std::make_unique<Bld305sDriver>(bus_config_);
+  if (bench_motion_enabled_) {
+    driver_->setMandatoryExchangesPerCycle(1);  // one alternating read per cycle
+    RCLCPP_WARN(logger(), "BENCH MOTION MODE requested (bench_motion_enabled=true). "
+      "Bench only: wheels off the ground, power cutoff held.");
+  }
 
   configuration_valid_ = true;
 
@@ -151,6 +158,10 @@ RoverHardwareInterface::on_configure(
 
   transport_open_ = true;
 
+  if (bench_motion_enabled_) {
+    return benchConfigure();
+  }
+
   RCLCPP_ERROR(
     logger(),
     "Shared Modbus transport opened successfully, but the verified BLD-305S "
@@ -187,6 +198,10 @@ RoverHardwareInterface::on_activate(
     return hardware_interface::CallbackReturn::ERROR;
   }
 
+  if (bench_motion_enabled_) {
+    return benchActivate();
+  }
+
   if (!operationally_ready_) {
     RCLCPP_ERROR(
       logger(),
@@ -209,6 +224,10 @@ RoverHardwareInterface::on_deactivate(
   const rclcpp_lifecycle::State & previous_state)
 {
   (void)previous_state;
+
+  if (bench_motion_enabled_) {
+    return benchDeactivate();
+  }
 
   if (active_) {
     // A failed transition must NOT falsely change local lifecycle state.
@@ -234,11 +253,32 @@ RoverHardwareInterface::on_cleanup(
 
   active_ = false;
   operationally_ready_ = false;
+  bench_configured_ = false;
 
   closeDriver();
   resetInterfaceStorage();
 
   return hardware_interface::CallbackReturn::SUCCESS;
+}
+
+hardware_interface::CallbackReturn
+RoverHardwareInterface::on_shutdown(
+  const rclcpp_lifecycle::State & previous_state)
+{
+  if (!bench_motion_enabled_) {
+    return hardware_interface::SystemInterface::on_shutdown(previous_state);
+  }
+  return benchShutdown(false);
+}
+
+hardware_interface::CallbackReturn
+RoverHardwareInterface::on_error(
+  const rclcpp_lifecycle::State & previous_state)
+{
+  if (!bench_motion_enabled_) {
+    return hardware_interface::SystemInterface::on_error(previous_state);
+  }
+  return benchShutdown(true);
 }
 
 std::vector<hardware_interface::StateInterface>
@@ -296,6 +336,10 @@ RoverHardwareInterface::read(
   previous_read_tick_ns_ = now;
   updateIoHeartbeat();
 
+  if (bench_motion_enabled_) {
+    return benchRead();
+  }
+
   if (!active_ || !operationally_ready_ || late_trigger_detected_) {
     bool expected = false;
 
@@ -326,6 +370,10 @@ RoverHardwareInterface::write(
   (void)period;
 
   updateIoHeartbeat();
+
+  if (bench_motion_enabled_) {
+    return benchWrite();
+  }
 
   if (!active_ || !operationally_ready_) {
     bool expected = false;
@@ -370,8 +418,22 @@ bool RoverHardwareInterface::parseConfiguration()
   const auto & parameters =
     hardware_info_.hardware_parameters;
 
+  // Off unless exactly "true". Anything other than "true"/"false" is refused,
+  // so a typo can never switch the mode silently.
+  bench_motion_enabled_ = false;
+  const auto bench_it = parameters.find("bench_motion_enabled");
+  if (bench_it != parameters.end()) {
+    if (bench_it->second == "true") {
+      bench_motion_enabled_ = true;
+    } else if (bench_it->second != "false") {
+      RCLCPP_ERROR(logger(), "bench_motion_enabled must be exactly 'true' or 'false', "
+        "got '%s'.", bench_it->second.c_str());
+      return false;
+    }
+  }
+
   auto parse_bus_configuration =
-    [&parameters](
+    [this, &parameters](
       Bld305sDriver::RtuConfig & config) -> bool
     {
       const std::string device_key = "serial_device";
@@ -426,7 +488,13 @@ bool RoverHardwareInterface::parseConfiguration()
       }
 
       long long baud = 0;
-      if (!parseInteger(baud_it->second, baud) || baud != 38400) {
+      if (bench_motion_enabled_) {
+        // Bench only: the drives are still at last year's 9600 today.
+        if (!parseInteger(baud_it->second, baud) || (baud != 9600 && baud != 38400)) {
+          RCLCPP_ERROR(logger(), "%s must be 9600 or 38400 in bench mode.", baud_key.c_str());
+          return false;
+        }
+      } else if (!parseInteger(baud_it->second, baud) || baud != 38400) {
         RCLCPP_ERROR(logger(), "%s must be 38400 for the current operating point. "
           "Provision ALL controllers with the vendor tool first.", baud_key.c_str());
         return false;
@@ -526,11 +594,19 @@ bool RoverHardwareInterface::parseConfiguration()
     RCLCPP_ERROR(logger(), "Stop deadline must not exceed the 300 ms team target.");
     return false;
   }
-  if (std::abs(timing_.update_hz - 15.0) > 0.01) {
+  if (!bench_motion_enabled_ && std::abs(timing_.update_hz - 15.0) > 0.01) {
     RCLCPP_ERROR(logger(), "The drivetrain component rate must be 15 Hz.");
     return false;
   }
-  const auto timing_check = core::validateTiming(timing_);
+  // Bench mode checks the same timing rules against its own stop deadline.
+  core::TimingConfig checked_timing = timing_;
+  if (bench_motion_enabled_) {
+    if (!parseBenchConfiguration()) {
+      return false;
+    }
+    checked_timing.stop_deadline_ms = bench_stop_deadline_ms_;
+  }
+  const auto timing_check = core::validateTiming(checked_timing);
   if (!timing_check.ok) {
     RCLCPP_ERROR(logger(), "Timing refusal: %s", timing_check.reason.c_str());
     return false;
