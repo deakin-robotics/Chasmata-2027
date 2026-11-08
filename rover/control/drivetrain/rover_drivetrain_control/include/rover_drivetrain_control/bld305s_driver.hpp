@@ -121,10 +121,21 @@ public:
     std::uint8_t slave_id,
     std::uint16_t raw_control);
 
-  // 0x005F is a provisional ACTUAL speed address from software sources only.
-  // Raw value is never converted to rad/s without verification against the manual and a bench read-back.
+  // 0x005F ACTUAL speed: manual-cited (FC 03), bench check pending.
+  // Raw value is never converted to rad/s without a bench read-back.
   [[nodiscard]] Result readActualSpeedRaw(
     std::uint8_t slave_id, std::uint16_t & raw_speed);
+
+  // Read-only (FC 03) probes; see docs/BLD305S_REGISTERS.md. Manual-cited,
+  // bench check pending. There are deliberately no matching write methods.
+  [[nodiscard]] Result readRunningStatusRaw(
+    std::uint8_t slave_id, std::uint16_t & raw_status);
+
+  [[nodiscard]] Result readDriveAddressRaw(
+    std::uint8_t slave_id, std::uint16_t & raw_address);
+
+  [[nodiscard]] Result readBaudCodeRaw(
+    std::uint8_t slave_id, std::uint16_t & raw_baud_code);
 
   [[nodiscard]] Result readTemperatureRaw(
     std::uint8_t slave_id,
@@ -165,7 +176,7 @@ private:
   // UNVERIFIED — cross-check against manual
   static constexpr std::uint16_t CONTROL_REGISTER = 0x0066;
 
-  // UNVERIFIED — actual speed register; needs manual and bench confirmation
+  // Manual-cited, bench check pending — actual speed register
   static constexpr std::uint16_t ACTUAL_SPEED_REGISTER = 0x005F;
 
   // UNVERIFIED — cross-check against manual
@@ -177,6 +188,14 @@ private:
   static constexpr std::uint16_t TEMPERATURE_REGISTER = 0x0096;
   static constexpr std::uint16_t CURRENT_REGISTER = 0x00B6;
   static constexpr std::uint16_t VOLTAGE_REGISTER = 0x00C6;
+
+  // Read-only (FC 03) addresses. Manual-cited, bench check pending.
+  // 0x0066 is also CONTROL_REGISTER on FC 06; this constant is read-only.
+  static constexpr std::uint16_t RUNNING_STATUS_REGISTER = 0x0066;
+  static constexpr std::uint16_t FAULT_REGISTER = 0x0076;
+  static constexpr std::uint16_t DRIVE_ADDRESS_REGISTER = 0x00A6;
+  // Never write: changing the stored baud code drops the drive off the bus.
+  static constexpr std::uint16_t BAUD_CODE_REGISTER = 0x00F6;
 
   static constexpr std::uint8_t MIN_SLAVE_ID = 1;
   static constexpr std::uint8_t MAX_SLAVE_ID = 247;

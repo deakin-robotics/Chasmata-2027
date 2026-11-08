@@ -10,7 +10,7 @@ This is a tracked artifact, **not** an acceptance certificate.
 | Forrest: GUI message (address, speed, direction, result) | Read-only `WheelTelemetry` / `DrivetrainTelemetry`, separating commanded, measured and communication result; no motor-command interface | Logging-only intent confirmed by Forrest; topic name, rate and publisher **not signed off** by operator interface team |
 | Wheel speed translated to motor speed and direction | `core::translateWheelSpeed` handles wheel rad/s, 50:1 configurable ratio, mirror direction | Unit tested; raw Modbus speed scaling/control words **UNVERIFIED** |
 | 15 Hz drivetrain rate at 38,400 baud | 15 Hz parameter required, 38,400 baud required | Arithmetic only; worker schedule not yet implemented, bus timing not measured |
-| Per-wheel telemetry (speed, faults) | `WheelTelemetry` message and raw telemetry methods; diagnostics node publishes probe results | No plugin publisher; actual speed 0x005F and fault register unverified |
+| Per-wheel telemetry (speed, faults) | `WheelTelemetry` message and raw telemetry methods; diagnostics node publishes probe results | No plugin publisher; actual speed 0x005F and fault code 0x0076 manual-cited, bench check pending |
 | Wheels stop within the 300 ms target after commands stop | `core::validateTiming` checks two periods + upstream + stop wire budget <= explicit stop deadline | **NO** stop-ACK implementation/test; watchdog missing |
 | No automatic re-arming after a stop or fault | Current plugin cannot activate | Deliberately fail-closed; no re-arming implemented |
 | Worst-case bus utilization at most 50% | `core::validateTiming` refuses >50% worst-case bus utilization | Requires measured `worst_bus_cycle_ms` |
@@ -19,13 +19,13 @@ This is a tracked artifact, **not** an acceptance certificate.
 | Liveness heartbeat from a monotonic clock | Monotonic raw heartbeat updated before `read` and `write` | No external heartbeat sink; no hardware watchdog |
 | No blocking Modbus I/O in the controller loop | Plugin no blocking Modbus read/write in ACTIVE path; example `is_async=true` | Actual worker callback dispatch in Jazzy **NOT tested** |
 | No silent defaults for safety settings | Required safety params, one serial configuration, unique ID mapping and timing validation | Actual configuration/adapter bench validation pending |
-| Drive faults detected and acted on | Fault reads return `UNSUPPORTED` | Fault register and response unresolved |
-| Never change the drives' stored baud rate | No writes to baud register 0x00F6 | Code inspection pass; vendor provisioning required |
+| Drive faults detected and acted on | `readFaultRaw()` reads fault code 0x0076 raw (function code 03); diagnostics probe selector 6 | Fault register manual-cited, bench check pending; no fault response implemented |
+| Never change the drives' stored baud rate | No writes to baud register 0x00F6 or save register 0x80FF; 0x00F6 is read only (probe selector 5) | Code inspection pass; vendor provisioning required |
 | Only verified stop commands are sent | No unsupported stop command issued | Bench coast/brake and stop command validation required |
 | One owner per serial bus | Standalone diagnostic node owns serial port only when explicitly enabled; no mode arbitration | Must not run alongside production hardware instance |
 | Testable without the rover | Provides hardware plugin shape and xacro template | Simulation stand-in not created; same controller config demonstration missing |
 | Core logic independent of ROS and hardware | Pure core C++17 tests without ROS/hardware | Tested with g++ here |
-| Actual speed read from a measurement register, never the setpoint | `readActualSpeedRaw(0x005F)` distinctly named, never converts to rad/s | Register address **UNVERIFIED**, must cross-check against the manual and bench-test |
+| Actual speed read from a measurement register, never the setpoint | `readActualSpeedRaw(0x005F)` distinctly named, never converts to rad/s; diagnostics probe selector 8 | Actual speed register manual-cited, bench check pending |
 | One USB-to-RS485 adapter for all four drives | One driver/context in hardware and diagnostics; YAML/xacro use one serial device and baud rate; unique IDs 1–4 | Mock verifies four-address traffic through one context; physical adapter test pending |
 | Copilot: failed deactivation | On failure, leaves `active_` unchanged | Static inspection; controller_manager reaction unknown |
 | Pluginlib discovery | plugin XML + CMake export | `check_drivetrain_plugin` discovered and loaded the plugin in the Jazzy development container |
@@ -47,7 +47,7 @@ This is a tracked artifact, **not** an acceptance certificate.
 - [ ] `pluginlib` resource discovery by `rover_drivetrain_control/RoverHardwareInterface`
 - [ ] Jazzy `is_async` and `rw_rate` scheduler behavior, actual update/worker timing
 - [ ] Confirm `pkg-config` and libmodbus ROS dependency keys via `rosdep`
-- [ ] Wire-protocol: manual page + bench observation for every register
+- [ ] Wire-protocol: bench observation for every register (manual pages now cited in [`BLD305S_REGISTERS.md`](BLD305S_REGISTERS.md))
 - [ ] Shared-bus transaction latency, 100,000-exchange loaded test, full four-drive cycle at 15 Hz / <=50% bus utilization; re-measure budgets after the single-adapter correction
 - [ ] Fault mapping and message contract signed by Forrest and GUI team
 - [ ] Independent physical enable-line watchdog agreed and tested

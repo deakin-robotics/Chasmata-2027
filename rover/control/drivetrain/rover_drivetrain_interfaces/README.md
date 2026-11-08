@@ -28,8 +28,9 @@ tool write to a drive outside `ros2_control`.
 ## Service
 
 - `ReadMotorDiagnostic.srv`: opt-in, read-only raw register probe for workshop
-  bring-up (temperature, current, voltage). It never writes speed, direction or
-  control words. Set `bus` to `drivetrain` and `address` to the target slave ID
+  bring-up (temperature, current, voltage, drive address, baud code, fault code,
+  running status, actual speed). Every selector is a function code 03 read and
+  returns the raw value only. It never writes speed, direction or control words. Set `bus` to `drivetrain` and `address` to the target slave ID
   (1–4). All drives share one USB-to-RS485 adapter; `WheelTelemetry.bus` uses
   the same `drivetrain` value. The old `left`/`right` bus names are no longer valid.
 

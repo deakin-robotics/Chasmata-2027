@@ -1,9 +1,14 @@
-# Read-only raw Modbus probing for workshop bring-up.
+# Read-only raw Modbus probing for workshop bring-up. Function code 03 only.
+# Register meanings: rover_drivetrain_control/docs/BLD305S_REGISTERS.md
+# (manual-cited, not bench-verified). Any other selector is rejected unsent.
 string bus                # must be "drivetrain" (one shared RS485 adapter)
 uint8 address
-uint8 register_selector    # 1 temp (0x0096), 2 current (0x00B6), 3 voltage (0x00C6)
+uint8 register_selector    # 1 temp (0x0096), 2 current (0x00B6), 3 voltage (0x00C6),
+                           # 4 drive address (0x00A6), 5 baud code (0x00F6),
+                           # 6 fault code (0x0076), 7 running status (0x0066),
+                           # 8 actual speed (0x005F)
 ---
 bool success
-uint16 raw_value
+uint16 raw_value           # raw register value; never unit-converted
 uint8 result_code
-string detail
+string detail              # human-readable note; may name the manual meaning of raw_value

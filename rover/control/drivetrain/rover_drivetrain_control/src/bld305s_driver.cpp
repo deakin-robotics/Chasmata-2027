@@ -126,8 +126,26 @@ Bld305sDriver::Result Bld305sDriver::writeControlRaw(
 Bld305sDriver::Result Bld305sDriver::readActualSpeedRaw(
   std::uint8_t slave_id, std::uint16_t & raw_speed)
 {
-  // UNVERIFIED — 0x005F is an actual-speed candidate, NOT validated on hardware.
+  // Manual-cited, bench check pending — NOT validated on hardware.
   return readHoldingRegister(slave_id, ACTUAL_SPEED_REGISTER, raw_speed);
+}
+
+Bld305sDriver::Result Bld305sDriver::readRunningStatusRaw(
+  std::uint8_t slave_id, std::uint16_t & raw_status)
+{
+  return readHoldingRegister(slave_id, RUNNING_STATUS_REGISTER, raw_status);
+}
+
+Bld305sDriver::Result Bld305sDriver::readDriveAddressRaw(
+  std::uint8_t slave_id, std::uint16_t & raw_address)
+{
+  return readHoldingRegister(slave_id, DRIVE_ADDRESS_REGISTER, raw_address);
+}
+
+Bld305sDriver::Result Bld305sDriver::readBaudCodeRaw(
+  std::uint8_t slave_id, std::uint16_t & raw_baud_code)
+{
+  return readHoldingRegister(slave_id, BAUD_CODE_REGISTER, raw_baud_code);
 }
 
 Bld305sDriver::Result Bld305sDriver::readTemperatureRaw(
@@ -158,13 +176,8 @@ Bld305sDriver::Result Bld305sDriver::readFaultRaw(
   std::uint8_t slave_id,
   std::uint16_t & raw_fault)
 {
-  (void)raw_fault;
-
-  if (!isValidSlaveId(slave_id)) {
-    return {ErrorCode::INVALID_SLAVE_ID, 0, 0};
-  }
-
-  return {ErrorCode::UNSUPPORTED, 0, 0};
+  // Manual-cited, bench check pending. Writing 0x0076 clears faults; never done here.
+  return readHoldingRegister(slave_id, FAULT_REGISTER, raw_fault);
 }
 
 Bld305sDriver::CommunicationState Bld305sDriver::communicationState(
@@ -457,8 +470,8 @@ Bld305sDriver::Result Bld305sDriver::endCycle()
   }
   // Minimum mandatory cycle: speed setpoint, actual-speed read, fault read.
   // Diagnostics are additional rotating reads and do not relax these.
-  // KNOWN PROBLEM: readFaultRaw() returns UNSUPPORTED (fault register unknown),
-  // so no real cycle can reach this count yet. Only the mock does, via diagnostic reads.
+  // readFaultRaw() now reads 0x0076 (manual-cited, bench check pending), but no
+  // live worker issues these exchanges yet. Only the mock reaches this count.
   constexpr std::uint8_t MANDATORY_EXCHANGES_PER_CYCLE = 3;
   for (auto id : cycle_slaves_) {
     auto & state = slave_states_[id];

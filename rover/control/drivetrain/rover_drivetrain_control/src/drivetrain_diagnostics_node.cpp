@@ -1,4 +1,5 @@
 #include "rover_drivetrain_control/bld305s_driver.hpp"
+#include "rover_drivetrain_control/diagnostic_probe.hpp"
 #include "rover_drivetrain_interfaces/msg/drivetrain_telemetry.hpp"
 #include "rover_drivetrain_interfaces/msg/wheel_telemetry.hpp"
 #include "rover_drivetrain_interfaces/srv/read_motor_diagnostic.hpp"
@@ -57,25 +58,20 @@ public:
           response->detail = "Expected bus 'drivetrain', slave ID 1..4, and an open serial connection";
           return;
         }
-        std::uint16_t value = 0;
-        dcr::Bld305sDriver::Result result{};
-        switch (request->register_selector) {
-          case 1: result = driver->readTemperatureRaw(request->address, value); break;
-          case 2: result = driver->readCurrentRaw(request->address, value); break;
-          case 3: result = driver->readVoltageRaw(request->address, value); break;
-          default:
-            response->result_code = 2;
-            response->detail = "Only selectors 1=temp, 2=current, 3=voltage are permitted";
-            return;
+        // Every selector is a function code 03 read; unknown selectors send nothing.
+        const auto read = dcr::diagnostics::readProbe(
+          *driver, request->address, request->register_selector);
+        if (!read) {
+          response->result_code = 2;
+          response->detail = "Only read-only selectors 1..8 are permitted";
+          return;
         }
-        response->success = result.ok();
-        response->raw_value = result.ok() ? value : 0;
-        response->result_code = result.ok() ? 0 : 3;
-        response->detail = result.ok() ?
-          "Raw register read ACK (units/scaling and bench verification pending)" :
-          "Modbus read failed; inspect transport and configuration";
-        recordProbe(request->bus, request->address, request->register_selector, result, value,
-          response->detail);
+        response->success = read->result.ok();
+        response->raw_value = read->raw_value;
+        response->result_code = read->result.ok() ? 0 : 3;
+        response->detail = read->detail;
+        recordProbe(request->bus, request->address, request->register_selector, read->result,
+          read->raw_value, response->detail);
       });
 
     if (enable_readonly_) {
@@ -143,7 +139,12 @@ private:
       case 1: wheel.raw_temperature_valid = ok; wheel.raw_temperature = ok ? value : 0; break;
       case 2: wheel.raw_current_valid = ok; wheel.raw_current = ok ? value : 0; break;
       case 3: wheel.raw_voltage_valid = ok; wheel.raw_voltage = ok ? value : 0; break;
-      default: break;
+      case 6: wheel.raw_fault_valid = ok; wheel.raw_fault = ok ? value : 0; break;
+      case 8:
+        wheel.measured_raw_speed_valid = ok;
+        wheel.measured_raw_speed = ok ? value : 0;
+        break;
+      default: break;  // 4, 5, 7: no telemetry field; reported in detail only
     }
     wheel.last_read_result = readResultFor(result);
     if (!ok) {

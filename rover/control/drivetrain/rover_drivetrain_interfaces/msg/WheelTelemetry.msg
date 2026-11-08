@@ -42,8 +42,8 @@ bool measured_speed_valid      # false until register and scaling are verified
 float64 measured_speed_rad_s   # meaningless unless measured_speed_valid; publishers set NaN
 uint8 measured_direction       # DIRECTION_*; UNKNOWN unless measured
 bool measured_raw_speed_valid  # true only when the raw read below was acknowledged
-uint16 measured_raw_speed      # raw actual-speed register (0x005F, provisional)
-bool raw_fault_valid           # fault register is unknown today; stays false
+uint16 measured_raw_speed      # raw actual-speed register (0x005F, manual-cited, bench check pending)
+bool raw_fault_valid           # true only when a fault read (0x0076) was acknowledged
 uint16 raw_fault
 bool raw_temperature_valid     # raw register counts, not SI units
 uint16 raw_temperature
