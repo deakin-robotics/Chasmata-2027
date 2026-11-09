@@ -329,6 +329,36 @@ CallbackReturn RoverHardwareInterface::benchActivate()
     bench_stop_latched_ = true;
     return CallbackReturn::ERROR;
   }
+
+  // Status 0 is not standstill: after a deactivate and reactivate a motor can
+  // still be coasting, and activation forgets each drive's last direction, so
+  // the reversal hold cannot catch it. Every drive's 0x005F must read near zero
+  // before anything can move; a failed read counts as not confirmed.
+  {
+    const std::int64_t deadline = steadyNowNs() +
+      static_cast<std::int64_t>(bench_stop_deadline_ms_ * 1e6);
+    std::string still_turning;
+    do {
+      still_turning.clear();
+      for (const auto & wheel : wheels_) {
+        std::uint16_t raw = 0;
+        const bool ok = static_cast<bool>(driver_->readActualSpeedRaw(wheel.slave_id, raw));
+        if (!ok || raw > core::BENCH_NEAR_ZERO_MOTOR_RPM) {
+          still_turning += " " + wheel.joint_name + "(ID " + std::to_string(wheel.slave_id) +
+            ") " + (ok ? std::to_string(raw) : std::string("n/a"));
+        }
+      }
+    } while (!still_turning.empty() && steadyNowNs() < deadline);
+    if (!still_turning.empty()) {
+      RCLCPP_ERROR(logger(), "Bench activation refused: the stop was accepted, but not every "
+        "drive read 0x005F at or below %u motor RPM within %.0f ms; a motor may still be "
+        "turning. 0x005F raw motor RPM:%s. Nothing else was written.",
+        static_cast<unsigned>(core::BENCH_NEAR_ZERO_MOTOR_RPM), bench_stop_deadline_ms_,
+        still_turning.c_str());
+      bench_stop_latched_ = true;
+      return CallbackReturn::ERROR;
+    }
+  }
   bench_stop_latched_ = false;
 
   // Per drive: internal mode and pole pairs (never saved), read both back,

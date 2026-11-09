@@ -112,7 +112,7 @@ Wheel geometry in `config/drivetrain_controllers.yaml` and `urdf/drivetrain.urdf
 Every run:
 
 - **Wheels off the ground.** Never run bench mode with the rover on the ground.
-- **One controller first.** Connect and prove a single drive before adding the others.
+- **One wheel at a time.** All four controllers stay powered and on the bus at IDs 1–4 (configure needs all four to answer). Spin one wheel at a time in per-wheel mode, with the other three at 0.
 - **Low cap.** Start `bench_rpm_cap` well below the 500 RPM ceiling, for example 100.
 - **Someone holds a power cutoff on the motor controllers' supply** for the whole run. That cutoff is the hardware stop.
 - **Never unattended.**
@@ -139,7 +139,7 @@ Copy `config/drivetrain_hardware.example.yaml` and set `bench_motion_enabled: tr
 ### What bench mode does
 
 - **Configure** opens the bus and, for each wheel, reads the drive address `0x00A6` (must equal the configured ID) and the fault code `0x0076` (must be 0). A failed, mismatched or garbled reply refuses, and the log names the wheel and the reason. Nothing is written. Several drives sharing one address show up as a garbled reply, or, with exactly four drives, as an ID that does not answer.
-- **Activate** first broadcasts stop and requires every drive to accept it (status `0`), before any per-drive write. Then, for each drive, it writes `0x0136=1` (internal mode) and `0x0116=pole_pairs` and reads both back; writes speed `0x0056=0`; writes stop (`0x0066=0`) and requires running status `0`. A successful write means libmodbus checked the drive's echo of the address and value. The manual documents no read-back for `0x0056`, so the echo is its only confirmation. The manual also lists `0x0136` for writes only: if its read-back returns Modbus exception 2 (illegal data address), the write echo is accepted and a warning is logged. Any other read-back failure refuses. None of these is saved, so power-cycling a drive restores its stored values. If any drive fails, activation refuses and all four are stopped.
+- **Activate** first broadcasts stop and requires every drive to accept it (status `0`), before any per-drive write. It then polls actual speed `0x005F` until every drive reads at or below 5 motor RPM, and refuses if that has not happened within `bench_stop_deadline_ms` (a failed read counts as not stopped). A motor still coasting from before a deactivation therefore cannot be restarted, even though activation forgets its last direction. Then, for each drive, it writes `0x0136=1` (internal mode) and `0x0116=pole_pairs` and reads both back; writes speed `0x0056=0`; writes stop (`0x0066=0`) and requires running status `0`. A successful write means libmodbus checked the drive's echo of the address and value. The manual documents no read-back for `0x0056`, so the echo is its only confirmation. The manual also lists `0x0136` for writes only: if its read-back returns Modbus exception 2 (illegal data address), the write echo is accepted and a warning is logged. Any other read-back failure refuses. None of these is saved, so power-cycling a drive restores its stored values. If any drive fails, activation refuses and all four are stopped.
 - **write()** converts each wheel command: motor RPM = |ω| × 60/(2π) × `gear_ratio`, clamped to the lower of `bench_rpm_cap` and `motor_rpm_limit`. Direction comes from the sign, with `mirrored` applied. Anything below 1 motor RPM is a stop: raw `0x0056` is whole RPM, so this is slightly wider than rounding alone. At most one write per drive per cycle:
   - a stop always goes first;
   - from stop, speed (`0x0056`) is written first, unless a nonzero speed within the cap is already acknowledged; then direction (`0x0066`) goes next, even if the target RPM has changed since, so a command that changes every cycle cannot stop the drive from starting;
@@ -153,37 +153,45 @@ Copy `config/drivetrain_hardware.example.yaml` and set `bench_motion_enabled: tr
 
 ### Bench test step: what a stop really does
 
-Do this on the day, before anything else, with **one drive connected**, wheels off the ground and the power cutoff held. It shows how long the motor takes to reach zero after its status says `0`.
+Do this on the day, before anything else. It shows how long a motor takes to reach zero after a stop, and whether status `0` means "stopped" or only "accepted".
 
-1. Activate bench mode with that one drive, then spin it slowly through the per-wheel path. The relay needs at least 10 messages a second, or it sends zeros. Only the first value matters with one drive:
+**Setup.** All four controllers are powered and on the bus at IDs 1–4: configure needs all four to answer, so you cannot test with one drive alone. All four wheels are off the ground, and someone holds the power cutoff. Test **one wheel at a time**, with the other three commanded to 0.
+
+1. Activate bench mode, then switch to per-wheel mode. `wheel_velocity_controller` starts inactive, and only one drive controller can be active at a time:
+
+   ```bash
+   ros2 control switch_controllers -c /drivetrain/controller_manager \
+     --deactivate diff_drive_controller --activate wheel_velocity_controller
+   ```
+
+2. Spin one wheel slowly through the direct-drive relay. The order is `[front_left, rear_left, front_right, rear_right]` in rad/s. The relay needs at least 10 messages a second, or it sends zeros. To test front-left:
 
    ```bash
    ros2 topic pub -r 20 /drivetrain/direct/wheel_speeds std_msgs/msg/Float64MultiArray \
      "{data: [0.2, 0.0, 0.0, 0.0]}"
    ```
 
-2. In a second terminal, log actual speed (`0x005F`, converted to rad/s and refreshed once a second at 2 Hz) with timestamps:
+3. In a second terminal, log actual speed (`0x005F`, converted to rad/s and refreshed once a second at 2 Hz) with timestamps, and keep the plugin's log visible:
 
    ```bash
    ros2 topic echo /drivetrain/joint_states | ts '%H:%M:%.S' | tee speed_log.txt
    ```
 
-3. Stop it: press Ctrl-C on the `ros2 topic pub`, and note the time. The relay then sends zeros, and the plugin writes `0x0066=0`.
-4. Deactivate the hardware **straight away**, while the motor may still be turning. Look for the WARN log line containing `stop accepted (status 0)`: it means every drive reported `0x0066 = 0`, and the same line ends with `0x005F raw motor RPM just after:` and each drive's raw speed, read once right after the stop was accepted (`n/a` if that read failed; the result is unchanged). **A nonzero value there means status 0 was only "accepted": the motor was still turning.** Keep logging step 2 until the velocity reads 0.
-5. To log both registers over time with the motor at rest, release the bus (`ros2 control set_hardware_component_state DCRDrivetrain unconfigured -c /drivetrain/controller_manager`). Then start the diagnostics node with probing enabled on the same adapter (see "Read-only diagnostics" above), and run the probe for selectors 7 (`0x0066`) and 8 (`0x005F`) every half second for 10 s:
+4. Command zero and note the time, **keeping the hardware active**. Stop the publisher in step 2 and publish zeros instead (in diff-drive mode, release the stick):
 
    ```bash
-   for i in $(seq 20); do
-     for s in 7 8; do
-       ros2 service call /drivetrain_diagnostics/read_motor_diagnostic \
-         rover_drivetrain_interfaces/srv/ReadMotorDiagnostic \
-         "{bus: drivetrain, address: 1, register_selector: $s}" | grep -o 'raw_value=[0-9]*'
-     done
-     sleep 0.5
-   done | ts '%H:%M:%.S' | tee status_log.txt
+   ros2 topic pub -r 20 /drivetrain/direct/wheel_speeds std_msgs/msg/Float64MultiArray \
+     "{data: [0.0, 0.0, 0.0, 0.0]}"
    ```
 
-Record the time from step 3 to a zero velocity. The plugin reads `0x0066` only when it checks a stop, not during the run-down, so step 2 is where the run-down shows. `ts` comes from the `moreutils` package.
+   The plugin writes `0x0066=0` to that drive; a commanded zero produces no log line. **Do not deactivate yet:** while active, the plugin keeps reading `0x005F`, so step 3 shows the run-down. After deactivation it stops reading, and `joint_states` would freeze at its last value.
+5. Watch step 3 until that wheel's velocity reads 0. The time from step 4 to that point is the run-down.
+6. Only then deactivate the hardware. Look for the WARN log line containing `stop accepted (status 0)`: every drive reported `0x0066 = 0`, and the line ends with `0x005F raw motor RPM just after:` and each drive's raw speed (`n/a` if that read failed; the result is unchanged). After a full run-down these should be 0. **A nonzero value there means status 0 was only "accepted": that motor was still turning.**
+7. Repeat steps 2–6 for each of the other three wheels.
+
+Activation also refuses until every drive's `0x005F` reads at or below 5 motor RPM. If you reactivate too soon after a run, wait and try again.
+
+`ts` comes from the `moreutils` package.
 
 ### Bench rate: timing at 9600 baud
 

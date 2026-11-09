@@ -609,8 +609,8 @@ bool diffDriveWouldRefuse(const ActiveBench & bench)
 void testFailedSpeedPollsStopAll()
 {
   resetDrives();
-  drives[3].regs[0x005F] = 300;  // 300 motor RPM -> 0.628 rad/s at the wheel
   ActiveBench bench;
+  drives[3].regs[0x005F] = 300;  // 300 motor RPM -> 0.628 rad/s at the wheel
   startMoving(bench);  // cycle 0 read 0x005F, cycle 1 read 0x0076
   const double last_good = bench.velocity(2);
   CHECK(std::isfinite(last_good) && last_good != 0.0);
@@ -633,8 +633,8 @@ void testFailedSpeedPollsStopAll()
 void testOneFailedSpeedPollRecovers()
 {
   resetDrives();
-  drives[3].regs[0x005F] = 300;
   ActiveBench bench;
+  drives[3].regs[0x005F] = 300;
   startMoving(bench);
   const double last_good = bench.velocity(2);
   drives[3].read_errno[0x005F] = ETIMEDOUT;
@@ -656,8 +656,8 @@ void testOneFailedSpeedPollRecovers()
 void testSpeedFreshnessResetsOnActivation()
 {
   resetDrives();
-  drives[3].regs[0x005F] = 300;
   ActiveBench bench;
+  drives[3].regs[0x005F] = 300;
   for (std::size_t w = 0; w < 4; ++w) CHECK(bench.velocity(w) == 0.0);  // first activation
   startMoving(bench);
   CHECK(bench.velocity(2) != 0.0);
@@ -666,6 +666,7 @@ void testSpeedFreshnessResetsOnActivation()
   drives[3].read_errno.clear();
   CHECK(cycle(*bench.hw) == ReturnType::OK);  // fault read
   CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
+  drives[3].regs[0x005F] = 0;  // run down, so reactivation's standstill check passes
   CHECK(bench.hw->on_activate(lifecycle_state) == CallbackReturn::SUCCESS);
   broadcasts = 0;
   // Activation just confirmed all four stopped: export 0, not a pre-activation value.
@@ -682,8 +683,8 @@ void testSpeedFreshnessResetsOnActivation()
 void testDiffDriveNeverSeesNaN()
 {
   resetDrives();
-  for (int id = 1; id <= 4; ++id) drives[id].regs[0x005F] = static_cast<std::uint16_t>(100 * id);
   ActiveBench bench;
+  for (int id = 1; id <= 4; ++id) drives[id].regs[0x005F] = static_cast<std::uint16_t>(100 * id);
   CHECK(!diffDriveWouldRefuse(bench));  // straight after activation, before any read
   startMoving(bench);
   CHECK(!diffDriveWouldRefuse(bench));
@@ -952,6 +953,40 @@ void testStopAcceptedLogsActualSpeed()
   drives[3].read_errno.clear();
 }
 
+void testReactivationWaitsForStandstill()
+{
+  // Deactivate while a motor coasts, then reactivate. Activation forgets the
+  // last direction, so the reversal hold cannot help; activation itself must
+  // refuse until every drive's 0x005F reads near zero.
+  resetDrives();
+  ActiveBench bench;
+  bench.command(0, radSFor(240.0));
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // speed
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // forward
+  CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);  // status 0 accepted
+  drives[1].regs[0x005F] = 240;  // ...but still coasting
+  writes.clear();
+  CHECK(bench.hw->on_activate(lifecycle_state) == CallbackReturn::ERROR);
+  for (const auto & w : writes) CHECK(w.slave == 0);  // only the initial broadcast stop
+  CHECK(bench.hw->write(t0, dt) == ReturnType::ERROR);  // nothing can move
+  // A failed 0x005F read is not standstill either.
+  drives[1].regs[0x005F] = 0;
+  drives[1].read_errno[0x005F] = ETIMEDOUT;
+  CHECK(bench.hw->on_activate(lifecycle_state) == CallbackReturn::ERROR);
+  drives[1].read_errno.clear();
+  // Just above near zero still refuses; at or below 5 RPM it activates.
+  drives[1].regs[0x005F] = 6;
+  CHECK(bench.hw->on_activate(lifecycle_state) == CallbackReturn::ERROR);
+  drives[1].regs[0x005F] = 0;
+  CHECK(bench.hw->on_activate(lifecycle_state) == CallbackReturn::SUCCESS);
+  // Motion works again from here.
+  bench.command(0, -radSFor(240.0));
+  CHECK(cycle(*bench.hw) == ReturnType::OK);
+  CHECK(cycle(*bench.hw) == ReturnType::OK);
+  CHECK(drives[1].regs[0x0066] == 2);
+  CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
+}
+
 }  // namespace
 
 int main(int argc, char ** argv)
@@ -987,6 +1022,7 @@ int main(int argc, char ** argv)
   testRepeatedOnErrorReturnsFailure();
   testReadWhileInactiveIsOkAndSilent();
   testStopAcceptedLogsActualSpeed();
+  testReactivationWaitsForStandstill();
 
   // Nothing, in any test, ever wrote the baud, address or save register.
   for (const auto & w : all_writes) {
