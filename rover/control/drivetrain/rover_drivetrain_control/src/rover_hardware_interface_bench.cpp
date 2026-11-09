@@ -160,6 +160,20 @@ std::string RoverHardwareInterface::drivesNotStopped()
   return not_stopped;
 }
 
+std::string RoverHardwareInterface::actualSpeedsForLog()
+{
+  // Shows whether status 0 meant "stopped" or only "accepted": a nonzero
+  // value here is a motor still turning after the drive accepted the stop.
+  std::string speeds;
+  for (std::size_t w = 0; w < WHEEL_COUNT; ++w) {
+    std::uint16_t raw = 0;
+    const bool ok = static_cast<bool>(driver_->readActualSpeedRaw(wheels_[w].slave_id, raw));
+    speeds += " " + wheels_[w].joint_name + "(ID " + std::to_string(wheels_[w].slave_id) +
+      ") " + (ok ? std::to_string(raw) : std::string("n/a"));
+  }
+  return speeds;
+}
+
 void RoverHardwareInterface::markStopAccepted(std::size_t wheel) noexcept
 {
   core::recordBenchWrite(bench_output_[wheel], {core::BenchRegister::CONTROL, 0}, true,
@@ -196,8 +210,10 @@ bool RoverHardwareInterface::stopAllAndConfirm(const std::string & reason)
     if (not_stopped.empty()) {
       for (std::size_t w = 0; w < WHEEL_COUNT; ++w) markStopAccepted(w);
       bench_stop_unconfirmed_ = false;
+      const std::string speeds = actualSpeedsForLog();  // after the result is settled
       RCLCPP_WARN(logger(), "STOP (%s): stop accepted (status 0) by all four drives after "
-        "%u broadcast(s).", reason.c_str(), attempts);
+        "%u broadcast(s); 0x005F raw motor RPM just after:%s", reason.c_str(), attempts,
+        speeds.c_str());
       return true;
     }
   } while (steadyNowNs() < deadline);
@@ -228,8 +244,10 @@ bool RoverHardwareInterface::keepBroadcastingStop(const std::string & reason)
     if (not_stopped.empty()) {
       for (std::size_t w = 0; w < WHEEL_COUNT; ++w) markStopAccepted(w);
       bench_stop_unconfirmed_ = false;
+      const std::string speeds = actualSpeedsForLog();
       RCLCPP_WARN(logger(), "STOP (%s): stop accepted (status 0) by all four drives after %u "
-        "further broadcast(s).", reason.c_str(), attempts);
+        "further broadcast(s); 0x005F raw motor RPM just after:%s", reason.c_str(), attempts,
+        speeds.c_str());
       return true;
     }
     RCLCPP_ERROR(logger(), "STOP (%s) still NOT ACCEPTED, broadcast %u of a %.0f s window:%s. "

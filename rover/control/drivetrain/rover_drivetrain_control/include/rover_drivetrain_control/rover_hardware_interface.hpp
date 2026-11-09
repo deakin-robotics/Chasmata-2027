@@ -115,6 +115,9 @@ private:
   [[nodiscard]] bool keepBroadcastingStop(const std::string & reason);
   // Drives whose running status is not 0 (or did not answer); empty if none.
   [[nodiscard]] std::string drivesNotStopped();
+  // One 0x005F read per drive, for the "stop accepted" log only: raw values,
+  // "n/a" for a failed read. Changes no state and never the stop result.
+  [[nodiscard]] std::string actualSpeedsForLog();
   void markStopAccepted(std::size_t wheel) noexcept;
   void endOpenCycle() noexcept;
 

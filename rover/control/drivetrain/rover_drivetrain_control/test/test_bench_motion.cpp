@@ -5,9 +5,12 @@
 
 #include <modbus/modbus.h>
 #include <rclcpp/rclcpp.hpp>
+#include <rcutils/logging.h>
 
 #include <array>
 #include <cerrno>
+#include <cstdarg>
+#include <cstdio>
 #include <cmath>
 #include <chrono>
 #include <thread>
@@ -903,6 +906,52 @@ void testReadWhileInactiveIsOkAndSilent()
   CHECK(bus_calls == calls);
 }
 
+// Captures formatted log lines, then passes them on to the normal handler.
+std::vector<std::string> captured_logs;
+rcutils_logging_output_handler_t previous_log_handler = nullptr;
+
+void captureLog(
+  const rcutils_log_location_t * location, int severity, const char * name,
+  rcutils_time_point_value_t timestamp, const char * format, va_list * args)
+{
+  va_list copy;
+  va_copy(copy, *args);
+  char buffer[2048];
+  std::vsnprintf(buffer, sizeof(buffer), format, copy);
+  va_end(copy);
+  captured_logs.emplace_back(buffer);
+  if (previous_log_handler) previous_log_handler(location, severity, name, timestamp, format, args);
+}
+
+void testStopAcceptedLogsActualSpeed()
+{
+  resetDrives();
+  ActiveBench bench;
+  startMoving(bench);
+  drives[1].regs[0x005F] = 0;
+  drives[2].regs[0x005F] = 37;               // status 0, but still turning
+  drives[3].read_errno[0x005F] = ETIMEDOUT;  // read fails: logged as n/a
+  drives[4].regs[0x005F] = 2;
+  previous_log_handler = rcutils_logging_get_output_handler();
+  captured_logs.clear();
+  rcutils_logging_set_output_handler(captureLog);
+  const auto result = bench.hw->on_deactivate(lifecycle_state);
+  rcutils_logging_set_output_handler(previous_log_handler);
+  // The failed speed read does not change the result.
+  CHECK(result == CallbackReturn::SUCCESS);
+  CHECK(allStopped());
+  const std::string expected = "0x005F raw motor RPM just after: front_left_wheel_joint(ID 1) 0 "
+    "rear_left_wheel_joint(ID 2) 37 front_right_wheel_joint(ID 3) n/a "
+    "rear_right_wheel_joint(ID 4) 2";
+  bool found = false;
+  for (const auto & line : captured_logs) {
+    found |= line.find("stop accepted (status 0)") != std::string::npos &&
+      line.find(expected) != std::string::npos;
+  }
+  CHECK(found);
+  drives[3].read_errno.clear();
+}
+
 }  // namespace
 
 int main(int argc, char ** argv)
@@ -937,6 +986,7 @@ int main(int argc, char ** argv)
   testReversalFallbackWhenSpeedUnavailable();
   testRepeatedOnErrorReturnsFailure();
   testReadWhileInactiveIsOkAndSilent();
+  testStopAcceptedLogsActualSpeed();
 
   // Nothing, in any test, ever wrote the baud, address or save register.
   for (const auto & w : all_writes) {
