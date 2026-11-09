@@ -12,12 +12,14 @@
 #include <rclcpp/rclcpp.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <limits>
 #include <mutex>
 #include <stdexcept>
 #include <string>
+#include <thread>
 
 namespace rover_drivetrain_control
 {
@@ -48,8 +50,8 @@ RoverHardwareInterface::~RoverHardwareInterface()
     return;
   }
   std::lock_guard<std::mutex> lock(bench_mutex_);
-  if (active_ && transport_open_) {
-    (void)stopAllAndConfirm("hardware interface destroyed while active");
+  if ((active_ || bench_stop_unconfirmed_) && transport_open_) {
+    (void)stopAllAndConfirm("hardware interface destroyed while active or with a stop unaccepted");
   }
 }
 
@@ -95,8 +97,10 @@ bool RoverHardwareInterface::parseBenchConfiguration()
       core::BENCH_MAX_RPM_CAP);
     return false;
   }
-  if (!std::isfinite(bench_stop_deadline_ms_) || bench_stop_deadline_ms_ <= 0.0) {
-    RCLCPP_ERROR(logger(), "bench_stop_deadline_ms must be positive.");
+  if (!std::isfinite(bench_stop_deadline_ms_) || bench_stop_deadline_ms_ <= 0.0 ||
+      bench_stop_deadline_ms_ > core::BENCH_MAX_STOP_DEADLINE_MS) {
+    RCLCPP_ERROR(logger(), "bench_stop_deadline_ms must be above 0 and at most %.0f ms: a stop "
+      "blocks the calling thread for up to this long.", core::BENCH_MAX_STOP_DEADLINE_MS);
     return false;
   }
 
@@ -141,15 +145,42 @@ void RoverHardwareInterface::endOpenCycle() noexcept
   bench_cycle_open_ = false;
 }
 
+std::string RoverHardwareInterface::drivesNotStopped()
+{
+  std::string not_stopped;
+  for (std::size_t w = 0; w < WHEEL_COUNT; ++w) {
+    std::uint16_t status = 0xFFFF;
+    const auto r = driver_->readRunningStatusRaw(wheels_[w].slave_id, status);
+    if (!r || status != 0) {
+      not_stopped += " " + wheels_[w].joint_name + "(ID " +
+        std::to_string(wheels_[w].slave_id) + (r ? ", status " + std::to_string(status) :
+        ", no valid reply") + ")";
+    }
+  }
+  return not_stopped;
+}
+
+void RoverHardwareInterface::markStopAccepted(std::size_t wheel) noexcept
+{
+  core::recordBenchWrite(bench_output_[wheel], {core::BenchRegister::CONTROL, 0}, true,
+    steadyNowNs());
+  bench_stop_cycle_[wheel] = bench_cycle_index_;
+  bench_speed_read_since_stop_[wheel] = false;
+  bench_near_zero_since_stop_[wheel] = false;
+}
+
 bool RoverHardwareInterface::stopAllAndConfirm(const std::string & reason)
 {
   if (!driver_ || !transport_open_) {
-    RCLCPP_ERROR(logger(), "STOP (%s): bus not open, cannot command or confirm a stop. "
+    RCLCPP_ERROR(logger(), "STOP (%s): bus not open, cannot command or check a stop. "
       "Use the power cutoff.", reason.c_str());
+    bench_stop_unconfirmed_ = true;
     return false;
   }
   endOpenCycle();
 
+  // Status 0 means the drive accepted the stop command. It is not proof the
+  // motor has run down; 0x005F shows that (see the README bench test step).
   const std::int64_t deadline = steadyNowNs() +
     static_cast<std::int64_t>(bench_stop_deadline_ms_ * 1e6);
   unsigned attempts = 0;
@@ -161,23 +192,12 @@ bool RoverHardwareInterface::stopAllAndConfirm(const std::string & reason)
       RCLCPP_ERROR(logger(), "STOP (%s): broadcast %u not sent (%s).", reason.c_str(), attempts,
         describe(broadcast).c_str());
     }
-    not_stopped.clear();
-    for (std::size_t w = 0; w < WHEEL_COUNT; ++w) {
-      std::uint16_t status = 0xFFFF;
-      const auto r = driver_->readRunningStatusRaw(wheels_[w].slave_id, status);
-      if (!r || status != 0) {
-        not_stopped += " " + wheels_[w].joint_name + "(ID " +
-          std::to_string(wheels_[w].slave_id) + (r ? ", status " + std::to_string(status) :
-          ", no valid reply") + ")";
-      }
-    }
+    not_stopped = drivesNotStopped();
     if (not_stopped.empty()) {
-      const auto now = steadyNowNs();
-      for (auto & out : bench_output_) {
-        core::recordBenchWrite(out, {core::BenchRegister::CONTROL, 0}, true, now);
-      }
-      RCLCPP_WARN(logger(), "STOP (%s): all four drives confirmed stopped after %u broadcast(s).",
-        reason.c_str(), attempts);
+      for (std::size_t w = 0; w < WHEEL_COUNT; ++w) markStopAccepted(w);
+      bench_stop_unconfirmed_ = false;
+      RCLCPP_WARN(logger(), "STOP (%s): stop accepted (status 0) by all four drives after "
+        "%u broadcast(s).", reason.c_str(), attempts);
       return true;
     }
   } while (steadyNowNs() < deadline);
@@ -185,9 +205,38 @@ bool RoverHardwareInterface::stopAllAndConfirm(const std::string & reason)
   for (auto & out : bench_output_) {
     out.direction_known = false;  // the next stop always re-sends
   }
-  RCLCPP_ERROR(logger(), "STOP (%s) NOT CONFIRMED within %.0f ms after %u broadcast(s):%s. "
+  bench_stop_unconfirmed_ = true;
+  RCLCPP_ERROR(logger(), "STOP (%s) NOT ACCEPTED within %.0f ms after %u broadcast(s):%s. "
     "Use the power cutoff now.", reason.c_str(), bench_stop_deadline_ms_, attempts,
     not_stopped.c_str());
+  return false;
+}
+
+bool RoverHardwareInterface::keepBroadcastingStop(const std::string & reason)
+{
+  if (!driver_ || !transport_open_) {
+    return false;
+  }
+  const std::int64_t end = steadyNowNs() +
+    static_cast<std::int64_t>(core::BENCH_UNCONFIRMED_STOP_WINDOW_MS * 1e6);
+  const auto pause = std::chrono::nanoseconds(static_cast<std::int64_t>(1e9 / timing_.update_hz));
+  unsigned attempts = 0;
+  while (steadyNowNs() < end) {
+    ++attempts;
+    (void)driver_->broadcastStop();
+    const std::string not_stopped = drivesNotStopped();
+    if (not_stopped.empty()) {
+      for (std::size_t w = 0; w < WHEEL_COUNT; ++w) markStopAccepted(w);
+      bench_stop_unconfirmed_ = false;
+      RCLCPP_WARN(logger(), "STOP (%s): stop accepted (status 0) by all four drives after %u "
+        "further broadcast(s).", reason.c_str(), attempts);
+      return true;
+    }
+    RCLCPP_ERROR(logger(), "STOP (%s) still NOT ACCEPTED, broadcast %u of a %.0f s window:%s. "
+      "Use the power cutoff.", reason.c_str(), attempts,
+      core::BENCH_UNCONFIRMED_STOP_WINDOW_MS / 1000.0, not_stopped.c_str());
+    std::this_thread::sleep_for(pause);
+  }
   return false;
 }
 
@@ -250,10 +299,19 @@ CallbackReturn RoverHardwareInterface::benchActivate()
     return CallbackReturn::ERROR;
   }
 
-  bench_stop_latched_ = false;
   bench_cycle_index_ = 0;
   bench_output_ = {};
-  bench_last_motion_direction_.fill(1);
+  bench_last_motion_direction_.fill(0);  // none yet: the first start is not a reversal
+
+  // Stop all four first, before any per-drive write, whatever state the
+  // drives were left in.
+  if (!stopAllAndConfirm("activation: stop before any per-drive write")) {
+    RCLCPP_ERROR(logger(), "Bench activation refused: not all four drives accepted the initial "
+      "stop. Nothing else was written.");
+    bench_stop_latched_ = true;
+    return CallbackReturn::ERROR;
+  }
+  bench_stop_latched_ = false;
 
   // Per drive: internal mode and pole pairs (never saved), read both back,
   // zero the speed setpoint, then stop and confirm the running status is 0.
@@ -313,9 +371,9 @@ CallbackReturn RoverHardwareInterface::benchActivate()
   }
 
   const auto now = steadyNowNs();
-  for (auto & out : bench_output_) {
-    core::recordBenchWrite(out, {core::BenchRegister::SPEED, 0}, true, now);
-    core::recordBenchWrite(out, {core::BenchRegister::CONTROL, 0}, true, now);
+  for (std::size_t w = 0; w < WHEEL_COUNT; ++w) {
+    core::recordBenchWrite(bench_output_[w], {core::BenchRegister::SPEED, 0}, true, now);
+    markStopAccepted(w);
   }
   // Configure confirmed fault 0 on every drive; freshness starts again from
   // here. Activation just confirmed all four stopped, so export 0, never a
@@ -347,9 +405,13 @@ CallbackReturn RoverHardwareInterface::benchDeactivate()
   }
   bench_stop_latched_ = true;  // no motion commands from here on
   if (!stopAllAndConfirm("deactivate")) {
-    RCLCPP_ERROR(logger(), "Deactivation refused: not all four drives confirmed stopped. "
-      "Active state unchanged; only stop commands will be sent.");
-    return CallbackReturn::ERROR;
+    // FAILURE keeps the framework's lifecycle state at active, matching active_.
+    RCLCPP_ERROR(logger(), "Deactivation failed: not all four drives accepted the stop "
+      "(status 0) within %.0f ms. The hardware stays active with motion latched off: read() and "
+      "write() send nothing more, so no further stop is sent until deactivation is retried or "
+      "on_error runs, which keeps broadcasting stop for %.0f s. Use the power cutoff.",
+      bench_stop_deadline_ms_, core::BENCH_UNCONFIRMED_STOP_WINDOW_MS / 1000.0);
+    return CallbackReturn::FAILURE;
   }
   active_ = false;
   return CallbackReturn::SUCCESS;
@@ -359,17 +421,25 @@ CallbackReturn RoverHardwareInterface::benchShutdown(bool from_error)
 {
   std::lock_guard<std::mutex> lock(bench_mutex_);
   bench_stop_latched_ = true;
-  bool stopped = true;
-  if (transport_open_) {
-    stopped = stopAllAndConfirm(from_error ? "error" : "shutdown");
-  }
   active_ = false;
   bench_configured_ = false;
-  closeDriver();
-  if (!stopped) {
-    return from_error ? CallbackReturn::FAILURE : CallbackReturn::ERROR;
+  const std::string reason = from_error ? "error" : "shutdown";
+  bool accepted = !bench_stop_unconfirmed_;
+  if (transport_open_) {
+    accepted = stopAllAndConfirm(reason);
+    if (!accepted && from_error) {
+      accepted = keepBroadcastingStop(reason);
+    }
   }
-  return CallbackReturn::SUCCESS;
+  if (!accepted && from_error) {
+    // Keep the bus open: a repeated on_error, a retry or the destructor can
+    // still broadcast stop. Every repeat returns FAILURE until a stop is accepted.
+    RCLCPP_ERROR(logger(), "on_error: stop still not accepted by all four drives; the bus "
+      "stays open. Use the power cutoff.");
+    return CallbackReturn::FAILURE;
+  }
+  closeDriver();
+  return accepted ? CallbackReturn::SUCCESS : CallbackReturn::ERROR;
 }
 
 ReturnType RoverHardwareInterface::benchSafetyStop(const std::string & reason)
@@ -383,11 +453,7 @@ ReturnType RoverHardwareInterface::benchRead()
 {
   std::lock_guard<std::mutex> lock(bench_mutex_);
   if (!active_) {
-    bool expected = false;
-    if (read_blocked_logged_.compare_exchange_strong(expected, true)) {
-      RCLCPP_ERROR(logger(), "read() called while bench motion is not active.");
-    }
-    return ReturnType::ERROR;
+    return ReturnType::OK;  // inactive: nothing to read, the bus is not touched
   }
   if (bench_stop_latched_) {
     return ReturnType::ERROR;
@@ -418,6 +484,12 @@ ReturnType RoverHardwareInterface::benchRead()
         raw_speed_state_valid_[w] = true;
         state_velocity_rad_s_[w] = core::benchWheelSpeedFromRaw(
           raw, wheel.gear_ratio, wheel.mirrored, bench_last_motion_direction_[w]);
+        // Reads run before this cycle's writes, so any read in a later cycle
+        // than the stop was taken after it.
+        if (bench_cycle_index_ > bench_stop_cycle_[w]) {
+          bench_speed_read_since_stop_[w] = true;
+          if (raw <= core::BENCH_NEAR_ZERO_MOTOR_RPM) bench_near_zero_since_stop_[w] = true;
+        }
       } else {
         // Keep exporting the last good value from the previous poll, never NaN
         // (see benchActivate). The next poll either refreshes it or, as a
@@ -488,25 +560,40 @@ ReturnType RoverHardwareInterface::benchWrite()
     const double cap = std::min(bench_rpm_cap_, wheel.motor_rpm_limit);
     const auto target = core::benchMotorCommand(
       command_velocity_rad_s_[w], wheel.gear_ratio, wheel.mirrored, cap);
+    core::BenchStartGate gate;
+    gate.last_motion_direction = bench_last_motion_direction_[w];
+    gate.reversal_clear = core::benchReversalClear(bench_near_zero_since_stop_[w],
+      bench_speed_read_since_stop_[w], bench_cycle_index_ - bench_stop_cycle_[w]);
     const auto planned = core::planBenchWrite(bench_output_[w], target, now,
-      bench_resend_after_ns_);
+      bench_resend_after_ns_, static_cast<std::uint16_t>(std::lround(cap)), gate);
     if (planned.reg == core::BenchRegister::NONE) {
       continue;
     }
+    const bool is_stop = planned.reg == core::BenchRegister::CONTROL && planned.value == 0;
+    // A re-sent stop must not restart the reversal hold; only a new stop does.
+    const bool was_stopped = bench_output_[w].direction_known && bench_output_[w].direction == 0;
     const auto r = planned.reg == core::BenchRegister::CONTROL ?
       driver_->writeControlRaw(wheel.slave_id, planned.value) :
       driver_->writeSpeedRaw(wheel.slave_id, planned.value);
+    const std::string who = wheel.joint_name + " (ID " + std::to_string(wheel.slave_id) + ")";
     if (r.code == Bld305sDriver::ErrorCode::SKIPPED_THIS_CYCLE) {
+      if (is_stop) {
+        // An earlier exchange with this drive failed this cycle, so its stop
+        // was not sent. Stopping the others alone would stop one side only.
+        return benchSafetyStop(who + " stop write skipped this cycle");
+      }
       continue;  // nothing sent; the state stays as it was
     }
     core::recordBenchWrite(bench_output_[w], planned, r.ok(), now);
     if (!r && planned.reg == core::BenchRegister::CONTROL) {
       // The drive may or may not have taken it. Re-syncing this drive alone
       // would stop one side only, so stop all four instead.
-      return benchSafetyStop(wheel.joint_name + " (ID " + std::to_string(wheel.slave_id) +
-        ") direction write failed (" + describe(r) + "); its state is unknown");
+      return benchSafetyStop(who + (is_stop ? " stop" : " direction") + " write failed (" +
+        describe(r) + "); its state is unknown");
     }
-    if (r && planned.reg == core::BenchRegister::CONTROL && planned.value != 0) {
+    if (r && is_stop) {
+      if (!was_stopped) markStopAccepted(w);
+    } else if (r && planned.reg == core::BenchRegister::CONTROL) {
       bench_last_motion_direction_[w] = static_cast<std::uint8_t>(planned.value);
     }
   }

@@ -86,12 +86,17 @@ int main()
   // Write planner: one write per cycle, stop first, speed before direction.
   const std::int64_t ms = 1000000;
   const std::int64_t resend = 500 * ms;  // 2 Hz: 1 s - one period
+  const std::uint16_t cap = 500;
   const BenchMotorCommand fwd{1, 300, false}, rev{2, 300, false}, stop{};
   BenchOutputState s;
+  BenchStartGate gate;  // like the hardware: last direction updated on acknowledged writes
   std::int64_t now = 1000 * ms;
   auto step = [&](const BenchMotorCommand & target) {
-      const auto w = planBenchWrite(s, target, now, resend);
+      const auto w = planBenchWrite(s, target, now, resend, cap, gate);
       if (w.reg != BenchRegister::NONE) recordBenchWrite(s, w, true, now);
+      if (w.reg == BenchRegister::CONTROL && w.value != 0) {
+        gate.last_motion_direction = static_cast<std::uint8_t>(w.value);
+      }
       return w;
     };
   auto w = step(fwd);  // unknown direction: stop first
@@ -111,13 +116,22 @@ int main()
   w = step({1, 200, false});
   CHECK(w.reg == BenchRegister::SPEED && w.value == 200);
   CHECK(step({1, 200, false}).reg == BenchRegister::NONE);
-  // Reversal: stop, speed, direction.
+  // Reversal: stop, then hold until the drive has run down, then direction.
+  // The acknowledged 200 RPM is nonzero and within the cap, so the direction
+  // goes straight after the hold; the new 300 RPM follows.
   w = step(rev);
   CHECK(w.reg == BenchRegister::CONTROL && w.value == 0);
-  w = step(rev);
-  CHECK(w.reg == BenchRegister::SPEED && w.value == 300);
+  gate.reversal_clear = false;
+  CHECK(step(rev).reg == BenchRegister::NONE);  // hold: still running down
+  CHECK(step(rev).reg == BenchRegister::NONE);
+  now += resend;
+  w = step(rev);  // still holding: only the stop is re-sent
+  CHECK(w.reg == BenchRegister::CONTROL && w.value == 0);
+  gate.reversal_clear = true;  // 0x005F read near zero after the stop
   w = step(rev);
   CHECK(w.reg == BenchRegister::CONTROL && w.value == 2);
+  w = step(rev);
+  CHECK(w.reg == BenchRegister::SPEED && w.value == 300);
   // Stop always wins, even with a speed change pending.
   w = step(stop);
   CHECK(w.reg == BenchRegister::CONTROL && w.value == 0);
@@ -127,8 +141,38 @@ int main()
   CHECK(w.reg == BenchRegister::CONTROL && w.value == 0);
   // A failed write makes the register unknown, so the next plan stops first.
   recordBenchWrite(s, {BenchRegister::CONTROL, 1}, false, now);
-  w = planBenchWrite(s, fwd, now, resend);
+  w = planBenchWrite(s, fwd, now, resend, cap, gate);
   CHECK(w.reg == BenchRegister::CONTROL && w.value == 0);
+
+  // Start starvation: from stop, a command whose RPM changes every cycle still
+  // starts once one nonzero speed within the cap is acknowledged.
+  {
+    BenchOutputState st;
+    recordBenchWrite(st, {BenchRegister::SPEED, 0}, true, now);   // activation zeroed it
+    recordBenchWrite(st, {BenchRegister::CONTROL, 0}, true, now);
+    const BenchStartGate first_start{};  // no motion since activation: not a reversal
+    w = planBenchWrite(st, {1, 100, false}, now, resend, cap, first_start);
+    CHECK(w.reg == BenchRegister::SPEED && w.value == 100);  // 0 is not a start speed
+    recordBenchWrite(st, w, true, now);
+    w = planBenchWrite(st, {1, 101, false}, now, resend, cap, first_start);  // target moved on
+    CHECK(w.reg == BenchRegister::CONTROL && w.value == 1);  // starts anyway
+    recordBenchWrite(st, w, true, now);
+    w = planBenchWrite(st, {1, 102, false}, now, resend, cap, first_start);
+    CHECK(w.reg == BenchRegister::SPEED && w.value == 102);  // then speed follows the target
+    // An acknowledged speed above the cap is never used to start.
+    BenchOutputState over;
+    recordBenchWrite(over, {BenchRegister::SPEED, 600}, true, now);
+    recordBenchWrite(over, {BenchRegister::CONTROL, 0}, true, now);
+    w = planBenchWrite(over, {1, 100, false}, now, resend, cap, first_start);
+    CHECK(w.reg == BenchRegister::SPEED && w.value == 100);
+  }
+
+  // Reversal clearance: near zero after the stop, or the fallback only while
+  // no speed read has succeeded since the stop.
+  CHECK(benchReversalClear(true, true, 0));
+  CHECK(!benchReversalClear(false, true, 100));  // speed readable but not near zero: wait
+  CHECK(!benchReversalClear(false, false, BENCH_REVERSAL_FALLBACK_CYCLES - 1));
+  CHECK(benchReversalClear(false, false, BENCH_REVERSAL_FALLBACK_CYCLES));
 
   // Fault-register freshness. The limit derives from the rate: 2.5 poll
   // intervals of 2 cycles, so 2.5 s at 2 Hz and 5 s at 1 Hz.

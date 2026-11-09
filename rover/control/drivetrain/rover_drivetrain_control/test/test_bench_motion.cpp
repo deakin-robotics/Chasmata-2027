@@ -55,6 +55,7 @@ std::array<Drive, 5> drives;  // index = slave ID 1..4
 std::vector<WriteRecord> writes;      // since the last resetDrives()
 std::vector<WriteRecord> all_writes;  // whole run, for the forbidden-register check
 unsigned broadcasts{0};
+unsigned bus_calls{0};  // every slave select, read and write
 
 void resetDrives()
 {
@@ -94,12 +95,14 @@ int modbus_set_slave(modbus_t * m, int slave)
 {
   CHECK(m == context && m->connected);
   CHECK(slave >= 0 && slave <= 4);
+  ++bus_calls;
   m->slave = slave;
   return 0;
 }
 int modbus_read_registers(modbus_t * m, int addr, int n, std::uint16_t * out)
 {
   CHECK(m == context && m->connected && n == 1);
+  ++bus_calls;
   CHECK(m->slave >= 1);  // never a read from the broadcast address
   Drive & d = drives[m->slave];
   if (!d.present) {errno = ETIMEDOUT; return -1;}
@@ -114,6 +117,7 @@ int modbus_read_registers(modbus_t * m, int addr, int n, std::uint16_t * out)
 int modbus_write_register(modbus_t * m, int addr, const std::uint16_t value)
 {
   CHECK(m == context && m->connected);
+  ++bus_calls;
   writes.push_back({m->slave, addr, value});
   all_writes.push_back({m->slave, addr, value});
   if (m->slave == 0) {
@@ -268,11 +272,18 @@ void testBenchParameterRefusals()
       {"baud_rate", "19200"},
       {"measured_worst_bus_cycle_ms", "100"},     // below the 187.5 ms wire floor
       {"measured_stop_wire_budget_ms", "100"},    // below the 153.6 ms stop floor
-      {"bench_stop_deadline_ms", "1000"}}) {      // < 110 + 2 x 500 + 200
+      {"bench_stop_deadline_ms", "1000"},         // < 110 + 2 x 500 + 200
+      {"bench_stop_deadline_ms", "5001"}}) {      // above the 5000 ms cap
     auto p = params(true);
     p.hardware_info.hardware_parameters[key] = value;
     Hardware hw;
     CHECK(hw.on_init(p) == CallbackReturn::ERROR);
+  }
+  {
+    auto p = params(true);
+    p.hardware_info.hardware_parameters["bench_stop_deadline_ms"] = "5000";  // the cap itself
+    Hardware hw;
+    CHECK(hw.on_init(p) == CallbackReturn::SUCCESS);
   }
 }
 
@@ -302,9 +313,12 @@ void testActivationSequence()
   CHECK(hw.on_configure(lifecycle_state) == CallbackReturn::SUCCESS);
   CHECK(writes.empty());  // configure only reads
   CHECK(hw.on_activate(lifecycle_state) == CallbackReturn::SUCCESS);
-  CHECK(writes.size() == 16);
+  CHECK(writes.size() == 17);
+  // First of all: a broadcast stop (address 0, 0x0066 = 0), before any per-drive write.
+  CHECK(writes[0].slave == 0 && writes[0].address == 0x0066 && writes[0].value == 0);
+  CHECK(broadcasts == 1);
   for (int id = 1; id <= 4; ++id) {
-    const auto base = static_cast<std::size_t>(id - 1) * 4;
+    const auto base = 1 + static_cast<std::size_t>(id - 1) * 4;
     CHECK(writes[base].slave == id && writes[base].address == 0x0136 && writes[base].value == 1);
     CHECK(writes[base + 1].address == 0x0116 && writes[base + 1].value == 4);
     CHECK(writes[base + 2].address == 0x0056 && writes[base + 2].value == 0);  // before stop
@@ -312,8 +326,26 @@ void testActivationSequence()
     CHECK(drives[id].regs[0x0116] == 4);
     CHECK(drives[id].regs[0x0056] == 0);  // stored 1500 RPM setpoint zeroed
   }
-  CHECK(broadcasts == 0);
   CHECK(hw.on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
+}
+
+void testActivationBroadcastsStopFirst()
+{
+  // A drive left running that will not accept the stop: activation refuses
+  // after the initial broadcast, with no per-drive write at all.
+  resetDrives();
+  drives[2].regs[0x0066] = 1;
+  drives[2].stuck_running = true;
+  {
+    Hardware hw;
+    CHECK(hw.on_init(params(true)) == CallbackReturn::SUCCESS);
+    CHECK(hw.on_configure(lifecycle_state) == CallbackReturn::SUCCESS);
+    CHECK(hw.on_activate(lifecycle_state) == CallbackReturn::ERROR);
+    CHECK(broadcasts >= 1);
+    for (const auto & w : writes) CHECK(w.slave == 0);  // broadcasts only
+    drives[2].stuck_running = false;  // let the destructor's stop be accepted
+  }
+  CHECK(allStopped());
 }
 
 void testPolePairsMismatchRefusesAndStopsAll()
@@ -409,14 +441,16 @@ void testMotionConversionAndChangeOnlyWrites()
   CHECK(cycle(*bench.hw) == ReturnType::OK);
   CHECK(writes.size() == 6);
 
-  // Reversal goes through stop: stop, then speed, then direction.
+  // Reversal goes through stop. The mock drive reports 0 RPM, so the first
+  // 0x005F read after the stop clears the hold; the direction goes at the
+  // acknowledged 300 RPM (within the cap), and the new 239 RPM follows.
   bench.command(0, -0.5);  // 238.7 RPM reverse
-  CHECK(cycle(*bench.hw) == ReturnType::OK);
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // cycle 3: stop
   CHECK(drives[1].regs[0x0066] == 0);
-  CHECK(cycle(*bench.hw) == ReturnType::OK);
-  CHECK(drives[1].regs[0x0056] == 239 && drives[1].regs[0x0066] == 0);
-  CHECK(cycle(*bench.hw) == ReturnType::OK);
-  CHECK(drives[1].regs[0x0066] == 2);
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // cycle 4: 0x005F reads 0, so direction
+  CHECK(drives[1].regs[0x0066] == 2 && drives[1].regs[0x0056] == 300);
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // cycle 5: new speed
+  CHECK(drives[1].regs[0x0056] == 239);
   CHECK(broadcasts == 0);
   CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
 }
@@ -702,7 +736,7 @@ void testDeactivateBroadcastsAndConfirms()
     ActiveBench bench;
     startMoving(bench);
     drives[2].stuck_running = true;
-    CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::ERROR);
+    CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::FAILURE);  // stays active
     CHECK(broadcasts >= 2);  // retried until the deadline
     CHECK(bench.hw->write(t0, dt) == ReturnType::ERROR);  // stop latched
     drives[2].stuck_running = false;
@@ -723,6 +757,150 @@ void testShutdownAndErrorStop()
     CHECK(broadcasts >= 1);
     CHECK(allStopped());
   }
+}
+
+// Wheel rad/s for a motor RPM at the 50:1 test gearbox (unmirrored wheel).
+double radSFor(double motor_rpm) {return motor_rpm / (60.0 / (2.0 * 3.14159265358979323846)) / 50.0;}
+
+void testSkippedStopWriteBroadcasts()
+{
+  resetDrives();
+  ActiveBench bench;
+  startMoving(bench);  // next cycle (2) reads 0x005F
+  bench.command(2, 0.0);  // wheel 2 (ID 3) must stop...
+  drives[3].read_errno[0x005F] = ETIMEDOUT;  // ...but its read fails first, so its stop is skipped
+  CHECK(bench.hw->read(t0, dt) == ReturnType::OK);
+  CHECK(broadcasts == 0);
+  CHECK(bench.hw->write(t0, dt) == ReturnType::ERROR);  // broadcast instead of a one-side stop
+  CHECK(broadcasts >= 1);
+  CHECK(allStopped());
+  drives[3].read_errno.clear();
+  CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
+}
+
+void testFailedStopWriteBroadcasts()
+{
+  resetDrives();
+  ActiveBench bench;
+  startMoving(bench);
+  bench.command(2, 0.0);
+  drives[3].control_write_times_out = true;  // the stop is sent but never acknowledged
+  CHECK(bench.hw->read(t0, dt) == ReturnType::OK);
+  CHECK(bench.hw->write(t0, dt) == ReturnType::ERROR);
+  CHECK(broadcasts >= 1);
+  CHECK(allStopped());
+  drives[3].control_write_times_out = false;
+  CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
+}
+
+void testRampingCommandStartsFromStop()
+{
+  // The target alternates between 100 and 101 RPM every cycle: once 100 RPM
+  // is acknowledged, the direction is written next even though 101 is wanted.
+  resetDrives();
+  ActiveBench bench;
+  bench.command(0, radSFor(100.0));
+  CHECK(cycle(*bench.hw) == ReturnType::OK);
+  CHECK(drives[1].regs[0x0056] == 100 && drives[1].regs[0x0066] == 0);
+  bench.command(0, radSFor(101.0));
+  CHECK(cycle(*bench.hw) == ReturnType::OK);
+  CHECK(drives[1].regs[0x0066] == 1);  // started at the acknowledged 100
+  bench.command(0, radSFor(100.0));
+  CHECK(cycle(*bench.hw) == ReturnType::OK);
+  bench.command(0, radSFor(101.0));
+  CHECK(cycle(*bench.hw) == ReturnType::OK);
+  CHECK(drives[1].regs[0x0066] == 1 && drives[1].regs[0x0056] == 101);  // speed follows
+  CHECK(broadcasts == 0);
+  CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
+}
+
+void testReversalWaitsForNearZeroSpeed()
+{
+  resetDrives();
+  ActiveBench bench;
+  bench.command(0, radSFor(240.0));
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // cycle 0: speed
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // cycle 1: forward
+  CHECK(drives[1].regs[0x0066] == 1);
+  drives[1].regs[0x005F] = 240;  // the motor is turning
+  bench.command(0, -radSFor(240.0));
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // cycle 2: stop
+  CHECK(drives[1].regs[0x0066] == 0);
+  // 0x005F keeps reading 240 (still running down): no reverse, however long.
+  for (int i = 0; i < 8; ++i) {
+    CHECK(cycle(*bench.hw) == ReturnType::OK);
+    CHECK(drives[1].regs[0x0066] == 0);
+  }
+  drives[1].regs[0x005F] = 6;  // just above near zero (5): still waits
+  CHECK(cycle(*bench.hw) == ReturnType::OK);
+  CHECK(cycle(*bench.hw) == ReturnType::OK);
+  CHECK(drives[1].regs[0x0066] == 0);
+  drives[1].regs[0x005F] = 3;  // near zero: the next speed read clears the hold
+  CHECK(cycle(*bench.hw) == ReturnType::OK);
+  CHECK(cycle(*bench.hw) == ReturnType::OK);
+  CHECK(drives[1].regs[0x0066] == 2);
+  CHECK(broadcasts == 0);
+  CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
+}
+
+void testReversalFallbackWhenSpeedUnavailable()
+{
+  resetDrives();
+  ActiveBench bench;
+  bench.command(0, radSFor(240.0));
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // cycle 0: speed
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // cycle 1: forward
+  drives[1].regs[0x005F] = 240;
+  bench.command(0, -radSFor(240.0));
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // cycle 2: 0x005F reads 240, then stop
+  drives[1].read_errno[0x005F] = ETIMEDOUT;   // no speed reading after the stop
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // cycle 3: 1 cycle since the stop
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // cycle 4: speed poll fails; 2 cycles
+  CHECK(drives[1].regs[0x0066] == 0);
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // cycle 5: 3 cycles, no speed since: fallback
+  CHECK(drives[1].regs[0x0066] == 2);
+  drives[1].read_errno.clear();  // otherwise the next failed poll stops all four
+  CHECK(broadcasts == 0);
+  CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
+}
+
+void testRepeatedOnErrorReturnsFailure()
+{
+  resetDrives();
+  ActiveBench bench;
+  startMoving(bench);
+  drives[2].stuck_running = true;
+  // First on_error: stop not accepted within the deadline, then 10 s more of
+  // broadcasts. FAILURE, and the bus stays open.
+  CHECK(bench.hw->on_error(lifecycle_state) == CallbackReturn::FAILURE);
+  CHECK(context != nullptr && context->connected);
+  const auto after_first = broadcasts;
+  CHECK(after_first >= 2);
+  // A repeated on_error broadcasts again and returns FAILURE again.
+  CHECK(bench.hw->on_error(lifecycle_state) == CallbackReturn::FAILURE);
+  CHECK(broadcasts > after_first);
+  CHECK(context != nullptr && context->connected);
+  // Once the drive accepts the stop, on_error succeeds and closes the bus.
+  drives[2].stuck_running = false;
+  CHECK(bench.hw->on_error(lifecycle_state) == CallbackReturn::SUCCESS);
+  CHECK(allStopped());
+  CHECK(context == nullptr);
+}
+
+void testReadWhileInactiveIsOkAndSilent()
+{
+  resetDrives();
+  Hardware hw;
+  CHECK(hw.on_init(params(true)) == CallbackReturn::SUCCESS);
+  CHECK(hw.on_configure(lifecycle_state) == CallbackReturn::SUCCESS);
+  auto calls = bus_calls;
+  CHECK(hw.read(t0, dt) == ReturnType::OK);  // configured, not yet active
+  CHECK(bus_calls == calls);
+  CHECK(hw.on_activate(lifecycle_state) == CallbackReturn::SUCCESS);
+  CHECK(hw.on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
+  calls = bus_calls;
+  CHECK(hw.read(t0, dt) == ReturnType::OK);  // after deactivation
+  CHECK(bus_calls == calls);
 }
 
 }  // namespace
@@ -751,6 +929,14 @@ int main(int argc, char ** argv)
   testSpeedZeroWriteFailureRefuses();
   testDeactivateBroadcastsAndConfirms();
   testShutdownAndErrorStop();
+  testActivationBroadcastsStopFirst();
+  testSkippedStopWriteBroadcasts();
+  testFailedStopWriteBroadcasts();
+  testRampingCommandStartsFromStop();
+  testReversalWaitsForNearZeroSpeed();
+  testReversalFallbackWhenSpeedUnavailable();
+  testRepeatedOnErrorReturnsFailure();
+  testReadWhileInactiveIsOkAndSilent();
 
   // Nothing, in any test, ever wrote the baud, address or save register.
   for (const auto & w : all_writes) {

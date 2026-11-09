@@ -72,10 +72,21 @@ struct BusCycleHealth
 
 // --- Bench motion (opt-in, bench_motion_enabled) ---------------------------
 
-// Motor RPM below this is a stop: it would round to raw 0 in register 0x0056.
+// Commands below this many motor RPM are a stop. Raw 0x0056 is whole RPM, so
+// this sits just above rounding alone: 0.5 to 1 RPM would round up to raw 1.
 inline constexpr double BENCH_DEADBAND_MOTOR_RPM = 1.0;
 // bench_rpm_cap above this is refused.
 inline constexpr double BENCH_MAX_RPM_CAP = 500.0;
+// bench_stop_deadline_ms above this is refused: a stop blocks for up to this long.
+inline constexpr double BENCH_MAX_STOP_DEADLINE_MS = 5000.0;
+// After a stop that is not accepted, on_error keeps broadcasting stop this long.
+inline constexpr double BENCH_UNCONFIRMED_STOP_WINDOW_MS = 10000.0;
+// A reversal waits for actual speed 0x005F at or below this (raw = motor RPM)...
+inline constexpr std::uint16_t BENCH_NEAR_ZERO_MOTOR_RPM = 5;
+// ...or, only while no 0x005F read has succeeded since the stop, this many
+// cycles. One more than the poll interval, so it can expire after one failed
+// speed poll; a second failed poll stops all four first.
+inline constexpr std::uint64_t BENCH_REVERSAL_FALLBACK_CYCLES = 3;
 
 struct BenchMotorCommand
 {
@@ -116,14 +127,35 @@ struct BenchWrite
   std::uint16_t value{0};
 };
 
+// Whether a drive at stop may now start in a given direction.
+struct BenchStartGate
+{
+  // Last nonzero direction acknowledged (1 forward, 2 reverse); 0 if none since activation.
+  std::uint8_t last_motion_direction{0};
+  // Starting opposite to last_motion_direction is a reversal: allowed only
+  // once benchReversalClear() says the drive has run down.
+  bool reversal_clear{false};
+};
+
+// A reversal may proceed once a 0x005F read taken after the stop shows near
+// zero, or, only while no 0x005F read has succeeded since the stop, after
+// BENCH_REVERSAL_FALLBACK_CYCLES cycles.
+[[nodiscard]] bool benchReversalClear(
+  bool near_zero_seen_since_stop, bool speed_read_since_stop,
+  std::uint64_t cycles_since_stop) noexcept;
+
 // At most ONE write per drive per cycle (bus budget). In priority order:
 // 1. a stop target, unknown direction or reversal writes stop (0x0066=0) first;
-// 2. from stop, speed is written before direction, so a drive never starts at a stale speed;
-// 3. a register not sent for resend_after_ns is re-sent (older first);
-// 4. otherwise only a changed speed is written.
+// 2. from stop, a reversal holds (re-sending only the stop) until gate.reversal_clear;
+// 3. from stop, speed is written first unless a nonzero speed within raw_cap is
+//    already acknowledged; then direction goes next even if the target RPM has
+//    changed since, so a changing command cannot starve the start;
+// 4. a register not sent for resend_after_ns is re-sent (older first);
+// 5. otherwise only a changed speed is written.
 [[nodiscard]] BenchWrite planBenchWrite(
   const BenchOutputState & state, const BenchMotorCommand & target,
-  std::int64_t now_ns, std::int64_t resend_after_ns) noexcept;
+  std::int64_t now_ns, std::int64_t resend_after_ns, std::uint16_t raw_cap,
+  const BenchStartGate & gate) noexcept;
 
 // Records a write result: an ACK updates the state, anything else makes it unknown.
 void recordBenchWrite(

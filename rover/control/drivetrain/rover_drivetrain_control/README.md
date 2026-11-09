@@ -139,11 +139,51 @@ Copy `config/drivetrain_hardware.example.yaml` and set `bench_motion_enabled: tr
 ### What bench mode does
 
 - **Configure** opens the bus and, for each wheel, reads the drive address `0x00A6` (must equal the configured ID) and the fault code `0x0076` (must be 0). A failed, mismatched or garbled reply refuses, and the log names the wheel and the reason. Nothing is written. Several drives sharing one address show up as a garbled reply, or, with exactly four drives, as an ID that does not answer.
-- **Activate**, for each drive: writes `0x0136=1` (internal mode) and `0x0116=pole_pairs` and reads both back; writes speed `0x0056=0`; writes stop (`0x0066=0`) and requires running status `0`. A successful write means libmodbus checked the drive's echo of the address and value. The manual documents no read-back for `0x0056`, so the echo is its only confirmation. The manual also lists `0x0136` for writes only: if its read-back returns Modbus exception 2 (illegal data address), the write echo is accepted and a warning is logged. Any other read-back failure refuses. None of these is saved, so power-cycling a drive restores its stored values. If any drive fails, activation refuses and all four are stopped.
-- **write()** converts each wheel command: motor RPM = |ω| × 60/(2π) × `gear_ratio`, clamped to the lower of `bench_rpm_cap` and `motor_rpm_limit`. Direction comes from the sign, with `mirrored` applied; anything below 1 motor RPM (which rounds to raw 0) is a stop. At most one write per drive per cycle: a stop always goes first; from stop, speed (`0x0056`) is written before direction (`0x0066`); a reversal goes through stop. Only changes are written, and each register is re-sent at least once a second.
-- **read()** alternates actual speed `0x005F` (converted back to wheel rad/s) and fault code `0x0076`. The drive reports speed as a magnitude, so its sign comes from the last direction written. The exported velocity is **never NaN** while active: it is 0 straight after activation (which has just confirmed all four stopped), then the last good reading. A single failed speed read keeps the last good value; a second failure in a row stops all four. This matters because `diff_drive_controller` (4.42.1, closed loop) returns an error on NaN wheel feedback before it writes any wheel command, which would also skip its `cmd_vel_timeout` zero and leave the last command running.
-- **Stops.** Any of these stops all four drives: a fault code other than 0; a fault code that cannot be confirmed (2 failed fault polls in a row, or no good fault read for 2.5 poll intervals, which is 2.5 s at 2 Hz, tracked per drive apart from the cycle health, and reset on activation); speed feedback lost (the same rule for actual-speed reads `0x005F`); a drive lost (existing per-cycle health: invalid after 2 missed cycles, lost after 3); a failed direction write (the drive's state is then unknown), a late trigger, deactivate, error or shutdown. A failed speed write is simply re-sent. A stop broadcasts `0x0066=0` to address 0, then reads every drive's status. If any status is not 0, it repeats the broadcast until `bench_stop_deadline_ms` runs out. It never stops one side only. `on_deactivate` succeeds only once all four confirm stopped. After a fault, unconfirmed-fault, lost-speed-feedback, loss, failed-write or late-trigger stop, motion stays latched off until the next successful activation.
+- **Activate** first broadcasts stop and requires every drive to accept it (status `0`), before any per-drive write. Then, for each drive, it writes `0x0136=1` (internal mode) and `0x0116=pole_pairs` and reads both back; writes speed `0x0056=0`; writes stop (`0x0066=0`) and requires running status `0`. A successful write means libmodbus checked the drive's echo of the address and value. The manual documents no read-back for `0x0056`, so the echo is its only confirmation. The manual also lists `0x0136` for writes only: if its read-back returns Modbus exception 2 (illegal data address), the write echo is accepted and a warning is logged. Any other read-back failure refuses. None of these is saved, so power-cycling a drive restores its stored values. If any drive fails, activation refuses and all four are stopped.
+- **write()** converts each wheel command: motor RPM = |ω| × 60/(2π) × `gear_ratio`, clamped to the lower of `bench_rpm_cap` and `motor_rpm_limit`. Direction comes from the sign, with `mirrored` applied. Anything below 1 motor RPM is a stop: raw `0x0056` is whole RPM, so this is slightly wider than rounding alone. At most one write per drive per cycle:
+  - a stop always goes first;
+  - from stop, speed (`0x0056`) is written first, unless a nonzero speed within the cap is already acknowledged; then direction (`0x0066`) goes next, even if the target RPM has changed since, so a command that changes every cycle cannot stop the drive from starting;
+  - a reversal goes through stop, then holds: the opposite direction is written only once actual speed `0x005F`, read after the stop, is at or below 5 motor RPM. If no `0x005F` read has succeeded since the stop, it waits 3 cycles instead (a second failed speed poll stops all four first);
+  - only changes are written, and each register is re-sent at least once a second.
+- **read()** alternates actual speed `0x005F` (converted back to wheel rad/s) and fault code `0x0076`. The drive reports speed as a magnitude, so its sign comes from the last direction written. The exported velocity is **never NaN** while active: it is 0 straight after activation (which has just had the stop accepted by all four), then the last good reading. A single failed speed read keeps the last good value; a second failure in a row stops all four. This matters because `diff_drive_controller` (4.42.1, closed loop) returns an error on NaN wheel feedback before it writes any wheel command, which would also skip its `cmd_vel_timeout` zero and leave the last command running. While inactive, `read()` returns OK without touching the bus.
+- **Stops.** Any of these stops all four drives: a fault code other than 0; a fault code that cannot be confirmed (2 failed fault polls in a row, or no good fault read for 2.5 poll intervals, which is 2.5 s at 2 Hz, tracked per drive apart from the cycle health, and reset on activation); speed feedback lost (the same rule for actual-speed reads `0x005F`); a drive lost (existing per-cycle health: invalid after 2 missed cycles, lost after 3); a stop write to one drive that is skipped this cycle (an earlier exchange with it failed) or fails; a failed direction write (the drive's state is then unknown); a late trigger; deactivate, error or shutdown. A failed speed write is simply re-sent. A stop broadcasts `0x0066=0` to address 0, then reads every drive's status. If any status is not 0, it repeats the broadcast until `bench_stop_deadline_ms` (at most 5000 ms) runs out. Because a stop that cannot reach one drive becomes a broadcast, a safety stop never stops one side only. After a fault, unconfirmed-fault, lost-speed-feedback, loss, failed-write or late-trigger stop, motion stays latched off until the next successful activation.
+- **"Stop accepted" is not "stopped".** Status `0` means the drive accepted the stop command, not that the motor has run down; the logs say "stop accepted (status 0)". Run the bench test step below to see how long the motor takes to reach zero.
+- **If a stop is not accepted:** `on_deactivate` returns FAILURE and the hardware stays active, with motion latched off; nothing more is sent from `read()` or `write()`. `on_error` keeps the bus open and keeps broadcasting stop at the update rate for 10 s, logging "use the power cutoff" on every attempt, then returns FAILURE. A repeated `on_error` does the same again and returns FAILURE until all four accept the stop. In every case, use the power cutoff.
 - **Never** writes `0x00F6` (baud), `0x00A6` (address) or `0x80FF` (save). The driver also refuses those addresses.
+
+### Bench test step: what a stop really does
+
+Do this on the day, before anything else, with **one drive connected**, wheels off the ground and the power cutoff held. It shows how long the motor takes to reach zero after its status says `0`.
+
+1. Activate bench mode with that one drive, then spin it slowly through the per-wheel path. The relay needs at least 10 messages a second, or it sends zeros. Only the first value matters with one drive:
+
+   ```bash
+   ros2 topic pub -r 20 /drivetrain/direct/wheel_speeds std_msgs/msg/Float64MultiArray \
+     "{data: [0.2, 0.0, 0.0, 0.0]}"
+   ```
+
+2. In a second terminal, log actual speed (`0x005F`, converted to rad/s and refreshed once a second at 2 Hz) with timestamps:
+
+   ```bash
+   ros2 topic echo /drivetrain/joint_states | ts '%H:%M:%.S' | tee speed_log.txt
+   ```
+
+3. Stop it: press Ctrl-C on the `ros2 topic pub`, and note the time. The relay then sends zeros, and the plugin writes `0x0066=0`.
+4. Keep logging until the velocity reads 0, then deactivate the hardware. Its log line `stop accepted (status 0)` is the `0x0066` reading.
+5. To log both registers over time with the motor at rest, release the bus (`ros2 control set_hardware_component_state DCRDrivetrain unconfigured -c /drivetrain/controller_manager`). Then start the diagnostics node with probing enabled on the same adapter (see "Read-only diagnostics" above), and run the probe for selectors 7 (`0x0066`) and 8 (`0x005F`) every half second for 10 s:
+
+   ```bash
+   for i in $(seq 20); do
+     for s in 7 8; do
+       ros2 service call /drivetrain_diagnostics/read_motor_diagnostic \
+         rover_drivetrain_interfaces/srv/ReadMotorDiagnostic \
+         "{bus: drivetrain, address: 1, register_selector: $s}" | grep -o 'raw_value=[0-9]*'
+     done
+     sleep 0.5
+   done | ts '%H:%M:%.S' | tee status_log.txt
+   ```
+
+Record the time from step 3 to a zero velocity. The plugin reads `0x0066` only when it checks a stop, not during the run-down, so step 2 is where the run-down shows. `ts` comes from the `moreutils` package.
 
 ### Bench rate: timing at 9600 baud
 

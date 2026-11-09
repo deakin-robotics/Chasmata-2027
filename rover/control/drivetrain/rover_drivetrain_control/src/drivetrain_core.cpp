@@ -95,9 +95,18 @@ double benchWheelSpeedFromRaw(
   return motor_signed / RAD_S_TO_RPM / gear_ratio * (mirrored ? -1.0 : 1.0);
 }
 
+bool benchReversalClear(
+  bool near_zero_seen_since_stop, bool speed_read_since_stop,
+  std::uint64_t cycles_since_stop) noexcept
+{
+  return near_zero_seen_since_stop ||
+         (!speed_read_since_stop && cycles_since_stop >= BENCH_REVERSAL_FALLBACK_CYCLES);
+}
+
 BenchWrite planBenchWrite(
   const BenchOutputState & s, const BenchMotorCommand & target,
-  std::int64_t now_ns, std::int64_t resend_after_ns) noexcept
+  std::int64_t now_ns, std::int64_t resend_after_ns, std::uint16_t raw_cap,
+  const BenchStartGate & gate) noexcept
 {
   const BenchWrite stop{BenchRegister::CONTROL, 0};
   const auto due = [&](bool known, std::int64_t sent_ns) {
@@ -116,7 +125,17 @@ BenchWrite planBenchWrite(
   }
   const bool speed_changed = !s.speed_known || s.speed != target.raw_rpm;
   if (s.direction == 0) {
-    if (speed_changed) return {BenchRegister::SPEED, target.raw_rpm};
+    const bool reversal = gate.last_motion_direction != 0 &&
+      target.direction != gate.last_motion_direction;
+    if (reversal && !gate.reversal_clear) {
+      // Hold at stop until the drive has run down; keep re-sending the stop.
+      if (due(true, s.direction_sent_ns)) return stop;
+      return {};
+    }
+    // A nonzero speed within the cap already acknowledged is safe to start at:
+    // direction goes next, even if the target has moved on, and speed follows.
+    const bool start_speed_ready = s.speed_known && s.speed > 0 && s.speed <= raw_cap;
+    if (!start_speed_ready) return {BenchRegister::SPEED, target.raw_rpm};
     return {BenchRegister::CONTROL, target.direction};
   }
   // Moving in the target direction.
