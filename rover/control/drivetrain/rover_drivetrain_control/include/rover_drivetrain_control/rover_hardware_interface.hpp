@@ -162,6 +162,9 @@ private:
   std::uint64_t bench_cycle_index_{0};
   std::array<core::BenchOutputState, WHEEL_COUNT> bench_output_{};
   std::array<std::uint8_t, WHEEL_COUNT> bench_last_motion_direction_{};
+  // Per drive, separate from cycle health; reset on every activation.
+  std::array<core::FaultFreshness, WHEEL_COUNT> bench_fault_freshness_{};
+  std::int64_t bench_fault_stale_after_ns_{0};
   // Lifecycle callbacks and the async read/write thread share the bus state.
   std::mutex bench_mutex_;
 };

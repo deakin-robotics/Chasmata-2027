@@ -130,6 +130,33 @@ int main()
   w = planBenchWrite(s, fwd, now, resend);
   CHECK(w.reg == BenchRegister::CONTROL && w.value == 0);
 
+  // Fault-register freshness. The limit derives from the rate: 2.5 poll
+  // intervals of 2 cycles, so 2.5 s at 2 Hz and 5 s at 1 Hz.
+  const std::int64_t sec = 1000000000LL;
+  CHECK(benchFaultStaleAfterNs(2.0) == 25 * sec / 10);
+  CHECK(benchFaultStaleAfterNs(1.0) == 5 * sec);
+  CHECK(benchFaultStaleAfterNs(0.0) == 0);
+  CHECK(benchFaultStaleAfterNs(std::numeric_limits<double>::quiet_NaN()) == 0);
+  const auto stale_limit = benchFaultStaleAfterNs(2.0);
+  FaultFreshness ff;
+  const std::int64_t t_act = 10 * sec;
+  resetFaultFreshness(ff, t_act);  // activation
+  CHECK(!faultPollsStale(ff, t_act, stale_limit));
+  CHECK(!faultPollsStale(ff, t_act + stale_limit, stale_limit));      // exactly 2.5 s: not longer than
+  CHECK(faultPollsStale(ff, t_act + stale_limit + 1, stale_limit));   // longer than 2.5 s: stale
+  recordFaultPoll(ff, false, t_act + sec);  // one failed poll
+  CHECK(!faultPollsStale(ff, t_act + sec, stale_limit));
+  recordFaultPoll(ff, true, t_act + 2 * sec);  // a good one clears it
+  CHECK(ff.consecutive_failed_polls == 0 && ff.last_ok_ns == t_act + 2 * sec);
+  CHECK(!faultPollsStale(ff, t_act + 2 * sec + stale_limit, stale_limit));
+  recordFaultPoll(ff, false, t_act + 3 * sec);
+  recordFaultPoll(ff, false, t_act + 4 * sec);  // two in a row
+  CHECK(faultPollsStale(ff, t_act + 4 * sec, stale_limit));
+  resetFaultFreshness(ff, t_act + 5 * sec);  // re-activation starts fresh
+  CHECK(!faultPollsStale(ff, t_act + 5 * sec, stale_limit));
+  // Stale by time alone: polls neither fail nor succeed (e.g. not issued).
+  CHECK(faultPollsStale(ff, t_act + 5 * sec + stale_limit + 1, stale_limit));
+
   // Wire-time floors at 9600 8N1: 1.0417 ms per character, 3.646 ms silence.
   const RtuFraming f9600{9600, 8, false, 1};
   CHECK(std::abs(rtuCharMs(f9600) - 1.041667) < 1e-4);

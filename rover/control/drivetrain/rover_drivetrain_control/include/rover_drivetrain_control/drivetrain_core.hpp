@@ -130,6 +130,30 @@ void recordBenchWrite(
   BenchOutputState & state, const BenchWrite & write, bool acknowledged,
   std::int64_t now_ns) noexcept;
 
+// Fault-register freshness, per drive and separate from the cycle health:
+// reads alternate, so a good actual-speed read on the next cycle resets the
+// miss counter and would otherwise hide fault polls that keep failing.
+inline constexpr std::uint64_t BENCH_FAULT_POLL_EVERY_CYCLES = 2;
+inline constexpr std::uint32_t BENCH_MAX_FAILED_FAULT_POLLS = 2;
+// Longest gap without a good fault read, in fault-poll intervals: 2.5 s at 2 Hz.
+inline constexpr double BENCH_FAULT_STALE_POLL_INTERVALS = 2.5;
+
+struct FaultFreshness
+{
+  std::uint32_t consecutive_failed_polls{0};
+  std::int64_t last_ok_ns{0};
+};
+
+// Fresh start: no failed polls, counted as confirmed at now_ns.
+void resetFaultFreshness(FaultFreshness & freshness, std::int64_t now_ns) noexcept;
+void recordFaultPoll(FaultFreshness & freshness, bool succeeded, std::int64_t now_ns) noexcept;
+// Derived from the rate: 2.5 poll intervals of 2 cycles each. 0 for an invalid rate.
+[[nodiscard]] std::int64_t benchFaultStaleAfterNs(double update_hz) noexcept;
+// True after BENCH_MAX_FAILED_FAULT_POLLS failed polls in a row, or when the
+// last good fault read is older than stale_after_ns.
+[[nodiscard]] bool faultPollsStale(
+  const FaultFreshness & freshness, std::int64_t now_ns, std::int64_t stale_after_ns) noexcept;
+
 // Modbus RTU wire time, used to refuse "measured" budgets that are physically
 // impossible. Floors exclude drive turnaround and USB adapter latency.
 struct RtuFraming

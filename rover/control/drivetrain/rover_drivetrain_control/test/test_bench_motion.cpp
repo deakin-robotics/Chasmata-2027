@@ -456,6 +456,68 @@ void testLossBroadcastsStop()
   CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
 }
 
+// After startMoving() the cycle index is 2: even cycles read 0x005F, odd ones 0x0076.
+
+void testFailedFaultPollsStopAll()
+{
+  resetDrives();
+  ActiveBench bench;
+  startMoving(bench);
+  // Fault reads fail on one drive while its speed reads keep succeeding. Each
+  // good speed read resets the cycle-health miss counter, so the drive is
+  // never "lost"; fault freshness must catch it instead.
+  drives[3].read_errno[0x0076] = ETIMEDOUT;
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // speed read OK
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // fault poll 1 fails: not yet a stop
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // speed read OK again
+  CHECK(broadcasts == 0);
+  CHECK(bench.hw->read(t0, dt) == ReturnType::ERROR);  // fault poll 2 fails: stop all
+  // 2 failed polls = 2 poll intervals = 2 s at 2 Hz, inside the 2.5 s limit.
+  CHECK(broadcasts >= 1);
+  CHECK(allStopped());
+  CHECK(cycle(*bench.hw) == ReturnType::ERROR);  // latched like a fault
+  drives[3].read_errno.clear();
+  CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
+}
+
+void testOneFailedFaultPollRecovers()
+{
+  resetDrives();
+  ActiveBench bench;
+  startMoving(bench);
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // speed
+  drives[3].read_errno[0x0076] = ETIMEDOUT;
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // fault poll fails once
+  drives[3].read_errno.clear();
+  for (int i = 0; i < 8; ++i) {  // four more good fault polls
+    CHECK(cycle(*bench.hw) == ReturnType::OK);
+  }
+  CHECK(broadcasts == 0);
+  CHECK(!allStopped());
+  CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
+}
+
+void testFaultFreshnessResetsOnActivation()
+{
+  resetDrives();
+  ActiveBench bench;
+  startMoving(bench);
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // speed
+  drives[3].read_errno[0x0076] = ETIMEDOUT;
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // fault poll 1 fails
+  drives[3].read_errno.clear();
+  CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
+  CHECK(bench.hw->on_activate(lifecycle_state) == CallbackReturn::SUCCESS);
+  broadcasts = 0;
+  // Without the reset this failed poll would be the second in a row and stop.
+  drives[3].read_errno[0x0076] = ETIMEDOUT;
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // cycle 0: speed
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // cycle 1: first failed poll since activation
+  CHECK(broadcasts == 0);
+  drives[3].read_errno.clear();
+  CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
+}
+
 void testFailedDirectionWriteStopsAll()
 {
   resetDrives();
@@ -524,6 +586,9 @@ int main(int argc, char ** argv)
   testFaultBroadcastsStop();
   testLossBroadcastsStop();
   testFailedDirectionWriteStopsAll();
+  testFailedFaultPollsStopAll();
+  testOneFailedFaultPollRecovers();
+  testFaultFreshnessResetsOnActivation();
   testControlModeReadBack();
   testSpeedZeroWriteFailureRefuses();
   testDeactivateBroadcastsAndConfirms();

@@ -129,6 +129,7 @@ bool RoverHardwareInterface::parseBenchConfiguration()
   // Re-send each output register at least once a second.
   const auto period_ns = static_cast<std::int64_t>(1e9 / hz);
   bench_resend_after_ns_ = std::max<std::int64_t>(0, 1'000'000'000LL - period_ns);
+  bench_fault_stale_after_ns_ = core::benchFaultStaleAfterNs(hz);
   return true;
 }
 
@@ -316,6 +317,10 @@ CallbackReturn RoverHardwareInterface::benchActivate()
     core::recordBenchWrite(out, {core::BenchRegister::SPEED, 0}, true, now);
     core::recordBenchWrite(out, {core::BenchRegister::CONTROL, 0}, true, now);
   }
+  // Configure confirmed fault 0 on every drive; freshness starts again from here.
+  for (auto & freshness : bench_fault_freshness_) {
+    core::resetFaultFreshness(freshness, now);
+  }
   previous_read_tick_ns_ = 0;
   late_trigger_detected_ = false;
   read_blocked_logged_.store(false, std::memory_order_release);
@@ -394,7 +399,7 @@ ReturnType RoverHardwareInterface::benchRead()
 
   // At 9600 baud there is time for one read per drive per cycle, so actual
   // speed and fault code alternate.
-  const bool speed_cycle = bench_cycle_index_ % 2 == 0;
+  const bool speed_cycle = bench_cycle_index_ % core::BENCH_FAULT_POLL_EVERY_CYCLES == 0;
   for (std::size_t w = 0; w < WHEEL_COUNT; ++w) {
     const auto & wheel = wheels_[w];
     std::uint16_t raw = 0;
@@ -405,9 +410,28 @@ ReturnType RoverHardwareInterface::benchRead()
         state_velocity_rad_s_[w] = core::benchWheelSpeedFromRaw(
           raw, wheel.gear_ratio, wheel.mirrored, bench_last_motion_direction_[w]);
       }
-    } else if (driver_->readFaultRaw(wheel.slave_id, raw) && raw != 0) {
-      return benchSafetyStop(wheel.joint_name + " (ID " + std::to_string(wheel.slave_id) +
-        ") fault code " + std::to_string(raw));
+    } else {
+      const bool ok = static_cast<bool>(driver_->readFaultRaw(wheel.slave_id, raw));
+      core::recordFaultPoll(bench_fault_freshness_[w], ok, steadyNowNs());
+      if (ok && raw != 0) {
+        return benchSafetyStop(wheel.joint_name + " (ID " + std::to_string(wheel.slave_id) +
+          ") fault code " + std::to_string(raw));
+      }
+    }
+  }
+
+  // Checked every cycle, apart from cycle health: a drive whose fault code
+  // cannot be confirmed is treated like a drive reporting a fault.
+  const auto now = steadyNowNs();
+  for (std::size_t w = 0; w < WHEEL_COUNT; ++w) {
+    const auto & freshness = bench_fault_freshness_[w];
+    if (core::faultPollsStale(freshness, now, bench_fault_stale_after_ns_)) {
+      return benchSafetyStop(wheels_[w].joint_name + " (ID " +
+        std::to_string(wheels_[w].slave_id) + ") fault code not confirmed: " +
+        std::to_string(freshness.consecutive_failed_polls) + " failed poll(s) in a row, last good " +
+        "read " + std::to_string((now - freshness.last_ok_ns) / 1'000'000) + " ms ago (limit " +
+        std::to_string(core::BENCH_MAX_FAILED_FAULT_POLLS) + " polls or " +
+        std::to_string(bench_fault_stale_after_ns_ / 1'000'000) + " ms)");
     }
   }
   return ReturnType::OK;
