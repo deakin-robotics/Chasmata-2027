@@ -145,35 +145,35 @@ void recordBenchWrite(
   }
 }
 
-void resetFaultFreshness(FaultFreshness & freshness, std::int64_t now_ns) noexcept
+void resetPollFreshness(PollFreshness & freshness, std::int64_t now_ns) noexcept
 {
   freshness.consecutive_failed_polls = 0;
   freshness.last_ok_ns = now_ns;
 }
 
-void recordFaultPoll(FaultFreshness & freshness, bool succeeded, std::int64_t now_ns) noexcept
+void recordPoll(PollFreshness & freshness, bool succeeded, std::int64_t now_ns) noexcept
 {
   if (succeeded) {
-    resetFaultFreshness(freshness, now_ns);
+    resetPollFreshness(freshness, now_ns);
   } else if (freshness.consecutive_failed_polls < std::numeric_limits<std::uint32_t>::max()) {
     ++freshness.consecutive_failed_polls;
   }
 }
 
-std::int64_t benchFaultStaleAfterNs(double update_hz) noexcept
+std::int64_t benchPollStaleAfterNs(double update_hz) noexcept
 {
   if (!std::isfinite(update_hz) || update_hz <= 0.0) {
     return 0;  // fail closed: everything is stale
   }
   const double poll_interval_ns =
-    static_cast<double>(BENCH_FAULT_POLL_EVERY_CYCLES) * 1e9 / update_hz;
-  return static_cast<std::int64_t>(std::llround(BENCH_FAULT_STALE_POLL_INTERVALS * poll_interval_ns));
+    static_cast<double>(BENCH_POLL_EVERY_CYCLES) * 1e9 / update_hz;
+  return static_cast<std::int64_t>(std::llround(BENCH_STALE_POLL_INTERVALS * poll_interval_ns));
 }
 
-bool faultPollsStale(
-  const FaultFreshness & freshness, std::int64_t now_ns, std::int64_t stale_after_ns) noexcept
+bool pollsStale(
+  const PollFreshness & freshness, std::int64_t now_ns, std::int64_t stale_after_ns) noexcept
 {
-  return freshness.consecutive_failed_polls >= BENCH_MAX_FAILED_FAULT_POLLS ||
+  return freshness.consecutive_failed_polls >= BENCH_MAX_FAILED_POLLS ||
          now_ns - freshness.last_ok_ns > stale_after_ns;
 }
 

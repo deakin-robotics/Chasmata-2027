@@ -8,6 +8,7 @@
 
 #include <array>
 #include <cerrno>
+#include <cmath>
 #include <chrono>
 #include <thread>
 #include <cstdint>
@@ -204,12 +205,14 @@ struct ActiveBench
 {
   std::unique_ptr<Hardware> hw = std::make_unique<Hardware>();
   std::vector<hardware_interface::CommandInterface> commands;
+  std::vector<hardware_interface::StateInterface> states;
 
   ActiveBench()
   {
     CHECK(hw->on_init(params(true)) == CallbackReturn::SUCCESS);
     commands = hw->export_command_interfaces();
-    CHECK(commands.size() == 4);
+    states = hw->export_state_interfaces();
+    CHECK(commands.size() == 4 && states.size() == 4);
     CHECK(hw->on_configure(lifecycle_state) == CallbackReturn::SUCCESS);
     CHECK(hw->on_activate(lifecycle_state) == CallbackReturn::SUCCESS);
     writes.clear();
@@ -217,6 +220,14 @@ struct ActiveBench
   }
 
   void command(std::size_t wheel, double rad_s) {(void)commands[wheel].set_value(rad_s);}
+
+  // Exported wheel velocity, as the controllers see it. NaN means "no current reading".
+  double velocity(std::size_t wheel) const
+  {
+    const auto value = states[wheel].get_optional<double>();
+    CHECK(value.has_value());
+    return *value;
+  }
 };
 
 void testDisabledRefusesAsToday()
@@ -448,11 +459,33 @@ void testLossBroadcastsStop()
   CHECK(cycle(*bench.hw) == ReturnType::OK);   // missed 1
   CHECK(cycle(*bench.hw) == ReturnType::OK);   // missed 2: data invalid
   CHECK(broadcasts == 0);
-  CHECK(cycle(*bench.hw) == ReturnType::ERROR);  // missed 3: lost -> stop all
+  // Missed 3. A silent drive has also failed two speed polls by now, so speed
+  // freshness stops all four in read(), on the same cycle as the loss.
+  CHECK(cycle(*bench.hw) == ReturnType::ERROR);
   CHECK(broadcasts >= 1);
   for (int id : {1, 2, 4}) CHECK(drives[id].regs[0x0066] == 0);  // never one side only
   drives[3].present = true;
   drives[3].regs[0x0066] = 0;
+  CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
+}
+
+void testLossByFailedWritesBroadcastsStop()
+{
+  // Reads keep succeeding, so neither freshness check fires; only the cycle
+  // health (lost after 3 missed cycles) catches a drive whose writes fail.
+  resetDrives();
+  ActiveBench bench;
+  startMoving(bench);
+  drives[3].speed_write_times_out = true;
+  bench.command(2, 0.3);  // force a speed write to drive 3 every cycle
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // speed write fails: missed 1
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // re-sent, fails: missed 2
+  CHECK(broadcasts == 0);
+  CHECK(bench.hw->read(t0, dt) == ReturnType::OK);      // reads still fine
+  CHECK(bench.hw->write(t0, dt) == ReturnType::ERROR);  // missed 3: lost -> stop all
+  CHECK(broadcasts >= 1);
+  CHECK(allStopped());
+  drives[3].speed_write_times_out = false;
   CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
 }
 
@@ -513,6 +546,75 @@ void testFaultFreshnessResetsOnActivation()
   drives[3].read_errno[0x0076] = ETIMEDOUT;
   CHECK(cycle(*bench.hw) == ReturnType::OK);  // cycle 0: speed
   CHECK(cycle(*bench.hw) == ReturnType::OK);  // cycle 1: first failed poll since activation
+  CHECK(broadcasts == 0);
+  drives[3].read_errno.clear();
+  CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
+}
+
+// Speed reads fail on one drive (wheel index 2, ID 3) while its fault reads
+// keep succeeding. Each good fault read resets the cycle-health miss counter,
+// so the drive is never "lost" and telemetryValid() stays true; speed
+// freshness must catch it, and the old reading must not stay exported.
+
+void testFailedSpeedPollsStopAll()
+{
+  resetDrives();
+  drives[3].regs[0x005F] = 300;  // 300 motor RPM -> 0.628 rad/s at the wheel
+  ActiveBench bench;
+  startMoving(bench);  // cycle 0 read 0x005F, cycle 1 read 0x0076
+  CHECK(std::isfinite(bench.velocity(2)) && bench.velocity(2) != 0.0);
+  drives[3].read_errno[0x005F] = ETIMEDOUT;
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // speed poll 1 fails: not yet a stop
+  CHECK(std::isnan(bench.velocity(2)));       // the old reading is not exported as current
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // fault read OK
+  CHECK(std::isnan(bench.velocity(2)));
+  CHECK(broadcasts == 0);
+  CHECK(bench.hw->read(t0, dt) == ReturnType::ERROR);  // speed poll 2 fails: stop all
+  // 2 failed polls = 2 poll intervals = 2 s at 2 Hz, inside the 2.5 s limit.
+  CHECK(broadcasts >= 1);
+  CHECK(allStopped());
+  CHECK(cycle(*bench.hw) == ReturnType::ERROR);  // latched
+  drives[3].read_errno.clear();
+  CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
+}
+
+void testOneFailedSpeedPollRecovers()
+{
+  resetDrives();
+  drives[3].regs[0x005F] = 300;
+  ActiveBench bench;
+  startMoving(bench);
+  drives[3].read_errno[0x005F] = ETIMEDOUT;
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // speed poll fails once
+  CHECK(std::isnan(bench.velocity(2)));
+  drives[3].read_errno.clear();
+  for (int i = 0; i < 8; ++i) {  // four more good speed polls
+    CHECK(cycle(*bench.hw) == ReturnType::OK);
+  }
+  CHECK(std::isfinite(bench.velocity(2)) && bench.velocity(2) != 0.0);  // fresh reading again
+  CHECK(broadcasts == 0);
+  CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
+}
+
+void testSpeedFreshnessResetsOnActivation()
+{
+  resetDrives();
+  drives[3].regs[0x005F] = 300;
+  ActiveBench bench;
+  startMoving(bench);
+  CHECK(std::isfinite(bench.velocity(2)));
+  drives[3].read_errno[0x005F] = ETIMEDOUT;
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // speed poll 1 fails
+  drives[3].read_errno.clear();
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // fault read
+  CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
+  CHECK(bench.hw->on_activate(lifecycle_state) == CallbackReturn::SUCCESS);
+  broadcasts = 0;
+  // Nothing measured before this activation is exported as current.
+  for (std::size_t w = 0; w < 4; ++w) CHECK(std::isnan(bench.velocity(w)));
+  // Without the reset this failed poll would be the second in a row and stop.
+  drives[3].read_errno[0x005F] = ETIMEDOUT;
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // cycle 0: first failed speed poll since activation
   CHECK(broadcasts == 0);
   drives[3].read_errno.clear();
   CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
@@ -585,7 +687,11 @@ int main(int argc, char ** argv)
   testMotionConversionAndChangeOnlyWrites();
   testFaultBroadcastsStop();
   testLossBroadcastsStop();
+  testLossByFailedWritesBroadcastsStop();
   testFailedDirectionWriteStopsAll();
+  testFailedSpeedPollsStopAll();
+  testOneFailedSpeedPollRecovers();
+  testSpeedFreshnessResetsOnActivation();
   testFailedFaultPollsStopAll();
   testOneFailedFaultPollRecovers();
   testFaultFreshnessResetsOnActivation();
