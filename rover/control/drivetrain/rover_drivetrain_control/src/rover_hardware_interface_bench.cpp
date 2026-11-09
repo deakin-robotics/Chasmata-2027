@@ -318,12 +318,15 @@ CallbackReturn RoverHardwareInterface::benchActivate()
     core::recordBenchWrite(out, {core::BenchRegister::CONTROL, 0}, true, now);
   }
   // Configure confirmed fault 0 on every drive; freshness starts again from
-  // here. No velocity from before this activation is exported as current.
+  // here. Activation just confirmed all four stopped, so export 0, never a
+  // velocity from before. Never export NaN while active: diff_drive_controller
+  // (4.42.1, closed loop) returns ERROR on NaN feedback before it writes wheel
+  // commands, which also skips its cmd_vel-timeout zero.
   for (std::size_t w = 0; w < WHEEL_COUNT; ++w) {
     core::resetPollFreshness(bench_fault_freshness_[w], now);
     core::resetPollFreshness(bench_speed_freshness_[w], now);
     raw_speed_state_valid_[w] = false;
-    state_velocity_rad_s_[w] = std::numeric_limits<double>::quiet_NaN();
+    state_velocity_rad_s_[w] = 0.0;
   }
   previous_read_tick_ns_ = 0;
   late_trigger_detected_ = false;
@@ -416,9 +419,10 @@ ReturnType RoverHardwareInterface::benchRead()
         state_velocity_rad_s_[w] = core::benchWheelSpeedFromRaw(
           raw, wheel.gear_ratio, wheel.mirrored, bench_last_motion_direction_[w]);
       } else {
-        // Never export the previous reading as current.
+        // Keep exporting the last good value from the previous poll, never NaN
+        // (see benchActivate). The next poll either refreshes it or, as a
+        // second failure in a row, stops all four below.
         raw_speed_state_valid_[w] = false;
-        state_velocity_rad_s_[w] = std::numeric_limits<double>::quiet_NaN();
       }
     } else {
       const bool ok = static_cast<bool>(driver_->readFaultRaw(wheel.slave_id, raw));
@@ -514,9 +518,8 @@ ReturnType RoverHardwareInterface::benchWrite()
   for (std::size_t w = 0; w < WHEEL_COUNT; ++w) {
     const auto id = wheels_[w].slave_id;
     communication_state_[w] = driver_->communicationState(id);
-    if (!driver_->telemetryValid(id)) {
-      state_velocity_rad_s_[w] = std::numeric_limits<double>::quiet_NaN();
-    }
+    // No NaN when telemetry turns invalid (2 missed cycles): the velocity stays
+    // at its last good value, and the third miss or a stale poll stops all four.
     if (communication_state_[w] == Bld305sDriver::CommunicationState::LOST) {
       return benchSafetyStop(wheels_[w].joint_name + " (ID " + std::to_string(id) + ") lost");
     }

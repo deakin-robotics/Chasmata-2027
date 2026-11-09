@@ -554,7 +554,20 @@ void testFaultFreshnessResetsOnActivation()
 // Speed reads fail on one drive (wheel index 2, ID 3) while its fault reads
 // keep succeeding. Each good fault read resets the cycle-health miss counter,
 // so the drive is never "lost" and telemetryValid() stays true; speed
-// freshness must catch it, and the old reading must not stay exported.
+// freshness must catch it. Exported velocity is never NaN: diff_drive_controller
+// returns ERROR on NaN feedback before writing wheel commands, which would
+// also skip its cmd_vel-timeout zero.
+
+// What diff_drive_controller 4.42.1 checks before writing wheel commands
+// (closed loop): any NaN left or right feedback means return ERROR, no write.
+// Left wheels are indices 0 and 1, right wheels 2 and 3.
+bool diffDriveWouldRefuse(const ActiveBench & bench)
+{
+  for (std::size_t index = 0; index < 2; ++index) {
+    if (std::isnan(bench.velocity(index)) || std::isnan(bench.velocity(index + 2))) return true;
+  }
+  return false;
+}
 
 void testFailedSpeedPollsStopAll()
 {
@@ -562,17 +575,19 @@ void testFailedSpeedPollsStopAll()
   drives[3].regs[0x005F] = 300;  // 300 motor RPM -> 0.628 rad/s at the wheel
   ActiveBench bench;
   startMoving(bench);  // cycle 0 read 0x005F, cycle 1 read 0x0076
-  CHECK(std::isfinite(bench.velocity(2)) && bench.velocity(2) != 0.0);
+  const double last_good = bench.velocity(2);
+  CHECK(std::isfinite(last_good) && last_good != 0.0);
   drives[3].read_errno[0x005F] = ETIMEDOUT;
   CHECK(cycle(*bench.hw) == ReturnType::OK);  // speed poll 1 fails: not yet a stop
-  CHECK(std::isnan(bench.velocity(2)));       // the old reading is not exported as current
+  CHECK(bench.velocity(2) == last_good);      // last good value kept, never NaN
   CHECK(cycle(*bench.hw) == ReturnType::OK);  // fault read OK
-  CHECK(std::isnan(bench.velocity(2)));
+  CHECK(bench.velocity(2) == last_good);
   CHECK(broadcasts == 0);
   CHECK(bench.hw->read(t0, dt) == ReturnType::ERROR);  // speed poll 2 fails: stop all
   // 2 failed polls = 2 poll intervals = 2 s at 2 Hz, inside the 2.5 s limit.
   CHECK(broadcasts >= 1);
   CHECK(allStopped());
+  CHECK(!diffDriveWouldRefuse(bench));
   CHECK(cycle(*bench.hw) == ReturnType::ERROR);  // latched
   drives[3].read_errno.clear();
   CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
@@ -584,14 +599,19 @@ void testOneFailedSpeedPollRecovers()
   drives[3].regs[0x005F] = 300;
   ActiveBench bench;
   startMoving(bench);
+  const double last_good = bench.velocity(2);
   drives[3].read_errno[0x005F] = ETIMEDOUT;
   CHECK(cycle(*bench.hw) == ReturnType::OK);  // speed poll fails once
-  CHECK(std::isnan(bench.velocity(2)));
+  CHECK(bench.velocity(2) == last_good);
   drives[3].read_errno.clear();
+  drives[3].regs[0x005F] = 450;  // the next good read must replace the kept value
   for (int i = 0; i < 8; ++i) {  // four more good speed polls
     CHECK(cycle(*bench.hw) == ReturnType::OK);
   }
-  CHECK(std::isfinite(bench.velocity(2)) && bench.velocity(2) != 0.0);  // fresh reading again
+  CHECK(std::isfinite(bench.velocity(2)) && bench.velocity(2) != last_good);  // fresh reading
+  // Magnitudes: the sign follows the last direction written, which changed
+  // after last_good was read (this wheel is mirrored, so it now runs reverse).
+  CHECK(std::abs(std::abs(bench.velocity(2)) / std::abs(last_good) - 1.5) < 1e-9);  // 450 / 300
   CHECK(broadcasts == 0);
   CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
 }
@@ -601,8 +621,9 @@ void testSpeedFreshnessResetsOnActivation()
   resetDrives();
   drives[3].regs[0x005F] = 300;
   ActiveBench bench;
+  for (std::size_t w = 0; w < 4; ++w) CHECK(bench.velocity(w) == 0.0);  // first activation
   startMoving(bench);
-  CHECK(std::isfinite(bench.velocity(2)));
+  CHECK(bench.velocity(2) != 0.0);
   drives[3].read_errno[0x005F] = ETIMEDOUT;
   CHECK(cycle(*bench.hw) == ReturnType::OK);  // speed poll 1 fails
   drives[3].read_errno.clear();
@@ -610,14 +631,44 @@ void testSpeedFreshnessResetsOnActivation()
   CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
   CHECK(bench.hw->on_activate(lifecycle_state) == CallbackReturn::SUCCESS);
   broadcasts = 0;
-  // Nothing measured before this activation is exported as current.
-  for (std::size_t w = 0; w < 4; ++w) CHECK(std::isnan(bench.velocity(w)));
+  // Activation just confirmed all four stopped: export 0, not a pre-activation value.
+  for (std::size_t w = 0; w < 4; ++w) CHECK(bench.velocity(w) == 0.0);
   // Without the reset this failed poll would be the second in a row and stop.
   drives[3].read_errno[0x005F] = ETIMEDOUT;
   CHECK(cycle(*bench.hw) == ReturnType::OK);  // cycle 0: first failed speed poll since activation
+  CHECK(bench.velocity(2) == 0.0);            // kept: the activation value
   CHECK(broadcasts == 0);
   drives[3].read_errno.clear();
   CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
+}
+
+void testDiffDriveNeverSeesNaN()
+{
+  resetDrives();
+  for (int id = 1; id <= 4; ++id) drives[id].regs[0x005F] = static_cast<std::uint16_t>(100 * id);
+  ActiveBench bench;
+  CHECK(!diffDriveWouldRefuse(bench));  // straight after activation, before any read
+  startMoving(bench);
+  CHECK(!diffDriveWouldRefuse(bench));
+  // A single failed speed read.
+  drives[3].read_errno[0x005F] = ETIMEDOUT;
+  CHECK(cycle(*bench.hw) == ReturnType::OK);
+  CHECK(!diffDriveWouldRefuse(bench));
+  drives[3].read_errno.clear();
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // fault read
+  // A drive goes silent: after 2 missed cycles telemetryValid() is false.
+  drives[2].present = false;
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // missed 1 (speed poll fails)
+  CHECK(!diffDriveWouldRefuse(bench));
+  CHECK(cycle(*bench.hw) == ReturnType::OK);  // missed 2 (fault poll fails): data invalid
+  CHECK(!diffDriveWouldRefuse(bench));
+  // Second failed speed poll: stop all four. Still no NaN for the controller.
+  CHECK(cycle(*bench.hw) == ReturnType::ERROR);
+  CHECK(!diffDriveWouldRefuse(bench));
+  drives[2].present = true;
+  drives[2].regs[0x0066] = 0;
+  CHECK(bench.hw->on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
+  CHECK(!diffDriveWouldRefuse(bench));
 }
 
 void testFailedDirectionWriteStopsAll()
@@ -692,6 +743,7 @@ int main(int argc, char ** argv)
   testFailedSpeedPollsStopAll();
   testOneFailedSpeedPollRecovers();
   testSpeedFreshnessResetsOnActivation();
+  testDiffDriveNeverSeesNaN();
   testFailedFaultPollsStopAll();
   testOneFailedFaultPollRecovers();
   testFaultFreshnessResetsOnActivation();
