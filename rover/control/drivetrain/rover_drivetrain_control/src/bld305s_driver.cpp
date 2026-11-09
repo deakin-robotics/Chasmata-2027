@@ -123,6 +123,57 @@ Bld305sDriver::Result Bld305sDriver::writeControlRaw(
   return writeSingleRegister(slave_id, CONTROL_REGISTER, raw_control);
 }
 
+Bld305sDriver::Result Bld305sDriver::writeControlModeRaw(
+  std::uint8_t slave_id, std::uint16_t raw_mode)
+{
+  return writeSingleRegister(slave_id, CONTROL_MODE_REGISTER, raw_mode);
+}
+
+Bld305sDriver::Result Bld305sDriver::writePolePairsRaw(
+  std::uint8_t slave_id, std::uint16_t raw_pole_pairs)
+{
+  return writeSingleRegister(slave_id, POLE_PAIRS_REGISTER, raw_pole_pairs);
+}
+
+Bld305sDriver::Result Bld305sDriver::broadcastStop()
+{
+  std::lock_guard<std::mutex> lock(transaction_mutex_);
+
+  if (context_ == nullptr || !connected_.load(std::memory_order_acquire)) {
+    return {ErrorCode::NOT_CONNECTED, 0, 0};
+  }
+
+  errno = 0;
+  int rc = modbus_set_slave(context_, BROADCAST_ADDRESS);
+  if (rc == -1) {
+    return {ErrorCode::MODBUS_ERROR, rc, errno};
+  }
+
+  // Every other transaction selects its own slave first, so the context
+  // never stays addressed to all drives.
+  errno = 0;
+  rc = modbus_write_register(context_, static_cast<int>(CONTROL_REGISTER), 0);
+  const int saved_errno = errno;
+
+  // Not per-slave traffic: no cycle accounting.
+  if (rc == 1 || (rc == -1 && saved_errno == ETIMEDOUT)) {
+    return {ErrorCode::OK, rc, 0};
+  }
+  return {ErrorCode::MODBUS_ERROR, rc, saved_errno};
+}
+
+bool Bld305sDriver::isIllegalDataAddress(const Result & result) noexcept
+{
+  // libmodbus reports exception code N as errno MODBUS_ENOBASE + N.
+  return result.code == ErrorCode::MODBUS_ERROR && result.system_errno == EMBXILADD;
+}
+
+void Bld305sDriver::setMandatoryExchangesPerCycle(std::uint8_t count) noexcept
+{
+  std::lock_guard<std::mutex> lock(transaction_mutex_);
+  mandatory_exchanges_per_cycle_ = count > 0 ? count : 1;
+}
+
 Bld305sDriver::Result Bld305sDriver::readActualSpeedRaw(
   std::uint8_t slave_id, std::uint16_t & raw_speed)
 {
@@ -394,6 +445,10 @@ Bld305sDriver::Result Bld305sDriver::writeSingleRegister(
 {
   std::lock_guard<std::mutex> lock(transaction_mutex_);
 
+  if (isForbiddenWrite(register_address)) {
+    return {ErrorCode::UNSUPPORTED, 0, 0};
+  }
+
   if (!isValidSlaveId(slave_id)) {
     return {ErrorCode::INVALID_SLAVE_ID, 0, 0};
   }
@@ -480,14 +535,12 @@ Bld305sDriver::Result Bld305sDriver::endCycle()
   if (!cycle_active_) {
     return {ErrorCode::INVALID_CYCLE_STATE, 0, 0};
   }
-  // Minimum mandatory cycle: speed setpoint, actual-speed read, fault read.
-  // Diagnostics are additional rotating reads and do not relax these.
-  // readFaultRaw() now reads 0x0076 (manual-cited, bench check pending), but no
-  // live worker issues these exchanges yet. Only the mock reaches this count.
-  constexpr std::uint8_t MANDATORY_EXCHANGES_PER_CYCLE = 3;
+  // Default mandatory cycle: speed setpoint, actual-speed read, fault read.
+  // Bench mode alternates reads and sets one mandatory exchange per cycle.
+  // Any failed exchange still makes the cycle bad.
   for (auto id : cycle_slaves_) {
     auto & state = slave_states_[id];
-    const bool good = state.success_count_cycle >= MANDATORY_EXCHANGES_PER_CYCLE &&
+    const bool good = state.success_count_cycle >= mandatory_exchanges_per_cycle_ &&
       !state.exchange_failed_cycle;
     // Miss counting and the valid/lost decision live in the core.
     core::WheelCycleHealth health;

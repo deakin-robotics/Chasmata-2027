@@ -48,5 +48,168 @@ int main()
   CHECK(!directCommandFresh(t0, t0 - 1, limit));            // clock went backwards
   CHECK(!directCommandFresh(0, t0, limit));                 // never received
   CHECK(!directCommandFresh(t0, t0, 0));                    // invalid timeout
+
+  // --- Bench motion -------------------------------------------------------
+  // RPM conversion: 1 rad/s x 60/(2 pi) x 50 = 477.46 motor RPM.
+  auto c = benchMotorCommand(1.0, 50.0, false, 500.0);
+  CHECK(c.direction == 1 && c.raw_rpm == 477 && !c.clamped);
+  c = benchMotorCommand(-0.5, 50.0, false, 500.0);   // 238.73
+  CHECK(c.direction == 2 && c.raw_rpm == 239);
+  // Cap.
+  c = benchMotorCommand(1.0, 50.0, false, 300.0);
+  CHECK(c.direction == 1 && c.raw_rpm == 300 && c.clamped);
+  c = benchMotorCommand(-100.0, 50.0, false, 300.0);
+  CHECK(c.direction == 2 && c.raw_rpm == 300 && c.clamped);
+  // Mirroring flips direction only.
+  c = benchMotorCommand(1.0, 50.0, true, 500.0);
+  CHECK(c.direction == 2 && c.raw_rpm == 477);
+  c = benchMotorCommand(-1.0, 50.0, true, 500.0);
+  CHECK(c.direction == 1 && c.raw_rpm == 477);
+  // Deadband: below 1 motor RPM is a stop; 0.0021 rad/s = 1.003 RPM is not.
+  c = benchMotorCommand(0.002, 50.0, false, 500.0);  // 0.955 RPM
+  CHECK(c.direction == 0 && c.raw_rpm == 0);
+  c = benchMotorCommand(0.0021, 50.0, false, 500.0);
+  CHECK(c.direction == 1 && c.raw_rpm == 1);
+  CHECK(benchMotorCommand(0.0, 50.0, false, 500.0).direction == 0);
+  // Anything invalid is a stop, never an error that keeps the old command.
+  CHECK(benchMotorCommand(std::numeric_limits<double>::quiet_NaN(), 50, false, 500).direction == 0);
+  CHECK(benchMotorCommand(std::numeric_limits<double>::infinity(), 50, false, 500).direction == 0);
+  CHECK(benchMotorCommand(1.0, 0.0, false, 500).direction == 0);
+  CHECK(benchMotorCommand(1.0, 50.0, false, 0.0).direction == 0);
+
+  // Read-back: raw RPM to wheel rad/s, sign from direction then mirroring.
+  CHECK(std::abs(benchWheelSpeedFromRaw(477, 50.0, false, 1) - 0.99903) < 1e-4);
+  CHECK(std::abs(benchWheelSpeedFromRaw(477, 50.0, false, 2) + 0.99903) < 1e-4);
+  CHECK(std::abs(benchWheelSpeedFromRaw(477, 50.0, true, 2) - 0.99903) < 1e-4);
+  CHECK(std::isnan(benchWheelSpeedFromRaw(477, 0.0, false, 1)));
+
+  // Write planner: one write per cycle, stop first, speed before direction.
+  const std::int64_t ms = 1000000;
+  const std::int64_t resend = 500 * ms;  // 2 Hz: 1 s - one period
+  const std::uint16_t cap = 500;
+  const BenchMotorCommand fwd{1, 300, false}, rev{2, 300, false}, stop{};
+  BenchOutputState s;
+  BenchStartGate gate;  // like the hardware: last direction updated on acknowledged writes
+  std::int64_t now = 1000 * ms;
+  auto step = [&](const BenchMotorCommand & target) {
+      const auto w = planBenchWrite(s, target, now, resend, cap, gate);
+      if (w.reg != BenchRegister::NONE) recordBenchWrite(s, w, true, now);
+      if (w.reg == BenchRegister::CONTROL && w.value != 0) {
+        gate.last_motion_direction = static_cast<std::uint8_t>(w.value);
+      }
+      return w;
+    };
+  auto w = step(fwd);  // unknown direction: stop first
+  CHECK(w.reg == BenchRegister::CONTROL && w.value == 0);
+  w = step(fwd);
+  CHECK(w.reg == BenchRegister::SPEED && w.value == 300);
+  w = step(fwd);
+  CHECK(w.reg == BenchRegister::CONTROL && w.value == 1);
+  CHECK(step(fwd).reg == BenchRegister::NONE);  // write only what changed
+  // Speed change in the same direction is a single speed write.
+  w = step({1, 200, false});
+  CHECK(w.reg == BenchRegister::SPEED && w.value == 200);
+  // Re-send: both due, the older (direction) goes first, then speed.
+  now += resend;
+  w = step({1, 200, false});
+  CHECK(w.reg == BenchRegister::CONTROL && w.value == 1);
+  w = step({1, 200, false});
+  CHECK(w.reg == BenchRegister::SPEED && w.value == 200);
+  CHECK(step({1, 200, false}).reg == BenchRegister::NONE);
+  // Reversal: stop, then hold until the drive has run down, then direction.
+  // The acknowledged 200 RPM is nonzero and within the cap, so the direction
+  // goes straight after the hold; the new 300 RPM follows.
+  w = step(rev);
+  CHECK(w.reg == BenchRegister::CONTROL && w.value == 0);
+  gate.reversal_clear = false;
+  CHECK(step(rev).reg == BenchRegister::NONE);  // hold: still running down
+  CHECK(step(rev).reg == BenchRegister::NONE);
+  now += resend;
+  w = step(rev);  // still holding: only the stop is re-sent
+  CHECK(w.reg == BenchRegister::CONTROL && w.value == 0);
+  gate.reversal_clear = true;  // 0x005F read near zero after the stop
+  w = step(rev);
+  CHECK(w.reg == BenchRegister::CONTROL && w.value == 2);
+  w = step(rev);
+  CHECK(w.reg == BenchRegister::SPEED && w.value == 300);
+  // Stop always wins, even with a speed change pending.
+  w = step(stop);
+  CHECK(w.reg == BenchRegister::CONTROL && w.value == 0);
+  CHECK(step(stop).reg == BenchRegister::NONE);
+  now += resend;
+  w = step(stop);  // a stopped drive still gets its stop re-sent
+  CHECK(w.reg == BenchRegister::CONTROL && w.value == 0);
+  // A failed write makes the register unknown, so the next plan stops first.
+  recordBenchWrite(s, {BenchRegister::CONTROL, 1}, false, now);
+  w = planBenchWrite(s, fwd, now, resend, cap, gate);
+  CHECK(w.reg == BenchRegister::CONTROL && w.value == 0);
+
+  // Start starvation: from stop, a command whose RPM changes every cycle still
+  // starts once one nonzero speed within the cap is acknowledged.
+  {
+    BenchOutputState st;
+    recordBenchWrite(st, {BenchRegister::SPEED, 0}, true, now);   // activation zeroed it
+    recordBenchWrite(st, {BenchRegister::CONTROL, 0}, true, now);
+    const BenchStartGate first_start{};  // no motion since activation: not a reversal
+    w = planBenchWrite(st, {1, 100, false}, now, resend, cap, first_start);
+    CHECK(w.reg == BenchRegister::SPEED && w.value == 100);  // 0 is not a start speed
+    recordBenchWrite(st, w, true, now);
+    w = planBenchWrite(st, {1, 101, false}, now, resend, cap, first_start);  // target moved on
+    CHECK(w.reg == BenchRegister::CONTROL && w.value == 1);  // starts anyway
+    recordBenchWrite(st, w, true, now);
+    w = planBenchWrite(st, {1, 102, false}, now, resend, cap, first_start);
+    CHECK(w.reg == BenchRegister::SPEED && w.value == 102);  // then speed follows the target
+    // An acknowledged speed above the cap is never used to start.
+    BenchOutputState over;
+    recordBenchWrite(over, {BenchRegister::SPEED, 600}, true, now);
+    recordBenchWrite(over, {BenchRegister::CONTROL, 0}, true, now);
+    w = planBenchWrite(over, {1, 100, false}, now, resend, cap, first_start);
+    CHECK(w.reg == BenchRegister::SPEED && w.value == 100);
+  }
+
+  // Reversal clearance: near zero after the stop, or the fallback only while
+  // no speed read has succeeded since the stop.
+  CHECK(benchReversalClear(true, true, 0));
+  CHECK(!benchReversalClear(false, true, 100));  // speed readable but not near zero: wait
+  CHECK(!benchReversalClear(false, false, BENCH_REVERSAL_FALLBACK_CYCLES - 1));
+  CHECK(benchReversalClear(false, false, BENCH_REVERSAL_FALLBACK_CYCLES));
+
+  // Fault-register freshness. The limit derives from the rate: 2.5 poll
+  // intervals of 2 cycles, so 2.5 s at 2 Hz and 5 s at 1 Hz.
+  const std::int64_t sec = 1000000000LL;
+  CHECK(benchPollStaleAfterNs(2.0) == 25 * sec / 10);
+  CHECK(benchPollStaleAfterNs(1.0) == 5 * sec);
+  CHECK(benchPollStaleAfterNs(0.0) == 0);
+  CHECK(benchPollStaleAfterNs(std::numeric_limits<double>::quiet_NaN()) == 0);
+  const auto stale_limit = benchPollStaleAfterNs(2.0);
+  PollFreshness ff;
+  const std::int64_t t_act = 10 * sec;
+  resetPollFreshness(ff, t_act);  // activation
+  CHECK(!pollsStale(ff, t_act, stale_limit));
+  CHECK(!pollsStale(ff, t_act + stale_limit, stale_limit));      // exactly 2.5 s: not longer than
+  CHECK(pollsStale(ff, t_act + stale_limit + 1, stale_limit));   // longer than 2.5 s: stale
+  recordPoll(ff, false, t_act + sec);  // one failed poll
+  CHECK(!pollsStale(ff, t_act + sec, stale_limit));
+  recordPoll(ff, true, t_act + 2 * sec);  // a good one clears it
+  CHECK(ff.consecutive_failed_polls == 0 && ff.last_ok_ns == t_act + 2 * sec);
+  CHECK(!pollsStale(ff, t_act + 2 * sec + stale_limit, stale_limit));
+  recordPoll(ff, false, t_act + 3 * sec);
+  recordPoll(ff, false, t_act + 4 * sec);  // two in a row
+  CHECK(pollsStale(ff, t_act + 4 * sec, stale_limit));
+  resetPollFreshness(ff, t_act + 5 * sec);  // re-activation starts fresh
+  CHECK(!pollsStale(ff, t_act + 5 * sec, stale_limit));
+  // Stale by time alone: polls neither fail nor succeed (e.g. not issued).
+  CHECK(pollsStale(ff, t_act + 5 * sec + stale_limit + 1, stale_limit));
+
+  // Wire-time floors at 9600 8N1: 1.0417 ms per character, 3.646 ms silence.
+  const RtuFraming f9600{9600, 8, false, 1};
+  CHECK(std::abs(rtuCharMs(f9600) - 1.041667) < 1e-4);
+  CHECK(std::abs(rtuSilenceMs(f9600) - 3.645833) < 1e-4);
+  // 4 x [(15 + 16) chars + 4 silences] = 187.5 ms
+  CHECK(std::abs(benchWorstCycleFloorMs(f9600, 4) - 187.5) < 1e-3);
+  // 8 chars + 1 silence + 50 ms timeout + 4 x (15 chars + 2 silences) = 153.65 ms
+  CHECK(std::abs(benchStopFloorMs(f9600, 4, 50.0) - 153.646) < 1e-2);
+  CHECK(rtuSilenceMs(RtuFraming{38400, 8, false, 1}) == 1.75);
+
   std::cout << "core tests passed\n";
 }

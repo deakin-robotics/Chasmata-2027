@@ -3,7 +3,8 @@
 robot_state_publisher and ros2_control_node with the real RoverHardwareInterface,
 all in the /drivetrain namespace, plus spawners and the direct-drive relay.
 
-The hardware refuses on_configure() until it is verified. The controller
+The hardware refuses on_configure() until it is verified, unless the hardware
+config sets bench_motion_enabled: true (bench test only; see the README). The controller
 manager stays up with the hardware unconfigured, and the spawners that need it
 exit with an error that this launch explains instead of treating it as a crash.
 """

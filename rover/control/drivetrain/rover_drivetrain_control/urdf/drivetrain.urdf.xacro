@@ -31,11 +31,14 @@
   <xacro:dcr_drivetrain_hardware
     serial_device="${hw['serial_device']}" baud_rate="${hw['baud_rate']}"
     parity="${hw['parity']}" data_bits="${hw['data_bits']}" stop_bits="${hw['stop_bits']}"
+    response_timeout_ms="${hw['response_timeout_ms']}"
     update_hz="${hw['update_hz']}" upstream_timeout_ms="${hw['upstream_timeout_ms']}"
     stop_deadline_ms="${hw['stop_deadline_ms']}"
     measured_stop_wire_budget_ms="${hw['measured_stop_wire_budget_ms']}"
     measured_worst_bus_cycle_ms="${hw['measured_worst_bus_cycle_ms']}"
     late_trigger_ms="${hw['late_trigger_ms']}"
     fl_id="${hw['fl_id']}" rl_id="${hw['rl_id']}" fr_id="${hw['fr_id']}" rr_id="${hw['rr_id']}"
-    gear_ratio="${hw['gear_ratio']}" motor_rpm_limit="${hw['motor_rpm_limit']}"/>
+    gear_ratio="${hw['gear_ratio']}" motor_rpm_limit="${hw['motor_rpm_limit']}"
+    bench_motion_enabled="${hw['bench_motion_enabled']}" pole_pairs="${hw['pole_pairs']}"
+    bench_rpm_cap="${hw['bench_rpm_cap']}" bench_stop_deadline_ms="${hw['bench_stop_deadline_ms']}"/>
 </robot>

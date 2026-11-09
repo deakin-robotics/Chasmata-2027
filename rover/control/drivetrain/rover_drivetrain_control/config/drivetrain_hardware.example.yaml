@@ -6,6 +6,7 @@ baud_rate: 38400   # the plugin requires 38400; drives are at 9600 today
 parity: 'N'        # framing unverified
 data_bits: 8
 stop_bits: 1
+response_timeout_ms: 30  # the plugin's previous built-in value
 update_hz: 15      # integer: also used as the ros2_control rw_rate attribute
 upstream_timeout_ms: 110
 stop_deadline_ms: 300
@@ -18,3 +19,19 @@ fr_id: 3
 rr_id: 4
 gear_ratio: 50          # PLACEHOLDER
 motor_rpm_limit: 2000   # PLACEHOLDER
+
+# --- Bench motion test only (see README "Bench motion test") -----------------
+# Off by default. Set true or false; anything else makes the plugin refuse to start.
+bench_motion_enabled: false
+# The values below are read only when bench_motion_enabled is true. All are
+# PLACEHOLDERS with no plugin default; the 0 is deliberately invalid.
+pole_pairs: 0                 # PLACEHOLDER: from the motor datasheet and the probe on the 12th; 0 is refused
+bench_rpm_cap: 100            # PLACEHOLDER: motor RPM, at most 500; start low
+bench_stop_deadline_ms: 1500  # PLACEHOLDER: from the bench timing working in the README
+# In bench mode, also change these (values from the README working, PLACEHOLDERS until measured):
+#   baud_rate: 9600
+#   response_timeout_ms: 50
+#   update_hz: 2
+#   late_trigger_ms: 750
+#   measured_worst_bus_cycle_ms: 245   # refused below the 187.5 ms wire floor at 9600
+#   measured_stop_wire_budget_ms: 200  # refused below the 153.6 ms floor at 9600 with a 50 ms timeout

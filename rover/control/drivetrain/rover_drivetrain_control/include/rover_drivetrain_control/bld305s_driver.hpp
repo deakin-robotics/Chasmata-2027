@@ -84,6 +84,10 @@ public:
     std::uint8_t success_count_cycle{0};
   };
 
+  // True only for a valid Modbus exception reply with code 2 (illegal data
+  // address): the drive answered, but does not support that register for this function.
+  [[nodiscard]] static bool isIllegalDataAddress(const Result & result) noexcept;
+
   static constexpr int TARGET_BAUD_RATE = 38400;  // target baud, bench-gated
   using SlaveIds = std::array<std::uint8_t, 4>;
 
@@ -104,6 +108,9 @@ public:
   // Supply all four wheel IDs, in any order, once for the shared bus.
   [[nodiscard]] Result beginCycle(const SlaveIds & slave_ids);
   [[nodiscard]] Result endCycle();
+  // Successful exchanges a slave needs for a good cycle. Default 3 (speed
+  // setpoint, actual speed, fault). Bench mode does one read per cycle and sets 1.
+  void setMandatoryExchangesPerCycle(std::uint8_t count) noexcept;
   void close();
   [[nodiscard]] bool isOpen() const noexcept;
 
@@ -121,13 +128,27 @@ public:
     std::uint8_t slave_id,
     std::uint16_t raw_control);
 
+  // Bench activation only: control mode (0x0136) and pole pairs (0x0116).
+  // Never followed by a save (0x80FF), so power-cycling restores the stored values.
+  [[nodiscard]] Result writeControlModeRaw(
+    std::uint8_t slave_id, std::uint16_t raw_mode);
+
+  [[nodiscard]] Result writePolePairsRaw(
+    std::uint8_t slave_id, std::uint16_t raw_pole_pairs);
+
+  // Stop every drive at once: broadcast address 0, 0x0066 = 0. Drives do not
+  // reply to a broadcast; libmodbus 3.1.x waits response_timeout for one anyway,
+  // so a timeout counts as sent. OK means "sent", never "stopped": confirm by
+  // reading every drive's running status.
+  [[nodiscard]] Result broadcastStop();
+
   // 0x005F ACTUAL speed: manual-cited (FC 03), bench check pending.
   // Raw value is never converted to rad/s without a bench read-back.
   [[nodiscard]] Result readActualSpeedRaw(
     std::uint8_t slave_id, std::uint16_t & raw_speed);
 
   // Read-only (FC 03) probes; see docs/BLD305S_REGISTERS.md. Manual-cited,
-  // bench check pending. There are deliberately no matching write methods.
+  // bench check pending. Drive address and baud code have no write methods.
   [[nodiscard]] Result readRunningStatusRaw(
     std::uint8_t slave_id, std::uint16_t & raw_status);
 
@@ -186,12 +207,6 @@ private:
   // Manual-cited, bench check pending — actual speed register
   static constexpr std::uint16_t ACTUAL_SPEED_REGISTER = 0x005F;
 
-  // UNVERIFIED — cross-check against manual
-  static constexpr std::uint16_t INIT_REGISTER_0136 = 0x0136;
-
-  // UNVERIFIED — cross-check against manual
-  static constexpr std::uint16_t INIT_REGISTER_0116 = 0x0116;
-
   static constexpr std::uint16_t TEMPERATURE_REGISTER = 0x0096;
   static constexpr std::uint16_t CURRENT_REGISTER = 0x00B6;
   static constexpr std::uint16_t VOLTAGE_REGISTER = 0x00C6;
@@ -203,9 +218,20 @@ private:
   static constexpr std::uint16_t DRIVE_ADDRESS_REGISTER = 0x00A6;
   // Never write: changing the stored baud code drops the drive off the bus.
   static constexpr std::uint16_t BAUD_CODE_REGISTER = 0x00F6;
-  // Same addresses as INIT_REGISTER_0116/0136; these names are read-only.
+  // Read by probes; written only during bench activation, never saved.
   static constexpr std::uint16_t POLE_PAIRS_REGISTER = 0x0116;
   static constexpr std::uint16_t CONTROL_MODE_REGISTER = 0x0136;
+  static constexpr std::uint16_t SAVE_REGISTER = 0x80FF;
+  static constexpr int BROADCAST_ADDRESS = 0;
+
+  // writeSingleRegister refuses these whatever the caller: a stored baud
+  // code or address change drops the drive off the bus, and a save makes
+  // any change permanent.
+  [[nodiscard]] static constexpr bool isForbiddenWrite(std::uint16_t address) noexcept
+  {
+    return address == BAUD_CODE_REGISTER || address == DRIVE_ADDRESS_REGISTER ||
+           address == SAVE_REGISTER;
+  }
 
   static constexpr std::uint8_t MIN_SLAVE_ID = 1;
   static constexpr std::uint8_t MAX_SLAVE_ID = 247;
@@ -231,6 +257,7 @@ private:
   void closeUnlocked() noexcept;
 
   bool cycle_active_{false};
+  std::uint8_t mandatory_exchanges_per_cycle_{3};
   SlaveIds cycle_slaves_{};
   [[nodiscard]] static bool validSlaveIds(const SlaveIds & slave_ids) noexcept;
   [[nodiscard]] bool isExpectedCycleSlave(std::uint8_t slave_id) const noexcept;

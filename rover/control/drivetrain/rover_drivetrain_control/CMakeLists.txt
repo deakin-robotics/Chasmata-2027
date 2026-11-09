@@ -29,7 +29,8 @@ target_include_directories(${PROJECT_NAME}_core PUBLIC
 
 add_library(${PROJECT_NAME} SHARED
   src/bld305s_driver.cpp
-  src/rover_hardware_interface.cpp)
+  src/rover_hardware_interface.cpp
+  src/rover_hardware_interface_bench.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
@@ -97,6 +98,17 @@ if(BUILD_TESTING)
     hardware_interface rclcpp rclcpp_lifecycle)
   target_link_libraries(test_hardware_configuration ${PROJECT_NAME})
   add_test(NAME drivetrain_hardware_configuration COMMAND test_hardware_configuration)
+
+  # Bench motion against four simulated drives: the real hardware interface and
+  # driver, with every libmodbus call mocked. No serial port is opened.
+  add_executable(test_bench_motion test/test_bench_motion.cpp
+    src/rover_hardware_interface.cpp src/rover_hardware_interface_bench.cpp
+    src/bld305s_driver.cpp)
+  target_include_directories(test_bench_motion PRIVATE include ${LIBMODBUS_INCLUDE_DIRS})
+  ament_target_dependencies(test_bench_motion
+    hardware_interface pluginlib rclcpp rclcpp_lifecycle)
+  target_link_libraries(test_bench_motion ${PROJECT_NAME}_core)
+  add_test(NAME drivetrain_bench_motion COMMAND test_bench_motion)
 
   # Unpopulated telemetry must never claim success or valid data.
   add_executable(test_telemetry_defaults test/test_telemetry_defaults.cpp)

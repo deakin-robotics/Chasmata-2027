@@ -18,6 +18,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -39,7 +40,8 @@ public:
   };
 
   RoverHardwareInterface() = default;
-  ~RoverHardwareInterface() override = default;
+  // In bench mode, an active interface stops every drive before it goes away.
+  ~RoverHardwareInterface() override;
 
   RoverHardwareInterface(const RoverHardwareInterface &) = delete;
   RoverHardwareInterface & operator=(const RoverHardwareInterface &) = delete;
@@ -59,6 +61,12 @@ public:
     const rclcpp_lifecycle::State & previous_state) override;
 
   hardware_interface::CallbackReturn on_cleanup(
+    const rclcpp_lifecycle::State & previous_state) override;
+
+  hardware_interface::CallbackReturn on_shutdown(
+    const rclcpp_lifecycle::State & previous_state) override;
+
+  hardware_interface::CallbackReturn on_error(
     const rclcpp_lifecycle::State & previous_state) override;
 
   std::vector<hardware_interface::StateInterface>
@@ -87,6 +95,31 @@ private:
 
   [[nodiscard]] const Bld305sDriver * driverForWheel(
     std::size_t wheel_index) const noexcept;
+
+  // Bench motion (bench_motion_enabled=true only); rover_hardware_interface_bench.cpp.
+  [[nodiscard]] bool parseBenchConfiguration();
+  [[nodiscard]] hardware_interface::CallbackReturn benchConfigure();
+  [[nodiscard]] hardware_interface::CallbackReturn benchActivate();
+  [[nodiscard]] hardware_interface::CallbackReturn benchDeactivate();
+  [[nodiscard]] hardware_interface::CallbackReturn benchShutdown(bool from_error);
+  [[nodiscard]] hardware_interface::return_type benchRead();
+  [[nodiscard]] hardware_interface::return_type benchWrite();
+  // Latches the stop, then stops all four drives. Always returns ERROR for read()/write().
+  [[nodiscard]] hardware_interface::return_type benchSafetyStop(const std::string & reason);
+  // Broadcast stop, then every drive's status must read 0 ("stop accepted",
+  // not proof the motor has run down); retries until bench_stop_deadline_ms.
+  // Sets or clears bench_stop_unconfirmed_. Caller holds bench_mutex_.
+  [[nodiscard]] bool stopAllAndConfirm(const std::string & reason);
+  // After a stop was not accepted: keep broadcasting at the update rate for
+  // BENCH_UNCONFIRMED_STOP_WINDOW_MS. True as soon as all four accept it.
+  [[nodiscard]] bool keepBroadcastingStop(const std::string & reason);
+  // Drives whose running status is not 0 (or did not answer); empty if none.
+  [[nodiscard]] std::string drivesNotStopped();
+  // One 0x005F read per drive, for the "stop accepted" log only: raw values,
+  // "n/a" for a failed read. Changes no state and never the stop result.
+  [[nodiscard]] std::string actualSpeedsForLog();
+  void markStopAccepted(std::size_t wheel) noexcept;
+  void endOpenCycle() noexcept;
 
   void updateIoHeartbeat() noexcept;
   [[nodiscard]] static std::int64_t steadyNowNs() noexcept;
@@ -126,6 +159,35 @@ private:
   core::TimingConfig timing_{};
   std::int64_t previous_read_tick_ns_{0};
   bool late_trigger_detected_{false};
+
+  // Bench motion. Off unless bench_motion_enabled is exactly "true".
+  bool bench_motion_enabled_{false};
+  long long bench_pole_pairs_{0};
+  double bench_rpm_cap_{0.0};
+  double bench_stop_deadline_ms_{0.0};
+  std::int64_t bench_resend_after_ns_{0};
+  bool bench_configured_{false};
+  bool bench_stop_latched_{false};  // no motion until the next successful activation
+  // Sticky: a stop was broadcast but not every drive reported status 0. Cleared
+  // only when a later stop is accepted. While set, on_error keeps the bus open.
+  bool bench_stop_unconfirmed_{false};
+  bool bench_cycle_open_{false};
+  std::uint64_t bench_cycle_index_{0};
+  std::array<core::BenchOutputState, WHEEL_COUNT> bench_output_{};
+  // Last nonzero direction acknowledged; 0 = none since activation. Updated
+  // only when a new direction write is acknowledged.
+  std::array<std::uint8_t, WHEEL_COUNT> bench_last_motion_direction_{};
+  // Reversal hold, per drive: the cycle of the last accepted stop, and what
+  // 0x005F reads since then have shown.
+  std::array<std::uint64_t, WHEEL_COUNT> bench_stop_cycle_{};
+  std::array<bool, WHEEL_COUNT> bench_speed_read_since_stop_{};
+  std::array<bool, WHEEL_COUNT> bench_near_zero_since_stop_{};
+  // Per drive, separate from cycle health; reset on every activation.
+  std::array<core::PollFreshness, WHEEL_COUNT> bench_fault_freshness_{};  // 0x0076
+  std::array<core::PollFreshness, WHEEL_COUNT> bench_speed_freshness_{};  // 0x005F
+  std::int64_t bench_poll_stale_after_ns_{0};
+  // Lifecycle callbacks and the async read/write thread share the bus state.
+  std::mutex bench_mutex_;
 };
 
 }  // namespace rover_drivetrain_control
