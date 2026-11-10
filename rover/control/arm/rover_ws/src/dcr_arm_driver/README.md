@@ -4,6 +4,12 @@ ROS 2 Jazzy arm hardware plugin for six joints via `/socketcan_bridge/tx` and `/
 
 **Start with [hardware commissioning](../../../docs/hardware-commissioning.md).** The default URDF disables motion. Motor/controller firmware, CAN units, folded references, physical support/brakes and motor-side loss-of-communication behavior must be verified before enabling a bench profile. A software stop cannot prevent collapse after loss of torque or CAN communication.
 
+## Hardware reference and items on hold
+
+The legacy rover controller addresses joints in this order, which matches the current URDF: base `0x01`, shoulder `0x02`, elbow `0x03`, yaw `0x04`, pitch `0x05`, roll `0x06`. Its end-effector commands use `0x07`. These are historical software assignments, not a measurement of the devices currently connected. The legacy launch selected `can1`, and its startup script set that interface to 1 Mbit/s. The current URDF names `can0`; verify the actual adapter name and bitrate before connecting to the physical bus. The arm plugin's `can_interface` parameter does not configure the SocketCAN bridge.
+
+The identified motor/driver combinations are GIM8108-48 + GDZ468, GIM4310-36 + GDZ34, and GIM4305-10 + GDZ34. **Physical motion testing remains on hold** until the per-joint model and CAN ID assignment, firmware and command units, encoder direction and folded readings, motor-side communication watchdog, brake or mechanical support, current limits, and independent stop are confirmed. The legacy code does not establish those facts. Record the measurements in a reviewed bench profile and follow the [commissioning procedure](../../../docs/hardware-commissioning.md) before enabling motion.
+
 ## Operating contract
 
 - Startup uses measured joint positions. It never commands an assumed zero or automatically homes the folded arm.
