@@ -1,0 +1,390 @@
+[
+  {
+    "name": "bridge startup",
+    "passed": true,
+    "detail": {
+      "port": "/dev/pts/0",
+      "usb": "/dev/ttyUSB0",
+      "baud": 500000
+    }
+  },
+  {
+    "name": "drive 1 raw write/read",
+    "passed": true,
+    "detail": {
+      "stored": 101,
+      "actual": 101
+    }
+  },
+  {
+    "name": "drive 2 raw write/read",
+    "passed": true,
+    "detail": {
+      "stored": 102,
+      "actual": 102
+    }
+  },
+  {
+    "name": "drive 3 raw write/read",
+    "passed": true,
+    "detail": {
+      "stored": 103,
+      "actual": 103
+    }
+  },
+  {
+    "name": "drive 4 raw write/read",
+    "passed": true,
+    "detail": {
+      "stored": 104,
+      "actual": 104
+    }
+  },
+  {
+    "name": "drive 1 firmware watchdog",
+    "passed": true,
+    "detail": {
+      "actual_after_650ms": 0
+    }
+  },
+  {
+    "name": "drive 2 firmware watchdog",
+    "passed": true,
+    "detail": {
+      "actual_after_650ms": 0
+    }
+  },
+  {
+    "name": "drive 3 firmware watchdog",
+    "passed": true,
+    "detail": {
+      "actual_after_650ms": 0
+    }
+  },
+  {
+    "name": "drive 4 firmware watchdog",
+    "passed": true,
+    "detail": {
+      "actual_after_650ms": 0
+    }
+  },
+  {
+    "name": "all six arm feedback channels",
+    "passed": false,
+    "detail": {
+      "positions": {
+        "base_joint": 0.0,
+        "elbow_joint": 0.0,
+        "pitch_joint": 0.0,
+        "roll_joint": 0.0,
+        "shoulder_joint": 0.0,
+        "yaw_joint": 0.0
+      },
+      "temperatures": {
+        "1": 25,
+        "2": 25,
+        "3": 25,
+        "4": 25,
+        "5": 25,
+        "6": 25
+      },
+      "bus_volts": {
+        "1": 24.0,
+        "2": 24.0,
+        "3": 24.0,
+        "4": 24.0,
+        "5": 24.0,
+        "6": 24.0
+      },
+      "reason": "e-stop active or unknown"
+    }
+  },
+  {
+    "name": "startup motion inhibited",
+    "passed": true,
+    "detail": {
+      "reason": "e-stop active or unknown"
+    }
+  },
+  {
+    "name": "arm controllers active",
+    "passed": true,
+    "detail": {
+      "arm_controller": "active",
+      "joint_state_broadcaster": "active"
+    }
+  },
+  {
+    "name": "zero trajectory and rearm",
+    "passed": true,
+    "detail": {
+      "status": 4,
+      "code": 0,
+      "reason": "motion inhibited",
+      "controller_ready": true
+    }
+  },
+  {
+    "name": "trajectory command capture",
+    "passed": true,
+    "detail": {
+      "1": [
+        "c204010000",
+        "c204010000",
+        "c204010000"
+      ],
+      "2": [
+        "c287010000",
+        "c287010000",
+        "c287010000"
+      ],
+      "3": [
+        "c209020000",
+        "c209020000",
+        "c209020000"
+      ],
+      "4": [
+        "c204010000",
+        "c204010000",
+        "c204010000"
+      ],
+      "5": [
+        "c287010000",
+        "c287010000",
+        "c287010000"
+      ],
+      "6": [
+        "c209020000",
+        "c209020000",
+        "c209020000"
+      ]
+    }
+  },
+  {
+    "name": "six-joint trajectory",
+    "passed": false,
+    "detail": {
+      "status": 4,
+      "code": 0,
+      "positions_rad": {
+        "base_joint": 0.08091748656096757,
+        "elbow_joint": 0.0,
+        "pitch_joint": 0.0,
+        "roll_joint": 0.0,
+        "shoulder_joint": 0.07631554419731065,
+        "yaw_joint": 0.0
+      },
+      "max_error_rad": 0.2,
+      "error": "Goal successfully reached!"
+    }
+  },
+  {
+    "name": "direct command capture",
+    "passed": true,
+    "detail": {
+      "1": [
+        "c2f4010000",
+        "c2f4010000",
+        "c2f4010000"
+      ],
+      "2": [
+        "c222020000",
+        "c222020000",
+        "c222020000"
+      ],
+      "3": [
+        "c24f020000",
+        "c24f020000",
+        "c24f020000"
+      ],
+      "4": [
+        "c27d020000",
+        "c27d020000",
+        "c27d020000"
+      ],
+      "5": [
+        "c2aa020000",
+        "c2aa020000",
+        "c2aa020000"
+      ],
+      "6": [
+        "c2d8020000",
+        "c2d8020000",
+        "c2d8020000"
+      ]
+    }
+  },
+  {
+    "name": "six-joint direct position",
+    "passed": false,
+    "detail": {
+      "1": 10.986328125,
+      "2": 11.9970703125,
+      "3": 64.79736328125,
+      "4": 0.0,
+      "5": 0.0,
+      "6": 0.0
+    }
+  },
+  {
+    "name": "direct speed",
+    "passed": false,
+    "detail": {
+      "speed_rpm": 0.0
+    }
+  },
+  {
+    "name": "estop stops all joints",
+    "passed": false,
+    "detail": {
+      "1": 300.0,
+      "2": 0.0,
+      "3": 0.0,
+      "4": 0.0,
+      "5": 0.0,
+      "6": 0.0
+    }
+  },
+  {
+    "name": "estop clear does not resume direct speed",
+    "passed": false,
+    "detail": {
+      "speed_rpm": -20.0,
+      "reason": "motion inhibited"
+    }
+  },
+  {
+    "name": "explicit direct rearm",
+    "passed": false,
+    "detail": {
+      "speed_rpm": -20.0
+    }
+  },
+  {
+    "name": "feedback loss inhibits and commands zero",
+    "passed": true,
+    "detail": {
+      "reason": "joint feedback stale",
+      "command_count": 54
+    }
+  },
+  {
+    "name": "feedback recovery does not resume speed",
+    "passed": true,
+    "detail": {
+      "speed_rpm": 0.0,
+      "reason": "motion inhibited"
+    }
+  },
+  {
+    "name": "drive 1 ROS diagnostics alongside arm",
+    "passed": false,
+    "detail": [
+      {
+        "success": false,
+        "value": 0,
+        "detail": "Modbus read failed; inspect transport and configuration"
+      },
+      {
+        "success": false,
+        "value": 0,
+        "detail": "Modbus read failed; inspect transport and configuration"
+      },
+      {
+        "success": true,
+        "value": 2400,
+        "detail": "Raw register read ACK (units/scaling and bench verification pending)"
+      }
+    ]
+  },
+  {
+    "name": "drive 2 ROS diagnostics alongside arm",
+    "passed": false,
+    "detail": [
+      {
+        "success": false,
+        "value": 0,
+        "detail": "Modbus read failed; inspect transport and configuration"
+      },
+      {
+        "success": true,
+        "value": 0,
+        "detail": "Raw register read ACK (units/scaling and bench verification pending)"
+      },
+      {
+        "success": true,
+        "value": 2400,
+        "detail": "Raw register read ACK (units/scaling and bench verification pending)"
+      }
+    ]
+  },
+  {
+    "name": "drive 3 ROS diagnostics alongside arm",
+    "passed": true,
+    "detail": [
+      {
+        "success": true,
+        "value": 25,
+        "detail": "Raw register read ACK (units/scaling and bench verification pending)"
+      },
+      {
+        "success": true,
+        "value": 0,
+        "detail": "Raw register read ACK (units/scaling and bench verification pending)"
+      },
+      {
+        "success": true,
+        "value": 2400,
+        "detail": "Raw register read ACK (units/scaling and bench verification pending)"
+      }
+    ]
+  },
+  {
+    "name": "drive 4 ROS diagnostics alongside arm",
+    "passed": true,
+    "detail": [
+      {
+        "success": true,
+        "value": 25,
+        "detail": "Raw register read ACK (units/scaling and bench verification pending)"
+      },
+      {
+        "success": true,
+        "value": 0,
+        "detail": "Raw register read ACK (units/scaling and bench verification pending)"
+      },
+      {
+        "success": true,
+        "value": 2400,
+        "detail": "Raw register read ACK (units/scaling and bench verification pending)"
+      }
+    ]
+  },
+  {
+    "name": "steady arm feedback at 50 Hz",
+    "passed": false,
+    "detail": {
+      "status_samples": 253,
+      "max_feedback_gap_s": 0.26030209100099455,
+      "per_channel_max_gap_s": {
+        "(1, 164)": 0.26030209100099455,
+        "(1, 174)": 0.02149104099953547,
+        "(2, 164)": 0.023973777999344748,
+        "(2, 174)": 0.023544636000224273,
+        "(3, 164)": 0.02395457100101339,
+        "(3, 174)": 0.023808031000953633,
+        "(4, 164)": 0.023049977000482613,
+        "(4, 174)": 0.02296762700098043,
+        "(5, 164)": 0.02290008499949181,
+        "(5, 174)": 0.022456763999798568,
+        "(6, 164)": 0.022336067000651383,
+        "(6, 174)": 0.060018966998541146
+      }
+    }
+  },
+  {
+    "name": "drivetrain activation gate",
+    "passed": true,
+    "detail": "ctivate\n[ros2_control_node-2] [ERROR] [1794304919.211649891] [drivetrain.controller_manager]: After activation, controller 'joint_state_broadcaster' is in state 'unconfigured' (1), expected 'active' (3). Releasing interfaces!\n[ros2_control_node-2] [ERROR] [1794304919.211669308] [drivetrain.controller_manager]: At least one controller failed to be activated. Releasing all interfaces and stopping all activated controllers because the switch strictness is set to STRICT.\n[ros2_control_node-2] [ERROR] [1794304919.211703184] [drivetrain.controller_manager]: Could not activate controller : 'joint_state_broadcaster'\n[ros2_control_node-2] [ERROR] [1794304919.211732311] [drivetrain.controller_manager]: Failed switching controllers.... \n[ros2_control_node-2] [ERROR] [1794304919.211747677] [drivetrain.controller_manager]: Unable to activate controllers: [ joint_state_broadcaster  ]\n[spawner-3] [ERROR] [1794304919.222725867] [drivetrain.spawner_joint_state_broadcaster]: Failed to activate controller : joint_state_broadcaster\n[spawner-4] [INFO] [1794304919.315104388] [drivetrain.spawner_diff_drive_controller]: waiting for service /drivetrain/controller_manager/list_controllers to become available...\n[ERROR] [spawner-3]: process has died [pid 4001, exit code 1, cmd '/opt/ros/jazzy/lib/controller_manager/spawner joint_state_broadcaster --controller-manager /drivetrain/controller_manager --param-file /tmp/verify_ws/install/rover_drivetrain_control/share/rover_drivetrain_control/config/drivetrain_controllers.yaml --ros-args -r __node:=spawner_joint_state_broadcaster -r __ns:=/drivetrain'].\n[INFO] [launch.user]: [drivetrain] joint_state_broadcaster did not reach its requested state. Expected while RoverHardwareInterface refuses on_configure(): the hardware stays unconfigured, so no controller can activate and nothing can move. Check with: ros2 control list_hardware_components -c /drivetrain/controller_manager\n[spawner-4] [INFO] [1794304920.324371635] [drivetrain.spawner_diff_drive_controller]: Setting controller param \"params_file\" to \"['/tmp/verify_ws/install/rover_drivetrain_control/share/rover_drivetrain_control/config/drivetrain_controllers.yaml']\" for diff_drive_controller\n[ros2_control_node-2] [INFO] [1794304920.329405535] [drivetrain.controller_manager]: Loading controller : 'diff_drive_controller' of type 'diff_drive_controller/DiffDriveController'\n[ros2_control_node-2] [INFO] [1794304920.329447025] [drivetrain.controller_manager]: Loading controller 'diff_drive_controller'\n[ros2_control_node-2] [INFO] [1794304920.331608731] [drivetrain.controller_manager]: Controller 'diff_drive_controller' node arguments: --ros-args --params-file /tmp/verify_ws/install/rover_drivetrain_control/share/rover_drivetrain_control/config/drivetrain_controllers.yaml --params-file /tmp/verify_ws/install/rover_drivetrain_control/share/rover_drivetrain_control/config/drivetrain_controllers.yaml \n[spawner-4] [INFO] [1794304920.353113201] [drivetrain.spawner_diff_drive_controller]: Loaded diff_drive_controller\n[ros2_control_node-2] [INFO] [1794304920.354581882] [drivetrain.controller_manager]: Configuring controller: 'diff_drive_controller'\n[ros2_control_node-2] [INFO] [1794304920.363462906] [drivetrain.controller_manager]: Activating controllers: [ diff_drive_controller ]\n[ros2_control_node-2] [WARN] [1794304920.363538271] [drivetrain.controller_manager]: Unable to activate controller 'diff_drive_controller' since the command interface 'front_left_wheel_joint/velocity' is not available.\n[spawner-4] [ERROR] [1794304920.364538416] [drivetrain.spawner_diff_drive_controller]: Failed to activate controller : diff_drive_controller\n[spawner-5] [INFO] [1794304920.468445816] [drivetrain.spawner_wheel_velocity_controller]: waiting for service /drivetrain/controller_manager/list_controllers to become available...\n[ERROR] [spawner-4]: process has died [pid 4002, exit code 1, cmd '/opt/ros/jazzy/lib/controller_manager/spawner diff_drive_controller --controller-manager /drivetrain/controller_manager --param-file /tmp/verify_ws/install/rover_drivetrain_control/share/rover_drivetrain_control/config/drivetrain_controllers.yaml --ros-args -r __node:=spawner_diff_drive_controller -r __ns:=/drivetrain'].\n[INFO] [launch.user]: [drivetrain] diff_drive_controller did not reach its requested state. Expected while RoverHardwareInterface refuses on_configure(): the hardware stays unconfigured, so no controller can activate and nothing can move. Check with: ros2 control list_hardware_components -c /drivetrain/controller_manager\n[spawner-5] [INFO] [1794304926.229300984] [drivetrain.spawner_wheel_velocity_controller]: Setting controller param \"params_file\" to \"['/tmp/verify_ws/install/rover_drivetrain_control/share/rover_drivetrain_control/config/drivetrain_controllers.yaml']\" for wheel_velocity_controller\n[ros2_control_node-2] [INFO] [1794304926.235072756] [drivetrain.controller_manager]: Loading controller : 'wheel_velocity_controller' of type 'forward_command_controller/ForwardCommandController'\n[ros2_control_node-2] [INFO] [1794304926.235118087] [drivetrain.controller_manager]: Loading controller 'wheel_velocity_controller'\n[ros2_control_node-2] [INFO] [1794304926.236284329] [drivetrain.controller_manager]: Controller 'wheel_velocity_controller' node arguments: --ros-args --params-file /tmp/verify_ws/install/rover_drivetrain_control/share/rover_drivetrain_control/config/drivetrain_controllers.yaml --params-file /tmp/verify_ws/install/rover_drivetrain_control/share/rover_drivetrain_control/config/drivetrain_controllers.yaml \n[spawner-5] [INFO] [1794304926.253022496] [drivetrain.spawner_wheel_velocity_controller]: Loaded wheel_velocity_controller\n[ros2_control_node-2] [INFO] [1794304926.254381657] [drivetrain.controller_manager]: Configuring controller: 'wheel_velocity_controller'\n[ros2_control_node-2] [INFO] [1794304926.255548319] [drivetrain.wheel_velocity_controller]: configure successful\n[INFO] [spawner-5]: process has finished cleanly [pid 4003]\n"
+  }
+]
