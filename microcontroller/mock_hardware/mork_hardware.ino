@@ -95,7 +95,10 @@ void sendException(uint8_t id, uint8_t function, uint8_t code) {
   sendRtu(reply, 3);
 }
 
-bool readRegister(const DriveState &drive, uint16_t address, uint16_t &value) {
+// Use an index rather than DriveState in the signature. Arduino's sketch
+// preprocessor generates prototypes before type declarations in .ino files.
+bool readRegister(uint8_t driveIndex, uint16_t address, uint16_t &value) {
+  const DriveState &drive = drives[driveIndex];
   switch (address) {
     case 0x0056: value = drive.speed; break;
     case 0x0066: value = drive.control; break;
@@ -114,7 +117,8 @@ bool readRegister(const DriveState &drive, uint16_t address, uint16_t &value) {
   return true;
 }
 
-bool writeRegister(DriveState &drive, uint16_t address, uint16_t value) {
+bool writeRegister(uint8_t driveIndex, uint16_t address, uint16_t value) {
+  DriveState &drive = drives[driveIndex];
   switch (address) {
     case 0x0056: drive.speed = value; drive.lastCommand = millis(); break;
     case 0x0066: drive.control = value; break;
@@ -150,8 +154,8 @@ void handleRtu(const uint8_t *request, uint8_t length) {
   const uint16_t argument = bigEndian16(request + 4);
   if (function == 0x06) {
     if (broadcast) {
-      for (uint8_t i = 0; i < 4; ++i) writeRegister(drives[i], address, argument);
-    } else if (writeRegister(drives[index], address, argument)) {
+      for (uint8_t i = 0; i < 4; ++i) writeRegister(i, address, argument);
+    } else if (writeRegister(index, address, argument)) {
       uint8_t reply[8];
       for (uint8_t i = 0; i < 6; ++i) reply[i] = request[i];
       sendRtu(reply, 6);
@@ -169,7 +173,7 @@ void handleRtu(const uint8_t *request, uint8_t length) {
   uint8_t reply[21] = {id, function, uint8_t(argument * 2)};
   for (uint8_t i = 0; i < argument; ++i) {
     uint16_t value;
-    if (!readRegister(drives[index], address + i, value)) {
+    if (!readRegister(index, address + i, value)) {
       sendException(id, function, 0x02);
       return;
     }
