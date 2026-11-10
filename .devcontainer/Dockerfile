@@ -59,6 +59,7 @@ RUN sudo apt-get update && sudo apt-get install -y \
     python3-pip \
     python3-numpy \
     python3-yaml \
+    python3-serial\
     wireless-tools \
     net-tools \
     iputils-ping \
