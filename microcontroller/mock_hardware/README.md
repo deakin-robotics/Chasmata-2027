@@ -1,5 +1,8 @@
 # USB rover hardware simulator
 
+The hardened arm driver defaults to motion disabled and requires live E-stop heartbeats, explicit rearming, and refreshed direct commands. Use a simulator-only profile with motion enabled for integration tests; follow the [current commissioning contract](../../rover/control/arm/docs/hardware-commissioning.md). The earlier verification harness in the archived evidence predates this contract.
+
+
 Flash this sketch onto an Arduino-compatible microcontroller and connect it to the ROS computer using **one USB data cable**. The board receives commands and returns simulated feedback for six arm joints and four drivetrain controllers. It requires no GPIO connections, external modules, or additional Arduino libraries.
 
 The host bridge lets the existing drivers share that USB connection:

@@ -106,6 +106,8 @@ class UsbMockBridge(Node):
         self.drive_buffer = bytearray()
         self.drive_replies = bytearray()
         self.pending_arm = deque()
+        self.pending_drive = deque()
+        self.last_send = time.monotonic()
         self.last_drive_byte = time.monotonic()
         self.publisher = self.create_publisher(Frame, "/socketcan_bridge/rx", 100)
         self.subscription = self.create_subscription(
@@ -118,10 +120,23 @@ class UsbMockBridge(Node):
     def queue_arm(self, frame):
         packet = encode_arm(frame)
         if packet is not None:
+            stamp = frame.header.stamp.sec + frame.header.stamp.nanosec * 1e-9
+            if stamp:
+                age = self.get_clock().now().nanoseconds * 1e-9 - stamp
+                if age < 0 or age > 0.1:
+                    return
+            motion = frame.data[0] in (0xC1, 0xC2)
+            if motion:
+                self.pending_arm = deque(
+                    item for item in self.pending_arm if item[2] != frame.id)
             if len(self.pending_arm) >= 256:
                 self.get_logger().error("USB command queue full; reduce arm update rate")
                 return
-            self.pending_arm.append(packet)
+            item = (time.monotonic() + 0.1, packet, frame.id if motion else None)
+            if frame.data[0] == 0xC1 and bytes(frame.data[1:5]) == bytes(4):
+                self.pending_arm.appendleft(item)
+            else:
+                self.pending_arm.append(item)
 
     def poll(self):
         try:
@@ -153,9 +168,21 @@ class UsbMockBridge(Node):
             del self.drive_buffer[:8]
             if (request[0] <= 4 and request[1] in (3, 6)
                     and crc16(request) == 0):
-                self.usb.write(request)
-        for _ in range(min(16, len(self.pending_arm))):
-            self.usb.write(self.pending_arm.popleft())
+                if len(self.pending_drive) < 16:
+                    self.pending_drive.append((now + 0.1, request))
+        self.pending_arm = deque(item for item in self.pending_arm if item[0] > now)
+        self.pending_drive = deque(item for item in self.pending_drive if item[0] > now)
+        # One packet per 1 ms callback, including shared Modbus traffic.
+        # A 0.8 ms guard allows timer jitter but prevents catch-up bursts.
+        if now - self.last_send >= 0.0008:
+            packet = None
+            if self.pending_drive:
+                _, packet = self.pending_drive.popleft()
+            elif self.pending_arm:
+                _, packet, _ = self.pending_arm.popleft()
+            if packet is not None:
+                self.usb.write(packet)
+                self.last_send = time.monotonic()
         self.usb_buffer.extend(self.usb.read(4096))
         for kind, payload in extract_responses(self.usb_buffer):
             if kind == "drive":
@@ -194,7 +221,8 @@ def main():
     finally:
         if node is not None:
             node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == "__main__":
