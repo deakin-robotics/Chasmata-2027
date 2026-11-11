@@ -6,12 +6,16 @@
 /drivetrain/controller_manager:
   ros__parameters:
     # 100 Hz so diff_drive's cmd_vel_timeout fires within 10 ms of 110 ms, keeping
-    # the 300 ms stop target. The hardware itself still reads and writes
-    # at 15 Hz (rw_rate in the ros2_control tag).
+    # the 300 ms stop target. The hardware itself reads and writes at its own
+    # update_hz (rw_rate in the ros2_control tag): 15 Hz in production, 2 Hz in
+    # bench mode, where a software stop takes about 1.3 s, not 300 ms.
     update_rate: 100
 
     hardware_components_initial_state:
-      # Keep the manager available for diagnostics if hardware startup fails.
+      # The hardware refuses on_configure() today, until it is verified.
+      # Unconfigured hardware cannot be activated, so no controller can claim the
+      # wheels and staying up is safe. It also keeps the controller manager
+      # running so the failure can be inspected instead of the launch exiting.
       shutdown_on_initial_state_failure: false
 
     joint_state_broadcaster:
@@ -25,7 +29,8 @@
   ros__parameters:
     left_wheel_names: [front_left_wheel_joint, rear_left_wheel_joint]
     right_wheel_names: [front_right_wheel_joint, rear_right_wheel_joint]
-    # Geometry is supplied from drivetrain_hardware.yaml at launch.
+    wheel_radius: 0.1      # m, PLACEHOLDER: measure on the rover
+    wheel_separation: 0.5  # m, PLACEHOLDER: measure on the rover
     cmd_vel_timeout: 0.11  # s; stop when cmd_vel goes quiet
     position_feedback: false  # the hardware exports velocity state only
     base_frame_id: base_link

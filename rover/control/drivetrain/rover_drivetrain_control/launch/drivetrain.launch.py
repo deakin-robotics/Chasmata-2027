@@ -3,7 +3,7 @@
 robot_state_publisher and ros2_control_node with the real RoverHardwareInterface,
 all in the /drivetrain namespace, plus spawners and the direct-drive relay.
 
-The controller manager and spawners report hardware and controller failures.
+The hardware requires the explicitly configured bench mode before it can move.
 """
 
 from launch import LaunchDescription

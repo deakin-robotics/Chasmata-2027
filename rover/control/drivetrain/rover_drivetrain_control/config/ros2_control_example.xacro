@@ -3,9 +3,11 @@
      Do not include this unchanged into a real robot: serial device, mapping,
      gearbox, RPM limit, timings and measurements must be supplied explicitly.
      Intended integration with existing team-generated URDF (not replacing it).
+     The plugin WILL REFUSE on_configure() pending hardware verification,
+     unless bench_motion_enabled is true (bench test only; see the README).
 -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-  <xacro:macro name="dcr_drivetrain_hardware" params="serial_device baud_rate parity data_bits stop_bits update_hz upstream_timeout_ms stop_deadline_ms measured_stop_wire_budget_ms measured_worst_bus_cycle_ms late_trigger_ms fl_id rl_id fr_id rr_id gear_ratio motor_rpm_limit">
+  <xacro:macro name="dcr_drivetrain_hardware" params="serial_device baud_rate parity data_bits stop_bits response_timeout_ms update_hz upstream_timeout_ms stop_deadline_ms measured_stop_wire_budget_ms measured_worst_bus_cycle_ms late_trigger_ms fl_id rl_id fr_id rr_id gear_ratio motor_rpm_limit bench_motion_enabled pole_pairs bench_rpm_cap bench_stop_deadline_ms">
     <!-- Jazzy reads is_async and rw_rate as attributes of this tag, not as
          <param>s (hardware_interface 4.48 component_parser). rw_rate must be a
          positive integer; it runs the hardware at 15 Hz while the controller
@@ -18,12 +20,19 @@
         <param name="parity">${parity}</param>
         <param name="data_bits">${data_bits}</param>
         <param name="stop_bits">${stop_bits}</param>
+        <param name="response_timeout_ms">${response_timeout_ms}</param>
         <param name="update_hz">${update_hz}</param>
         <param name="upstream_timeout_ms">${upstream_timeout_ms}</param>
         <param name="stop_deadline_ms">${stop_deadline_ms}</param>
         <param name="measured_stop_wire_budget_ms">${measured_stop_wire_budget_ms}</param>
         <param name="measured_worst_bus_cycle_ms">${measured_worst_bus_cycle_ms}</param>
         <param name="late_trigger_ms">${late_trigger_ms}</param>
+        <!-- Bench motion: off unless true. YAML booleans reach xacro as True/False;
+             lower() hands the plugin exactly true/false, and it refuses anything else. -->
+        <param name="bench_motion_enabled">${str(bench_motion_enabled).lower()}</param>
+        <param name="pole_pairs">${pole_pairs}</param>
+        <param name="bench_rpm_cap">${bench_rpm_cap}</param>
+        <param name="bench_stop_deadline_ms">${bench_stop_deadline_ms}</param>
       </hardware>
       <joint name="front_left_wheel_joint">
         <param name="slave_id">${fl_id}</param>

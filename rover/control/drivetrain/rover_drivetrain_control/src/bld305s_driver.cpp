@@ -103,6 +103,7 @@ Bld305sDriver::Result Bld305sDriver::writeSpeedRaw(
   std::uint8_t slave_id,
   std::uint16_t raw_speed)
 {
+  // UNVERIFIED — cross-check against manual
   return writeSingleRegister(slave_id, SPEED_REGISTER, raw_speed);
 }
 
@@ -110,6 +111,7 @@ Bld305sDriver::Result Bld305sDriver::readSpeedRaw(
   std::uint8_t slave_id,
   std::uint16_t & raw_speed)
 {
+  // UNVERIFIED — cross-check against manual
   return readHoldingRegister(slave_id, SPEED_REGISTER, raw_speed);
 }
 
@@ -117,23 +119,96 @@ Bld305sDriver::Result Bld305sDriver::writeControlRaw(
   std::uint8_t slave_id,
   std::uint16_t raw_control)
 {
+  // UNVERIFIED — cross-check against manual
   return writeSingleRegister(slave_id, CONTROL_REGISTER, raw_control);
 }
 
-Bld305sDriver::Result Bld305sDriver::setInternalMode(std::uint8_t slave_id)
+Bld305sDriver::Result Bld305sDriver::writeControlModeRaw(
+  std::uint8_t slave_id, std::uint16_t raw_mode)
 {
-  return writeSingleRegister(slave_id, INIT_REGISTER_0136, 1);
+  return writeSingleRegister(slave_id, CONTROL_MODE_REGISTER, raw_mode);
 }
 
-Bld305sDriver::Result Bld305sDriver::readControlRaw(std::uint8_t slave_id, std::uint16_t & value)
+Bld305sDriver::Result Bld305sDriver::writePolePairsRaw(
+  std::uint8_t slave_id, std::uint16_t raw_pole_pairs)
 {
-  return readHoldingRegister(slave_id, CONTROL_REGISTER, value);
+  return writeSingleRegister(slave_id, POLE_PAIRS_REGISTER, raw_pole_pairs);
+}
+
+Bld305sDriver::Result Bld305sDriver::broadcastStop()
+{
+  std::lock_guard<std::mutex> lock(transaction_mutex_);
+
+  if (context_ == nullptr || !connected_.load(std::memory_order_acquire)) {
+    return {ErrorCode::NOT_CONNECTED, 0, 0};
+  }
+
+  errno = 0;
+  int rc = modbus_set_slave(context_, BROADCAST_ADDRESS);
+  if (rc == -1) {
+    return {ErrorCode::MODBUS_ERROR, rc, errno};
+  }
+
+  // Every other transaction selects its own slave first, so the context
+  // never stays addressed to all drives.
+  errno = 0;
+  rc = modbus_write_register(context_, static_cast<int>(CONTROL_REGISTER), 0);
+  const int saved_errno = errno;
+
+  // Not per-slave traffic: no cycle accounting.
+  if (rc == 1 || (rc == -1 && saved_errno == ETIMEDOUT)) {
+    return {ErrorCode::OK, rc, 0};
+  }
+  return {ErrorCode::MODBUS_ERROR, rc, saved_errno};
+}
+
+bool Bld305sDriver::isIllegalDataAddress(const Result & result) noexcept
+{
+  // libmodbus reports exception code N as errno MODBUS_ENOBASE + N.
+  return result.code == ErrorCode::MODBUS_ERROR && result.system_errno == EMBXILADD;
+}
+
+void Bld305sDriver::setMandatoryExchangesPerCycle(std::uint8_t count) noexcept
+{
+  std::lock_guard<std::mutex> lock(transaction_mutex_);
+  mandatory_exchanges_per_cycle_ = count > 0 ? count : 1;
 }
 
 Bld305sDriver::Result Bld305sDriver::readActualSpeedRaw(
   std::uint8_t slave_id, std::uint16_t & raw_speed)
 {
+  // Manual-cited, bench check pending — NOT validated on hardware.
   return readHoldingRegister(slave_id, ACTUAL_SPEED_REGISTER, raw_speed);
+}
+
+Bld305sDriver::Result Bld305sDriver::readRunningStatusRaw(
+  std::uint8_t slave_id, std::uint16_t & raw_status)
+{
+  return readHoldingRegister(slave_id, RUNNING_STATUS_REGISTER, raw_status);
+}
+
+Bld305sDriver::Result Bld305sDriver::readDriveAddressRaw(
+  std::uint8_t slave_id, std::uint16_t & raw_address)
+{
+  return readHoldingRegister(slave_id, DRIVE_ADDRESS_REGISTER, raw_address);
+}
+
+Bld305sDriver::Result Bld305sDriver::readBaudCodeRaw(
+  std::uint8_t slave_id, std::uint16_t & raw_baud_code)
+{
+  return readHoldingRegister(slave_id, BAUD_CODE_REGISTER, raw_baud_code);
+}
+
+Bld305sDriver::Result Bld305sDriver::readPolePairsRaw(
+  std::uint8_t slave_id, std::uint16_t & raw_pole_pairs)
+{
+  return readHoldingRegister(slave_id, POLE_PAIRS_REGISTER, raw_pole_pairs);
+}
+
+Bld305sDriver::Result Bld305sDriver::readControlModeRaw(
+  std::uint8_t slave_id, std::uint16_t & raw_mode)
+{
+  return readHoldingRegister(slave_id, CONTROL_MODE_REGISTER, raw_mode);
 }
 
 Bld305sDriver::Result Bld305sDriver::readTemperatureRaw(
@@ -164,6 +239,7 @@ Bld305sDriver::Result Bld305sDriver::readFaultRaw(
   std::uint8_t slave_id,
   std::uint16_t & raw_fault)
 {
+  // Manual-cited, bench check pending. Writing 0x0076 clears faults; never done here.
   return readHoldingRegister(slave_id, FAULT_REGISTER, raw_fault);
 }
 
@@ -369,6 +445,10 @@ Bld305sDriver::Result Bld305sDriver::writeSingleRegister(
 {
   std::lock_guard<std::mutex> lock(transaction_mutex_);
 
+  if (isForbiddenWrite(register_address)) {
+    return {ErrorCode::UNSUPPORTED, 0, 0};
+  }
+
   if (!isValidSlaveId(slave_id)) {
     return {ErrorCode::INVALID_SLAVE_ID, 0, 0};
   }
@@ -455,12 +535,12 @@ Bld305sDriver::Result Bld305sDriver::endCycle()
   if (!cycle_active_) {
     return {ErrorCode::INVALID_CYCLE_STATE, 0, 0};
   }
-  // Minimum mandatory cycle: speed setpoint, actual-speed read, fault read.
-  // Diagnostics are additional rotating reads and do not relax these.
-  constexpr std::uint8_t MANDATORY_EXCHANGES_PER_CYCLE = 3;
+  // Default mandatory cycle: speed setpoint, actual-speed read, fault read.
+  // Bench mode alternates reads and sets one mandatory exchange per cycle.
+  // Any failed exchange still makes the cycle bad.
   for (auto id : cycle_slaves_) {
     auto & state = slave_states_[id];
-    const bool good = state.success_count_cycle >= MANDATORY_EXCHANGES_PER_CYCLE &&
+    const bool good = state.success_count_cycle >= mandatory_exchanges_per_cycle_ &&
       !state.exchange_failed_cycle;
     // Miss counting and the valid/lost decision live in the core.
     core::WheelCycleHealth health;

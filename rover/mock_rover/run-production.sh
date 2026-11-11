@@ -23,11 +23,17 @@ try:
     limit = float(config['motor_rpm_limit'])
     radius = float(config['wheel_radius'])
     separation = float(config['wheel_separation'])
-    if not math.isfinite(ratio) or ratio <= 0 or not math.isfinite(limit) or limit < 800:
-        raise ValueError('gear_ratio must be positive and motor_rpm_limit must be at least 800 RPM')
+    if not math.isfinite(ratio) or ratio <= 0 or not math.isfinite(limit) or limit <= 0:
+        raise ValueError('gear_ratio and motor_rpm_limit must be positive and finite')
+    if config.get('bench_motion_enabled') is not True:
+        raise ValueError('bench_motion_enabled must be true for drivetrain motion')
+    bench_cap = float(config['bench_rpm_cap'])
+    if not math.isfinite(bench_cap) or bench_cap <= 0 or bench_cap > 500:
+        raise ValueError('bench_rpm_cap must be positive and at most 500 RPM')
+    limit = min(800.0, limit, bench_cap)
     if not math.isfinite(radius) or radius <= 0 or not math.isfinite(separation) or separation <= 0:
         raise ValueError('wheel_radius and wheel_separation must be positive finite metres')
-    print(800 * 2 * math.pi / (60 * ratio), radius, separation)
+    print(limit * 2 * math.pi / (60 * ratio), radius, separation)
 except (OSError, KeyError, TypeError, ValueError, yaml.YAMLError) as error:
     print(f'Invalid drivetrain configuration: {error}', file=sys.stderr)
     sys.exit(1)
