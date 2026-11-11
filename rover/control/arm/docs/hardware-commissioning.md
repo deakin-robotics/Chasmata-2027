@@ -4,7 +4,7 @@
 
 The driver now defaults to **motion disabled**. This is a software preparation for supported bench tests, not certification that the arm is safe to operate. A gravity-loaded arm can fall if a motor loses power, CAN, torque or its controller. A host-side zero-speed request cannot cross a broken CAN link and is not a verified brake or torque-disable command. Support the arm mechanically and verify motor-side watchdog/brake behavior before enabling motion. Do not intentionally disconnect an unsupported loaded arm.
 
-The controller model, firmware, gear ratios, direction conventions, encoder zero, folded angles, braking behavior and current limits still require hardware confirmation. No automatic enable, disable or fault-clear motor opcode has been invented. The current protocol assumes its position and speed units are joint-side degrees and RPM. Do not enable a motor whose units differ until conversion is implemented and tested.
+The operator confirmed that the motors directly drive the joints with a 1:1 mechanical ratio and no gearbox. No gearbox multiplier is required. The per-joint controller model, firmware, direction conventions, encoder zero, folded angles, braking behavior and current limits still require hardware confirmation. No automatic enable, disable or fault-clear motor opcode has been invented. The current protocol assumes its position and speed units are joint-side degrees and RPM. Do not enable a motor whose units differ until conversion is implemented and tested.
 
 ## New operating contract
 
@@ -111,7 +111,7 @@ The operator identified these combinations on 11 November 2026:
 
 The per-joint assignment and firmware versions have not yet been supplied. Do not infer gear ratios or joint mapping solely from these model strings.
 
-Manufacturer reference: [SteadyWin support downloads](https://steadywin.cn/en/col.jsp?id=124), GDZXXX driver documents `3.02_20250714.zip`, containing custom CAN protocol `V3.07b0`. Inspection confirms the little-endian C1/C2 command layouts and A4/AE feedback layouts used here. Its C2 count is described per motor revolution; joint-side scaling still needs confirmation. The [GDZ34 release notes](https://steadywin.cn/pd.jsp?fromColId=0&id=179) associate A4 support with firmware V3028. Older firmware must not be assumed compatible. The protocol includes a brake-output command, but its presence does not prove a brake is fitted or establish safe electrical polarity. This change sends no brake command and claims no verified hardware watchdog. Record those details during commissioning.
+Manufacturer reference: [SteadyWin support downloads](https://steadywin.cn/en/col.jsp?id=124), GDZXXX driver documents `3.02_20250714.zip`, containing custom CAN protocol `V3.07b0`. Inspection confirms the little-endian C1/C2 command layouts and A4/AE feedback layouts used here. Its C2 count is described per motor revolution; the operator-confirmed 1:1 direct drive means this is also one joint revolution. Verify the deployed firmware and encoder convention during commissioning. The [GDZ34 release notes](https://steadywin.cn/pd.jsp?fromColId=0&id=179) associate A4 support with firmware V3028. Older firmware must not be assumed compatible. The protocol includes a brake-output command, but its presence does not prove a brake is fitted or establish safe electrical polarity. This change sends no brake command and claims no verified hardware watchdog. Record those details during commissioning.
 
 ## Software validation on 11 November 2026
 
