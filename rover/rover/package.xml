@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>mock_rover</name>
+  <name>rover</name>
   <version>0.1.0</version>
   <description>C++ ROS 2 mock rover for GUI integration testing.</description>
   <maintainer email="robotics@example.com">Deakin Competitive Robotics Club</maintainer>
@@ -8,6 +8,8 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <depend>control_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>controller_manager_msgs</depend>
   <depend>ecam_alerts</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_action</depend>

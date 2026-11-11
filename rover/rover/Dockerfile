@@ -8,6 +8,7 @@ RUN apt-get update \
         python3-colcon-common-extensions \
         ros-jazzy-ament-cmake-gtest \
         ros-jazzy-control-msgs \
+        ros-jazzy-controller-manager-msgs \
         ros-jazzy-launch-xml \
         ros-jazzy-rosbridge-server \
         ros-jazzy-rosidl-default-generators \
@@ -16,10 +17,10 @@ RUN apt-get update \
 WORKDIR /workspace
 COPY interfaces/telemetry_interfaces /workspace/src/telemetry_interfaces
 COPY rover/shared/ecam_alerts /workspace/src/ecam_alerts
-COPY rover/mock_rover /workspace/src/mock_rover
+COPY rover/rover /workspace/src/rover
 
 RUN source /opt/ros/jazzy/setup.bash \
     && colcon build --symlink-install
 
 ENTRYPOINT ["/bin/bash", "-lc"]
-CMD ["source /opt/ros/jazzy/setup.bash && source /workspace/install/setup.bash && ros2 launch mock_rover mock_rover.launch.xml"]
+CMD ["source /opt/ros/jazzy/setup.bash && source /workspace/install/setup.bash && ros2 launch rover rover.launch.xml"]

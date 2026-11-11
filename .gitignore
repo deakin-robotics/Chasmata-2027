@@ -7,3 +7,6 @@ old_code/
 # Python bytecode caches
 __pycache__/
 *.py[cod]
+
+rover/rover/.env
+rover/rover/.env.drive

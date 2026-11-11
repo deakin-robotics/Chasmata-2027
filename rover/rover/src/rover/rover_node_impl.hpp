@@ -29,10 +29,11 @@
 #include <telemetry_interfaces/msg/fma_mode_state.hpp>
 #include <telemetry_interfaces/msg/fma_state.hpp>
 
-#include "mock_rover/joint_simulator.hpp"
-#include "mock_rover/mock_rover_node.hpp"
+#include "rover/joint_simulator.hpp"
+#include "rover/drive_backend.hpp"
+#include "rover/rover_node.hpp"
 
-namespace mock_rover
+namespace rover
 {
 using FollowJointTrajectory = control_msgs::action::FollowJointTrajectory;
 using GoalHandleTrajectory = rclcpp_action::ServerGoalHandle<FollowJointTrajectory>;
@@ -45,11 +46,11 @@ inline const JointSimulator::JointLimits kJointLimits{
   {"elbow_joint", {-0.087266463, 4.799655442}}, {"yaw_joint", {-1.658062789, 3.228859116}},
   {"pitch_joint", {-0.087266463, 3.752457891}}, {"roll_joint", {-3.228859116, 3.228859116}}};
 
-class MockRoverNode : public rclcpp::Node
+class RoverNode : public rclcpp::Node
 {
 public:
-  MockRoverNode();
-  ~MockRoverNode() override;
+  explicit RoverNode(std::unique_ptr<DriveBackend> drive_backend);
+  ~RoverNode() override;
 
 private:
   struct Pending { std::string value; std::chrono::steady_clock::time_point due; };
@@ -73,6 +74,7 @@ private:
   void publish_heartbeat();
 
   JointSimulator joints_;
+  std::unique_ptr<DriveBackend> drive_backend_;
   std::recursive_mutex joints_mutex_;
   std::mutex trajectory_mutex_;
   struct TrajectoryWorker { std::thread thread; std::shared_ptr<std::atomic<bool>> finished; };
@@ -93,4 +95,4 @@ private:
   rclcpp_action::Server<FollowJointTrajectory>::SharedPtr trajectory_server_;
   rclcpp::TimerBase::SharedPtr tick_timer_, heartbeat_timer_;
 };
-}  // namespace mock_rover
+}  // namespace rover

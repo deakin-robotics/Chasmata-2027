@@ -1,6 +1,6 @@
-#include "../rover/mock_rover_node_impl.hpp"
+#include "../rover/rover_node_impl.hpp"
 
-namespace mock_rover
+namespace rover
 {
 namespace
 {
@@ -10,16 +10,16 @@ double seconds(const builtin_interfaces::msg::Duration & duration)
 }
 }  // namespace
 
-rclcpp_action::GoalResponse MockRoverNode::handle_goal(const rclcpp_action::GoalUUID &, std::shared_ptr<const FollowJointTrajectory::Goal> goal)
+rclcpp_action::GoalResponse RoverNode::handle_goal(const rclcpp_action::GoalUUID &, std::shared_ptr<const FollowJointTrajectory::Goal> goal)
 {
   return goal->trajectory.joint_names.empty() || goal->trajectory.points.empty() ?
     rclcpp_action::GoalResponse::REJECT : rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
-rclcpp_action::CancelResponse MockRoverNode::handle_cancel(const std::shared_ptr<GoalHandleTrajectory>)
+rclcpp_action::CancelResponse RoverNode::handle_cancel(const std::shared_ptr<GoalHandleTrajectory>)
 {
   return rclcpp_action::CancelResponse::ACCEPT;
 }
-void MockRoverNode::handle_accepted(const std::shared_ptr<GoalHandleTrajectory> goal_handle)
+void RoverNode::handle_accepted(const std::shared_ptr<GoalHandleTrajectory> goal_handle)
 {
   for (auto it = trajectory_workers_.begin(); it != trajectory_workers_.end();) {
     if (it->finished->load()) {
@@ -42,7 +42,7 @@ void MockRoverNode::handle_accepted(const std::shared_ptr<GoalHandleTrajectory> 
   }), finished});
 }
 
-MockRoverNode::~MockRoverNode()
+RoverNode::~RoverNode()
 {
   stopping_ = true;
   for (auto & worker : trajectory_workers_) {
@@ -50,7 +50,7 @@ MockRoverNode::~MockRoverNode()
   }
 }
 
-void MockRoverNode::abort(const std::shared_ptr<GoalHandleTrajectory> & goal_handle, int32_t code, const std::string & message)
+void RoverNode::abort(const std::shared_ptr<GoalHandleTrajectory> & goal_handle, int32_t code, const std::string & message)
 {
   auto result = std::make_shared<FollowJointTrajectory::Result>();
   result->error_code = code;
@@ -58,7 +58,7 @@ void MockRoverNode::abort(const std::shared_ptr<GoalHandleTrajectory> & goal_han
   goal_handle->abort(result);
 }
 
-void MockRoverNode::execute_trajectory(const std::shared_ptr<GoalHandleTrajectory> & goal_handle)
+void RoverNode::execute_trajectory(const std::shared_ptr<GoalHandleTrajectory> & goal_handle)
 {
   std::lock_guard<std::mutex> execution_lock(trajectory_mutex_);
   if (stopping_ || !rclcpp::ok(get_node_base_interface()->get_context())) return;
@@ -142,4 +142,4 @@ void MockRoverNode::execute_trajectory(const std::shared_ptr<GoalHandleTrajector
   result->error_code = FollowJointTrajectory::Result::SUCCESSFUL;
   goal_handle->succeed(result);
 }
-}  // namespace mock_rover
+}  // namespace rover
