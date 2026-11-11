@@ -30,6 +30,7 @@ add_library(rover_node SHARED
   src/rover/fma_control.cpp
   src/drive/mock_drive_backend.cpp
   src/drive/real_drive_backend.cpp
+  src/arm/mock_arm_backend.cpp
   src/arm/arm_control.cpp
   src/arm/trajectory.cpp)
 target_link_libraries(rover_node rover_simulation)
@@ -61,6 +62,9 @@ if(BUILD_TESTING)
   target_link_libraries(test_rover_integration rover_node)
   ament_target_dependencies(test_rover_integration
     control_msgs rclcpp rclcpp_action sensor_msgs std_msgs telemetry_interfaces)
+  ament_add_gtest(test_arm_backend test/test_arm_backend.cpp)
+  target_link_libraries(test_arm_backend rover_node)
+  ament_target_dependencies(test_arm_backend control_msgs rclcpp rclcpp_action std_msgs telemetry_interfaces)
   ament_add_gtest(test_real_drive_backend test/test_real_drive_backend.cpp)
   target_include_directories(test_real_drive_backend PRIVATE src/drive)
   target_link_libraries(test_real_drive_backend rover_node)

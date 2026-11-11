@@ -1,4 +1,4 @@
-#include "../rover/rover_node_impl.hpp"
+#include "mock_arm_backend.hpp"
 
 namespace rover
 {
@@ -10,16 +10,16 @@ double seconds(const builtin_interfaces::msg::Duration & duration)
 }
 }  // namespace
 
-rclcpp_action::GoalResponse RoverNode::handle_goal(const rclcpp_action::GoalUUID &, std::shared_ptr<const FollowJointTrajectory::Goal> goal)
+rclcpp_action::GoalResponse MockArmBackend::handle_goal(const rclcpp_action::GoalUUID &, std::shared_ptr<const FollowJointTrajectory::Goal> goal)
 {
   return goal->trajectory.joint_names.empty() || goal->trajectory.points.empty() ?
     rclcpp_action::GoalResponse::REJECT : rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
-rclcpp_action::CancelResponse RoverNode::handle_cancel(const std::shared_ptr<GoalHandleTrajectory>)
+rclcpp_action::CancelResponse MockArmBackend::handle_cancel(const std::shared_ptr<GoalHandleTrajectory>)
 {
   return rclcpp_action::CancelResponse::ACCEPT;
 }
-void RoverNode::handle_accepted(const std::shared_ptr<GoalHandleTrajectory> goal_handle)
+void MockArmBackend::handle_accepted(const std::shared_ptr<GoalHandleTrajectory> goal_handle)
 {
   for (auto it = trajectory_workers_.begin(); it != trajectory_workers_.end();) {
     if (it->finished->load()) {
@@ -34,15 +34,15 @@ void RoverNode::handle_accepted(const std::shared_ptr<GoalHandleTrajectory> goal
     try {
       execute_trajectory(goal_handle);
     } catch (const std::exception & error) {
-      if (rclcpp::ok(get_node_base_interface()->get_context()) && !stopping_) {
-        RCLCPP_ERROR(get_logger(), "Trajectory execution failed: %s", error.what());
+      if (rclcpp::ok(node_.get_node_base_interface()->get_context()) && !stopping_) {
+        RCLCPP_ERROR(node_.get_logger(), "Trajectory execution failed: %s", error.what());
       }
     }
     finished->store(true);
   }), finished});
 }
 
-RoverNode::~RoverNode()
+MockArmBackend::~MockArmBackend()
 {
   stopping_ = true;
   for (auto & worker : trajectory_workers_) {
@@ -50,7 +50,7 @@ RoverNode::~RoverNode()
   }
 }
 
-void RoverNode::abort(const std::shared_ptr<GoalHandleTrajectory> & goal_handle, int32_t code, const std::string & message)
+void MockArmBackend::abort(const std::shared_ptr<GoalHandleTrajectory> & goal_handle, int32_t code, const std::string & message)
 {
   auto result = std::make_shared<FollowJointTrajectory::Result>();
   result->error_code = code;
@@ -58,10 +58,10 @@ void RoverNode::abort(const std::shared_ptr<GoalHandleTrajectory> & goal_handle,
   goal_handle->abort(result);
 }
 
-void RoverNode::execute_trajectory(const std::shared_ptr<GoalHandleTrajectory> & goal_handle)
+void MockArmBackend::execute_trajectory(const std::shared_ptr<GoalHandleTrajectory> & goal_handle)
 {
   std::lock_guard<std::mutex> execution_lock(trajectory_mutex_);
-  if (stopping_ || !rclcpp::ok(get_node_base_interface()->get_context())) return;
+  if (stopping_ || !rclcpp::ok(node_.get_node_base_interface()->get_context())) return;
   const auto trajectory = goal_handle->get_goal()->trajectory;
   const auto names = trajectory.joint_names;
   const std::set<std::string> name_set(names.begin(), names.end());
@@ -109,7 +109,7 @@ void RoverNode::execute_trajectory(const std::shared_ptr<GoalHandleTrajectory> &
     const auto target_time = seconds(point.time_from_start);
     const auto segment = target_time - previous_point;
     while (true) {
-      if (stopping_ || !rclcpp::ok(get_node_base_interface()->get_context())) return;
+      if (stopping_ || !rclcpp::ok(node_.get_node_base_interface()->get_context())) return;
       if (goal_handle->is_canceling()) { stop_joints(); result->error_code = FollowJointTrajectory::Result::INVALID_GOAL; result->error_string = "The trajectory was cancelled during execution."; goal_handle->canceled(result); return; }
       const auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
       const auto fraction = segment <= 0.0 ? 1.0 : std::clamp((elapsed - previous_point) / segment, 0.0, 1.0);
@@ -137,7 +137,7 @@ void RoverNode::execute_trajectory(const std::shared_ptr<GoalHandleTrajectory> &
     previous_point = target_time;
     previous.assign(point.positions.begin(), point.positions.end());
   }
-  if (stopping_ || !rclcpp::ok(get_node_base_interface()->get_context())) return;
+  if (stopping_ || !rclcpp::ok(node_.get_node_base_interface()->get_context())) return;
   stop_joints();
   result->error_code = FollowJointTrajectory::Result::SUCCESSFUL;
   goal_handle->succeed(result);

@@ -9,6 +9,12 @@ backend confirms valid mode requests after the configured mock delay. C++ caller
 can inject another `DriveBackend` through `make_rover_node`; its mode result
 determines whether Rover Control confirms or rejects the pending request.
 
+Arm control uses an `arm_backend` launch parameter. It defaults to `mock`, which
+provides the simulated joint states and trajectory action. `arm_backend:=real`
+selects a placeholder that rejects mode requests and sends no hardware commands;
+it does not yet integrate the arm driver. Both development and production use
+`mock` by default.
+
 Run the development stack with:
 
 ```bash

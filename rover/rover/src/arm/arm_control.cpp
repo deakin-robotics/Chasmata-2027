@@ -1,8 +1,8 @@
-#include "../rover/rover_node_impl.hpp"
+#include "mock_arm_backend.hpp"
 
 namespace rover
 {
-void RoverNode::on_joint_command(const sensor_msgs::msg::JointState::SharedPtr message)
+void MockArmBackend::on_joint_command(const sensor_msgs::msg::JointState::SharedPtr message)
 {
   if (message->position.empty()) return;
   JointSimulator::JointValues values;
@@ -19,14 +19,13 @@ void RoverNode::on_joint_command(const sensor_msgs::msg::JointState::SharedPtr m
   publish_joint_state();
 }
 
-void RoverNode::on_joy(const std::string & subsystem, const sensor_msgs::msg::Joy & message, size_t left_trigger, size_t right_trigger)
+void MockArmBackend::on_joy(const sensor_msgs::msg::Joy & message)
 {
-  if (message.axes.size() <= right_trigger) return;
-  for (const auto axis : {message.axes[left_trigger], message.axes[right_trigger]}) {
+  if (message.axes.size() <= 9) return;
+  for (const auto axis : {message.axes[8], message.axes[9]}) {
     if (!std::isfinite(axis) || axis < 0.0 || axis > 1.0) return;
   }
   if (std::any_of(message.buttons.begin(), message.buttons.end(), [](int32_t value) { return value != 0 && value != 1; })) return;
-  if (subsystem == "drive") { drive_backend_->on_joy(message); return; }
   if (arm_mode_ == "MANUAL") {
     const bool gimbal_held = message.buttons.size() > 4 && message.buttons[4] > 0;
     apply_deltas({{"base_joint", message.axes[0]}, {"shoulder_joint", message.axes[1]},
@@ -38,7 +37,7 @@ void RoverNode::on_joy(const std::string & subsystem, const sensor_msgs::msg::Jo
   }
 }
 
-void RoverNode::apply_deltas(const JointSimulator::JointValues & deltas, double speed)
+void MockArmBackend::apply_deltas(const JointSimulator::JointValues & deltas, double speed)
 {
   JointSimulator::JointValues targets;
   {
