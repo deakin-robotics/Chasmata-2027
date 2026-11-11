@@ -33,7 +33,7 @@ timeout 45 ros2 run controller_manager spawner diff_drive_controller \
   --controller-manager /drivetrain/controller_manager --param-file "$config" --inactive
 timeout 45 ros2 run controller_manager spawner joint_state_broadcaster \
   --controller-manager /drivetrain/controller_manager --param-file "$config"
-setsid ros2 run mock_rover mock_rover --ros-args -p drive_backend:=real \
+setsid ros2 run rover rover --ros-args -p drive_backend:=real \
   -p drive_max_wheel_speed:=1.6755160819145563 \
   -p drive_wheel_radius:=0.1 -p drive_wheel_separation:=0.5 & pids+=($!)
 timeout 35 python3 "$test_dir/test_manual_ros_control.py"

@@ -24,7 +24,7 @@ On the Rover PC, copy the drivetrain driver's `config/drivetrain_hardware.exampl
 to `config/drivetrain_hardware.yaml`, fill in the hardware settings and run:
 
 ```bash
-cd rover/mock_rover
+cd rover/rover
 docker compose up --build prod
 ```
 
@@ -41,7 +41,7 @@ Then run each stack in its own PowerShell terminal:
 **Mock rover**
 
 ```powershell
-cd rover/mock_rover
+cd rover/rover
 docker compose up --build
 ```
 

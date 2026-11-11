@@ -8,11 +8,11 @@ docker compose -f basestation/docker-compose.yml config --quiet
 docker compose -f basestation/docker-compose.local.yml config --quiet
 ```
 
-Build the images and run the MoveIt and mock-rover integration tests:
+Build the images and run the MoveIt and rover integration tests:
 
 ```bash
 docker build -f basestation/Dockerfile -t basestation-ci .
-docker build -f rover/mock_rover/Dockerfile -t rover-ci .
+docker build -f rover/rover/Dockerfile -t rover-ci .
 bash basestation/test/run_ros_integration.sh
 ```
 
@@ -21,7 +21,7 @@ Build the remaining images and run the hosted-route and camera-recovery tests:
 ```bash
 docker build -f basestation/operations-web/Dockerfile -t basestation-web-ci .
 docker build -t basestation-camera-health-ci basestation/camera-health
-docker build -f rover/mock_rover/Dockerfile.media-source -t rover-camera-ci rover/mock_rover
+docker build -f rover/rover/Dockerfile.media-source -t rover-camera-ci rover/rover
 bash basestation/test/run_hosted_integration.sh
 ```
 

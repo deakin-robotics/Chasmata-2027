@@ -5,11 +5,11 @@ import { GimbalPriorityOwner } from '../fma/fma-state.service';
 import { RosConnection } from '../ros/ros-connection';
 import { RosHeartbeatMonitor } from '../ros/ros-heartbeat-monitor';
 
-// Temporary mock-rover contract until Control provides the production topic.
+// Temporary rover contract until Control provides the production topic.
 const GIMBAL_PRIORITY_REQUEST_TOPIC = '/fma/gimbal/request';
 const STRING_MESSAGE_TYPE = 'std_msgs/String';
 
-/** Publishes temporary Gimbal priority requests for mock-rover testing. */
+/** Publishes temporary Gimbal priority requests for rover testing. */
 @Service()
 export class GimbalPriorityCommandPublisher {
   private readonly rosConnection = inject(RosConnection);

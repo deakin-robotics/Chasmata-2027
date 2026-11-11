@@ -6,7 +6,7 @@ on:
       - 'basestation/**'
       - 'interfaces/**'
       - 'gui/**'
-      - 'rover/mock_rover/**'
+      - 'rover/rover/**'
       - 'rover/shared/ecam_alerts/**'
       - '.github/workflows/basestation-pr-build.yml'
 
@@ -47,7 +47,7 @@ jobs:
       - name: Build BaseStation image
         run: docker build -f basestation/Dockerfile -t basestation-ci .
       - name: Build mock rover image
-        run: docker build -f rover/mock_rover/Dockerfile -t rover-ci .
+        run: docker build -f rover/rover/Dockerfile -t rover-ci .
       - name: Run shared ECAM aggregation tests in an isolated ROS domain
         run: |
           mkdir -p "$RUNNER_TEMP/basestation-test-results"
@@ -77,7 +77,7 @@ jobs:
       - name: Build camera health image
         run: docker build -t basestation-camera-health-ci basestation/camera-health
       - name: Build mock camera image
-        run: docker build -f rover/mock_rover/Dockerfile.media-source -t rover-camera-ci rover/mock_rover
+        run: docker build -f rover/rover/Dockerfile.media-source -t rover-camera-ci rover/rover
       - name: Run hosted integration tests
         run: |
           mkdir -p "$RUNNER_TEMP/basestation-test-results"
