@@ -15,7 +15,7 @@ docker run -d --name "$base" --network none --ipc shareable \
   -e ROS_DOMAIN_ID=147 -e ROS_LOCALHOST_ONLY=1 basestation-ci >/dev/null
 docker run -d --name "$mock" --network "container:$base" --ipc "container:$base" \
   -e ROS_DOMAIN_ID=147 -e ROS_LOCALHOST_ONLY=1 --entrypoint /bin/bash rover-ci -lc \
-  'source /opt/ros/jazzy/setup.bash && source /workspace/install/setup.bash && exec ros2 run mock_rover mock_rover' >/dev/null
+  'source /opt/ros/jazzy/setup.bash && source /workspace/install/setup.bash && exec ros2 run rover rover' >/dev/null
 docker cp basestation/test/ros_integration.py "$base:/tmp/ros_integration.py"
 
 # Exercise heartbeat, joint feedback and Position planning against the real nodes.

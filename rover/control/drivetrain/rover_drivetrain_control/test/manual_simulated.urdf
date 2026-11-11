@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<robot name="drivetrain_test">
+  <link name="base_link"/>
+  <link name="fl"/><link name="rl"/><link name="fr"/><link name="rr"/>
+  <joint name="front_left_wheel_joint" type="continuous"><parent link="base_link"/><child link="fl"/><axis xyz="0 1 0"/></joint>
+  <joint name="rear_left_wheel_joint" type="continuous"><parent link="base_link"/><child link="rl"/><axis xyz="0 1 0"/></joint>
+  <joint name="front_right_wheel_joint" type="continuous"><parent link="base_link"/><child link="fr"/><axis xyz="0 1 0"/></joint>
+  <joint name="rear_right_wheel_joint" type="continuous"><parent link="base_link"/><child link="rr"/><axis xyz="0 1 0"/></joint>
+  <ros2_control name="DCRDrivetrain" type="system">
+    <hardware><plugin>mock_components/GenericSystem</plugin></hardware>
+    <joint name="front_left_wheel_joint"><command_interface name="velocity"/><state_interface name="velocity"/></joint>
+    <joint name="rear_left_wheel_joint"><command_interface name="velocity"/><state_interface name="velocity"/></joint>
+    <joint name="front_right_wheel_joint"><command_interface name="velocity"/><state_interface name="velocity"/></joint>
+    <joint name="rear_right_wheel_joint"><command_interface name="velocity"/><state_interface name="velocity"/></joint>
+  </ros2_control>
+</robot>

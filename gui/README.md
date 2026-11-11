@@ -37,7 +37,7 @@ The mission-control interface is inspired by the Airbus glass cockpit philosophy
 - [Telemetry requirements](docs/telemetry-requirements.md) — FMA, ECAM, and System Display (SD) telemetry, update rates, and recovery behaviour.
 - [Arm inverse kinematics](docs/arm-ik.md) — URDF model, browser-side IK solver, and the future joint-angle command handoff.
 - [WebRTC camera stream](docs/webrtc-camera-stream.md) — MediaMTX/WHEP architecture, camera contract, and local media-stack runbook.
-- [Mock rover](../rover/mock_rover/README.md) — ROS 2 feedback simulator for GUI integration testing.
+- [Mock rover](../rover/rover/README.md) — ROS 2 feedback simulator for GUI integration testing.
 
 ## 🖥️ Current Angular implementation
 
@@ -113,7 +113,7 @@ can start in either order:
 
 ```bash
 # Terminal 1
-cd ../rover/mock_rover
+cd ../rover/rover
 docker compose up --build
 
 # Terminal 2
@@ -127,7 +127,7 @@ BaseStation paths.
 
 For local WebRTC camera development and validation, see
 [WebRTC camera stream](docs/webrtc-camera-stream.md). It covers the
-base-station MediaMTX gateway, mock-rover RTSP publishers, WHEP endpoints,
+base-station MediaMTX gateway, rover RTSP publishers, WHEP endpoints,
 video configuration, and smoke testing.
 
 ## 🏗️ Architecture

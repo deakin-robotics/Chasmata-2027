@@ -1,6 +1,6 @@
 # Rover Quick Reference Handbook
 
-> **v0.1 — GUI-only basestation/mock-rover procedures.** This handbook uses
+> **v0.1 — GUI-only basestation/rover procedures.** This handbook uses
 > only GUI-provided camera, telemetry, control, and restart functions. Physical
 > hardware behavior and physical E-stop procedure are not yet validated.
 

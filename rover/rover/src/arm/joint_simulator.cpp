@@ -1,10 +1,10 @@
-#include "mock_rover/joint_simulator.hpp"
+#include "rover/joint_simulator.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
-namespace mock_rover
+namespace rover
 {
 JointSimulator::JointSimulator(std::vector<std::string> joint_names, JointLimits joint_limits,
   double max_speed_rad_s)
@@ -77,4 +77,4 @@ void JointSimulator::step(double elapsed_seconds)
 
 JointSimulator::JointValues JointSimulator::positions() const { return positions_; }
 JointSimulator::JointValues JointSimulator::velocities() const { return velocities_; }
-}  // namespace mock_rover
+}  // namespace rover

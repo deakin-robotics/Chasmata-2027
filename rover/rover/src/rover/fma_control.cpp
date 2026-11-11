@@ -1,6 +1,6 @@
-#include "mock_rover_node_impl.hpp"
+#include "rover_node_impl.hpp"
 
-namespace mock_rover
+namespace rover
 {
 namespace
 {
@@ -16,11 +16,15 @@ std::string upper_trimmed(std::string value)
 }
 }  // namespace
 
-void MockRoverNode::request_mode(const std::string & subsystem, const std::string & raw_mode)
+void RoverNode::request_mode(const std::string & subsystem, const std::string & raw_mode)
 {
   const auto mode = upper_trimmed(raw_mode);
   const auto & valid = subsystem == "drive" ? drive_modes_ : arm_modes_;
   if (valid.count(mode) == 0) {
+    if (subsystem == "drive") {
+      drive_backend_->cancel_mode_request();
+      if (!drive_backend_->confirmed_mode_valid()) drive_mode_.clear();
+    }
     rejected_modes_[subsystem] = mode;
     pending_modes_.erase(subsystem);
     rejection_clear_[subsystem] = std::chrono::steady_clock::now() + std::chrono::milliseconds(500);
@@ -29,11 +33,12 @@ void MockRoverNode::request_mode(const std::string & subsystem, const std::strin
     rejection_clear_.erase(subsystem);
     pending_modes_[subsystem] = Pending{mode, std::chrono::steady_clock::now() +
       std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(ack_delay_))};
+    if (subsystem == "drive") drive_backend_->request_mode(mode);
   }
   publish_fma();
 }
 
-void MockRoverNode::request_override(const std::string & raw)
+void RoverNode::request_override(const std::string & raw)
 {
   const auto command = upper_trimmed(raw);
   if (command == "ENABLE" || command == "DISABLE") {
@@ -42,7 +47,7 @@ void MockRoverNode::request_override(const std::string & raw)
   }
 }
 
-void MockRoverNode::request_gimbal(const std::string & raw)
+void RoverNode::request_gimbal(const std::string & raw)
 {
   const auto owner = upper_trimmed(raw);
   if (owner == "DRIVER" || owner == "ARM OPS") {
@@ -51,19 +56,30 @@ void MockRoverNode::request_gimbal(const std::string & raw)
   }
 }
 
-std::chrono::steady_clock::time_point MockRoverNode::due_time() const
+std::chrono::steady_clock::time_point RoverNode::due_time() const
 {
   return std::chrono::steady_clock::now() +
     std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(ack_delay_));
 }
 
-void MockRoverNode::tick()
+void RoverNode::tick()
 {
   const auto now = std::chrono::steady_clock::now();
   for (const auto & subsystem : {std::string("drive"), std::string("arm")}) {
     const auto pending = pending_modes_.find(subsystem);
-    if (pending != pending_modes_.end() && pending->second.due <= now) {
-      if (subsystem == "drive") drive_mode_ = pending->second.value; else arm_mode_ = pending->second.value;
+    if (pending == pending_modes_.end()) continue;
+    if (subsystem == "drive") {
+      const auto result = drive_backend_->take_mode_result();
+      if (!result) continue;
+      if (*result) drive_mode_ = pending->second.value;
+      else {
+        if (!drive_backend_->confirmed_mode_valid()) drive_mode_.clear();
+        rejected_modes_[subsystem] = pending->second.value;
+        rejection_clear_[subsystem] = now + std::chrono::milliseconds(500);
+      }
+      pending_modes_.erase(pending); publish_fma();
+    } else if (pending->second.due <= now) {
+      arm_mode_ = pending->second.value;
       pending_modes_.erase(pending); publish_fma();
     }
   }
@@ -81,7 +97,7 @@ void MockRoverNode::tick()
   if (std::chrono::duration<double>(now - last_fma_).count() >= 1.0) publish_fma();
 }
 
-void MockRoverNode::publish_fma()
+void RoverNode::publish_fma()
 {
   telemetry_interfaces::msg::FmaState message;
   message.schema = "dcr/fma-state/v1"; message.sequence = ++sequence_; message.law = law_; message.system = "GOOD";
@@ -91,7 +107,7 @@ void MockRoverNode::publish_fma()
   message.gimbal_priority.rejected = "";
   fma_publisher_->publish(message); last_fma_ = std::chrono::steady_clock::now();
 }
-telemetry_interfaces::msg::FmaModeState MockRoverNode::mode_state(const std::string & subsystem, const std::string & confirmed) const
+telemetry_interfaces::msg::FmaModeState RoverNode::mode_state(const std::string & subsystem, const std::string & confirmed) const
 {
   telemetry_interfaces::msg::FmaModeState state;
   state.confirmed = confirmed;
@@ -99,4 +115,4 @@ telemetry_interfaces::msg::FmaModeState MockRoverNode::mode_state(const std::str
   const auto rejected = rejected_modes_.find(subsystem); state.rejected = rejected == rejected_modes_.end() ? "" : rejected->second;
   return state;
 }
-}  // namespace mock_rover
+}  // namespace rover

@@ -19,6 +19,8 @@ fr_id: 3
 rr_id: 4
 gear_ratio: 50          # PLACEHOLDER
 motor_rpm_limit: 2000   # PLACEHOLDER
+wheel_radius: 0.1       # PLACEHOLDER: metres
+wheel_separation: 0.5   # PLACEHOLDER: metres
 
 # --- Bench motion test only (see README "Bench motion test") -----------------
 # Off by default. Set true or false; anything else makes the plugin refuse to start.

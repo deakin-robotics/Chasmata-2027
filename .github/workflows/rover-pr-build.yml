@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build mock rover image
-        run: docker build -f rover/mock_rover/Dockerfile -t rover-ci .
+        run: docker build -f rover/rover/Dockerfile -t rover-ci .
 
       # Run the package suites and fail the job if either the runner or a test fails.
       - name: Run ROS tests
@@ -28,7 +28,7 @@ jobs:
           source /opt/ros/jazzy/setup.bash
           source /workspace/install/setup.bash
           cd /workspace
-          colcon test --packages-select telemetry_interfaces ecam_alerts mock_rover --event-handlers console_direct+
+          colcon test --packages-select telemetry_interfaces ecam_alerts rover --event-handlers console_direct+
           test_status=$?
           colcon test-result --verbose
           result_status=$?
@@ -39,7 +39,7 @@ jobs:
         shell: bash
         run: |
           if docker container inspect rover-ci-tests >/dev/null 2>&1; then
-            for package in telemetry_interfaces ecam_alerts mock_rover; do
+            for package in telemetry_interfaces ecam_alerts rover; do
               mkdir -p "$RUNNER_TEMP/rover-test-results/$package"
               docker cp "rover-ci-tests:/workspace/build/$package/test_results/." "$RUNNER_TEMP/rover-test-results/$package/" 2>/dev/null || true
             done
@@ -63,7 +63,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build mock camera image
-        run: docker build -f rover/mock_rover/Dockerfile.media-source -t rover-camera-ci rover/mock_rover
+        run: docker build -f rover/rover/Dockerfile.media-source -t rover-camera-ci rover/rover
 
       - name: Verify camera recovery after gateway restart
         run: bash .github/scripts/test-mock-camera-recovery.sh

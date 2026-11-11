@@ -1,14 +1,28 @@
-#include "mock_rover_node_impl.hpp"
+#include "rover_node_impl.hpp"
+#include "../drive/mock_drive_backend.hpp"
+#include "../drive/real_drive_backend.hpp"
 
-namespace mock_rover
+namespace rover
 {
-MockRoverNode::MockRoverNode()
-: Node("mock_rover"), joints_(std::vector<std::string>(kJointNames.begin(), kJointNames.end()), kJointLimits, 1.0)
+RoverNode::RoverNode(std::unique_ptr<DriveBackend> drive_backend)
+: Node("rover"), joints_(std::vector<std::string>(kJointNames.begin(), kJointNames.end()), kJointLimits, 1.0),
+  drive_backend_(std::move(drive_backend))
 {
   declare_parameter<double>("publish_rate_hz", 10.0);
   declare_parameter<double>("mode_ack_delay_ms", 150.0);
+  declare_parameter<std::string>("drive_backend", "mock");
+  declare_parameter<double>("drive_max_wheel_speed", 0.0);
+  declare_parameter<double>("drive_wheel_radius", 0.0);
+  declare_parameter<double>("drive_wheel_separation", 0.0);
   const auto rate = std::max(get_parameter("publish_rate_hz").as_double(), 1.0);
   ack_delay_ = std::max(get_parameter("mode_ack_delay_ms").as_double() / 1000.0, 0.0);
+  if (!drive_backend_) {
+    const auto backend = get_parameter("drive_backend").as_string();
+    if (backend == "mock") drive_backend_ = std::make_unique<MockDriveBackend>(ack_delay_);
+    else if (backend == "real") drive_backend_ = std::make_unique<RealDriveBackend>(*this, get_parameter("drive_max_wheel_speed").as_double(),
+      get_parameter("drive_wheel_radius").as_double(), get_parameter("drive_wheel_separation").as_double());
+    else throw std::invalid_argument("drive_backend must be mock or real");
+  }
 
   const auto retained = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
   fma_publisher_ = create_publisher<telemetry_interfaces::msg::FmaState>("/fma/state", retained);
@@ -17,7 +31,7 @@ MockRoverNode::MockRoverNode()
     rclcpp::QoS(rclcpp::KeepLast(1)).reliable());
 
   subscriptions_.push_back(create_subscription<sensor_msgs::msg::JointState>("/arm/joint_commands", 10,
-    std::bind(&MockRoverNode::on_joint_command, this, std::placeholders::_1)));
+    std::bind(&RoverNode::on_joint_command, this, std::placeholders::_1)));
   subscriptions_.push_back(create_subscription<sensor_msgs::msg::Joy>("/drive/joy", 10,
     [this](sensor_msgs::msg::Joy::SharedPtr message) { on_joy("drive", *message, 4, 5); }));
   subscriptions_.push_back(create_subscription<sensor_msgs::msg::Joy>("/arm/joy", 10,
@@ -35,18 +49,18 @@ MockRoverNode::MockRoverNode()
 
   trajectory_server_ = rclcpp_action::create_server<FollowJointTrajectory>(this,
     "/arm_controller/follow_joint_trajectory",
-    std::bind(&MockRoverNode::handle_goal, this, std::placeholders::_1, std::placeholders::_2),
-    std::bind(&MockRoverNode::handle_cancel, this, std::placeholders::_1),
-    std::bind(&MockRoverNode::handle_accepted, this, std::placeholders::_1));
+    std::bind(&RoverNode::handle_goal, this, std::placeholders::_1, std::placeholders::_2),
+    std::bind(&RoverNode::handle_cancel, this, std::placeholders::_1),
+    std::bind(&RoverNode::handle_accepted, this, std::placeholders::_1));
   tick_timer_ = create_wall_timer(std::chrono::duration<double>(1.0 / rate),
-    std::bind(&MockRoverNode::tick, this));
+    std::bind(&RoverNode::tick, this));
   heartbeat_timer_ = create_wall_timer(std::chrono::seconds(1), [this]() { publish_heartbeat(); });
   publish_fma();
   publish_joint_state();
   publish_heartbeat();
 }
 
-void MockRoverNode::publish_joint_state()
+void RoverNode::publish_joint_state()
 {
   std::lock_guard<std::recursive_mutex> lock(joints_mutex_);
   sensor_msgs::msg::JointState message; message.header.stamp = get_clock()->now();
@@ -54,10 +68,15 @@ void MockRoverNode::publish_joint_state()
   for (const auto * name : kJointNames) { message.name.emplace_back(name); message.position.push_back(positions.at(name)); message.velocity.push_back(velocities.at(name)); }
   joint_state_publisher_->publish(message);
 }
-void MockRoverNode::publish_heartbeat() { heartbeat_publisher_->publish(std_msgs::msg::Empty{}); }
-}  // namespace mock_rover
+void RoverNode::publish_heartbeat() { heartbeat_publisher_->publish(std_msgs::msg::Empty{}); }
+}  // namespace rover
 
-std::shared_ptr<rclcpp::Node> mock_rover::make_mock_rover_node()
+std::shared_ptr<rclcpp::Node> rover::make_rover_node()
 {
-  return std::make_shared<MockRoverNode>();
+  return std::make_shared<RoverNode>(nullptr);
+}
+
+std::shared_ptr<rclcpp::Node> rover::make_rover_node(std::unique_ptr<DriveBackend> drive_backend)
+{
+  return std::make_shared<RoverNode>(std::move(drive_backend));
 }

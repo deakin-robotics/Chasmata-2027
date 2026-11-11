@@ -1,6 +1,6 @@
 # Rover Operations SOP
 
-> **v0.1 — GUI-only basestation/mock-rover procedures.** These procedures use
+> **v0.1 — GUI-only basestation/rover procedures.** These procedures use
 > only GUI-provided camera, telemetry, control, and restart functions. Physical
 > hardware behavior and physical E-stop procedure are not yet validated.
 
