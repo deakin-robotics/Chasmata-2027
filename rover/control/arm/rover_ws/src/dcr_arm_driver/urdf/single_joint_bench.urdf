@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<!-- Secured direct-drive motor example. These limits are an example bench
+     window, NOT measured calibration. Replace both copies of the position
+     limits before use if the measured encoder position lies outside it.
+     No automatic homing, encoder offset, or folded reference is supplied. -->
+<robot name="single_joint_bench">
+  <link name="base_link"/>
+  <link name="base_rot"/>
+  <joint name="base_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="base_rot"/>
+    <axis xyz="0 0 -1"/>
+    <!-- 0.05 rad/s = approximately 0.477 RPM. Effort is metadata only;
+         configure the real current/torque limit on the motor controller. -->
+    <limit lower="-0.10" upper="0.10" effort="1.0" velocity="0.05"/>
+  </joint>
+  <ros2_control name="ArmBench" type="system">
+    <hardware>
+      <plugin>dcr_arm_driver/ArmHardwareInterface</plugin>
+      <param name="motion_enabled">false</param>
+      <!-- Transport must be started separately on the verified interface. -->
+      <param name="can_interface">can1</param>
+      <param name="base_joint_can_id">0x01</param>
+      <!-- Confirmed mechanical ratio: 1:1 direct drive. Existing CAN
+           degrees/RPM conversion needs no gearbox multiplier. -->
+    </hardware>
+    <joint name="base_joint">
+      <command_interface name="position">
+        <param name="min">-0.10</param>
+        <param name="max">0.10</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+  </ros2_control>
+</robot>

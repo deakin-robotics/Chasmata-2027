@@ -1,0 +1,316 @@
+Starting >>> dcr_arm_driver
+Starting >>> rover_drivetrain_control
+Finished <<< rover_drivetrain_control [0.12s]
+--- stderr: dcr_arm_driver
+Errors while running CTest
+Output from these tests are in: /tmp/verify_ws/build/dcr_arm_driver/Testing/Temporary/LastTest.log
+Use "--rerun-failed --output-on-failure" to re-run the failed cases verbosely.
+---
+Finished <<< dcr_arm_driver [7.46s]	[ with test failures ]
+
+Summary: 2 packages finished [7.62s]
+  1 package had stderr output: dcr_arm_driver
+  1 package had test failures: dcr_arm_driver
+build/dcr_arm_driver/Testing/20261110-0959/Test.xml: 1 test, 0 errors, 1 failure, 0 skipped
+- test_direct_drive
+  <<< failure message
+    -- run_test.py: invoking following command in '/tmp/verify_ws/build/dcr_arm_driver':
+     - /tmp/verify_ws/build/dcr_arm_driver/test_direct_drive --gtest_output=xml:/tmp/verify_ws/build/dcr_arm_driver/test_results/dcr_arm_driver/test_direct_drive.gtest.xml
+    Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+    [==========] Running 6 tests from 1 test suite.
+    [----------] Global test environment set-up.
+    [----------] 6 tests from DirectDriveTest
+    [ RUN      ] DirectDriveTest.DirectCommandsPersistAndCanReturnToController
+    [WARN] [1794304776.610700030] [rcl]: ROS_LOCALHOST_ONLY is deprecated but still honored if it is enabled. Use ROS_AUTOMATIC_DISCOVERY_RANGE and ROS_STATIC_PEERS instead.
+    [WARN] [1794304776.610717491] [rcl]: 'localhost_only' is enabled, 'automatic_discovery_range' and 'static_peers' will be ignored.
+    [INFO] [1794304776.635701024] [ArmHardwareInterface]: Initializing...
+    [INFO] [1794304776.643338310] [ArmHardwareInterface]: CAN interface: can0
+    [WARN] [1794304776.643369321] [ArmHardwareInterface]: No position interface limits for joint joint_1; using [-pi, pi] for encoder normalization
+    [INFO] [1794304776.643443008] [ArmHardwareInterface]: Initialized joint 'joint_1' with CAN ID 0x01
+    [WARN] [1794304776.643456278] [ArmHardwareInterface]: No position interface limits for joint joint_2; using [-pi, pi] for encoder normalization
+    [INFO] [1794304776.643473111] [ArmHardwareInterface]: Initialized joint 'joint_2' with CAN ID 0x02
+    [INFO] [1794304776.643494484] [ArmHardwareInterface]: ArmHardwareInterface initialized with 2 joints
+    [INFO] [1794304776.647337572] [ArmHardwareInterface]: Activating...
+    [INFO] [1794304776.651577800] [ArmHardwareInterface]: Arm activated
+    [INFO] [1794304776.953854743] [ArmHardwareInterface]: Exported 2 command interfaces
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:144: Failure
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+    
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:144: Failure
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+    
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:144: Failure
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+    
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:144: Failure
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+    
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:144: Failure
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+    
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:144: Failure
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+    
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:144: Failure
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+    
+    [INFO] [1794304778.665462069] [ArmHardwareInterface]: Deactivating...
+    [  FAILED  ] DirectDriveTest.DirectCommandsPersistAndCanReturnToController (2075 ms)
+    [ RUN      ] DirectDriveTest.InvalidCommandsDoNotReplaceLatchedCommand
+    [INFO] [1794304778.684483147] [ArmHardwareInterface]: Initializing...
+    [INFO] [1794304778.685233982] [ArmHardwareInterface]: CAN interface: can0
+    [WARN] [1794304778.685251723] [ArmHardwareInterface]: No position interface limits for joint joint_1; using [-pi, pi] for encoder normalization
+    [INFO] [1794304778.685279172] [ArmHardwareInterface]: Initialized joint 'joint_1' with CAN ID 0x01
+    [WARN] [1794304778.685289998] [ArmHardwareInterface]: No position interface limits for joint joint_2; using [-pi, pi] for encoder normalization
+    [INFO] [1794304778.685300335] [ArmHardwareInterface]: Initialized joint 'joint_2' with CAN ID 0x02
+    [INFO] [1794304778.685310463] [ArmHardwareInterface]: ArmHardwareInterface initialized with 2 joints
+    [INFO] [1794304778.686177591] [ArmHardwareInterface]: Activating...
+    [INFO] [1794304778.688383232] [ArmHardwareInterface]: Arm activated
+    [INFO] [1794304778.989829380] [ArmHardwareInterface]: Exported 2 command interfaces
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:144: Failure
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+    
+    [INFO] [1794304779.897082860] [ArmHardwareInterface]: Deactivating...
+    [  FAILED  ] DirectDriveTest.InvalidCommandsDoNotReplaceLatchedCommand (1224 ms)
+    [ RUN      ] DirectDriveTest.PositionOutsideJointLimitsIsRejected
+    [INFO] [1794304779.908801977] [ArmHardwareInterface]: Initializing...
+    [INFO] [1794304779.909533746] [ArmHardwareInterface]: CAN interface: can0
+    [WARN] [1794304779.909551486] [ArmHardwareInterface]: No position interface limits for joint joint_1; using [-pi, pi] for encoder normalization
+    [INFO] [1794304779.909579145] [ArmHardwareInterface]: Initialized joint 'joint_1' with CAN ID 0x01
+    [WARN] [1794304779.909588574] [ArmHardwareInterface]: No position interface limits for joint joint_2; using [-pi, pi] for encoder normalization
+    [INFO] [1794304779.909599610] [ArmHardwareInterface]: Initialized joint 'joint_2' with CAN ID 0x02
+    [INFO] [1794304779.909610575] [ArmHardwareInterface]: ArmHardwareInterface initialized with 2 joints
+    [INFO] [1794304779.910486714] [ArmHardwareInterface]: Activating...
+    [INFO] [1794304779.912485404] [ArmHardwareInterface]: Arm activated
+    [INFO] [1794304780.214929269] [ArmHardwareInterface]: Exported 2 command interfaces
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:144: Failure
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+    
+    [INFO] [1794304780.617166428] [ArmHardwareInterface]: Deactivating...
+    [  FAILED  ] DirectDriveTest.PositionOutsideJointLimitsIsRejected (719 ms)
+    [ RUN      ] DirectDriveTest.DirectSpeedStopsAtTheJointLimit
+    [INFO] [1794304780.627913304] [ArmHardwareInterface]: Initializing...
+    [INFO] [1794304780.628645631] [ArmHardwareInterface]: CAN interface: can0
+    [WARN] [1794304780.628664140] [ArmHardwareInterface]: No position interface limits for joint joint_1; using [-pi, pi] for encoder normalization
+    [INFO] [1794304780.628693056] [ArmHardwareInterface]: Initialized joint 'joint_1' with CAN ID 0x01
+    [WARN] [1794304780.628702904] [ArmHardwareInterface]: No position interface limits for joint joint_2; using [-pi, pi] for encoder normalization
+    [INFO] [1794304780.628714848] [ArmHardwareInterface]: Initialized joint 'joint_2' with CAN ID 0x02
+    [INFO] [1794304780.628726861] [ArmHardwareInterface]: ArmHardwareInterface initialized with 2 joints
+    [INFO] [1794304780.629582465] [ArmHardwareInterface]: Activating...
+    [INFO] [1794304780.631481697] [ArmHardwareInterface]: Arm activated
+    [INFO] [1794304780.933842618] [ArmHardwareInterface]: Exported 2 command interfaces
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:144: Failure
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+    
+    [INFO] [1794304781.235596877] [ArmHardwareInterface]: Deactivating...
+    [  FAILED  ] DirectDriveTest.DirectSpeedStopsAtTheJointLimit (618 ms)
+    [ RUN      ] DirectDriveTest.StaleFeedbackStopsAndClearsLatchedDirectSpeed
+    [INFO] [1794304781.246120602] [ArmHardwareInterface]: Initializing...
+    [INFO] [1794304781.246846084] [ArmHardwareInterface]: CAN interface: can0
+    [WARN] [1794304781.246863336] [ArmHardwareInterface]: No position interface limits for joint joint_1; using [-pi, pi] for encoder normalization
+    [INFO] [1794304781.246888480] [ArmHardwareInterface]: Initialized joint 'joint_1' with CAN ID 0x01
+    [WARN] [1794304781.246898608] [ArmHardwareInterface]: No position interface limits for joint joint_2; using [-pi, pi] for encoder normalization
+    [INFO] [1794304781.246909504] [ArmHardwareInterface]: Initialized joint 'joint_2' with CAN ID 0x02
+    [INFO] [1794304781.246919981] [ArmHardwareInterface]: ArmHardwareInterface initialized with 2 joints
+    [INFO] [1794304781.247789833] [ArmHardwareInterface]: Activating...
+    [INFO] [1794304781.250108137] [ArmHardwareInterface]: Arm activated
+    [INFO] [1794304781.552917224] [ArmHardwareInterface]: Exported 2 command interfaces
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:218: Failure
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+    
+    [INFO] [1794304782.256620441] [ArmHardwareInterface]: Deactivating...
+    [  FAILED  ] DirectDriveTest.StaleFeedbackStopsAndClearsLatchedDirectSpeed (1020 ms)
+    [ RUN      ] DirectDriveTest.EstopOverridesDirectDriveAndActivationResetsIt
+    [INFO] [1794304782.267158697] [ArmHardwareInterface]: Initializing...
+    [INFO] [1794304782.267879780] [ArmHardwareInterface]: CAN interface: can0
+    [WARN] [1794304782.267896752] [ArmHardwareInterface]: No position interface limits for joint joint_1; using [-pi, pi] for encoder normalization
+    [INFO] [1794304782.267924970] [ArmHardwareInterface]: Initialized joint 'joint_1' with CAN ID 0x01
+    [WARN] [1794304782.267934050] [ArmHardwareInterface]: No position interface limits for joint joint_2; using [-pi, pi] for encoder normalization
+    [INFO] [1794304782.267945644] [ArmHardwareInterface]: Initialized joint 'joint_2' with CAN ID 0x02
+    [INFO] [1794304782.267955981] [ArmHardwareInterface]: ArmHardwareInterface initialized with 2 joints
+    [INFO] [1794304782.268903921] [ArmHardwareInterface]: Activating...
+    [INFO] [1794304782.271135478] [ArmHardwareInterface]: Arm activated
+    [INFO] [1794304782.573058336] [ArmHardwareInterface]: Exported 2 command interfaces
+    [INFO] [1794304782.673728927] [ArmHardwareInterface]: Exported 2 command interfaces
+    [WARN] [1794304782.673953619] [ArmHardwareInterface]: E-stop asserted; arm motion inhibited until a new command is issued
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:144: Failure
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+    
+    [INFO] [1794304783.278083633] [ArmHardwareInterface]: Deactivating...
+    [INFO] [1794304783.279362711] [ArmHardwareInterface]: Activating...
+    [INFO] [1794304783.281550754] [ArmHardwareInterface]: Arm activated
+    [INFO] [1794304783.584290770] [ArmHardwareInterface]: Exported 2 command interfaces
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:144: Failure
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+    
+    [INFO] [1794304783.786025321] [ArmHardwareInterface]: Deactivating...
+    [  FAILED  ] DirectDriveTest.EstopOverridesDirectDriveAndActivationResetsIt (1529 ms)
+    [----------] 6 tests from DirectDriveTest (7187 ms total)
+    
+    [----------] Global test environment tear-down
+    [==========] 6 tests from 1 test suite ran. (7187 ms total)
+    [  PASSED  ] 0 tests.
+    [  FAILED  ] 6 tests, listed below:
+    [  FAILED  ] DirectDriveTest.DirectCommandsPersistAndCanReturnToController
+    [  FAILED  ] DirectDriveTest.InvalidCommandsDoNotReplaceLatchedCommand
+    [  FAILED  ] DirectDriveTest.PositionOutsideJointLimitsIsRejected
+    [  FAILED  ] DirectDriveTest.DirectSpeedStopsAtTheJointLimit
+    [  FAILED  ] DirectDriveTest.StaleFeedbackStopsAndClearsLatchedDirectSpeed
+    [  FAILED  ] DirectDriveTest.EstopOverridesDirectDriveAndActivationResetsIt
+    
+     6 FAILED TESTS
+    -- run_test.py: return code 1
+    -- run_test.py: inject classname prefix into gtest result file '/tmp/verify_ws/build/dcr_arm_driver/test_results/dcr_arm_driver/test_direct_drive.gtest.xml'
+    -- run_test.py: verify result file '/tmp/verify_ws/build/dcr_arm_driver/test_results/dcr_arm_driver/test_direct_drive.gtest.xml'
+  >>>
+build/dcr_arm_driver/test_results/dcr_arm_driver/test_direct_drive.gtest.xml: 6 tests, 0 errors, 6 failures, 0 skipped
+- dcr_arm_driver.DirectDriveTest DirectCommandsPersistAndCanReturnToController (/source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:163)
+  <<< failure message
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:144
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:144
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:144
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:144
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:144
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:144
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:144
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+  >>>
+- dcr_arm_driver.DirectDriveTest InvalidCommandsDoNotReplaceLatchedCommand (/source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:176)
+  <<< failure message
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:144
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+  >>>
+- dcr_arm_driver.DirectDriveTest PositionOutsideJointLimitsIsRejected (/source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:187)
+  <<< failure message
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:144
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+  >>>
+- dcr_arm_driver.DirectDriveTest DirectSpeedStopsAtTheJointLimit (/source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:193)
+  <<< failure message
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:144
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+  >>>
+- dcr_arm_driver.DirectDriveTest StaleFeedbackStopsAndClearsLatchedDirectSpeed (/source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:199)
+  <<< failure message
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:218
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+  >>>
+- dcr_arm_driver.DirectDriveTest EstopOverridesDirectDriveAndActivationResetsIt (/source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:223)
+  <<< failure message
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:144
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+    /source/rover/control/arm/rover_ws/src/dcr_arm_driver/test/test_direct_drive.cpp:144
+    Expected equality of these values:
+      frames.size()
+        Which is: 6
+      2u
+        Which is: 2
+  >>>
+
+Summary: 11 tests, 0 errors, 7 failures, 0 skipped

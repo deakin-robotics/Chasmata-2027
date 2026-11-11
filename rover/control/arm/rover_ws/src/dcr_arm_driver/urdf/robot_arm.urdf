@@ -117,6 +117,8 @@
     <ros2_control name="ArmController" type="system">
         <hardware>
             <plugin>dcr_arm_driver/ArmHardwareInterface</plugin>
+            <!-- Explicit commissioning gate: enable only in a reviewed bench profile. -->
+            <param name="motion_enabled">false</param>
             <param name="can_interface">can0</param>
             <param name="base_joint_can_id">0x01</param>
             <param name="shoulder_joint_can_id">0x02</param>

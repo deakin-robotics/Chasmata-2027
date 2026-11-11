@@ -2,7 +2,6 @@
 build/
 install/
 log/
-.devcontainer/
 old_code/
 
 # Python bytecode caches

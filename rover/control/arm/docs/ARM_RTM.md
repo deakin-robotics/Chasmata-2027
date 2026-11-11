@@ -1,3 +1,5 @@
+> **Implementation update (11 November 2026):** this matrix preserves the earlier review and source requirements. See [hardware commissioning](hardware-commissioning.md) for the new fault latch, heartbeat leases, folded-reference recovery and default motion gate. Physical validation, GUI authority integration and hardware-specific calibration remain open.
+
 ## Current control paths
 
 ```text

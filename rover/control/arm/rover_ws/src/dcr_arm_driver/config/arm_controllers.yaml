@@ -32,8 +32,14 @@ arm_controller:
     action_monitor_rate: 10.0
     allow_integration_in_goal_trajectories: true
     constraints:
+      base_joint: {trajectory: 0.15, goal: 0.02}
+      shoulder_joint: {trajectory: 0.15, goal: 0.02}
+      elbow_joint: {trajectory: 0.15, goal: 0.02}
+      yaw_joint: {trajectory: 0.15, goal: 0.02}
+      pitch_joint: {trajectory: 0.15, goal: 0.02}
+      roll_joint: {trajectory: 0.15, goal: 0.02}
       stopped_velocity_tolerance: 0.05
-    goal_time: 0.0
+      goal_time: 1.0
     gains:
       base_joint: { p: 100.0, i: 0.01, d: 5.0 }
       shoulder_joint: { p: 100.0, i: 0.01, d: 5.0 }
