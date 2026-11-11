@@ -49,6 +49,7 @@ protected:
         }
         response->ok = switch_ok_;
         if (switch_ok_) manual_active_ = request->activate_controllers.at(0) == "wheel_velocity_controller";
+        if (drop_hardware_after_switch_) hardware_active_ = false;
       });
     commands_ = driver_->create_subscription<std_msgs::msg::Float64MultiArray>("/drivetrain/direct/wheel_speeds", 10,
       [this](std_msgs::msg::Float64MultiArray::SharedPtr message) { received_ = message->data; ++command_count_; });
@@ -89,6 +90,7 @@ protected:
   rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr velocity_commands_;
   std::unique_ptr<rover::RealDriveBackend> backend_;
   bool hardware_active_{true}, manual_active_{false}, switch_ok_{true}, fail_after_apply_{false};
+  bool drop_hardware_after_switch_{false};
   size_t command_count_{0};
   size_t velocity_count_{0};
   size_t switch_calls_{0};
@@ -283,4 +285,52 @@ TEST_F(RealDriveTest, PausesInputDuringControllerSwitch)
   std::optional<bool> result;
   ASSERT_TRUE(wait([&] { result = backend_->take_mode_result(); return result.has_value(); }, 5s));
   EXPECT_EQ(result, std::optional<bool>(true));
+}
+
+// An inactive drivetrain clears FMA confirmation, blocks input and can recover on a later request.
+TEST_F(RealDriveTest, ClearsConfirmationWhenHardwareIsInactiveAndRecovers)
+{
+  auto node = rover::make_rover_node(std::move(backend_));
+  executor_.add_node(node);
+  auto modes = driver_->create_publisher<std_msgs::msg::String>("/fma/drive/request", 10);
+  auto joy = driver_->create_publisher<sensor_msgs::msg::Joy>("/drive/joy", 10);
+  telemetry_interfaces::msg::FmaState latest;
+  auto subscription = driver_->create_subscription<telemetry_interfaces::msg::FmaState>("/fma/state",
+    rclcpp::QoS(1).reliable().transient_local(),
+    [&latest](telemetry_interfaces::msg::FmaState::SharedPtr state) { latest = *state; });
+  ASSERT_TRUE(wait([&] { return modes->get_subscription_count() > 0 && joy->get_subscription_count() > 0 && subscription->get_publisher_count() > 0; }, 2s));
+  std_msgs::msg::String mode; mode.data = "MANUAL"; modes->publish(mode);
+  ASSERT_TRUE(wait([&] { return latest.drive.confirmed == "MANUAL"; }, 3s));
+  executor_.spin_some();
+  const auto before_stop = command_count_;
+  hardware_active_ = false;
+  mode.data = "VELOCITY"; modes->publish(mode);
+  ASSERT_TRUE(wait([&] { return latest.drive.rejected == "VELOCITY"; }, 3s));
+  EXPECT_TRUE(latest.drive.confirmed.empty());
+  ASSERT_TRUE(wait([&] { return command_count_ > before_stop && received_ == std::vector<double>({0, 0, 0, 0}); }, 1s));
+  const auto count = command_count_;
+  sensor_msgs::msg::Joy input; input.axes = {0, 0, 0, 0, 0.5F, 1.0F}; input.buttons = {0, 0, 0, 0};
+  joy->publish(input);
+  EXPECT_FALSE(wait([&] { return command_count_ > count; }, 250ms));
+  hardware_active_ = true;
+  mode.data = "MANUAL"; modes->publish(mode);
+  ASSERT_TRUE(wait([&] { return latest.drive.confirmed == "MANUAL"; }, 3s));
+  joy->publish(input);
+  ASSERT_TRUE(wait([&] { return command_count_ > count; }, 1s));
+  EXPECT_EQ(received_, std::vector<double>({1, 1, 2, 2}));
+  executor_.remove_node(node);
+}
+
+// Hardware loss after a switch also invalidates the previous mode rather than restoring it.
+TEST_F(RealDriveTest, InvalidatesConfirmationIfHardwareDropsAfterSwitch)
+{
+  ASSERT_EQ(request("MANUAL"), std::optional<bool>(true));
+  drop_hardware_after_switch_ = true;
+  EXPECT_EQ(request("VELOCITY"), std::optional<bool>(false));
+  EXPECT_FALSE(backend_->confirmed_mode_valid());
+  executor_.spin_some();
+  const auto count = command_count_;
+  sensor_msgs::msg::Joy joy; joy.axes = {0, 0, 0, 0, 0.5F, 1.0F};
+  backend_->on_joy(joy);
+  EXPECT_FALSE(wait([&] { return command_count_ > count; }, 200ms));
 }

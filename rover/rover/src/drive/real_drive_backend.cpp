@@ -104,7 +104,12 @@ std::optional<bool> RealDriveBackend::take_mode_result()
     const auto active = std::any_of(components.begin(), components.end(), [](const auto & item) {
       return item.name == kHardware && item.state.label == "active";
     });
-    if (!active) return switch_sent_ ? rollback() : finish(false);
+    if (!active) {
+      active_mode_.clear();
+      confirmed_mode_valid_ = false;
+      stop();
+      return finish(false);
+    }
     if (stage_ == Stage::verify_hardware) return finish(true);
     send_controllers_request(Stage::controllers);
   } else if ((stage_ == Stage::controllers || stage_ == Stage::verify ||
