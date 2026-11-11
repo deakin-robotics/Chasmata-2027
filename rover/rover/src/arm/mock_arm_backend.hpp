@@ -2,6 +2,8 @@
 
 #include "../rover/rover_node_impl.hpp"
 #include "rover/arm_backend.hpp"
+#include <std_srvs/srv/trigger.hpp>
+#include <std_msgs/msg/u_int8.hpp>
 
 namespace rover
 {
@@ -24,7 +26,7 @@ public:
   void request_mode(const std::string & mode) override;
   void cancel_mode_request() override;
   std::optional<bool> take_mode_result() override;
-  void tick() override { publish_joint_state(); }
+  void tick() override { publish_joint_state(); publish_orientation(); }
 private:
   void on_joint_command(const sensor_msgs::msg::JointState::SharedPtr message);
   void on_joy(const sensor_msgs::msg::Joy & message);
@@ -35,6 +37,7 @@ private:
   void abort(const std::shared_ptr<GoalHandleTrajectory> & goal_handle, int32_t code, const std::string & message);
   void execute_trajectory(const std::shared_ptr<GoalHandleTrajectory> & goal_handle);
   void publish_joint_state();
+  void publish_orientation();
   JointSimulator joints_;
   std::recursive_mutex joints_mutex_;
   std::mutex trajectory_mutex_;
@@ -42,11 +45,13 @@ private:
   std::vector<TrajectoryWorker> trajectory_workers_;
   std::atomic<bool> stopping_{false};
   rclcpp::Node & node_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr rearm_service_;
   std::chrono::steady_clock::duration delay_;
   std::optional<std::chrono::steady_clock::time_point> due_;
   std::string requested_mode_, arm_mode_;
   std::atomic<bool> orientation_locked_{false};
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_publisher_;
+  rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr orientation_publisher_;
   std::vector<rclcpp::SubscriptionBase::SharedPtr> subscriptions_;
   rclcpp_action::Server<FollowJointTrajectory>::SharedPtr trajectory_server_;
 };

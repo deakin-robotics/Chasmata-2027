@@ -6,6 +6,14 @@ MockArmBackend::MockArmBackend(rclcpp::Node & node, double delay_seconds)
 : joints_(std::vector<std::string>(kJointNames.begin(), kJointNames.end()), kJointLimits, 1.0),
   node_(node), delay_(std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(delay_seconds)))
 {
+  rearm_service_ = node_.create_service<std_srvs::srv::Trigger>("/arm/rearm",
+    [this](const std_srvs::srv::Trigger::Request::SharedPtr, std_srvs::srv::Trigger::Response::SharedPtr response) {
+      const bool trajectory_active = std::any_of(trajectory_workers_.begin(), trajectory_workers_.end(),
+        [](const TrajectoryWorker & worker) { return !worker.finished->load(); });
+      response->success = !trajectory_active;
+      response->message = trajectory_active ? "Cancel the active trajectory before recovery." : "Simulated arm ready.";
+    });
+  orientation_publisher_ = node_.create_publisher<std_msgs::msg::UInt8>("/arm/position/ownership", rclcpp::QoS(1).reliable().transient_local());
   joint_state_publisher_ = node_.create_publisher<sensor_msgs::msg::JointState>("/arm/joint_states", 10);
   subscriptions_.push_back(node_.create_subscription<sensor_msgs::msg::JointState>("/arm/joint_commands", 10,
     std::bind(&MockArmBackend::on_joint_command, this, std::placeholders::_1)));
@@ -18,6 +26,7 @@ MockArmBackend::MockArmBackend(rclcpp::Node & node, double delay_seconds)
     std::bind(&MockArmBackend::handle_cancel, this, std::placeholders::_1),
     std::bind(&MockArmBackend::handle_accepted, this, std::placeholders::_1));
   publish_joint_state();
+  publish_orientation();
 }
 void MockArmBackend::request_mode(const std::string & mode)
 {
@@ -31,6 +40,12 @@ std::optional<bool> MockArmBackend::take_mode_result()
   due_.reset();
   arm_mode_ = requested_mode_;
   return true;
+}
+void MockArmBackend::publish_orientation()
+{
+  std_msgs::msg::UInt8 message;
+  message.data = orientation_locked_ ? 2 : 1;
+  orientation_publisher_->publish(message);
 }
 void MockArmBackend::publish_joint_state()
 {

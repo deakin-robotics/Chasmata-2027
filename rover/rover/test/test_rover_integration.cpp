@@ -15,6 +15,7 @@
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/empty.hpp>
 #include <std_msgs/msg/string.hpp>
+#include <std_srvs/srv/trigger.hpp>
 #include <telemetry_interfaces/msg/fma_state.hpp>
 #include <trajectory_msgs/msg/joint_trajectory_point.hpp>
 
@@ -222,6 +223,17 @@ TEST_F(RoverIntegrationTest, PublishesHeartbeatJointStateAndFmaAcknowledgement)
   ASSERT_TRUE(wait_for([this] { return latest_fma().arm.rejected == "INVALID"; }, 1s));
 }
 
+TEST_F(RoverIntegrationTest, MockRecoveryRespondsWithoutSelectingAMode)
+{
+  auto recovery = client_->create_client<std_srvs::srv::Trigger>("/arm/rearm");
+  ASSERT_TRUE(recovery->wait_for_service(2s));
+  const auto before = latest_fma().arm.confirmed;
+  auto future = recovery->async_send_request(std::make_shared<std_srvs::srv::Trigger::Request>());
+  ASSERT_TRUE(wait_for([&] { return future.wait_for(0s) == std::future_status::ready; }, 2s));
+  EXPECT_TRUE(future.get()->success);
+  EXPECT_EQ(latest_fma().arm.confirmed, before);
+}
+
 // Manual joystick input moves the arm; Position wrist input works only when orientation is unlocked.
 TEST_F(RoverIntegrationTest, AppliesManualAndUnlockedPositionJoystickMappings)
 {
@@ -289,6 +301,11 @@ TEST_F(RoverIntegrationTest, ValidatesExecutesAndCancelsTrajectories)
   ASSERT_NE(long_handle, nullptr);
   const auto heartbeat_count = heartbeats_;
   ASSERT_TRUE(wait_for([this, heartbeat_count] { return heartbeats_ > heartbeat_count; }, 2s));
+  auto recovery = client_->create_client<std_srvs::srv::Trigger>("/arm/rearm");
+  ASSERT_TRUE(recovery->wait_for_service(1s));
+  auto recovery_result = recovery->async_send_request(std::make_shared<std_srvs::srv::Trigger::Request>());
+  ASSERT_TRUE(wait_for([&] { return recovery_result.wait_for(0s) == std::future_status::ready; }, 1s));
+  EXPECT_FALSE(recovery_result.get()->success);
   auto cancel_future = trajectory_client_->async_cancel_goal(long_handle);
   ASSERT_TRUE(wait_for([&cancel_future] { return cancel_future.wait_for(0s) == std::future_status::ready; }, 1s));
   auto cancelled_result = trajectory_client_->async_get_result(long_handle);

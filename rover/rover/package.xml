@@ -16,6 +16,7 @@
   <depend>rclcpp_action</depend>
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
   <depend>telemetry_interfaces</depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
@@ -26,7 +27,6 @@
   <test_depend>rclcpp_lifecycle</test_depend>
   <test_depend>can_msgs</test_depend>
   <test_depend>arm_interfaces</test_depend>
-  <test_depend>std_srvs</test_depend>
   <test_depend>action_msgs</test_depend>
 
   <export><build_type>ament_cmake</build_type></export>

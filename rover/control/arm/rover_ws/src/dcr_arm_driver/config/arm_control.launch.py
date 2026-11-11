@@ -56,7 +56,7 @@ def launch_stack(context):
         Node(
             package='controller_manager',
             executable='spawner',
-            arguments=['arm_controller'],
+            arguments=['arm_real_controller'],
         ),
     ]
 
@@ -65,6 +65,6 @@ def generate_launch_description():
     share = get_package_share_directory('dcr_arm_driver')
     return LaunchDescription([
         DeclareLaunchArgument('urdf', default_value=os.path.join(share, 'urdf', 'robot_arm.urdf')),
-        DeclareLaunchArgument('controllers', default_value=os.path.join(share, 'config', 'arm_controllers.yaml')),
+        DeclareLaunchArgument('controllers', default_value=os.path.join(share, 'config', 'arm_real_controllers.yaml')),
         OpaqueFunction(function=launch_stack),
     ])

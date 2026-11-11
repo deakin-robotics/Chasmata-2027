@@ -1,6 +1,7 @@
 #ifndef DCR_ARM_DRIVER_ARM_HARDWARE_INTERFACE_HPP_
 #define DCR_ARM_DRIVER_ARM_HARDWARE_INTERFACE_HPP_
 
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <memory>
@@ -17,9 +18,12 @@
 #include <arm_interfaces/msg/motor_stat2.hpp>
 #include <can_msgs/msg/frame.hpp>
 #include <dcr_arm_driver/msg/direct_drive.hpp>
+#include <dcr_arm_driver/srv/arm_handoff.hpp>
+#include <dcr_arm_driver/srv/arm_trajectory_gate.hpp>
 #include <hardware_interface/types/hardware_interface_return_values.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/bool.hpp>
+#include <std_msgs/msg/u_int64.hpp>
 #include <std_srvs/srv/trigger.hpp>
 #include <telemetry_interfaces/msg/arm_control_status.hpp>
 
@@ -123,6 +127,16 @@ private:
   std::chrono::steady_clock::time_point healthy_since_{};
   std::chrono::steady_clock::time_point last_estop_{};
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr rearm_service_;
+  rclcpp::Service<dcr_arm_driver::srv::ArmHandoff>::SharedPtr handoff_service_;
+  uint8_t control_owner_{0};
+  uint64_t control_request_id_{0};
+  std::chrono::steady_clock::time_point last_control_lease_{};
+  rclcpp::Subscription<std_msgs::msg::UInt64>::SharedPtr control_lease_sub_;
+  rclcpp::Service<dcr_arm_driver::srv::ArmTrajectoryGate>::SharedPtr trajectory_gate_service_;
+  std::vector<std::array<uint8_t, 16>> active_trajectory_ids_;
+  std::array<uint8_t, 16> approved_trajectory_id_{};
+  bool trajectory_approved_{false};
+  bool trajectory_canceling_{false};
   void latch_fault(const std::string &reason, bool lost_reference = false);
   bool estop_clear(std::chrono::steady_clock::time_point now) const;
 

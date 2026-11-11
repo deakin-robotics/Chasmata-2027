@@ -2,6 +2,9 @@
 #include <thread>
 #include <gtest/gtest.h>
 #include <dcr_arm_driver/arm_hardware_interface.hpp>
+#include <controller_manager_msgs/srv/list_controllers.hpp>
+#include <control_msgs/action/follow_joint_trajectory.hpp>
+#include <rclcpp_action/rclcpp_action.hpp>
 #include <sensor_msgs/msg/joy.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <telemetry_interfaces/msg/fma_state.hpp>
@@ -39,6 +42,7 @@ TEST(RealArmIntegration, ManualUsesDriverFeedbackAndStopsWhenInputExpires)
   auto status_sub = hw.node->create_subscription<telemetry_interfaces::msg::ArmControlStatus>("/arm/control/status", 10,
     [&](const telemetry_interfaces::msg::ArmControlStatus & status) { arm_status = status; });
   int32_t last_speed = 0;
+  int32_t last_position = 0;
   bool saw_speed = false;
   unsigned tx_count = 0, matching_frames = 0;
   int max_raw = 0;
@@ -50,6 +54,11 @@ TEST(RealArmIntegration, ManualUsesDriverFeedbackAndStopsWhenInputExpires)
   auto tx = hw.node->create_subscription<can_msgs::msg::Frame>("/socketcan_bridge/tx", 100,
     [&](const can_msgs::msg::Frame & msg) {
       ++tx_count;
+      if (msg.id == 7 && msg.data[0] == 0xC2) {
+        uint32_t bits = uint32_t(msg.data[1]) | (uint32_t(msg.data[2]) << 8) |
+          (uint32_t(msg.data[3]) << 16) | (uint32_t(msg.data[4]) << 24);
+        last_position = static_cast<int32_t>(bits);
+      }
       if (msg.id == 7 && msg.data[0] == 0xC1) {
         ++matching_frames;
         uint32_t bits = uint32_t(msg.data[1]) | (uint32_t(msg.data[2]) << 8) |
@@ -89,7 +98,54 @@ TEST(RealArmIntegration, ManualUsesDriverFeedbackAndStopsWhenInputExpires)
   run(600ms); EXPECT_EQ(fma.arm.confirmed, "MANUAL");
   sensor_msgs::msg::Joy input; input.axes = std::vector<float>(10, 0); input.buttons = std::vector<int32_t>(12, 0);
   input.axes[0] = 1.0; joy->publish(input); run(150ms); EXPECT_TRUE(saw_speed) << "tx=" << tx_count << " matched=" << matching_frames << " max=" << max_raw << " id=" << direct_id << " mode=" << int(direct_mode) << " direct=" << last_direct << " FMA=" << fma.arm.confirmed << " reason=" << arm_status.reason;
-  run(400ms); EXPECT_EQ(last_speed, 0);
+  // Recovery revokes ownership: queued commands with the previous token cannot
+  // restart motion until the operator requests Manual again.
+  saw_speed = false;
+  auto recover_again = rearm->async_send_request(std::make_shared<std_srvs::srv::Trigger::Request>());
+  run(150ms);
+  ASSERT_EQ(recover_again.wait_for(0s), std::future_status::ready);
+  ASSERT_TRUE(recover_again.get()->success);
+  run(400ms);
+  EXPECT_FALSE(saw_speed);
+  EXPECT_TRUE(fma.arm.confirmed.empty());
+  mode->publish(request); run(500ms);
+  ASSERT_EQ(fma.arm.confirmed, "MANUAL");
+  using Trajectory = control_msgs::action::FollowJointTrajectory;
+  using GoalHandle = rclcpp_action::ServerGoalHandle<Trajectory>;
+  using List = controller_manager_msgs::srv::ListControllers;
+  std::shared_ptr<GoalHandle> forwarded;
+  auto manager = hw.node->create_service<List>("/controller_manager/list_controllers",
+    [](const List::Request::SharedPtr, List::Response::SharedPtr response) {
+      controller_manager_msgs::msg::ControllerState controller;
+      controller.name = "arm_real_controller"; controller.state = "active";
+      response->controller.push_back(controller);
+    });
+  auto server = rclcpp_action::create_server<Trajectory>(hw.node, "/arm_real_controller/follow_joint_trajectory",
+    [](const rclcpp_action::GoalUUID &, std::shared_ptr<const Trajectory::Goal>) { return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE; },
+    [](const std::shared_ptr<GoalHandle>) { return rclcpp_action::CancelResponse::ACCEPT; },
+    [&](const std::shared_ptr<GoalHandle> handle) { forwarded = handle; });
+  auto action_client = rclcpp_action::create_client<Trajectory>(hw.node, "/arm_controller/follow_joint_trajectory");
+  request.data = "POSITION"; mode->publish(request);
+  run(1500ms);
+  ASSERT_EQ(fma.arm.confirmed, "POSITION");
+  EXPECT_EQ(arm_status.control_owner, 3u);
+  Trajectory::Goal goal;
+  goal.trajectory.joint_names = {"base_joint"};
+  trajectory_msgs::msg::JointTrajectoryPoint point;
+  point.positions = {0.6}; point.time_from_start.sec = 3;
+  goal.trajectory.points.push_back(point);
+  auto goal_future = action_client->async_send_goal(goal);
+  run(500ms);
+  ASSERT_EQ(goal_future.wait_for(0s), std::future_status::ready);
+  ASSERT_NE(goal_future.get(), nullptr);
+  ASSERT_NE(forwarded, nullptr);
+  ASSERT_FALSE(arm_status.motion_inhibited);
+  auto commands = hw.export_command_interfaces();
+  ASSERT_TRUE(commands[0].set_value(0.6));
+  run(200ms);
+  EXPECT_GT(last_position, 1304);
+  forwarded->succeed(std::make_shared<Trajectory::Result>());
+  run(150ms);
   executor.remove_node(rover_node); rover_node.reset();
   timer.reset(); hw.on_deactivate(rclcpp_lifecycle::State()); executor.remove_node(hw.node);
   rclcpp::shutdown();

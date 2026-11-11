@@ -19,6 +19,7 @@ find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(telemetry_interfaces REQUIRED)
 
 add_library(rover_simulation SHARED src/arm/joint_simulator.cpp)
@@ -40,7 +41,7 @@ target_include_directories(rover_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 ament_target_dependencies(rover_node
-  control_msgs controller_manager_msgs dcr_arm_driver geometry_msgs rclcpp rclcpp_action sensor_msgs std_msgs telemetry_interfaces)
+  control_msgs controller_manager_msgs dcr_arm_driver geometry_msgs rclcpp rclcpp_action sensor_msgs std_msgs std_srvs telemetry_interfaces)
 
 add_executable(rover src/rover/rover_main.cpp)
 target_link_libraries(rover rover_node)
@@ -63,20 +64,23 @@ if(BUILD_TESTING)
   find_package(rclcpp_lifecycle REQUIRED)
   find_package(can_msgs REQUIRED)
   find_package(arm_interfaces REQUIRED)
-  find_package(std_srvs REQUIRED)
   find_package(action_msgs REQUIRED)
   ament_add_gtest(test_joint_simulator test/test_joint_simulator.cpp)
   target_link_libraries(test_joint_simulator rover_simulation)
   ament_add_gtest(test_rover_integration test/test_rover_integration.cpp)
   target_link_libraries(test_rover_integration rover_node)
   ament_target_dependencies(test_rover_integration
-    control_msgs rclcpp rclcpp_action sensor_msgs std_msgs telemetry_interfaces)
+    control_msgs rclcpp rclcpp_action sensor_msgs std_msgs std_srvs telemetry_interfaces)
   ament_add_gtest(test_arm_backend test/test_arm_backend.cpp)
   target_link_libraries(test_arm_backend rover_node)
-  ament_target_dependencies(test_arm_backend control_msgs dcr_arm_driver rclcpp rclcpp_action sensor_msgs std_msgs telemetry_interfaces)
+  ament_target_dependencies(test_arm_backend control_msgs dcr_arm_driver rclcpp rclcpp_action sensor_msgs std_msgs std_srvs telemetry_interfaces)
+  ament_add_gtest(test_position_arm_backend test/test_position_arm_backend.cpp)
+  target_link_libraries(test_position_arm_backend rover_node)
+  ament_target_dependencies(test_position_arm_backend control_msgs controller_manager_msgs dcr_arm_driver
+    rclcpp rclcpp_action sensor_msgs std_msgs telemetry_interfaces)
   ament_add_gtest(test_real_arm_integration test/test_real_arm_integration.cpp)
   target_link_libraries(test_real_arm_integration rover_node dcr_arm_driver::arm_hardware_interface)
-  ament_target_dependencies(test_real_arm_integration dcr_arm_driver hardware_interface rclcpp rclcpp_lifecycle
+  ament_target_dependencies(test_real_arm_integration control_msgs controller_manager_msgs dcr_arm_driver hardware_interface rclcpp rclcpp_action rclcpp_lifecycle
     can_msgs arm_interfaces std_msgs std_srvs action_msgs telemetry_interfaces sensor_msgs)
   ament_add_gtest(test_real_drive_backend test/test_real_drive_backend.cpp)
   target_include_directories(test_real_drive_backend PRIVATE src/drive)

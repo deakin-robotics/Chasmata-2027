@@ -18,6 +18,9 @@ protected:
   rclcpp::Publisher<can_msgs::msg::Frame>::SharedPtr feedback;
   rclcpp::Publisher<DirectDrive>::SharedPtr commands;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr estop;
+  rclcpp::Publisher<std_msgs::msg::UInt64>::SharedPtr lease;
+  uint64_t lease_token = 42;
+  bool send_lease = true;
   rclcpp::Publisher<action_msgs::msg::GoalStatusArray>::SharedPtr goals;
   rclcpp::Subscription<can_msgs::msg::Frame>::SharedPtr tx;
   rclcpp::Subscription<telemetry_interfaces::msg::ArmControlStatus>::SharedPtr
@@ -61,8 +64,9 @@ protected:
     commands =
         hardware.node->create_publisher<DirectDrive>("/arm/direct_drive", 10);
     estop = hardware.node->create_publisher<std_msgs::msg::Bool>("/estop", 10);
+    lease = hardware.node->create_publisher<std_msgs::msg::UInt64>("/arm/control/lease", 10);
     goals = hardware.node->create_publisher<action_msgs::msg::GoalStatusArray>(
-        "/arm_controller/follow_joint_trajectory/_action/status",
+        "/arm_real_controller/follow_joint_trajectory/_action/status",
         rclcpp::QoS(1).transient_local());
     tx = hardware.node->create_subscription<can_msgs::msg::Frame>(
         "/socketcan_bridge/tx", 100, [this](const can_msgs::msg::Frame &f) {
@@ -82,6 +86,7 @@ protected:
     ASSERT_EQ(hardware.on_activate(rclcpp_lifecycle::State()),
               hardware_interface::CallbackReturn::SUCCESS);
     timer = hardware.node->create_wall_timer(20ms, [this] {
+      if (send_lease) { std_msgs::msg::UInt64 value; value.data = lease_token; lease->publish(value); }
       if (send_heartbeat) {
         std_msgs::msg::Bool s;
         s.data = stop;
@@ -135,13 +140,39 @@ protected:
     while (f.wait_for(0s) != std::future_status::ready &&
            std::chrono::steady_clock::now() < end)
       run(5ms);
-    return f.wait_for(0s) == std::future_status::ready && f.get()->success;
+    const bool success = f.wait_for(0s) == std::future_status::ready && f.get()->success;
+    if (success && client == rearm)
+      return handoff_mode(dcr_arm_driver::srv::ArmHandoff::Request::MANUAL);
+    return success;
+  }
+  bool handoff_mode(uint8_t mode, uint64_t token = 42) {
+    using Handoff = dcr_arm_driver::srv::ArmHandoff;
+    auto client = hardware.node->create_client<Handoff>("/arm/control/handoff");
+    if (!client->wait_for_service(1s)) return false;
+    auto request = std::make_shared<Handoff::Request>(); request->mode = mode; request->request_id = token;
+    auto future = client->async_send_request(request);
+    const auto end = std::chrono::steady_clock::now() + 1s;
+    while (future.wait_for(0s) != std::future_status::ready && std::chrono::steady_clock::now() < end) run(5ms);
+    const bool success = future.wait_for(0s) == std::future_status::ready && future.get()->success;
+    if (success) lease_token = token;
+    return success;
+  }
+  bool gate_goal(uint8_t uuid_first_byte, uint64_t token = 42) {
+    using Gate = dcr_arm_driver::srv::ArmTrajectoryGate;
+    auto client = hardware.node->create_client<Gate>("/arm/control/trajectory_gate");
+    if (!client->wait_for_service(1s)) return false;
+    auto request = std::make_shared<Gate::Request>(); request->enable = true; request->request_id = token; request->goal_id[0] = uuid_first_byte;
+    auto future = client->async_send_request(request);
+    const auto end = std::chrono::steady_clock::now() + 1s;
+    while (future.wait_for(0s) != std::future_status::ready && std::chrono::steady_clock::now() < end) run(5ms);
+    return future.wait_for(0s) == std::future_status::ready && future.get()->success;
   }
   void command(uint8_t mode, double value = 0) {
     DirectDrive m;
     m.id = 1;
     m.mode = mode;
     m.value = value;
+    m.request_id = 42;
     commands->publish(m);
     run(120ms);
   }
@@ -176,17 +207,128 @@ TEST_F(DirectDriveTest, ReportsAcceptedDirectControlForEachConfiguredJoint) {
   EXPECT_EQ(status.joint_can_ids, (std::vector<uint32_t>{1, 2}));
   DirectDrive cmd;
   cmd.mode = DirectDrive::SPEED;
-  cmd.request_id = 123;
+  cmd.request_id = 42;
   cmd.id = 1; commands->publish(cmd);
   cmd.id = 2; commands->publish(cmd);
   run(80ms);
   ASSERT_EQ(status.direct_request_ids.size(), 2u);
-  EXPECT_EQ(status.direct_request_ids[0], 123u);
-  EXPECT_EQ(status.direct_request_ids[1], 123u);
+  EXPECT_EQ(status.direct_request_ids[0], 42u);
+  EXPECT_EQ(status.direct_request_ids[1], 42u);
   run(300ms);
   EXPECT_FALSE(status.direct_ready);
   EXPECT_EQ(status.direct_request_ids[0], 0u);
   EXPECT_EQ(status.direct_request_ids[1], 0u);
+}
+TEST_F(DirectDriveTest, HandoffRequiresHealthyRearmedAndStationaryArm) {
+  using Handoff = dcr_arm_driver::srv::ArmHandoff;
+  auto handoff = hardware.node->create_client<Handoff>("/arm/control/handoff");
+  ASSERT_TRUE(handoff->wait_for_service(1s));
+  auto transfer = [&](uint8_t mode) {
+    auto request = std::make_shared<Handoff::Request>();
+    request->mode = mode; request->request_id = 42;
+    auto future = handoff->async_send_request(request);
+    auto end = std::chrono::steady_clock::now() + 1s;
+    while (future.wait_for(0s) != std::future_status::ready && std::chrono::steady_clock::now() < end) run(5ms);
+    return future.wait_for(0s) == std::future_status::ready && future.get()->success;
+  };
+  EXPECT_FALSE(transfer(Handoff::Request::POSITION_LOCKED));
+  ASSERT_TRUE(call(rearm));
+  ASSERT_TRUE(transfer(Handoff::Request::POSITION_LOCKED));
+  run(40ms);
+  EXPECT_EQ(status.control_owner, Handoff::Request::POSITION_LOCKED);
+  command(DirectDrive::SPEED, 5);
+  EXPECT_EQ(status.control_owner, Handoff::Request::POSITION_LOCKED);
+  ASSERT_TRUE(transfer(Handoff::Request::MANUAL));
+  run(40ms);
+  EXPECT_EQ(status.control_owner, Handoff::Request::MANUAL);
+  stop = true; run(80ms);
+  EXPECT_FALSE(transfer(Handoff::Request::POSITION_LOCKED));
+  EXPECT_EQ(status.control_owner, 0u);
+}
+TEST_F(DirectDriveTest, OnlyTheApprovedActiveTrajectoryCanReleaseTheHold) {
+  ASSERT_TRUE(call(rearm));
+  ASSERT_TRUE(handoff_mode(dcr_arm_driver::srv::ArmHandoff::Request::POSITION_LOCKED));
+  auto interfaces = hardware.export_command_interfaces();
+  ASSERT_TRUE(interfaces[0].set_value(1.2));
+  action_msgs::msg::GoalStatusArray statuses;
+  action_msgs::msg::GoalStatus goal; goal.status = 2; goal.goal_info.goal_id.uuid[0] = 42;
+  statuses.status_list.push_back(goal); goals->publish(statuses);
+  run(80ms);
+  EXPECT_TRUE(status.motion_inhibited);
+  EXPECT_FALSE(gate_goal(43));
+  EXPECT_TRUE(status.motion_inhibited);
+  auto second = goal; second.goal_info.goal_id.uuid[0] = 43;
+  statuses.status_list.push_back(second); goals->publish(statuses); run(40ms);
+  EXPECT_FALSE(gate_goal(42));
+  EXPECT_TRUE(status.motion_inhibited);
+  statuses.status_list.pop_back(); goals->publish(statuses); run(40ms);
+  ASSERT_TRUE(gate_goal(42));
+  run(80ms);
+  EXPECT_FALSE(status.motion_inhibited);
+  statuses.status_list.clear(); goals->publish(statuses); run(60ms);
+  EXPECT_TRUE(status.motion_inhibited);
+  EXPECT_FALSE(gate_goal(42));
+  ASSERT_TRUE(handoff_mode(dcr_arm_driver::srv::ArmHandoff::Request::POSITION_LOCKED, 43));
+  statuses.status_list.push_back(goal); goals->publish(statuses); run(60ms);
+  EXPECT_FALSE(gate_goal(42, 42));
+  EXPECT_TRUE(status.motion_inhibited);
+}
+TEST_F(DirectDriveTest, UnlockedPositionAllowsOnlyWristDirectDuringTrajectory) {
+  hardware.on_deactivate(rclcpp_lifecycle::State());
+  params.hardware_info.joints[0].name = "base_joint";
+  params.hardware_info.joints[1].name = "yaw_joint";
+  auto & config = params.hardware_info.hardware_parameters;
+  config.erase("joint_1_can_id"); config.erase("joint_2_can_id");
+  config.erase("joint_1_folded_reference_rad"); config.erase("joint_2_folded_reference_rad");
+  config["base_joint_can_id"] = "1"; config["yaw_joint_can_id"] = "2";
+  config["base_joint_folded_reference_rad"] = "3.141592653589793";
+  config["yaw_joint_folded_reference_rad"] = "3.141592653589793";
+  auto & xml = params.hardware_info.original_xml;
+  xml.replace(xml.find("joint_1"), 7, "base_joint");
+  xml.replace(xml.find("joint_2"), 7, "yaw_joint");
+  ASSERT_EQ(hardware.on_init(params), hardware_interface::CallbackReturn::SUCCESS);
+  ASSERT_EQ(hardware.on_activate(rclcpp_lifecycle::State()), hardware_interface::CallbackReturn::SUCCESS);
+  run(650ms); ASSERT_TRUE(call(rearm));
+  ASSERT_TRUE(handoff_mode(dcr_arm_driver::srv::ArmHandoff::Request::POSITION_UNLOCKED));
+  action_msgs::msg::GoalStatusArray statuses;
+  action_msgs::msg::GoalStatus goal; goal.status = 2; goal.goal_info.goal_id.uuid[0] = 42;
+  statuses.status_list.push_back(goal); goals->publish(statuses); run(40ms);
+  ASSERT_TRUE(gate_goal(42));
+  DirectDrive wrist; wrist.id = 2; wrist.mode = DirectDrive::SPEED; wrist.value = 5; wrist.request_id = 42;
+  commands->publish(wrist); run(80ms);
+  EXPECT_EQ(latest(2).data[0], 0xC1);
+  EXPECT_EQ(latest(2).data[1], 0xF4);
+  DirectDrive proximal = wrist; proximal.id = 1; commands->publish(proximal); run(50ms);
+  EXPECT_EQ(latest(1).data[0], 0xC2);
+  EXPECT_EQ(status.control_owner, dcr_arm_driver::srv::ArmHandoff::Request::POSITION_UNLOCKED);
+}
+TEST_F(DirectDriveTest, RearmRevokesThePreviousDirectControlToken) {
+  ASSERT_TRUE(call(rearm));
+  auto future = rearm->async_send_request(std::make_shared<std_srvs::srv::Trigger::Request>());
+  auto end = std::chrono::steady_clock::now() + 1s;
+  while (future.wait_for(0s) != std::future_status::ready && std::chrono::steady_clock::now() < end) run(5ms);
+  ASSERT_EQ(future.wait_for(0s), std::future_status::ready);
+  ASSERT_TRUE(future.get()->success);
+  command(DirectDrive::SPEED, 5);
+  EXPECT_FALSE(status.direct_ready);
+  ASSERT_TRUE(handoff_mode(dcr_arm_driver::srv::ArmHandoff::Request::MANUAL, 43));
+  command(DirectDrive::SPEED, 5);  // Old token 42 is still rejected.
+  EXPECT_EQ(status.direct_request_ids[0], 0u);
+  DirectDrive command_with_new_token; command_with_new_token.id = 1;
+  command_with_new_token.mode = DirectDrive::SPEED; command_with_new_token.value = 5;
+  command_with_new_token.request_id = 43;
+  commands->publish(command_with_new_token); run(80ms);
+  EXPECT_EQ(status.direct_request_ids[0], 43u);
+  speed();
+}
+TEST_F(DirectDriveTest, OwnershipLeaseExpiryInhibitsEvenWithoutDirectCommands) {
+  ASSERT_TRUE(call(rearm));
+  ASSERT_TRUE(handoff_mode(dcr_arm_driver::srv::ArmHandoff::Request::POSITION_LOCKED));
+  send_lease = false;
+  run(650ms);
+  EXPECT_TRUE(status.motion_inhibited);
+  EXPECT_EQ(status.control_owner, 0u);
+  EXPECT_NE(status.reason.find("ownership lease"), std::string::npos);
 }
 TEST_F(DirectDriveTest, StartupIsLatchedAtMeasuredFoldedPose) {
   stopped();
@@ -402,6 +544,7 @@ TEST_F(DirectDriveTest, ReleaseDoesNotResumeControllerTarget) {
 }
 TEST_F(DirectDriveTest, ActiveTrajectoryRejectsDirectAndRearm) {
   ASSERT_TRUE(call(rearm));
+  ASSERT_TRUE(handoff_mode(dcr_arm_driver::srv::ArmHandoff::Request::POSITION_LOCKED));
   action_msgs::msg::GoalStatusArray a;
   action_msgs::msg::GoalStatus g;
   g.status = 2;
@@ -414,12 +557,15 @@ TEST_F(DirectDriveTest, ActiveTrajectoryRejectsDirectAndRearm) {
 }
 TEST_F(DirectDriveTest, NonfiniteControllerTargetLatches) {
   ASSERT_TRUE(call(rearm));
+  ASSERT_TRUE(handoff_mode(dcr_arm_driver::srv::ArmHandoff::Request::POSITION_LOCKED));
   action_msgs::msg::GoalStatusArray a;
   action_msgs::msg::GoalStatus g;
   g.status = 2;
+  g.goal_info.goal_id.uuid[0] = 42;
   a.status_list.push_back(g);
   goals->publish(a);
   run(20ms);
+  ASSERT_TRUE(gate_goal(42));
   auto interfaces = hardware.export_command_interfaces();
   ASSERT_TRUE(
       interfaces[0].set_value(std::numeric_limits<double>::quiet_NaN()));

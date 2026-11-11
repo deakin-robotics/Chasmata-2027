@@ -75,7 +75,7 @@ describe('ArmPositionControl', () => {
     expect(createCommand).toHaveBeenCalledWith(
       snapshot,
       [0, 0, 0, 0, 0, 0, 1, 1, 0, 0],
-      { suppressClearFaultButton: true, includeTriggers: true },
+      { includeTriggers: true },
     );
     expect(publish).toHaveBeenCalledOnce();
   });
@@ -92,7 +92,7 @@ describe('ArmPositionControl', () => {
     expect(createCommand).toHaveBeenCalledWith(
       snapshot,
       new Array(10).fill(0),
-      { suppressClearFaultButton: true, includeTriggers: false },
+      { includeTriggers: false },
     );
     expect(publish).toHaveBeenCalledOnce();
   });
@@ -108,7 +108,7 @@ describe('ArmPositionControl', () => {
     expect(createCommand).toHaveBeenCalledWith(
       snapshot,
       [0, 0, 0, 0.3, -0.4, 0, 0.1, 0.2, 0, 0],
-      { suppressClearFaultButton: true, includeTriggers: true },
+      { includeTriggers: true },
     );
   });
 
@@ -124,7 +124,7 @@ describe('ArmPositionControl', () => {
     expect(createCommand).toHaveBeenCalledWith(
       snapshot,
       [0, 0, 0, -0.3, 0.4, 0, 0, 0, 0, 0],
-      { suppressClearFaultButton: true, includeTriggers: false },
+      { includeTriggers: false },
     );
   });
 

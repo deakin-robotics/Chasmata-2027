@@ -103,6 +103,10 @@ void RoverNode::tick()
     if (iterator->second <= now) { rejected_modes_.erase(iterator->first); iterator = rejection_clear_.erase(iterator); publish_fma(); } else ++iterator;
   }
   arm_backend_->tick();
+  if (const auto update = arm_backend_->take_mode_update()) {
+    arm_mode_ = *update;
+    publish_fma();
+  }
   if (!arm_mode_.empty() && !arm_backend_->confirmed_mode_valid()) {
     arm_mode_.clear();
     publish_fma();

@@ -14,5 +14,6 @@ public:
   virtual std::optional<bool> take_mode_result() = 0;
   virtual void tick() = 0;
   virtual bool confirmed_mode_valid() const { return true; }
+  virtual std::optional<std::string> take_mode_update() { return std::nullopt; }
 };
 }  // namespace rover

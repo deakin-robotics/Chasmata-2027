@@ -4,6 +4,7 @@ import { By } from '@angular/platform-browser';
 
 import { ControlModeCoordinator } from '../../../../../core/control/control-mode-coordinator';
 import { ArmControlModeService } from '../../../../../core/control/arm/arm-control-mode';
+import { ArmRecovery } from '../../../../../core/control/arm/arm-recovery';
 import { GamepadInput } from '../../../../../core/gamepad/gamepad-input';
 import { ArmMode } from '../../../../../core/fma/fma-state.service';
 import { BaseStationConnection } from '../../../../../core/ros/base-station-connection';
@@ -107,6 +108,21 @@ describe('ArmMasterPage', () => {
     ).toBeTruthy();
     expect(fixture.nativeElement.querySelector('.law-override button').disabled).toBe(true);
     expect(fixture.nativeElement.querySelector('.clear-faults button').disabled).toBe(true);
+  });
+
+  it.each([true, false])('shows the recovery result without requesting a mode, success=%s', async (success) => {
+    roverAvailable.set(true);
+    fixture.detectChanges();
+    requestArmMode.mockClear();
+    const rearm = vi.spyOn(TestBed.inject(ArmRecovery), 'rearm')
+      .mockResolvedValue({ success, message: success ? 'Recovered' : 'Arm is inhibited' });
+    const button = fixture.nativeElement.querySelector('.clear-faults button') as HTMLButtonElement;
+    button.click(); fixture.detectChanges(); button.click();
+    await fixture.whenStable(); fixture.detectChanges();
+    expect(rearm).toHaveBeenCalledOnce();
+    expect(fixture.nativeElement.querySelector('.arm-recovery-message').textContent)
+      .toContain(success ? 'Recovered' : 'Arm is inhibited');
+    expect(requestArmMode).not.toHaveBeenCalled();
   });
 
   it('should enable the camera feed when switched on', () => {
@@ -294,7 +310,17 @@ describe('ArmMasterPage', () => {
     );
   });
 
-  it('disables the mode selector when BaseStation is lost', () => {
+  it('can request the selected Manual mode again without BaseStation', () => {
+    roverAvailable.set(true);
+    fixture.detectChanges();
+    requestArmMode.mockClear();
+    const buttons = fixture.nativeElement.querySelectorAll('.arm-mode-selector button') as NodeListOf<HTMLButtonElement>;
+    buttons[0].click();
+    expect(requestArmMode).toHaveBeenCalledOnce();
+    expect(requestArmMode).toHaveBeenCalledWith(ArmMode.Manual);
+  });
+
+  it('keeps Manual available but disables Position when BaseStation is lost', () => {
     roverAvailable.set(true);
     baseStationAvailable.set(true);
     fixture.detectChanges();
@@ -309,8 +335,9 @@ describe('ArmMasterPage', () => {
     fixture.detectChanges();
 
     expect(requestArmMode).toHaveBeenCalledWith(ArmMode.Manual);
-    expect(selectorControl.getAttribute('aria-disabled')).toBe('true');
-    expect([...modeButtons].every((button) => button.disabled)).toBe(true);
+    expect(selectorControl.getAttribute('aria-disabled')).toBe('false');
+    expect(modeButtons[0].disabled).toBe(false);
+    expect(modeButtons[1].disabled).toBe(true);
 
     baseStationAvailable.set(true);
     fixture.detectChanges();

@@ -3,14 +3,14 @@ controller_manager:
     update_rate: 50
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
-    arm_controller:
+    arm_real_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
 joint_state_broadcaster:
   ros__parameters:
     interfaces: [position, velocity]
 
-arm_controller:
+arm_real_controller:
   ros__parameters:
     joints: [base_joint]
     command_interfaces: [position]

@@ -17,6 +17,7 @@ constexpr double PI = 3.14159265358979323846;
 constexpr double DEGREES_TO_RADIANS = PI / 180.0;
 constexpr double RPM_TO_RADIANS_PER_SECOND = TWO_PI / 60.0;
 constexpr auto COMMAND_TIMEOUT = std::chrono::milliseconds(250);
+constexpr auto CONTROL_LEASE_TIMEOUT = std::chrono::milliseconds(500);
 constexpr auto ESTOP_TIMEOUT = std::chrono::milliseconds(500);
 constexpr auto RECOVERY_DWELL = std::chrono::milliseconds(500);
 constexpr auto FEEDBACK_TIMEOUT = std::chrono::milliseconds(250);
@@ -268,6 +269,13 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_activate(
             this->direct_drive_callback(msg);
           });
 
+  control_lease_sub_ = node->create_subscription<std_msgs::msg::UInt64>(
+      "/arm/control/lease", rclcpp::QoS(10), [this](const std_msgs::msg::UInt64 &msg) {
+        std::lock_guard<std::mutex> lock(lifecycle_mutex_);
+        if (active_ && !fault_latched_ && control_owner_ != 0 && msg.data == control_request_id_)
+          last_control_lease_ = std::chrono::steady_clock::now();
+      });
+
   for (auto &joint : joints_) {
     joint.direct_mode = dcr_arm_driver::msg::DirectDrive::CONTROLLER;
     joint.direct_value = 0.0;
@@ -289,6 +297,9 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_activate(
   }
   trajectory_rearm_ready_ = false;
   trajectory_goal_active_ = false;
+  control_owner_ = 0;
+  trajectory_approved_ = false;
+  active_trajectory_ids_.clear();
   publish_status();
 
   // Motors retain their last speed command if this process exits abruptly.
@@ -323,6 +334,9 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_activate(
         } else {
           fault_latched_ = false;
           fault_reason_.clear();
+          control_owner_ = 0;
+          control_request_id_ = 0;
+          trajectory_approved_ = false;
           motion_inhibited_ = true;
           trajectory_rearm_ready_ = true;
           for (auto &joint : joints_) {
@@ -333,6 +347,78 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_activate(
           }
           response->success = true;
           response->message = "Rearmed at measured pose; send a new command";
+        }
+        publish_status();
+      });
+
+  handoff_service_ = node->create_service<dcr_arm_driver::srv::ArmHandoff>(
+      "/arm/control/handoff",
+      [this](const dcr_arm_driver::srv::ArmHandoff::Request::SharedPtr request,
+             dcr_arm_driver::srv::ArmHandoff::Response::SharedPtr response) {
+        using Handoff = dcr_arm_driver::srv::ArmHandoff::Request;
+        std::lock_guard<std::mutex> lock(lifecycle_mutex_);
+        const auto now = std::chrono::steady_clock::now();
+        response->success = false;
+        if (request->mode != Handoff::MANUAL && request->mode != Handoff::POSITION_LOCKED &&
+            request->mode != Handoff::POSITION_UNLOCKED) {
+          response->message = "Invalid arm ownership request";
+        } else if (request->request_id == 0) {
+          response->message = "Ownership request token is required";
+        } else if (!active_ || !motion_enabled_ || fault_latched_ || !estop_clear(now) ||
+                   !all_feedback_fresh(now) || !all_motor_status_safe(now)) {
+          response->message = "Arm not ready for ownership handoff";
+        } else if (trajectory_goal_active_ || std::any_of(joints_.begin(), joints_.end(),
+              [](const JointInfo &joint) { return std::abs(joint.velocity) > 0.05 ||
+                (joint.direct_mode != dcr_arm_driver::msg::DirectDrive::CONTROLLER &&
+                 std::abs(joint.direct_value) > 1e-9); })) {
+          response->message = "Stop direct motion and cancel active trajectories before handoff";
+        } else {
+          control_owner_ = request->mode;
+          control_request_id_ = request->request_id;
+          last_control_lease_ = now;
+          trajectory_approved_ = false;
+          motion_inhibited_ = true;
+          trajectory_rearm_ready_ = true;
+          for (auto &joint : joints_) {
+            joint.estop_hold_position = joint.position;
+            joint.last_position_command = joint.position;
+            joint.position_command = joint.position;
+            joint.direct_value = 0.0;
+            joint.direct_mode = dcr_arm_driver::msg::DirectDrive::CONTROLLER;
+            joint.direct_request_id = 0;
+          }
+          response->success = true;
+          response->message = "Arm ownership transferred at measured position";
+        }
+        publish_status();
+      });
+
+  trajectory_gate_service_ = node->create_service<dcr_arm_driver::srv::ArmTrajectoryGate>(
+      "/arm/control/trajectory_gate",
+      [this](const dcr_arm_driver::srv::ArmTrajectoryGate::Request::SharedPtr request,
+             dcr_arm_driver::srv::ArmTrajectoryGate::Response::SharedPtr response) {
+        std::lock_guard<std::mutex> lock(lifecycle_mutex_);
+        const auto now = std::chrono::steady_clock::now();
+        response->success = false;
+        if (request->request_id == 0 || request->request_id != control_request_id_) {
+          response->message = "Trajectory request belongs to a previous ownership";
+        } else if (!request->enable) {
+          motion_inhibited_ = true;
+          trajectory_approved_ = false;
+          for (auto &joint : joints_) joint.estop_hold_position = joint.position;
+          response->success = true;
+          response->message = "Trajectory output inhibited";
+        } else if ((control_owner_ != 2 && control_owner_ != 3) || !active_ || !motion_enabled_ ||
+            fault_latched_ || !estop_clear(now) || !all_feedback_fresh(now) || !all_motor_status_safe(now)) {
+          response->message = "Position ownership or driver readiness unavailable";
+        } else if (trajectory_canceling_ || active_trajectory_ids_.size() != 1 || active_trajectory_ids_.front() != request->goal_id) {
+          response->message = "Requested trajectory is not the only active goal";
+        } else {
+          approved_trajectory_id_ = request->goal_id;
+          trajectory_approved_ = true;
+          motion_inhibited_ = false;
+          response->success = true;
+          response->message = "Accepted trajectory enabled";
         }
         publish_status();
       });
@@ -372,7 +458,7 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_activate(
 
   trajectory_status_sub_ =
       node->create_subscription<action_msgs::msg::GoalStatusArray>(
-          "/arm_controller/follow_joint_trajectory/_action/status",
+          "/arm_real_controller/follow_joint_trajectory/_action/status",
           rclcpp::QoS(1).transient_local(),
           [this](const action_msgs::msg::GoalStatusArray &msg) {
             this->trajectory_status_callback(msg);
@@ -426,8 +512,11 @@ void ArmHardwareInterface::deactivate_endpoints() {
     }
   }
   direct_drive_sub_.reset();
+  control_lease_sub_.reset();
   can_sub_.reset();
   rearm_service_.reset();
+  handoff_service_.reset();
+  trajectory_gate_service_.reset();
   folded_service_.reset();
   trajectory_status_sub_.reset();
   stat1_pub_.reset();
@@ -610,6 +699,8 @@ ArmHardwareInterface::write(const rclcpp::Time & /*time*/,
   }
   if (!estop_clear(now))
     latch_fault("E-stop asserted, unknown or heartbeat expired");
+  if (control_owner_ != 0 && now - last_control_lease_ > CONTROL_LEASE_TIMEOUT)
+    latch_fault("arm control ownership lease expired");
   for (const auto &joint : joints_) {
     if (joint.direct_mode != dcr_arm_driver::msg::DirectDrive::CONTROLLER &&
         now - joint.last_direct_command > COMMAND_TIMEOUT)
@@ -706,6 +797,7 @@ void ArmHardwareInterface::publish_status() {
   const auto now = std::chrono::steady_clock::now();
   telemetry_interfaces::msg::ArmControlStatus status;
   status.hardware_active = active_ && static_cast<bool>(can_pub_);
+  status.control_owner = control_owner_;
   status.estop_clear = estop_clear(now);
   status.feedback_fresh = all_feedback_fresh(now);
   status.motor_status_safe = all_motor_status_safe(now);
@@ -714,7 +806,7 @@ void ArmHardwareInterface::publish_status() {
   status.controller_ready =
       trajectory_rearm_ready_ && !fault_latched_ && motion_enabled_;
   status.direct_ready = status.hardware_active && motion_enabled_ && !fault_latched_ &&
-      !trajectory_goal_active_ && status.estop_clear && status.feedback_fresh && status.motor_status_safe;
+      (control_owner_ == 1 || control_owner_ == 3) && (!trajectory_goal_active_ || control_owner_ == 3) && status.estop_clear && status.feedback_fresh && status.motor_status_safe;
   for (const auto &joint : joints_) {
     status.joint_names.push_back(joint.name);
     status.joint_can_ids.push_back(joint.can_id);
@@ -830,30 +922,35 @@ void ArmHardwareInterface::trajectory_status_callback(
   const auto now = std::chrono::steady_clock::now();
   const bool feedback_fresh = all_feedback_fresh(now);
   const bool motor_status_safe = all_motor_status_safe(now);
-  const bool active_goal = std::any_of(
-      msg.status_list.begin(), msg.status_list.end(),
-      [](const action_msgs::msg::GoalStatus &status) {
-        return status.status == action_msgs::msg::GoalStatus::STATUS_ACCEPTED ||
-               status.status ==
-                   action_msgs::msg::GoalStatus::STATUS_EXECUTING ||
-               status.status == action_msgs::msg::GoalStatus::STATUS_CANCELING;
-      });
-  if (!active_goal) {
-    trajectory_rearm_ready_ = !fault_latched_ && estop_clear(now) &&
-                              feedback_fresh && motor_status_safe;
-  } else if (fault_latched_ || !motion_enabled_ || !estop_clear(now) ||
-             !estop_state_received_ ||
-             estop_asserted_.load(std::memory_order_relaxed) ||
-             !feedback_fresh || !motor_status_safe) {
-    // A goal that remained active through E-stop or feedback loss must finish
-    // before a new goal can re-enable controller output.
-    trajectory_rearm_ready_ = false;
-  } else if (motion_inhibited_ && trajectory_rearm_ready_) {
-    motion_inhibited_ = false;
-    for (auto &joint : joints_) {
-      joint.direct_mode = dcr_arm_driver::msg::DirectDrive::CONTROLLER;
-      joint.direct_value = 0.0;
+  active_trajectory_ids_.clear();
+  trajectory_canceling_ = false;
+  bool active_goal = false;
+  for (const auto &entry : msg.status_list) {
+    if (entry.status == action_msgs::msg::GoalStatus::STATUS_ACCEPTED ||
+        entry.status == action_msgs::msg::GoalStatus::STATUS_EXECUTING) {
+      active_goal = true;
+      active_trajectory_ids_.push_back(entry.goal_info.goal_id.uuid);
+    } else if (entry.status == action_msgs::msg::GoalStatus::STATUS_CANCELING) {
+      active_goal = true;
+      trajectory_canceling_ = true;
     }
+  }
+  const bool approved_active = trajectory_approved_ && !trajectory_canceling_ && active_trajectory_ids_.size() == 1 &&
+      active_trajectory_ids_.front() == approved_trajectory_id_;
+  if (active_goal && control_owner_ != 2 && control_owner_ != 3) {
+    latch_fault("trajectory requested without Position ownership");
+  } else if (fault_latched_ || !motion_enabled_ || !estop_clear(now) ||
+             !estop_state_received_ || estop_asserted_.load(std::memory_order_relaxed) ||
+             !feedback_fresh || !motor_status_safe) {
+    trajectory_rearm_ready_ = false;
+    motion_inhibited_ = true;
+  } else if (!active_goal || !approved_active) {
+    if (!motion_inhibited_) {
+      for (auto &joint : joints_) joint.estop_hold_position = joint.position;
+    }
+    motion_inhibited_ = true;
+    trajectory_rearm_ready_ = true;
+    if (!active_goal) trajectory_approved_ = false;
   }
   trajectory_goal_active_ = active_goal;
 }
@@ -862,7 +959,7 @@ void ArmHardwareInterface::direct_drive_callback(
     const dcr_arm_driver::msg::DirectDrive &msg) {
   std::lock_guard<std::mutex> lock(lifecycle_mutex_);
   if (!active_ || !motion_enabled_ || fault_latched_ ||
-      trajectory_goal_active_ ||
+      (trajectory_goal_active_ && control_owner_ != 3) ||
       !estop_clear(std::chrono::steady_clock::now()) ||
       !estop_state_received_ ||
       estop_asserted_.load(std::memory_order_relaxed)) {
@@ -873,6 +970,10 @@ void ArmHardwareInterface::direct_drive_callback(
   if (joint == nullptr) {
     return;
   }
+
+  const bool wrist = joint->name == "yaw_joint" || joint->name == "pitch_joint" || joint->name == "roll_joint";
+  if (control_owner_ == 0 || msg.request_id != control_request_id_ ||
+      control_owner_ == 2 || (control_owner_ == 3 && !wrist)) return;
 
   const auto now = std::chrono::steady_clock::now();
   if (msg.mode != dcr_arm_driver::msg::DirectDrive::CONTROLLER &&
@@ -938,6 +1039,7 @@ void ArmHardwareInterface::direct_drive_callback(
     // position ramp at the fresh measured pose validated above, only on handover.
     joint->last_position_command = joint->position;
   }
+  last_control_lease_ = now;
   joint->last_direct_command = now;
   joint->direct_mode = msg.mode;
   joint->direct_value = msg.value;
@@ -968,6 +1070,9 @@ void ArmHardwareInterface::latch_fault(const std::string &reason,
   fault_latched_ = true;
   motion_inhibited_ = true;
   trajectory_rearm_ready_ = false;
+  control_owner_ = 0;
+  control_request_id_ = 0;
+  trajectory_approved_ = false;
   for (auto &joint : joints_) {
     joint.direct_mode = dcr_arm_driver::msg::DirectDrive::CONTROLLER;
     joint.direct_value = 0;

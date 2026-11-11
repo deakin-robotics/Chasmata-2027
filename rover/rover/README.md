@@ -11,13 +11,28 @@ determines whether Rover Control confirms or rejects the pending request.
 
 Arm control uses an `arm_backend` launch parameter. It defaults to `mock`, which
 provides the simulated joint states and trajectory action. `arm_backend:=real`
-selects the real Manual backend. Copy `config/arm_manual.example.yaml` and set
+selects the real arm backend. Copy `config/arm_manual.example.yaml` and set
 six positive Manual speed limits in RPM, compatible with the commissioned arm
 profile; pass its path as `arm_manual_config:=<path>`. Manual is confirmed only
 after the driver accepts neutral direct commands for every configured joint.
-Position is not yet implemented. The driver must be launched and rearmed
-separately for testing. Both development and production use
+Position requires the active real arm trajectory controller and a verified
+ownership handoff. Rover Control gates `/arm_controller/follow_joint_trajectory`
+and forwards accepted goals to the driver's `arm_real_controller` action.
+For testing, start the driver with its existing launch and use the GUI's
+Clear Faults button to rearm; mode selection remains a separate action. Both development and production use
 `mock` by default.
+
+For an isolated ROS-domain integration check with a simulated CAN bus and the
+real trajectory controller, source the workspace and run:
+
+```bash
+ROS_DOMAIN_ID=196 python3 rover/rover/test/position_stack_sim.py
+ROS_DOMAIN_ID=196 python3 rover/rover/test/position_stack_sim.py --full
+```
+
+The default test uses one simulated joint; `--full` exercises all six,
+including independent wrist control during an unlocked trajectory. Both enable
+motion only in a temporary simulator profile and do not connect to hardware.
 
 Run the development stack with:
 

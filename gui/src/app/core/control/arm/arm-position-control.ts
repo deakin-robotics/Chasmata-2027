@@ -33,7 +33,6 @@ export class ArmPositionControl {
       snapshot,
       axes,
       {
-        suppressClearFaultButton: snapshot.buttons[16] === undefined,
         includeTriggers: !locked,
       },
     );

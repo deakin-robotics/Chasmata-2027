@@ -8,19 +8,25 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-from std_msgs.msg import String
+from std_msgs.msg import Bool, String, UInt8
 
 
 class FakeRover(Node):
     def __init__(self):
         super().__init__("basestation_test_rover")
         self.behaviour = "abort"
+        self.locked = False
+        self.ownership = self.create_publisher(UInt8, "/arm/position/ownership", 10)
+        self.create_subscription(Bool, "/arm/orientation_lock", self.set_lock, 10)
         self.joints = self.create_publisher(JointState, "/arm/joint_states", 10)
         self.create_timer(0.1, self.publish_joints)
         self.create_subscription(String, "/test/trajectory_behaviour", self.set_behaviour, 10)
         self.server = ActionServer(self, FollowJointTrajectory, "/arm_controller/follow_joint_trajectory",
                                    self.execute, goal_callback=self.goal, cancel_callback=self.cancel,
                                    callback_group=ReentrantCallbackGroup())
+
+    def set_lock(self, message):
+        self.locked = message.data
 
     def set_behaviour(self, message):
         self.behaviour = message.data
@@ -31,6 +37,9 @@ class FakeRover(Node):
         message.name = ["base_joint", "shoulder_joint", "elbow_joint", "yaw_joint", "pitch_joint", "roll_joint"]
         message.position = [0.0, 0.5, 0.5, 0.0, 0.0, 0.0]
         self.joints.publish(message)
+        ownership = UInt8()
+        ownership.data = 2 if self.locked else 1
+        self.ownership.publish(ownership)
 
     def goal(self, request):
         return GoalResponse.REJECT if self.behaviour == "reject" else GoalResponse.ACCEPT

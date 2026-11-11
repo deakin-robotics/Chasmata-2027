@@ -9,7 +9,7 @@ The driver starts inhibited. Its default hardware profile disables motion. Mock 
 ```mermaid
 flowchart LR
     moveit[MoveIt 2 or trajectory client]
-    trajectory[arm_controller<br/>JointTrajectoryController]
+    trajectory[arm_real_controller<br/>JointTrajectoryController]
     direct[/arm/direct_drive<br/>DirectDrive/]
     estop[/estop<br/>live safety heartbeat/]
 
@@ -97,7 +97,8 @@ The A4/Ae response layout and units are implemented in [`motor.cpp`](rover_ws/sr
 | `/estop` | `std_msgs/msg/Bool` | Live stop state; clear heartbeat expires after 500 ms |
 | `/arm/rearm` | `std_srvs/srv/Trigger` | Explicit recovery after healthy feedback, live clear E-stop and stationary arm |
 | `/arm/confirm_folded_pose` | `std_srvs/srv/Trigger` | Physically confirm calibrated encoder turn after feedback loss |
-| `/arm_controller/follow_joint_trajectory` | `control_msgs/action/FollowJointTrajectory` | Trajectory control in radians |
+| `/arm_controller/follow_joint_trajectory` | `control_msgs/action/FollowJointTrajectory` | Rover Control gated trajectory action in radians |
+| `/arm_real_controller/follow_joint_trajectory` | `control_msgs/action/FollowJointTrajectory` | Internal driver trajectory controller |
 | `/arm/joint_states` | `sensor_msgs/msg/JointState` | Measured position (rad) and velocity (rad/s) |
 | `/motor_stat_1`, `/motor_stat_2` | `arm_interfaces` messages | Motor encoder and controller telemetry |
 | `/arm/control/status` | `telemetry_interfaces/msg/ArmControlStatus` | Driver readiness, feedback freshness and inhibit reason |

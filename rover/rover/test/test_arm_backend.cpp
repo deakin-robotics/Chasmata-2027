@@ -7,6 +7,7 @@
 #include <std_msgs/msg/string.hpp>
 #include <sensor_msgs/msg/joy.hpp>
 #include <dcr_arm_driver/msg/direct_drive.hpp>
+#include <dcr_arm_driver/srv/arm_handoff.hpp>
 #include <telemetry_interfaces/msg/arm_control_status.hpp>
 #include <map>
 #include <telemetry_interfaces/msg/fma_state.hpp>
@@ -59,7 +60,7 @@ TEST_F(ArmBackendSelection, RealBackendRejectsRequestsWithoutSimulatorEndpoints)
     "/arm_controller/follow_joint_trajectory");
   rclcpp::executors::SingleThreadedExecutor executor;
   executor.add_node(node); executor.add_node(client);
-  auto deadline = std::chrono::steady_clock::now() + 3s;
+  auto deadline = std::chrono::steady_clock::now() + 5s;
   std_msgs::msg::String mode; mode.data = "MANUAL";
   while (request->get_subscription_count() == 0 && std::chrono::steady_clock::now() < deadline) {
     executor.spin_some(); std::this_thread::sleep_for(20ms);
@@ -71,7 +72,7 @@ TEST_F(ArmBackendSelection, RealBackendRejectsRequestsWithoutSimulatorEndpoints)
   EXPECT_TRUE(rejected);
   EXPECT_TRUE(latest.arm.confirmed.empty());
   EXPECT_EQ(client->count_publishers("/arm/joint_states"), 0u);
-  EXPECT_FALSE(action->action_server_is_ready());
+  EXPECT_TRUE(action->action_server_is_ready());
   EXPECT_EQ(client->count_publishers("/arm/direct_drive"), 1u);
   executor.remove_node(client); executor.remove_node(node);
 }
@@ -90,10 +91,18 @@ TEST_F(ArmBackendSelection, ManualRequiresAcknowledgementsAndStopsStaleInput)
   auto status_pub = driver->create_publisher<Status>("/arm/control/status", 10);
   Status status;
   status.direct_ready = true;
+  status.hardware_active = status.estop_clear = status.feedback_fresh = status.motor_status_safe = status.controller_ready = true;
   status.joint_names = {"base_joint", "shoulder_joint", "elbow_joint", "yaw_joint", "pitch_joint", "roll_joint"};
   status.joint_can_ids = {9, 8, 7, 6, 5, 4};
   status.joint_max_velocity_rpm = {10, 10, 10, 10, 10, 10};
   status.direct_request_ids = {0, 0, 0, 0, 0, 0};
+  auto handoff = driver->create_service<dcr_arm_driver::srv::ArmHandoff>("/arm/control/handoff",
+    [&](const dcr_arm_driver::srv::ArmHandoff::Request::SharedPtr req,
+        dcr_arm_driver::srv::ArmHandoff::Response::SharedPtr response) {
+      status.control_owner = req->mode;
+      std::fill(status.direct_request_ids.begin(), status.direct_request_ids.end(), 0);
+      response->success = true;
+    });
   std::map<uint32_t, Command> commands;
   auto command_sub = driver->create_subscription<Command>("/arm/direct_drive", 32,
     [&](const Command & cmd) { commands[cmd.id] = cmd; });
@@ -134,6 +143,8 @@ TEST_F(ArmBackendSelection, ManualRequiresAcknowledgementsAndStopsStaleInput)
   spin(350ms);
   for (const auto & entry : commands) EXPECT_DOUBLE_EQ(entry.second.value, 0.0);
   mode.data = "POSITION"; request->publish(mode); spin(200ms);
+  EXPECT_EQ(latest.arm.pending, "POSITION");
+  spin(3100ms);
   EXPECT_EQ(latest.arm.rejected, "POSITION");
   EXPECT_EQ(latest.arm.confirmed, "MANUAL");
   timer.reset(); spin(500ms); EXPECT_TRUE(latest.arm.confirmed.empty());

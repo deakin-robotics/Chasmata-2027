@@ -14,7 +14,8 @@
     'ros gamepad rover-status base-station-status'
     '. gamepad-stem rover-flow base-station-stem'
     'camera gamepad-flow master base-station-flow'
-    'arm-mode arm-mode law-override clear-faults';
+    'arm-mode arm-mode law-override clear-faults'
+    '. . . recovery-message';
   grid-template-columns: repeat(4, minmax(0, 1fr));
   column-gap: 0.5rem;
   row-gap: 0.6rem;
@@ -71,6 +72,11 @@ app-ros-connection-button {
 
 .clear-faults {
   grid-area: clear-faults;
+}
+
+.arm-recovery-message {
+  grid-area: recovery-message;
+  overflow-wrap: anywhere;
 }
 
 .arm-mode-selector {

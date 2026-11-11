@@ -23,6 +23,8 @@ find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/DirectDrive.msg"
+  "srv/ArmHandoff.srv"
+  "srv/ArmTrajectoryGate.srv"
 )
 rosidl_get_typesupport_target(direct_drive_typesupport ${PROJECT_NAME}
   "rosidl_typesupport_cpp")

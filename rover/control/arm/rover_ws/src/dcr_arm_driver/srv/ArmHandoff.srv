@@ -1,0 +1,9 @@
+uint8 MANUAL=1
+uint8 POSITION_LOCKED=2
+uint8 POSITION_UNLOCKED=3
+uint8 mode
+# New ownership token; zero is invalid.
+uint64 request_id
+---
+bool success
+string message

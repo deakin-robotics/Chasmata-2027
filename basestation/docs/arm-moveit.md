@@ -21,6 +21,8 @@ GUI target pose
   -> arm_moveit_bridge
   -> MoveIt planning and time parameterization
   -> /arm_controller/follow_joint_trajectory
+  -> Rover Control ownership gate
+  -> /arm_real_controller/follow_joint_trajectory
   -> rover controller
   -> /arm/joint_states
   -> GUI model viewer
@@ -38,6 +40,11 @@ model is display-only.
   `/arm/joy` control.
 - **LOCKED** (`/arm/orientation_lock = true`): MoveIt plans the full `arm`
   group (J1-J6) while constraining `ee_link` to the requested orientation.
+
+Rover Control publishes `/arm/position/ownership` (0 unavailable or handoff,
+1 unlocked, 2 locked). The bridge waits for a fresh matching ownership before
+planning and before sending a trajectory, so it does not submit a new goal
+while the rover is still transferring the wrist joints.
 
 While locked, joystick and trigger wrist input is ignored. The captured end
 effector orientation stays fixed until the operator unlocks, changes the

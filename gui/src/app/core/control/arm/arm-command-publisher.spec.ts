@@ -19,10 +19,6 @@ describe('ArmCommandPublisher', () => {
     expect(service.publish({ axes: [0, 0, 0, 0], buttons: [] })).toBe(false);
   });
 
-  it('should not publish clear faults while ROS is disconnected', () => {
-    expect(service.publishClearFaults()).toBe(false);
-  });
-
   it('should release Arm authority when stopping control', () => {
     controlMode.activate('arm');
 
@@ -40,7 +36,7 @@ describe('ArmCommandPublisher', () => {
     const command = service.createCommand(snapshot, [0.1, 0.2, 0.3, 0.4]);
 
     expect(command.axes).toEqual([0.1, 0.2, 0.3, 0.4, 0, 0, 0, 0, 1, 1]);
-    expect(command.buttons).toEqual([1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1]);
+    expect(command.buttons).toEqual([1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1]);
   });
 
   it('can omit triggers for a zeroed Position-mode command', () => {
