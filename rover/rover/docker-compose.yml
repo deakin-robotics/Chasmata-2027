@@ -40,6 +40,10 @@ services:
         source: ../control/drivetrain/rover_drivetrain_control/config
         target: /etc/rover/drivetrain
         read_only: true
+      - type: bind
+        source: ../control/arm/config
+        target: /etc/rover/arm
+        read_only: true
       - /dev:/dev
     device_cgroup_rules:
       - 'c 166:* rwm'

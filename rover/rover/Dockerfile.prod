@@ -3,12 +3,12 @@ FROM ros:jazzy-ros-base
 SHELL ["/bin/bash", "-c"]
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        build-essential libmodbus-dev pkg-config python3-colcon-common-extensions python3-yaml \
+        build-essential libmodbus-dev libfmt-dev pkg-config python3-colcon-common-extensions python3-yaml \
         ros-jazzy-hardware-interface ros-jazzy-pluginlib ros-jazzy-can-msgs ros-jazzy-urdf ros-jazzy-ament-cmake-gtest ros-jazzy-control-msgs ros-jazzy-controller-manager-msgs \
         ros-jazzy-ros2-control ros-jazzy-diff-drive-controller \
-        ros-jazzy-forward-command-controller ros-jazzy-joint-state-broadcaster \
+        ros-jazzy-forward-command-controller ros-jazzy-joint-state-broadcaster ros-jazzy-joint-trajectory-controller \
         ros-jazzy-robot-state-publisher ros-jazzy-xacro ros-jazzy-launch-xml \
-        ros-jazzy-rosbridge-server ros-jazzy-rosidl-default-generators \
+        ros-jazzy-rosbridge-server ros-jazzy-rosidl-default-generators ros-jazzy-diagnostic-updater \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
@@ -16,6 +16,7 @@ COPY interfaces/telemetry_interfaces /workspace/src/telemetry_interfaces
 COPY rover/shared/ecam_alerts /workspace/src/ecam_alerts
 COPY rover/control/arm/rover_ws/src/arm_interfaces /workspace/src/arm_interfaces
 COPY rover/control/arm/rover_ws/src/dcr_arm_driver /workspace/src/dcr_arm_driver
+COPY rover/control/arm/rover_ws/src/nobleo_socketcan_bridge /workspace/src/nobleo_socketcan_bridge
 COPY rover/rover /workspace/src/rover
 COPY rover/control/drivetrain/rover_drivetrain_interfaces /workspace/src/rover_drivetrain_interfaces
 COPY rover/control/drivetrain/rover_drivetrain_control /workspace/src/rover_drivetrain_control

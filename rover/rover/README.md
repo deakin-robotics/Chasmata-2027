@@ -40,16 +40,41 @@ Run the development stack with:
 docker compose up --build
 ```
 
-For the production stack, copy `drivetrain_hardware.example.yaml` to
-`drivetrain_hardware.yaml` in the drivetrain driver's `config` directory and
-fill in the rover's hardware values. Then run:
+For the production stack, configure the drivetrain as described in its README.
+In `rover/control/arm/config`, create these local, untracked files:
+
+- `arm_hardware.yaml`: copy `arm_hardware.example.yaml` and set the actual,
+  already configured SocketCAN interface.
+- `arm_manual.yaml`: copy `rover/rover/config/arm_manual.example.yaml` and
+  set the six commissioned RPM limits.
+- `robot_arm.urdf` and `arm_controllers.yaml`: copy the arm driver's URDF and
+  controller YAML, then use the arm team's commissioned values. Motion is
+  disabled in the supplied URDF. Existing controller YAML copies must use
+  `arm_real_controller` for both controller entries.
+
+For a first setup, run from the repository root, then edit the copied files:
+
+```bash
+cp rover/control/arm/config/arm_hardware.example.yaml rover/control/arm/config/arm_hardware.yaml
+cp rover/rover/config/arm_manual.example.yaml rover/control/arm/config/arm_manual.yaml
+cp rover/control/arm/rover_ws/src/dcr_arm_driver/urdf/robot_arm.urdf rover/control/arm/config/robot_arm.urdf
+cp rover/control/arm/rover_ws/src/dcr_arm_driver/config/arm_controllers.yaml rover/control/arm/config/arm_controllers.yaml
+```
+
+Connect the real E-stop authority that continuously publishes `/estop`, and
+bring up the CAN interface using the verified bitrate before starting the
+stack. See the arm driver README for commissioning and stop arrangements.
+From `rover/rover`, run:
 
 ```bash
 docker compose up --build prod
 ```
 
-Production uses the real drivetrain backend and the arm simulator. Synthetic camera feeds
-run in development; the production stack does not yet start cameras.
+Production starts the real drivetrain and arm backends, the arm controller and
+the SocketCAN bridge. It does not configure the CAN interface or provide the
+E-stop authority. Use the GUI Clear Faults button to rearm the driver when
+required, then select the desired arm mode. Synthetic camera feeds run in
+development; the production stack does not yet start cameras.
 Full trigger input uses the configured bench RPM cap, converted using the YAML gear ratio.
 Velocity mode uses the wheel radius and separation from the same YAML. Enable and
 configure bench motion as described in the drivetrain driver README before testing.

@@ -4,6 +4,10 @@ install/
 log/
 rover/rover/.env
 rover/rover/.env.drive
+rover/control/arm/config/arm_hardware.yaml
+rover/control/arm/config/arm_manual.yaml
+rover/control/arm/config/robot_arm.urdf
+rover/control/arm/config/arm_controllers.yaml
 old_code/
 
 # Python bytecode caches
