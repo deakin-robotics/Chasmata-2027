@@ -320,6 +320,59 @@ TEST_F(DirectDriveTest, PositionCommandIsRateLimited) {
   EXPECT_GT(samples, 1u);
   EXPECT_LT(previous, 1.57);
 }
+TEST_F(DirectDriveTest, SpeedToPositionHoldStartsAtMeasuredPose) {
+  ASSERT_TRUE(call(rearm));
+  command(DirectDrive::SPEED, 5);
+  speed();
+  angle = 1540; // Jog from ~0.50 to ~0.59 rad under speed control.
+  run(40ms);
+  const double measured = angle * 6.283185307 / 16384.0;
+  frames.clear();
+  command(DirectDrive::POSITION, measured * 180.0 / 3.141592653589793);
+
+  unsigned samples = 0;
+  for (const auto &f : frames) {
+    if (f.id != 1 || f.data[0] != 0xC2)
+      continue;
+    const uint32_t raw = uint32_t(f.data[1]) | (uint32_t(f.data[2]) << 8) |
+                         (uint32_t(f.data[3]) << 16) |
+                         (uint32_t(f.data[4]) << 24);
+    const double position = raw * 6.283185307 / 16384.0;
+    // Allow two encoder counts for the two position-frame conversions.
+    EXPECT_NEAR(position, measured, 2 * 6.283185307 / 16384.0);
+    ++samples;
+  }
+  EXPECT_GT(samples, 1u);
+}
+TEST_F(DirectDriveTest, SpeedToPositionReseedsOnceAndKeepsRateLimit) {
+  ASSERT_TRUE(call(rearm));
+  command(DirectDrive::SPEED, -5);
+  ASSERT_EQ(latest().data[0], 0xC1);
+  angle = 1069; // Jog from ~0.50 to ~0.41 rad under speed control.
+  run(40ms);
+  double previous = angle * 6.283185307 / 16384.0;
+  frames.clear();
+  command(DirectDrive::POSITION, -90);
+  // Refresh the position command while feedback remains at the jogged pose.
+  // This must continue the ramp, not reseed it on every position message.
+  command(DirectDrive::POSITION, -90);
+
+  unsigned samples = 0;
+  for (const auto &f : frames) {
+    if (f.id != 1 || f.data[0] != 0xC2)
+      continue;
+    const uint32_t bits = uint32_t(f.data[1]) | (uint32_t(f.data[2]) << 8) |
+                          (uint32_t(f.data[3]) << 16) |
+                          (uint32_t(f.data[4]) << 24);
+    const int32_t raw = bits & 0x80000000U ? -1 - int32_t(~bits) : int32_t(bits);
+    const double position = raw * 6.283185307 / 16384.0;
+    EXPECT_LE(std::abs(position - previous), .0208);
+    EXPECT_LE(position, previous);
+    previous = position;
+    ++samples;
+  }
+  EXPECT_GT(samples, 1u);
+}
 TEST_F(DirectDriveTest, ReleaseDoesNotResumeControllerTarget) {
   ASSERT_TRUE(call(rearm));
   command(DirectDrive::SPEED, 5);
