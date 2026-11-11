@@ -217,6 +217,28 @@ The driver rejects targets outside that joint's position limits. Direct position
 
 Stop the publisher with Ctrl+C: after 250 ms without a command the driver clears direct control and latches inhibition. For an operator stop use the live E-stop authority and independent stop as appropriate. To return to trajectory control, stop the direct publisher, rearm and submit a new trajectory. Sending `mode: 0` also releases direct control and latches inhibition; rearm is still required.
 
+### Inspect raw CAN traffic
+
+On the host or in the privileged testing container, monitor the verified CAN interface with `candump`. The historical setup used `can1` at 1 Mbit/s; replace `can1` below if the active adapter has another name:
+
+```bash
+candump -tz can1
+```
+
+Arm requests use each motor's CAN ID (`0x01`–`0x06`) and status request bytes `A4` and `AE`. Replies should arrive from the corresponding motor IDs. Inspect raw traffic while observing `/arm/control/status` and `/motor_stat_1`, `/motor_stat_2`; use decoded driver telemetry to interpret values. Raw traffic inspection is read-only. Do not inject CAN frames with `cansend` while the driver or another controller is active, since that bypasses its limits, command lease and fault handling.
+
+### Encoder startup ambiguity
+
+The `A4` feedback reports a wrapped encoder angle. The driver converts each sample into a joint position within the configured URDF limits. If more than one revolution value fits those limits, a wrapped angle alone cannot identify the physical turn. Startup remains inhibited when the sample is ambiguous; it does not automatically home the motor or assume the folded pose is zero. The driver can establish an initial turn reference when the configured range and sample identify one unique position.
+
+If feedback is lost for more than 250 ms, the driver latches inhibition and discards the previous turn reference because the arm may have moved while disconnected. Restored CAN feedback alone cannot resolve that ambiguity. After physically supporting and confirming the arm at its calibrated folded pose, configure that joint's measured `<joint_name>_folded_reference_rad` in the URDF and follow the `/arm/confirm_folded_pose` procedure above. That service requires asserted E-stop, fresh stationary feedback, no active trajectory, and agreement with the configured reference; it resolves the encoder turn only and never commands a motor home operation.
+
+### Fault and stop behavior
+
+The driver latches an arm wide inhibit if any configured joint has stale encoder or motor status (250 ms), a reported nonzero motor fault, an invalid/ambiguous encoder, measured overspeed, or if a CAN error frame arrives. It also latches on asserted, unknown or expired E-stop state (500 ms), expired direct command lease (250 ms), invalid controller target, direct control release, or lifecycle deactivation/error. Faults are reported in `/arm/control/status`; motor status details are published on `/motor_stat_1` and `/motor_stat_2`.
+
+When inhibited, the host requests zero speed and prevents new motion. This request cannot reach a motor over a failed CAN link and cannot guarantee support after loss of motor power or torque. On a gravity loaded arm, mechanical support and a verified motor side watchdog or brake are required. The driver does not automatically clear motor faults. After diagnosing the cause, physically verifying the arm's position and restoring healthy feedback and the live clear E-stop heartbeat, wait until the arm is stationary and no trajectory is active, call `/arm/rearm`, require success, and submit a new command. Reconnection does not resume the previous command. The software checks the status faults visible in the A4/AE protocol; it cannot detect unreported hardware or mechanical failures.
+
 ## Stop, faults and recovery
 
 Assert the stop through the single authority. For the mock CLI example, terminate its `false` publisher before starting an asserted heartbeat:
