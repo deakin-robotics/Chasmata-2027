@@ -273,6 +273,26 @@ TEST_F(DirectDriveTest, OnlyTheApprovedActiveTrajectoryCanReleaseTheHold) {
   EXPECT_FALSE(gate_goal(42, 42));
   EXPECT_TRUE(status.motion_inhibited);
 }
+TEST_F(DirectDriveTest, OwnershipChangesHoldMeasuredPoseInsteadOfOldControllerTarget) {
+  using Handoff = dcr_arm_driver::srv::ArmHandoff;
+  ASSERT_TRUE(call(rearm));
+  auto interfaces = hardware.export_command_interfaces();
+  ASSERT_TRUE(interfaces[0].set_value(1.2));
+  for (const auto mode : {Handoff::Request::POSITION_UNLOCKED, Handoff::Request::POSITION_LOCKED,
+                          Handoff::Request::MANUAL}) {
+    angle += 100;
+    run(80ms);
+    const double measured = angle * 6.283185307 / 16384.0;
+    ASSERT_TRUE(handoff_mode(mode));
+    run(80ms);
+    const auto frame = latest();
+    ASSERT_EQ(frame.data[0], 0xC2);
+    const uint32_t raw = uint32_t(frame.data[1]) | (uint32_t(frame.data[2]) << 8) |
+                         (uint32_t(frame.data[3]) << 16) | (uint32_t(frame.data[4]) << 24);
+    EXPECT_NEAR(raw * 6.283185307 / 16384.0, measured, 2 * 6.283185307 / 16384.0);
+    ASSERT_TRUE(interfaces[0].set_value(1.2));
+  }
+}
 TEST_F(DirectDriveTest, UnlockedPositionAllowsOnlyWristDirectDuringTrajectory) {
   hardware.on_deactivate(rclcpp_lifecycle::State());
   params.hardware_info.joints[0].name = "base_joint";

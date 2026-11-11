@@ -49,13 +49,26 @@ TEST(PositionArmBackend, HandoffsGateGoalsAndPreserveWristOwnership)
       response->controller.push_back(item);
     });
   bool accept_handoff = true;
-  auto handoff = driver->create_service<Handoff>("/arm/control/handoff",
-    [&](const Handoff::Request::SharedPtr req, Handoff::Response::SharedPtr response) {
-      response->success = accept_handoff;
-      if (response->success) {
+  unsigned handoff_count = 0;
+  bool delay_handoff = false;
+  std::shared_ptr<rmw_request_id_t> delayed_header;
+  Handoff::Request::SharedPtr delayed_request;
+  rclcpp::Service<Handoff>::SharedPtr handoff;
+  const auto respond_handoff = [&](const std::shared_ptr<rmw_request_id_t> & header,
+                                   const Handoff::Request::SharedPtr & req) {
+      Handoff::Response response;
+      response.success = accept_handoff;
+      if (response.success) {
         status.control_owner = req->mode; std::fill(status.direct_request_ids.begin(), status.direct_request_ids.end(), 0);
       }
-    });
+      handoff->send_response(*header, response);
+    };
+  const auto handoff_callback = [&](std::shared_ptr<rmw_request_id_t> header, Handoff::Request::SharedPtr req) {
+      ++handoff_count;
+      if (delay_handoff) { delayed_header = header; delayed_request = req; }
+      else respond_handoff(header, req);
+    };
+  handoff = driver->create_service<Handoff>("/arm/control/handoff", handoff_callback);
   unsigned hold_requests = 0, enable_requests = 0;
   auto gate = driver->create_service<dcr_arm_driver::srv::ArmTrajectoryGate>("/arm/control/trajectory_gate",
     [&](const dcr_arm_driver::srv::ArmTrajectoryGate::Request::SharedPtr req,
@@ -64,11 +77,12 @@ TEST(PositionArmBackend, HandoffsGateGoalsAndPreserveWristOwnership)
       response->success = true;
     });
   std::map<uint32_t, double> commands;
+  bool acknowledge_direct = true;
   auto command_sub = driver->create_subscription<dcr_arm_driver::msg::DirectDrive>("/arm/direct_drive", 32,
     [&](const dcr_arm_driver::msg::DirectDrive & msg) {
       commands[msg.id] = msg.value;
       for (size_t i = 0; i < status.joint_can_ids.size(); ++i)
-        if (status.joint_can_ids[i] == msg.id) status.direct_request_ids[i] = msg.request_id;
+        if (acknowledge_direct && status.joint_can_ids[i] == msg.id) status.direct_request_ids[i] = msg.request_id;
     });
   uint8_t ownership = 0;
   auto ownership_sub = driver->create_subscription<std_msgs::msg::UInt8>("/arm/position/ownership", 10,
@@ -77,13 +91,15 @@ TEST(PositionArmBackend, HandoffsGateGoalsAndPreserveWristOwnership)
   auto fma_sub = driver->create_subscription<telemetry_interfaces::msg::FmaState>("/fma/state", rclcpp::QoS(1).reliable().transient_local(),
     [&](const telemetry_interfaces::msg::FmaState & msg) { fma = msg; });
   std::shared_ptr<ServerGoal> forwarded;
+  bool finish_cancel = true;
+  bool publish_status = true;
   auto action = rclcpp_action::create_server<Trajectory>(driver, "/arm_real_controller/follow_joint_trajectory",
     [](const rclcpp_action::GoalUUID &, std::shared_ptr<const Trajectory::Goal>) { return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE; },
     [](const std::shared_ptr<ServerGoal>) { return rclcpp_action::CancelResponse::ACCEPT; },
     [&](const std::shared_ptr<ServerGoal> goal) { forwarded = goal; });
   auto timer = driver->create_wall_timer(20ms, [&] {
-    publisher->publish(status);
-    if (forwarded && forwarded->is_canceling()) { forwarded->canceled(std::make_shared<Trajectory::Result>()); forwarded.reset(); }
+    if (publish_status) publisher->publish(status);
+    if (finish_cancel && forwarded && forwarded->is_canceling()) { forwarded->canceled(std::make_shared<Trajectory::Result>()); forwarded.reset(); }
   });
   auto trajectory = rclcpp_action::create_client<Trajectory>(driver, "/arm_controller/follow_joint_trajectory");
   rclcpp::executors::SingleThreadedExecutor executor; executor.add_node(rover); executor.add_node(driver);
@@ -126,7 +142,14 @@ TEST(PositionArmBackend, HandoffsGateGoalsAndPreserveWristOwnership)
   input.axes[6] = 1; joy->publish(input);
   ASSERT_TRUE(wait([&] { return commands.count(4) && commands[4] == 1.0; }, 1s));
   EXPECT_EQ(commands.count(1), 0u); EXPECT_EQ(commands.count(2), 0u); EXPECT_EQ(commands.count(3), 0u);
+  finish_cancel = false;
+  const auto before_lock = handoff_count;
   std_msgs::msg::Bool locked; locked.data = true; lock->publish(locked);
+  ASSERT_TRUE(wait([&] { return forwarded && forwarded->is_canceling(); }, 2s));
+  wait([] { return false; }, 300ms);
+  EXPECT_EQ(handoff_count, before_lock);
+  EXPECT_EQ(status.control_owner, Handoff::Request::POSITION_UNLOCKED);
+  finish_cancel = true;
   ASSERT_TRUE(wait([&] { return !forwarded && status.control_owner == Handoff::Request::POSITION_LOCKED && fma.arm.confirmed == "POSITION"; }, 3s));
   wait([] { return false; }, 300ms);
   EXPECT_EQ(ownership, 2u);
@@ -140,15 +163,70 @@ TEST(PositionArmBackend, HandoffsGateGoalsAndPreserveWristOwnership)
   ASSERT_TRUE(wait([&] { return forwarded != nullptr; }, 1s));
   EXPECT_TRUE(forwarded->get_goal()->path_tolerance.empty());
   EXPECT_TRUE(forwarded->get_goal()->goal_tolerance.empty());
-  auto cancel = trajectory->async_cancel_goal(handle);
-  ASSERT_TRUE(wait([&] { return cancel.wait_for(0s) == std::future_status::ready; }, 2s));
-  ASSERT_TRUE(wait([&] { return forwarded == nullptr; }, 2s));
+  finish_cancel = false;
+  const auto before_unlock = handoff_count;
+  locked.data = false; lock->publish(locked);
+  ASSERT_TRUE(wait([&] { return forwarded && forwarded->is_canceling(); }, 2s));
+  wait([] { return false; }, 300ms);
+  EXPECT_EQ(handoff_count, before_unlock);
+  EXPECT_EQ(status.control_owner, Handoff::Request::POSITION_LOCKED);
+  finish_cancel = true;
+  ASSERT_TRUE(wait([&] { return !forwarded && status.control_owner == Handoff::Request::POSITION_UNLOCKED && ownership == 1; }, 3s));
   mode.data = "MANUAL"; request->publish(mode);
   ASSERT_TRUE(wait([&] { return fma.arm.confirmed == "MANUAL"; }, 3s));
   EXPECT_EQ(status.control_owner, Handoff::Request::MANUAL);
+  locked.data = true; lock->publish(locked);
+  wait([] { return false; }, 150ms);
+  mode.data = "POSITION"; request->publish(mode);
+  ASSERT_TRUE(wait([&] { return fma.arm.confirmed == "POSITION" && ownership == 2; }, 3s));
+  EXPECT_EQ(status.control_owner, Handoff::Request::POSITION_LOCKED);
+  mode.data = "MANUAL"; request->publish(mode);
+  ASSERT_TRUE(wait([&] { return fma.arm.confirmed == "MANUAL"; }, 3s));
+  locked.data = false; lock->publish(locked);
+  wait([] { return false; }, 150ms);
+  delay_handoff = true; mode.data = "POSITION"; request->publish(mode);
+  ASSERT_TRUE(wait([&] { return delayed_request != nullptr; }, 2s));
+  wait([] { return false; }, 350ms);
+  EXPECT_EQ(fma.arm.pending, "POSITION");
+  EXPECT_EQ(fma.arm.confirmed, "MANUAL");
+  delay_handoff = false; respond_handoff(delayed_header, delayed_request);
+  delayed_header.reset(); delayed_request.reset();
+  ASSERT_TRUE(wait([&] { return fma.arm.confirmed == "POSITION"; }, 3s));
+  mode.data = "MANUAL"; request->publish(mode);
+  ASSERT_TRUE(wait([&] { return fma.arm.confirmed == "MANUAL"; }, 3s));
+  // An unanswered handoff leaves ownership uncertain even if the last
+  // status still names Manual, so it must not remain confirmed on timeout.
+  delay_handoff = true; mode.data = "POSITION"; request->publish(mode);
+  ASSERT_TRUE(wait([&] { return delayed_request != nullptr; }, 2s));
+  ASSERT_TRUE(wait([&] { return fma.arm.rejected == "POSITION"; }, 4s));
+  EXPECT_TRUE(fma.arm.confirmed.empty());
+  delay_handoff = false; accept_handoff = false;
+  respond_handoff(delayed_header, delayed_request);
+  delayed_header.reset(); delayed_request.reset(); accept_handoff = true;
+  mode.data = "MANUAL"; request->publish(mode);
+  ASSERT_TRUE(wait([&] { return fma.arm.confirmed == "MANUAL"; }, 3s));
+  // A handoff response alone cannot confirm Position: each wrist must accept
+  // the new token before the FMA can complete the request.
+  acknowledge_direct = false; mode.data = "POSITION"; request->publish(mode);
+  ASSERT_TRUE(wait([&] { return status.control_owner == Handoff::Request::POSITION_UNLOCKED; }, 2s));
+  wait([] { return false; }, 350ms);
+  EXPECT_EQ(fma.arm.pending, "POSITION");
+  EXPECT_NE(fma.arm.confirmed, "POSITION");
+  acknowledge_direct = true;
+  ASSERT_TRUE(wait([&] { return fma.arm.confirmed == "POSITION"; }, 2s));
+  mode.data = "MANUAL"; request->publish(mode);
+  ASSERT_TRUE(wait([&] { return fma.arm.confirmed == "MANUAL"; }, 3s));
   accept_handoff = false; mode.data = "POSITION"; request->publish(mode);
   ASSERT_TRUE(wait([&] { return fma.arm.rejected == "POSITION"; }, 4s));
   EXPECT_EQ(fma.arm.confirmed, "MANUAL");
+  accept_handoff = true;
+  handoff.reset();
+  wait([] { return false; }, 300ms);
+  request->publish(mode);
+  ASSERT_TRUE(wait([&] { return fma.arm.pending == "POSITION"; }, 1s));
+  ASSERT_TRUE(wait([&] { return fma.arm.rejected == "POSITION"; }, 4s));
+  EXPECT_EQ(fma.arm.confirmed, "MANUAL");
+  handoff = driver->create_service<Handoff>("/arm/control/handoff", handoff_callback);
   accept_handoff = true; request->publish(mode);
   ASSERT_TRUE(wait([&] { return fma.arm.confirmed == "POSITION"; }, 3s));
   locked.data = false; lock->publish(locked); mode.data = "MANUAL"; request->publish(mode);
@@ -171,10 +249,38 @@ TEST(PositionArmBackend, HandoffsGateGoalsAndPreserveWristOwnership)
   EXPECT_EQ(result.get().code, rclcpp_action::ResultCode::SUCCEEDED);
   EXPECT_GT(feedback_count, 0u);
   EXPECT_GT(enable_requests, 0u);
+  // Loss of feedback during a partially accepted handoff cannot retain
+  // either the old Manual confirmation or a new Position confirmation.
+  mode.data = "MANUAL"; request->publish(mode);
+  ASSERT_TRUE(wait([&] { return fma.arm.confirmed == "MANUAL"; }, 3s));
+  acknowledge_direct = false; mode.data = "POSITION"; request->publish(mode);
+  ASSERT_TRUE(wait([&] { return status.control_owner == Handoff::Request::POSITION_UNLOCKED; }, 2s));
+  publish_status = false;
+  ASSERT_TRUE(wait([&] { return fma.arm.rejected == "POSITION"; }, 4s));
+  EXPECT_TRUE(fma.arm.confirmed.empty());
+  acknowledge_direct = true; publish_status = true;
+  request->publish(mode);
+  ASSERT_TRUE(wait([&] { return fma.arm.confirmed == "POSITION"; }, 3s));
+  auto active = trajectory->async_send_goal(goal);
+  ASSERT_TRUE(wait([&] { return active.wait_for(0s) == std::future_status::ready && forwarded; }, 2s));
+  auto active_handle = active.get(); ASSERT_NE(active_handle, nullptr);
+  auto active_result = trajectory->async_get_result(active_handle);
   controller_active = false;
   ASSERT_TRUE(wait([&] { return fma.arm.confirmed.empty(); }, 2s));
+  ASSERT_TRUE(wait([&] { return active_result.wait_for(0s) == std::future_status::ready; }, 2s));
+  EXPECT_NE(active_result.get().code, rclcpp_action::ResultCode::SUCCEEDED);
   auto unavailable = trajectory->async_send_goal(goal);
   ASSERT_TRUE(wait([&] { return unavailable.wait_for(0s) == std::future_status::ready; }, 1s));
   EXPECT_EQ(unavailable.get(), nullptr);
+  // Stale driver status also revokes Manual ownership and stops refreshes.
+  controller_active = true;
+  mode.data = "MANUAL"; request->publish(mode);
+  ASSERT_TRUE(wait([&] { return fma.arm.confirmed == "MANUAL"; }, 3s));
+  publish_status = false;
+  ASSERT_TRUE(wait([&] { return fma.arm.confirmed.empty(); }, 2s));
+  wait([] { return false; }, 150ms);
+  commands.clear();
+  wait([] { return false; }, 350ms);
+  EXPECT_TRUE(commands.empty());
   executor.remove_node(driver); executor.remove_node(rover); rclcpp::shutdown();
 }

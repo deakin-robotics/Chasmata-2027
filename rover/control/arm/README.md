@@ -108,6 +108,15 @@ The driver latches inhibition on stale feedback/status (250 ms), reported motor 
 
 Wrapped encoder feedback may not identify a unique joint turn when multiple revolutions fit the configured range. The driver inhibits motion when it cannot establish an unambiguous reference. After encoder feedback is lost, it discards the prior turn reference because the arm may have moved while disconnected. The folded-pose confirmation service only restores a calibrated turn reference after a physical check; it does not move or home the arm.
 
+For arm-team commissioning, simulation does not verify physical joint directions,
+speed limits, encoder calibration or the loaded arm's response to ownership
+handoffs. With the commissioning safeguards in place, verify both Manual ↔
+Position directions, locked and unlocked wrist transfers (including trajectory
+cancellation), and stopping after communication or controller loss. Confirm
+that the measured pose is held and no previous target resumes after a handoff
+or deliberate recovery. Follow the driver commissioning guide for physical
+support and stop arrangements.
+
 ## Package layout
 
 ```text
