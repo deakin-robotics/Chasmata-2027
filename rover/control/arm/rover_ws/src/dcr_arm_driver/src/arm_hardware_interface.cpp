@@ -922,6 +922,12 @@ void ArmHardwareInterface::direct_drive_callback(
     }
   }
 
+  if (joint->direct_mode == DirectDrive::SPEED &&
+      msg.mode == DirectDrive::POSITION) {
+    // Speed control can move away from the last position target. Start the
+    // position ramp at the fresh measured pose validated above, only on handover.
+    joint->last_position_command = joint->position;
+  }
   joint->last_direct_command = now;
   joint->direct_mode = msg.mode;
   joint->direct_value = msg.value;
