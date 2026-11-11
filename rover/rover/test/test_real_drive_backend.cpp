@@ -38,6 +38,7 @@ protected:
       });
     switch_service_ = driver_->create_service<Switch>("/drivetrain/controller_manager/switch_controller",
       [this](const std::shared_ptr<Switch::Request> request, std::shared_ptr<Switch::Response> response) {
+        ++switch_calls_;
         EXPECT_EQ(request->activate_controllers.size(), 1U);
         EXPECT_EQ(request->deactivate_controllers.size(), 1U);
         if (fail_after_apply_) {
@@ -90,6 +91,7 @@ protected:
   bool hardware_active_{true}, manual_active_{false}, switch_ok_{true}, fail_after_apply_{false};
   size_t command_count_{0};
   size_t velocity_count_{0};
+  size_t switch_calls_{0};
   std::vector<double> received_;
   geometry_msgs::msg::TwistStamped velocity_;
 };
@@ -209,4 +211,76 @@ TEST_F(RealDriveTest, RestoresPreviousControllerAfterPartialFailure)
   EXPECT_EQ(request("VELOCITY"), std::optional<bool>(false));
   EXPECT_TRUE(manual_active_);
   EXPECT_TRUE(backend_->confirmed_mode_valid());
+}
+
+// Pending requests keep routing input through the confirmed Manual or Velocity mode.
+TEST_F(RealDriveTest, RoutesInputThroughConfirmedModeDuringReadinessChecks)
+{
+  ASSERT_EQ(request("MANUAL"), std::optional<bool>(true));
+  backend_->request_mode("VELOCITY");
+  send(0.5F, 1.0F, false);
+  EXPECT_EQ(received_, std::vector<double>({1, 1, 2, 2}));
+  ASSERT_FALSE(backend_->take_mode_result().has_value());
+  send(0.5F, 1.0F, false);
+  EXPECT_EQ(received_, std::vector<double>({1, 1, 2, 2}));
+  std::optional<bool> result;
+  ASSERT_TRUE(wait([&] { result = backend_->take_mode_result(); return result.has_value(); }, 5s));
+  ASSERT_EQ(result, std::optional<bool>(true));
+
+  backend_->request_mode("MANUAL");
+  sensor_msgs::msg::Joy joy; joy.axes = {0.0F, -1.0F, 0, 0, 0, 0};
+  auto count = velocity_count_;
+  backend_->on_joy(joy);
+  ASSERT_TRUE(wait([&] { return velocity_count_ > count; }, 1s));
+  EXPECT_NEAR(velocity_.twist.linear.x, 0.2, 1e-9);
+  ASSERT_FALSE(backend_->take_mode_result().has_value());
+  count = velocity_count_;
+  backend_->on_joy(joy);
+  ASSERT_TRUE(wait([&] { return velocity_count_ > count; }, 1s));
+  EXPECT_NEAR(velocity_.twist.linear.x, 0.2, 1e-9);
+  ASSERT_TRUE(wait([&] { result = backend_->take_mode_result(); return result.has_value(); }, 5s));
+  ASSERT_EQ(result, std::optional<bool>(true));
+  send(0.5F, 1.0F, false);
+  EXPECT_EQ(received_, std::vector<double>({1, 1, 2, 2}));
+}
+
+// A failed handoff resumes the verified previous controller; an unknown owner blocks input.
+TEST_F(RealDriveTest, ResumesAfterFailedHandoffOnlyWhenOwnershipIsKnown)
+{
+  ASSERT_EQ(request("MANUAL"), std::optional<bool>(true));
+  switch_ok_ = false;
+  EXPECT_EQ(request("VELOCITY"), std::optional<bool>(false));
+  send(0.5F, 1.0F, false);
+  EXPECT_EQ(received_, std::vector<double>({1, 1, 2, 2}));
+
+  fail_after_apply_ = true;
+  EXPECT_EQ(request("VELOCITY"), std::optional<bool>(false));
+  EXPECT_FALSE(backend_->confirmed_mode_valid());
+  executor_.spin_some();
+  const auto count = command_count_;
+  sensor_msgs::msg::Joy joy; joy.axes = {0, 0, 0, 0, 0.5F, 1.0F};
+  backend_->on_joy(joy);
+  EXPECT_FALSE(wait([&] { return command_count_ > count; }, 200ms));
+}
+
+// Joystick input is suspended while a controller switch is awaiting verification.
+TEST_F(RealDriveTest, PausesInputDuringControllerSwitch)
+{
+  ASSERT_EQ(request("MANUAL"), std::optional<bool>(true));
+  const auto previous_switches = switch_calls_;
+  backend_->request_mode("VELOCITY");
+  ASSERT_TRUE(wait([&] {
+    backend_->take_mode_result();
+    return switch_calls_ > previous_switches;
+  }, 3s));
+  ASSERT_TRUE(wait([&] {
+    return received_ == std::vector<double>({0, 0, 0, 0});
+  }, 1s));
+  const auto count = command_count_;
+  sensor_msgs::msg::Joy joy; joy.axes = {0, 0, 0, 0, 0.5F, 1.0F};
+  backend_->on_joy(joy);
+  EXPECT_FALSE(wait([&] { return command_count_ > count; }, 200ms));
+  std::optional<bool> result;
+  ASSERT_TRUE(wait([&] { result = backend_->take_mode_result(); return result.has_value(); }, 5s));
+  EXPECT_EQ(result, std::optional<bool>(true));
 }

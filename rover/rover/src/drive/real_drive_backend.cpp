@@ -44,7 +44,6 @@ void RealDriveBackend::request_mode(const std::string & mode)
   previous_mode_ = active_mode_;
   switch_sent_ = false;
   requested_mode_ = mode;
-  stop();
   stage_ = Stage::waiting_services;
   deadline_ = std::chrono::steady_clock::now() + 3s;
 }
@@ -133,6 +132,9 @@ std::optional<bool> RealDriveBackend::take_mode_result()
     }
     if (active(desired) && !active(other)) { send_hardware_request(Stage::verify_hardware); return std::nullopt; }
     if (stage_ == Stage::verify) return rollback();
+    // The old controller remains in control through readiness checks. Stop only
+    // when ownership is about to change, and suppress input until verified.
+    stop();
     auto request = std::make_shared<Switch::Request>();
     request->activate_controllers = {desired};
     if (active(other)) request->deactivate_controllers = {other};
@@ -162,7 +164,9 @@ void RealDriveBackend::stop()
 
 void RealDriveBackend::on_joy(const sensor_msgs::msg::Joy & joy)
 {
-  if (stage_ != Stage::idle || active_mode_.empty()) return;
+  const bool current_controller_in_control = stage_ == Stage::idle ||
+    stage_ == Stage::waiting_services || stage_ == Stage::hardware || stage_ == Stage::controllers;
+  if (!current_controller_in_control || !confirmed_mode_valid_ || active_mode_.empty()) return;
   if (active_mode_ == "VELOCITY") {
     if (joy.axes.size() < 2 || !std::isfinite(joy.axes[0]) || !std::isfinite(joy.axes[1]) ||
       std::abs(joy.axes[0]) > 1.0 || std::abs(joy.axes[1]) > 1.0) { stop(); return; }
