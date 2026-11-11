@@ -8,3 +8,5 @@ uint8 mode
 # Speed magnitude is limited by that joint's configured max_velocity.
 # Ignored for CONTROLLER.
 float64 value
+# Correlates an accepted command with the requesting backend; zero is allowed for legacy clients.
+uint64 request_id

@@ -1,11 +1,13 @@
 <?xml version="1.0"?>
 <launch>
+  <arg name="arm_manual_config" default="$(find-pkg-share rover)/config/arm_manual.example.yaml"/>
   <arg name="arm_backend" default="mock"/>
   <arg name="drive_backend" default="mock"/>
   <arg name="drive_max_wheel_speed" default="$(env DRIVE_MAX_WHEEL_SPEED 0.0)"/>
   <arg name="drive_wheel_radius" default="$(env DRIVE_WHEEL_RADIUS 0.0)"/>
   <arg name="drive_wheel_separation" default="$(env DRIVE_WHEEL_SEPARATION 0.0)"/>
   <node pkg="rover" exec="rover" name="rover" output="screen">
+    <param from="$(var arm_manual_config)"/>
     <param name="arm_backend" value="$(var arm_backend)"/>
     <param name="drive_backend" value="$(var drive_backend)"/>
     <param name="drive_max_wheel_speed" value="$(var drive_max_wheel_speed)" type="float"/>

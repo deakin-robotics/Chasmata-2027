@@ -28,7 +28,7 @@ RoverNode::RoverNode(std::unique_ptr<DriveBackend> drive_backend, const rclcpp::
 
   const auto arm_backend = get_parameter("arm_backend").as_string();
   if (arm_backend == "mock") arm_backend_ = std::make_unique<MockArmBackend>(*this, ack_delay_);
-  else if (arm_backend == "real") arm_backend_ = std::make_unique<RealArmBackend>();
+  else if (arm_backend == "real") arm_backend_ = std::make_unique<RealArmBackend>(*this);
   else throw std::invalid_argument("arm_backend must be mock or real");
 
   const auto retained = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();

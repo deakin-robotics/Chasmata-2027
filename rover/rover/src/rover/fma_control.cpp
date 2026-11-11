@@ -85,6 +85,7 @@ void RoverNode::tick()
       if (!result) continue;
       if (*result) arm_mode_ = pending->second.value;
       else {
+        if (!arm_backend_->confirmed_mode_valid()) arm_mode_.clear();
         rejected_modes_[subsystem] = pending->second.value;
         rejection_clear_[subsystem] = now + std::chrono::milliseconds(500);
       }
@@ -102,6 +103,10 @@ void RoverNode::tick()
     if (iterator->second <= now) { rejected_modes_.erase(iterator->first); iterator = rejection_clear_.erase(iterator); publish_fma(); } else ++iterator;
   }
   arm_backend_->tick();
+  if (!arm_mode_.empty() && !arm_backend_->confirmed_mode_valid()) {
+    arm_mode_.clear();
+    publish_fma();
+  }
   if (std::chrono::duration<double>(now - last_fma_).count() >= 1.0) publish_fma();
 }
 

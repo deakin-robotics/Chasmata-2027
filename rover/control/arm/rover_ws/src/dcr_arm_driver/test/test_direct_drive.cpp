@@ -167,6 +167,27 @@ protected:
     EXPECT_EQ(f.data[2], 1);
   }
 };
+TEST_F(DirectDriveTest, ReportsAcceptedDirectControlForEachConfiguredJoint) {
+  EXPECT_FALSE(status.direct_ready);
+  ASSERT_TRUE(call(rearm));
+  run(40ms);
+  ASSERT_TRUE(status.direct_ready);
+  ASSERT_EQ(status.joint_names.size(), 2u);
+  EXPECT_EQ(status.joint_can_ids, (std::vector<uint32_t>{1, 2}));
+  DirectDrive cmd;
+  cmd.mode = DirectDrive::SPEED;
+  cmd.request_id = 123;
+  cmd.id = 1; commands->publish(cmd);
+  cmd.id = 2; commands->publish(cmd);
+  run(80ms);
+  ASSERT_EQ(status.direct_request_ids.size(), 2u);
+  EXPECT_EQ(status.direct_request_ids[0], 123u);
+  EXPECT_EQ(status.direct_request_ids[1], 123u);
+  run(300ms);
+  EXPECT_FALSE(status.direct_ready);
+  EXPECT_EQ(status.direct_request_ids[0], 0u);
+  EXPECT_EQ(status.direct_request_ids[1], 0u);
+}
 TEST_F(DirectDriveTest, StartupIsLatchedAtMeasuredFoldedPose) {
   stopped();
   EXPECT_TRUE(status.motion_inhibited);

@@ -61,6 +61,7 @@ struct JointInfo {
   // untouched.
   uint8_t direct_mode = dcr_arm_driver::msg::DirectDrive::CONTROLLER;
   double direct_value = 0.0;
+  uint64_t direct_request_id = 0;
 };
 
 class ArmHardwareInterface : public hardware_interface::SystemInterface {

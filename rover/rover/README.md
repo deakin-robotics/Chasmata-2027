@@ -11,8 +11,12 @@ determines whether Rover Control confirms or rejects the pending request.
 
 Arm control uses an `arm_backend` launch parameter. It defaults to `mock`, which
 provides the simulated joint states and trajectory action. `arm_backend:=real`
-selects a placeholder that rejects mode requests and sends no hardware commands;
-it does not yet integrate the arm driver. Both development and production use
+selects the real Manual backend. Copy `config/arm_manual.example.yaml` and set
+six positive Manual speed limits in RPM, compatible with the commissioned arm
+profile; pass its path as `arm_manual_config:=<path>`. Manual is confirmed only
+after the driver accepts neutral direct commands for every configured joint.
+Position is not yet implemented. The driver must be launched and rearmed
+separately for testing. Both development and production use
 `mock` by default.
 
 Run the development stack with:

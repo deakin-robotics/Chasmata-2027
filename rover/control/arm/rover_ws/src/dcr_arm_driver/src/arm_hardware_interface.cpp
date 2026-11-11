@@ -263,7 +263,7 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_activate(
   // positions cannot overwrite them on the next control iteration.
   direct_drive_sub_ =
       node->create_subscription<dcr_arm_driver::msg::DirectDrive>(
-          "/arm/direct_drive", rclcpp::QoS(1),
+          "/arm/direct_drive", rclcpp::QoS(32),
           [this](const dcr_arm_driver::msg::DirectDrive &msg) {
             this->direct_drive_callback(msg);
           });
@@ -713,6 +713,16 @@ void ArmHardwareInterface::publish_status() {
       motion_inhibited_ || fault_latched_ || !motion_enabled_;
   status.controller_ready =
       trajectory_rearm_ready_ && !fault_latched_ && motion_enabled_;
+  status.direct_ready = status.hardware_active && motion_enabled_ && !fault_latched_ &&
+      !trajectory_goal_active_ && status.estop_clear && status.feedback_fresh && status.motor_status_safe;
+  for (const auto &joint : joints_) {
+    status.joint_names.push_back(joint.name);
+    status.joint_can_ids.push_back(joint.can_id);
+    status.joint_max_velocity_rpm.push_back(joint.max_velocity / RPM_TO_RADIANS_PER_SECOND);
+    status.direct_request_ids.push_back(status.direct_ready &&
+        joint.direct_mode == dcr_arm_driver::msg::DirectDrive::SPEED &&
+        now - joint.last_direct_command <= COMMAND_TIMEOUT ? joint.direct_request_id : 0);
+  }
   if (!status.hardware_active)
     status.reason = "arm hardware inactive";
   else if (!motion_enabled_)
@@ -931,6 +941,7 @@ void ArmHardwareInterface::direct_drive_callback(
   joint->last_direct_command = now;
   joint->direct_mode = msg.mode;
   joint->direct_value = msg.value;
+  joint->direct_request_id = msg.request_id;
   if (msg.mode == DirectDrive::CONTROLLER) {
     latch_fault("direct control released: rearm before new trajectory");
     joint->estop_hold_position = joint->position;

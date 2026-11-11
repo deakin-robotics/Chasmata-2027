@@ -35,8 +35,10 @@ The identified motor/driver combinations are GIM8108-48 + GDZ468, GIM4310-36 + G
 | `/arm/confirm_folded_pose` | `std_srvs/srv/Trigger` | Confirm calibrated turn reference without motion |
 | `/arm_controller/follow_joint_trajectory` | `control_msgs/action/FollowJointTrajectory` | Trajectory execution with configured tolerances |
 | `/arm/joint_states` | `sensor_msgs/msg/JointState` | Position in radians, speed in rad/s |
-| `/arm/control/status` | `telemetry_interfaces/msg/ArmControlStatus` | Readiness, freshness and inhibit reason |
+| `/arm/control/status` | `telemetry_interfaces/msg/ArmControlStatus` | Readiness, configured joint IDs and speed limits, and accepted direct-command request IDs |
 | `/motor_stat_1`, `/motor_stat_2` | `arm_interfaces` telemetry | Per-motor encoder and controller status |
+
+`direct_ready` reports readiness for direct control separately from the trajectory-related `motion_inhibited` flag. The status arrays share joint order; direct request IDs are nonzero only while the corresponding accepted speed command is fresh.
 
 Direct modes: `CONTROLLER=0` releases direct control and latches inhibition; `POSITION=1` commands an absolute angle in degrees; `SPEED=2` commands speed in RPM. All configured joints must be healthy; a secured single-motor test requires a matching one-joint URDF and controller profile, rather than synthetic feedback for disconnected joints.
 
