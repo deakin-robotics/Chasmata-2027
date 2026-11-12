@@ -6,6 +6,18 @@
 
 namespace rover
 {
+class DisabledDriveBackend final : public DriveBackend
+{
+public:
+  void request_mode(const std::string &) override { result_ = false; }
+  void cancel_mode_request() override { result_.reset(); }
+  std::optional<bool> take_mode_result() override { auto result = result_; result_.reset(); return result; }
+  bool confirmed_mode_valid() const override { return false; }
+  void on_joy(const sensor_msgs::msg::Joy &) override {}
+private:
+  std::optional<bool> result_;
+};
+
 // A disabled arm exposes no arm endpoints or simulated state.
 class DisabledArmBackend final : public ArmBackend
 {
@@ -36,7 +48,8 @@ RoverNode::RoverNode(std::unique_ptr<DriveBackend> drive_backend, const rclcpp::
     if (backend == "mock") drive_backend_ = std::make_unique<MockDriveBackend>(ack_delay_);
     else if (backend == "real") drive_backend_ = std::make_unique<RealDriveBackend>(*this, get_parameter("drive_max_wheel_speed").as_double(),
       get_parameter("drive_wheel_radius").as_double(), get_parameter("drive_wheel_separation").as_double());
-    else throw std::invalid_argument("drive_backend must be mock or real");
+    else if (backend == "disabled") drive_backend_ = std::make_unique<DisabledDriveBackend>();
+    else throw std::invalid_argument("drive_backend must be mock, real or disabled");
   }
 
   const auto arm_backend = get_parameter("arm_backend").as_string();

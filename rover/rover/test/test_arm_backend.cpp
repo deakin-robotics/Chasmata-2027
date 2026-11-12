@@ -74,6 +74,48 @@ TEST_F(ArmBackendSelection, DisabledRejectsModesWithoutArmEndpoints)
   executor.remove_node(client); executor.remove_node(node);
 }
 
+TEST_F(ArmBackendSelection, DisabledDriveRejectsModesAndDoesNotPublishWheelCommands)
+{
+  rclcpp::NodeOptions options;
+  options.parameter_overrides({rclcpp::Parameter("drive_backend", "disabled"),
+    rclcpp::Parameter("arm_backend", "disabled")});
+  auto node = rover::make_rover_node(options);
+  auto client = std::make_shared<rclcpp::Node>("disabled_drive_test_client");
+  auto request = client->create_publisher<std_msgs::msg::String>("/fma/drive/request", 10);
+  auto joy = client->create_publisher<sensor_msgs::msg::Joy>("/drive/joy", 10);
+  telemetry_interfaces::msg::FmaState latest;
+  auto sub = client->create_subscription<telemetry_interfaces::msg::FmaState>("/fma/state",
+    rclcpp::QoS(1).reliable().transient_local(), [&](const telemetry_interfaces::msg::FmaState & msg) { latest = msg; });
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(node); executor.add_node(client);
+  const auto wait = [&](const auto & condition) {
+    const auto end = std::chrono::steady_clock::now() + 3s;
+    while (std::chrono::steady_clock::now() < end) {
+      executor.spin_some(); if (condition()) return true; std::this_thread::sleep_for(10ms);
+    }
+    return false;
+  };
+  ASSERT_TRUE(wait([&] { return request->get_subscription_count() > 0 && joy->get_subscription_count() > 0; }));
+  for (const auto * mode : {"MANUAL", "VELOCITY", "MANAGED"}) {
+    std_msgs::msg::String message; message.data = mode; request->publish(message);
+    ASSERT_TRUE(wait([&] { return latest.drive.rejected == mode; }));
+    EXPECT_TRUE(latest.drive.confirmed.empty());
+  }
+  sensor_msgs::msg::Joy input; input.axes = std::vector<float>(6, 1.0); input.buttons = std::vector<int32_t>(4, 0);
+  joy->publish(input);
+  std::this_thread::sleep_for(100ms); executor.spin_some();
+  EXPECT_EQ(client->count_publishers("/drivetrain/direct/wheel_speeds"), 0u);
+  EXPECT_EQ(client->count_publishers("/drivetrain/diff_drive_controller/cmd_vel"), 0u);
+  executor.remove_node(client); executor.remove_node(node);
+}
+
+TEST_F(ArmBackendSelection, InvalidDriveSelectionFails)
+{
+  rclcpp::NodeOptions options;
+  options.parameter_overrides({rclcpp::Parameter("drive_backend", "invalid")});
+  EXPECT_THROW(rover::make_rover_node(options), std::invalid_argument);
+}
+
 TEST_F(ArmBackendSelection, RealBackendRejectsRequestsWithoutSimulatorEndpoints)
 {
   rclcpp::NodeOptions options;

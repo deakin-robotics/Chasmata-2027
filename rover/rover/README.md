@@ -18,9 +18,8 @@ after the driver accepts neutral direct commands for every configured joint.
 Position requires the active real arm trajectory controller and a verified
 ownership handoff. Rover Control gates `/arm_controller/follow_joint_trajectory`
 and forwards accepted goals to the driver's `arm_real_controller` action.
-For testing, start the driver with its existing launch and use the GUI's
-Clear Faults button to rearm; mode selection remains a separate action. Both development and production use
-`mock` by default.
+Use the GUI's Clear Faults button to rearm; mode selection remains a separate
+action. Development uses mock backends by default; production uses real ones.
 
 For an isolated ROS-domain integration check with a simulated CAN bus and the
 real trajectory controller, source the workspace and run:
@@ -75,6 +74,27 @@ the SocketCAN bridge. It does not configure the CAN interface or provide the
 E-stop authority. Use the GUI Clear Faults button to rearm the driver when
 required, then select the desired arm mode. Synthetic camera feeds run in
 development; the production stack does not yet start cameras.
+
+For an isolated hardware test, set `DRIVE_BACKEND` or `ARM_BACKEND` to
+`disabled` before starting production. Both default to `real`. A disabled
+subsystem rejects its mode requests and publishes no simulated hardware data;
+its driver and configuration checks are skipped. For example, in PowerShell:
+
+```powershell
+# Arm only
+$env:DRIVE_BACKEND = 'disabled'
+docker compose up --build prod
+
+# Drivetrain only (use a new terminal, or clear DRIVE_BACKEND first)
+$env:ARM_BACKEND = 'disabled'
+docker compose up --build prod
+```
+
+Set both variables to `disabled` to run Rover Control with neither subsystem.
+Remove the environment variables or set them to `real` for the whole rover;
+PowerShell environment variables persist in the current terminal. The real arm
+still needs its configured CAN interface and live E-stop authority. Cameras
+require their separate production startup.
 Full trigger input uses the configured bench RPM cap, converted using the YAML gear ratio.
 Velocity mode uses the wheel radius and separation from the same YAML. Enable and
 configure bench motion as described in the drivetrain driver README before testing.

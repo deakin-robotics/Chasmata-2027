@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+DRIVE_BACKEND=${DRIVE_BACKEND:-real}
+ARM_BACKEND=${ARM_BACKEND:-real}
+if [[ "$DRIVE_BACKEND" != real && "$DRIVE_BACKEND" != disabled ]]; then
+  echo 'DRIVE_BACKEND must be real or disabled' >&2
+  exit 1
+fi
+if [[ "$ARM_BACKEND" != real && "$ARM_BACKEND" != disabled ]]; then
+  echo 'ARM_BACKEND must be real or disabled' >&2
+  exit 1
+fi
+
+if [[ "$DRIVE_BACKEND" == real ]]; then
 DRIVE_LIMITS=$(python3 - <<'PY'
 import math
 import os
@@ -41,12 +53,8 @@ PY
 )
 read -r DRIVE_MAX_WHEEL_SPEED DRIVE_WHEEL_RADIUS DRIVE_WHEEL_SEPARATION <<< "$DRIVE_LIMITS"
 export DRIVE_MAX_WHEEL_SPEED DRIVE_WHEEL_RADIUS DRIVE_WHEEL_SEPARATION
-
-ARM_BACKEND=${ARM_BACKEND:-real}
-if [[ "$ARM_BACKEND" != real && "$ARM_BACKEND" != disabled ]]; then
-  echo 'ARM_BACKEND must be real or disabled' >&2
-  exit 1
 fi
+
 if [[ "$ARM_BACKEND" == real ]]; then
 ARM_CAN_INTERFACE=$(python3 - <<'PY'
 import os
@@ -79,18 +87,19 @@ set +u
 source /opt/ros/jazzy/setup.bash
 source /workspace/install/setup.bash
 set -u
-ros2 launch rover_drivetrain_control drivetrain.launch.py hardware_config:=/etc/rover/drivetrain/drivetrain_hardware.yaml &
-drivetrain_pid=$!
-child_pids=("$drivetrain_pid")
+child_pids=()
+if [[ "$DRIVE_BACKEND" == real ]]; then
+  ros2 launch rover_drivetrain_control drivetrain.launch.py hardware_config:=/etc/rover/drivetrain/drivetrain_hardware.yaml &
+  child_pids+=("$!")
+fi
 if [[ "$ARM_BACKEND" == real ]]; then
-ros2 run nobleo_socketcan_bridge socketcan_bridge --ros-args -p interface:="$ARM_CAN_INTERFACE" &
-can_pid=$!
-ros2 launch dcr_arm_driver arm_control.launch.py urdf:=/etc/rover/arm/robot_arm.urdf controllers:=/etc/rover/arm/arm_controllers.yaml &
-arm_pid=$!
-child_pids+=("$can_pid" "$arm_pid")
-ros2 launch rover rover.launch.xml drive_backend:=real arm_backend:=real arm_manual_config:=/etc/rover/arm/arm_manual.yaml &
+  ros2 run nobleo_socketcan_bridge socketcan_bridge --ros-args -p interface:="$ARM_CAN_INTERFACE" &
+  child_pids+=("$!")
+  ros2 launch dcr_arm_driver arm_control.launch.py urdf:=/etc/rover/arm/robot_arm.urdf controllers:=/etc/rover/arm/arm_controllers.yaml &
+  child_pids+=("$!")
+  ros2 launch rover rover.launch.xml drive_backend:="$DRIVE_BACKEND" arm_backend:=real arm_manual_config:=/etc/rover/arm/arm_manual.yaml &
 else
-ros2 launch rover rover.launch.xml drive_backend:=real arm_backend:=disabled &
+  ros2 launch rover rover.launch.xml drive_backend:="$DRIVE_BACKEND" arm_backend:=disabled &
 fi
 rover_pid=$!
 child_pids+=("$rover_pid")

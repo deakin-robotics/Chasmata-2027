@@ -32,6 +32,7 @@ services:
     ipc: host
     environment:
       ARM_BACKEND: "${ARM_BACKEND:-real}"
+      DRIVE_BACKEND: "${DRIVE_BACKEND:-real}"
       ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
       ROS_LOCALHOST_ONLY: "0"
       RMW_IMPLEMENTATION: rmw_fastrtps_cpp
