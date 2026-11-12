@@ -149,7 +149,7 @@ protected:
     for (auto it = frames.rbegin(); it != frames.rend(); ++it)
       if (it->id == id)
         return *it;
-    return {};
+    return can_msgs::msg::Frame{};
   }
   void stopped() {
     run(120ms);
@@ -171,7 +171,8 @@ TEST_F(DirectDriveTest, StartupIsLatchedAtMeasuredFoldedPose) {
   stopped();
   EXPECT_TRUE(status.motion_inhibited);
   auto states = hardware.export_state_interfaces();
-  EXPECT_NEAR(states[0].get_value(), .5, .001);
+  ASSERT_TRUE(states[0].get_optional().has_value());
+  EXPECT_NEAR(states[0].get_optional().value(), .5, .001);
   ASSERT_TRUE(call(rearm));
   command(DirectDrive::SPEED, 5);
   speed();
