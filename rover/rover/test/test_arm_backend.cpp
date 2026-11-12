@@ -41,6 +41,39 @@ TEST_F(ArmBackendSelection, InvalidSelectionFails)
   EXPECT_THROW(rover::make_rover_node(options), std::invalid_argument);
 }
 
+TEST_F(ArmBackendSelection, DisabledRejectsModesWithoutArmEndpoints)
+{
+  rclcpp::NodeOptions options;
+  options.parameter_overrides({rclcpp::Parameter("arm_backend", "disabled")});
+  auto node = rover::make_rover_node(options);
+  auto client = std::make_shared<rclcpp::Node>("disabled_arm_test_client");
+  auto request = client->create_publisher<std_msgs::msg::String>("/fma/arm/request", 10);
+  telemetry_interfaces::msg::FmaState latest;
+  auto sub = client->create_subscription<telemetry_interfaces::msg::FmaState>("/fma/state",
+    rclcpp::QoS(1).reliable().transient_local(), [&](const telemetry_interfaces::msg::FmaState & msg) { latest = msg; });
+  auto action = rclcpp_action::create_client<control_msgs::action::FollowJointTrajectory>(client,
+    "/arm_controller/follow_joint_trajectory");
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(node); executor.add_node(client);
+  const auto wait = [&](const auto & condition) {
+    const auto end = std::chrono::steady_clock::now() + 3s;
+    while (std::chrono::steady_clock::now() < end) {
+      executor.spin_some(); if (condition()) return true; std::this_thread::sleep_for(10ms);
+    }
+    return false;
+  };
+  ASSERT_TRUE(wait([&] { return request->get_subscription_count() > 0; }));
+  for (const auto * mode : {"MANUAL", "POSITION"}) {
+    std_msgs::msg::String message; message.data = mode; request->publish(message);
+    ASSERT_TRUE(wait([&] { return latest.arm.rejected == mode; }));
+    EXPECT_TRUE(latest.arm.confirmed.empty());
+  }
+  EXPECT_EQ(client->count_publishers("/arm/joint_states"), 0u);
+  EXPECT_EQ(client->count_publishers("/arm/direct_drive"), 0u);
+  EXPECT_FALSE(action->action_server_is_ready());
+  executor.remove_node(client); executor.remove_node(node);
+}
+
 TEST_F(ArmBackendSelection, RealBackendRejectsRequestsWithoutSimulatorEndpoints)
 {
   rclcpp::NodeOptions options;
