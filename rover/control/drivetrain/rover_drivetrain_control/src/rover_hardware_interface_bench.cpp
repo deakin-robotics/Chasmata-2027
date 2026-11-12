@@ -361,7 +361,7 @@ CallbackReturn RoverHardwareInterface::benchActivate()
   }
   bench_stop_latched_ = false;
 
-  // Per drive: internal mode and pole pairs (never saved), read both back,
+  // Per drive: internal mode and pole pairs (never saved), read pole pairs back,
   // zero the speed setpoint, then stop and confirm the running status is 0.
   // A successful FC06 write means libmodbus matched the echoed address and value.
   const auto pole_pairs = static_cast<std::uint16_t>(bench_pole_pairs_);
@@ -369,26 +369,15 @@ CallbackReturn RoverHardwareInterface::benchActivate()
   auto prepare_drive = [&](const WheelConfig & wheel) -> std::string {
       const auto id = wheel.slave_id;
       std::uint16_t value = 0;
+      // 0x0136 does not answer reads on our controllers (times out, bench
+      // 2026-11-12); the manual lists it as write-only. The write echo is the
+      // only confirmation, so it is never read back.
       Bld305sDriver::Result r = driver_->writeControlModeRaw(id, 1);
       if (!r) return "control mode write 0x0136=1 failed (" + describe(r) + ")";
       r = driver_->writePolePairsRaw(id, pole_pairs);
       if (!r) {
         return "pole pairs write 0x0116=" + std::to_string(pole_pairs) + " failed (" +
                describe(r) + ")";
-      }
-      r = driver_->readControlModeRaw(id, value);
-      if (!r) {
-        // The manual lists 0x0136 for FC06 only. Exception 2 alone means the drive
-        // answered but cannot read it back, so the FC06 echo above is the confirmation.
-        // Any other failure (timeout, CRC, other exception) still refuses.
-        if (!Bld305sDriver::isIllegalDataAddress(r)) {
-          return "control mode read-back failed (" + describe(r) + ")";
-        }
-        RCLCPP_WARN(logger(), "Bench activation: %s (ID %u) does not support reading back "
-          "0x0136 (exception 2, illegal data address); accepting the write echo of 0x0136=1.",
-          wheel.joint_name.c_str(), static_cast<unsigned>(id));
-      } else if (value != 1) {
-        return "control mode read back " + std::to_string(value) + ", expected 1";
       }
       r = driver_->readPolePairsRaw(id, value);
       if (!r) return "pole pairs read-back failed (" + describe(r) + ")";
