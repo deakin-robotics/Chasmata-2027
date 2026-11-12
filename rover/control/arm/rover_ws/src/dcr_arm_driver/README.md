@@ -69,6 +69,65 @@ source install/setup.bash
 
 In every additional container terminal, return to the repository root and source both `/opt/ros/jazzy/setup.bash` and `install/setup.bash`. All participating processes need the same `ROS_DOMAIN_ID`; use a dedicated domain for bench tests to avoid unrelated publishers. Verify it is unused before choosing a value.
 
+## Direct single-motor bench (host interlocks bypassed)
+
+For the standalone motor at **CAN address `0x05`**, use this launch instead of
+`arm_control.launch.py`. It starts a dedicated bridge on `can0` and accepts
+motor angle goals in **degrees**, with no URDF or controller manager needed.
+Build and source the workspace as above, then run:
+
+```bash
+ros2 launch dcr_arm_driver single_motor_bench.launch.py interface:=can0 motor_id:=5
+```
+
+From another sourced terminal in the same ROS domain, send an angle:
+
+```bash
+ros2 topic pub --once /arm/bench/angle_deg std_msgs/msg/Float64 '{data: 90.0}'
+```
+
+By default, each goal reads the motor's multi-turn position (`0xA3`) and sends
+one `0xC2` target at the nearest equivalent angle. For example, a motor at 1170°
+(three turns plus 90°) commanded to 60° moves back 30° to 1140°, rather than
+unwinding three turns. Goals are orientations modulo 360°, not relative moves.
+An unanswered position request expires after one second; resend the goal after
+restoring communication. The stop service also cancels any pending goal.
+
+For explicit multi-turn absolute targets, launch with `shortest_path:=false`.
+That mode sends the raw target without waiting for feedback. Both modes reject
+nonfinite or unrepresentable values. No angle is sent at startup.
+
+Position is polled at 5 Hz and published as multi-turn degrees:
+
+```bash
+ros2 topic echo /arm/bench/position_deg
+```
+
+Units follow the manufacturer's CAN protocol: 16,384 counts per motor revolution.
+No gearbox conversion is applied. Confirm encoder placement and output-shaft
+scaling before interpreting these as joint degrees. The connected device at
+`0x05` reported a ratio of 36 via `0xB0`, while the operator identified a
+GIM4305-10-D; that hardware-configuration discrepancy has not been resolved.
+
+**This mode ignores `/estop` and bypasses host motion-enable, rearm, feedback/fault
+checks, joint limits, rate limits and motion-command expiry.** Nearest-angle
+selection requires a position reply to calculate its target, not a safety rearm.
+The motor's own firmware
+protections still apply. Use only a standalone secured motor and stop other
+controllers/bridges using the same physical bus. Bench traffic uses
+`/arm/bench/tx` and `/arm/bench/rx`. The normal arm driver retains its interlocks.
+The older single-joint URDF procedure below remains available for testing those
+interlocks.
+
+To send a zero-speed request:
+
+```bash
+ros2 service call /arm/bench/stop std_srvs/srv/Trigger '{}'
+```
+
+This is a CAN request, not a verified physical stop or torque disable. Exiting
+the bench node does not cancel a motor goal; use the stop service before exit.
+
 ## Prepare the single-joint bench
 
 The supplied [bench URDF](urdf/single_joint_bench.urdf) and [bench controller configuration](config/single_joint_bench_controllers.yaml) configure only `base_joint`, CAN ID `0x01`. They install with the package. Motion defaults to disabled. The example position window is ±0.10 rad (±5.73 degrees) and velocity limit is 0.05 rad/s (0.477 RPM). These are provisional bench settings, not measured mechanical limits. The URDF effort value does not program the motor's current limit.
