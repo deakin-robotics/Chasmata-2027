@@ -64,6 +64,11 @@ ament_target_dependencies(
 )
 target_link_libraries(arm_hardware_interface dcr_arm_driver_lib "${direct_drive_typesupport}")
 
+add_executable(single_motor_bench src/single_motor_bench.cpp)
+target_link_libraries(single_motor_bench dcr_arm_driver_lib)
+ament_target_dependencies(single_motor_bench rclcpp std_msgs std_srvs can_msgs)
+install(TARGETS single_motor_bench DESTINATION lib/${PROJECT_NAME})
+
 # Install headers
 install(
   DIRECTORY include/
@@ -113,6 +118,9 @@ ament_export_dependencies(rosidl_default_runtime)
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(test_direct_drive test/test_direct_drive.cpp)
+  ament_add_gtest(test_single_motor_bench test/test_single_motor_bench.cpp)
+  target_link_libraries(test_single_motor_bench dcr_arm_driver_lib)
+  ament_target_dependencies(test_single_motor_bench rclcpp std_msgs std_srvs can_msgs)
   target_link_libraries(test_direct_drive arm_hardware_interface)
   ament_target_dependencies(test_direct_drive hardware_interface rclcpp rclcpp_lifecycle
     can_msgs arm_interfaces std_msgs std_srvs action_msgs)
