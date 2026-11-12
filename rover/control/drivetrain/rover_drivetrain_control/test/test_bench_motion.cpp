@@ -43,7 +43,8 @@ struct Drive
   bool stuck_running{false};       // acknowledges stop but keeps running
   bool control_write_times_out{false};  // 0x0066 writes get no reply (broadcast unaffected)
   bool speed_write_times_out{false};    // 0x0056 writes get no reply
-  std::map<int, int> read_errno;        // per-register read failure, e.g. EMBXILADD (exception 2)
+  std::map<int, int> read_errno;        // per-register read failure, e.g. ETIMEDOUT or an exception
+  std::map<int, int> write_errno;       // per-register write failure (no echo)
 };
 
 struct WriteRecord
@@ -59,6 +60,7 @@ std::vector<WriteRecord> writes;      // since the last resetDrives()
 std::vector<WriteRecord> all_writes;  // whole run, for the forbidden-register check
 unsigned broadcasts{0};
 unsigned bus_calls{0};  // every slave select, read and write
+std::map<int, unsigned> reads_by_address;  // since the last resetDrives()
 
 void resetDrives()
 {
@@ -70,6 +72,7 @@ void resetDrives()
   }
   for (int id = 1; id <= 4; ++id) drives[id].regs[0x00A6] = static_cast<std::uint16_t>(id);
   writes.clear();
+  reads_by_address.clear();
   broadcasts = 0;
 }
 
@@ -110,6 +113,7 @@ int modbus_read_registers(modbus_t * m, int addr, int n, std::uint16_t * out)
   Drive & d = drives[m->slave];
   if (!d.present) {errno = ETIMEDOUT; return -1;}
   if (d.garbled) {errno = EMBBADCRC; return -1;}
+  ++reads_by_address[addr];
   if (const auto it = d.read_errno.find(addr); it != d.read_errno.end()) {
     errno = it->second;  // libmodbus: exception N is MODBUS_ENOBASE + N
     return -1;
@@ -137,6 +141,10 @@ int modbus_write_register(modbus_t * m, int addr, const std::uint16_t value)
   Drive & d = drives[m->slave];
   if (!d.present) {errno = ETIMEDOUT; return -1;}
   if (d.garbled) {errno = EMBBADCRC; return -1;}
+  if (const auto it = d.write_errno.find(addr); it != d.write_errno.end()) {
+    errno = it->second;
+    return -1;
+  }
   if (addr == 0x0066 && d.control_write_times_out) {errno = ETIMEDOUT; return -1;}
   if (addr == 0x0056 && d.speed_write_times_out) {errno = ETIMEDOUT; return -1;}
   if (addr == 0x0066 && value == 0 && d.stuck_running) return 1;
@@ -385,23 +393,24 @@ bool activateWith(const std::function<void()> & set_up_drives)
   return ok;
 }
 
-void testControlModeReadBack()
+void testControlModeConfirmedByWriteEchoOnly()
 {
-  // Exception 2 (illegal data address) on the 0x0136 read: the FC06 echo of
-  // 0x0136=1 is accepted, with a warning, on every drive.
+  // Bench 2026-11-12: every drive times out on a 0x0136 read (errno 110). The
+  // FC06 write echo is the confirmation, so activation succeeds and never reads it.
   CHECK(activateWith([] {
-      for (int id = 1; id <= 4; ++id) drives[id].read_errno[0x0136] = EMBXILADD;
+      for (int id = 1; id <= 4; ++id) drives[id].read_errno[0x0136] = ETIMEDOUT;
     }));
   std::size_t mode_writes = 0;
   for (const auto & w : writes) mode_writes += w.address == 0x0136 && w.value == 1;
   CHECK(mode_writes == 4);
+  CHECK(reads_by_address[0x0136] == 0);
 
-  // Any other 0x0136 read-back failure still refuses.
-  CHECK(!activateWith([] {drives[2].read_errno[0x0136] = EMBXILFUN;}));  // exception 1
-  CHECK(!activateWith([] {drives[2].read_errno[0x0136] = EMBXILVAL;}));  // exception 3
-  CHECK(!activateWith([] {drives[2].read_errno[0x0136] = ETIMEDOUT;}));  // no reply
-  CHECK(!activateWith([] {drives[2].read_errno[0x0136] = EMBBADCRC;}));  // garbled
-  // The exception-2 allowance is for 0x0136 only, never for pole pairs.
+  // A failed 0x0136 write (no echo) still refuses, and stops all four.
+  CHECK(!activateWith([] {drives[2].write_errno[0x0136] = ETIMEDOUT;}));
+  CHECK(!activateWith([] {drives[2].write_errno[0x0136] = EMBXILADD;}));  // exception reply
+
+  // The 0x0116 read-back stays strict: no exception or timeout is accepted.
+  CHECK(!activateWith([] {drives[2].read_errno[0x0116] = ETIMEDOUT;}));
   CHECK(!activateWith([] {drives[2].read_errno[0x0116] = EMBXILADD;}));
 }
 
@@ -1009,7 +1018,7 @@ int main(int argc, char ** argv)
   testFailedFaultPollsStopAll();
   testOneFailedFaultPollRecovers();
   testFaultFreshnessResetsOnActivation();
-  testControlModeReadBack();
+  testControlModeConfirmedByWriteEchoOnly();
   testSpeedZeroWriteFailureRefuses();
   testDeactivateBroadcastsAndConfirms();
   testShutdownAndErrorStop();

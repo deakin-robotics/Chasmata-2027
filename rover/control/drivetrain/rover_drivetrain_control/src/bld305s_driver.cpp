@@ -162,12 +162,6 @@ Bld305sDriver::Result Bld305sDriver::broadcastStop()
   return {ErrorCode::MODBUS_ERROR, rc, saved_errno};
 }
 
-bool Bld305sDriver::isIllegalDataAddress(const Result & result) noexcept
-{
-  // libmodbus reports exception code N as errno MODBUS_ENOBASE + N.
-  return result.code == ErrorCode::MODBUS_ERROR && result.system_errno == EMBXILADD;
-}
-
 void Bld305sDriver::setMandatoryExchangesPerCycle(std::uint8_t count) noexcept
 {
   std::lock_guard<std::mutex> lock(transaction_mutex_);
