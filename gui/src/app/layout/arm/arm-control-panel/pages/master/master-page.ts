@@ -1,10 +1,10 @@
-import { Component, computed, effect, inject, untracked } from '@angular/core';
+import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 
 import {
   ArmControlMode,
   ArmControlModeService,
 } from '../../../../../core/control/arm/arm-control-mode';
-import { ArmCommandPublisher } from '../../../../../core/control/arm/arm-command-publisher';
+import { ArmRecovery } from '../../../../../core/control/arm/arm-recovery';
 import { ControlModeCoordinator } from '../../../../../core/control/control-mode-coordinator';
 import { ControlCommandPublisher } from '../../../../../core/control/control-command-publisher';
 import { GamepadInput } from '../../../../../core/gamepad/gamepad-input';
@@ -52,7 +52,7 @@ type TopologyStatus = {
 })
 export class ArmMasterPage {
   private readonly armControlMode = inject(ArmControlModeService);
-  private readonly armCommandPublisher = inject(ArmCommandPublisher);
+  private readonly armRecovery = inject(ArmRecovery);
   private readonly controlModeCoordinator = inject(ControlModeCoordinator);
   private readonly controlCommandPublisher = inject(ControlCommandPublisher);
   private readonly gamepad = inject(GamepadInput);
@@ -86,16 +86,18 @@ export class ArmMasterPage {
   readonly masterDriveEnabled = this.armControlMode.enabled;
   readonly ArmMode = ArmMode;
   readonly armMode = this.armControlMode.mode;
-  readonly armModeOptions: readonly ControlModeOption[] = [
+  readonly armModeOptions = computed<readonly ControlModeOption[]>(() => [
     { label: ArmMode.Manual, value: ArmMode.Manual },
-    { label: ArmMode.Position, value: ArmMode.Position },
-  ];
+    { label: ArmMode.Position, value: ArmMode.Position, disabled: !this.heartbeatMonitor.baseStationAvailable() },
+  ]);
   readonly masterDriveTone = computed<ControlSwitchTone>(() => {
     if (!this.masterDriveEnabled()) return 'normal';
     if (!this.heartbeatMonitor.roverAvailable() || !this.gamepad.connected()) return 'critical';
     if (!this.heartbeatMonitor.baseStationAvailable()) return 'caution';
     return this.armControlMode.canControlArm() ? 'normal' : 'critical';
   });
+  readonly recoveryPending = signal(false);
+  readonly recoveryMessage = signal<string | null>(null);
   readonly rosConnected = this.heartbeatMonitor.roverAvailable;
   readonly baseStationAvailable = this.heartbeatMonitor.baseStationAvailable;
   readonly gamepadConnected = this.gamepad.connected;
@@ -145,14 +147,25 @@ export class ArmMasterPage {
     else this.armControlMode.disable();
   }
 
-  /** Sends the explicit two-step motor-driver fault reset command. */
-  clearArmFaults(button: TwoStepActionButton): void {
-    if (this.armCommandPublisher.publishClearFaults()) button.reset();
+  /** Requests the driver?s deliberate recovery after the two-step action. */
+  async clearArmFaults(button: TwoStepActionButton): Promise<void> {
+    if (this.recoveryPending()) return;
+    this.recoveryPending.set(true);
+    this.recoveryMessage.set(null);
+    try {
+      const result = await this.armRecovery.rearm();
+      this.recoveryMessage.set(result.message);
+    } catch {
+      this.recoveryMessage.set('Arm recovery service unavailable.');
+    } finally {
+      this.recoveryPending.set(false);
+      button.reset();
+    }
   }
 
   selectArmMode(mode: string): void {
     if (mode === ArmMode.Manual || mode === ArmMode.Position) {
-      this.controlModeCoordinator.selectArmMode(mode as ArmControlMode);
+      this.controlModeCoordinator.requestArmMode(mode as ArmControlMode);
     }
   }
 

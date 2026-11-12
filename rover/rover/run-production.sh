@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+DRIVE_BACKEND=${DRIVE_BACKEND:-real}
+ARM_BACKEND=${ARM_BACKEND:-real}
+if [[ "$DRIVE_BACKEND" != real && "$DRIVE_BACKEND" != disabled ]]; then
+  echo 'DRIVE_BACKEND must be real or disabled' >&2
+  exit 1
+fi
+if [[ "$ARM_BACKEND" != real && "$ARM_BACKEND" != disabled ]]; then
+  echo 'ARM_BACKEND must be real or disabled' >&2
+  exit 1
+fi
+
+if [[ "$DRIVE_BACKEND" == real ]]; then
 DRIVE_LIMITS=$(python3 - <<'PY'
 import math
 import os
@@ -41,23 +53,64 @@ PY
 )
 read -r DRIVE_MAX_WHEEL_SPEED DRIVE_WHEEL_RADIUS DRIVE_WHEEL_SEPARATION <<< "$DRIVE_LIMITS"
 export DRIVE_MAX_WHEEL_SPEED DRIVE_WHEEL_RADIUS DRIVE_WHEEL_SEPARATION
+fi
+
+if [[ "$ARM_BACKEND" == real ]]; then
+ARM_CAN_INTERFACE=$(python3 - <<'PY'
+import os
+import re
+import sys
+import yaml
+
+try:
+    root = '/etc/rover/arm'
+    with open(os.path.join(root, 'arm_hardware.yaml'), encoding='utf-8') as config_file:
+        config = yaml.safe_load(config_file)
+    interface = config.get('can_interface') if isinstance(config, dict) else None
+    if not isinstance(interface, str) or not re.fullmatch(r'[A-Za-z0-9_.-]{1,15}', interface):
+        raise ValueError('can_interface must name the commissioned SocketCAN interface')
+    for name in ('arm_manual.yaml', 'robot_arm.urdf', 'arm_controllers.yaml'):
+        if not os.path.isfile(os.path.join(root, name)):
+            raise ValueError(f'missing commissioned arm configuration: {name}')
+    with open(f'/sys/class/net/{interface}/type', encoding='ascii') as interface_type:
+        if interface_type.read().strip() != '280':
+            raise ValueError(f'{interface} is not a CAN interface')
+    print(interface)
+except (OSError, ValueError, yaml.YAMLError) as error:
+    print(f'Invalid arm configuration: {error}', file=sys.stderr)
+    sys.exit(1)
+PY
+)
+fi
 
 set +u
 source /opt/ros/jazzy/setup.bash
 source /workspace/install/setup.bash
 set -u
-ros2 launch rover_drivetrain_control drivetrain.launch.py hardware_config:=/etc/rover/drivetrain/drivetrain_hardware.yaml &
-drivetrain_pid=$!
-ros2 launch rover rover.launch.xml drive_backend:=real &
+child_pids=()
+if [[ "$DRIVE_BACKEND" == real ]]; then
+  ros2 launch rover_drivetrain_control drivetrain.launch.py hardware_config:=/etc/rover/drivetrain/drivetrain_hardware.yaml &
+  child_pids+=("$!")
+fi
+if [[ "$ARM_BACKEND" == real ]]; then
+  ros2 run nobleo_socketcan_bridge socketcan_bridge --ros-args -p interface:="$ARM_CAN_INTERFACE" &
+  child_pids+=("$!")
+  ros2 launch dcr_arm_driver arm_control.launch.py urdf:=/etc/rover/arm/robot_arm.urdf controllers:=/etc/rover/arm/arm_controllers.yaml &
+  child_pids+=("$!")
+  ros2 launch rover rover.launch.xml drive_backend:="$DRIVE_BACKEND" arm_backend:=real arm_manual_config:=/etc/rover/arm/arm_manual.yaml &
+else
+  ros2 launch rover rover.launch.xml drive_backend:="$DRIVE_BACKEND" arm_backend:=disabled &
+fi
 rover_pid=$!
+child_pids+=("$rover_pid")
 cleanup() {
   trap - TERM INT EXIT
-  kill -TERM "$drivetrain_pid" "$rover_pid" 2>/dev/null || true
-  wait "$drivetrain_pid" "$rover_pid" 2>/dev/null || true
+  kill -TERM "${child_pids[@]}" 2>/dev/null || true
+  wait "${child_pids[@]}" 2>/dev/null || true
 }
 trap cleanup TERM INT EXIT
 set +e
-wait -n "$drivetrain_pid" "$rover_pid"
+wait -n "${child_pids[@]}"
 status=$?
 set -e
 exit "$status"

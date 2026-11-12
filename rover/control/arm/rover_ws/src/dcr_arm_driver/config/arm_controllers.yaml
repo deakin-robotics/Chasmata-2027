@@ -3,7 +3,7 @@ controller_manager:
     update_rate: 50  # Control loop frequency (50 Hz)
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
-    arm_controller:
+    arm_real_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
 # Joint state broadcaster is remapped to /arm/joint_states in arm_control.launch.py
@@ -14,7 +14,7 @@ joint_state_broadcaster:
       - velocity
 
 # Joint trajectory controller: receives trajectory commands from MoveIt2
-arm_controller:
+arm_real_controller:
   ros__parameters:
     joints:
       - base_joint

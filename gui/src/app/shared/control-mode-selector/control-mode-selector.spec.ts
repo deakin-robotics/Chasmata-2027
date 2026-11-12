@@ -53,6 +53,15 @@ describe('ControlModeSelector', () => {
     expect(selected).toEqual([]);
   });
 
+  it('can emit the selected option when re-selection is enabled', () => {
+    const selected: string[] = [];
+    component.valueChange.subscribe((value) => selected.push(value));
+    fixture.componentRef.setInput('allowReselect', true);
+    fixture.detectChanges();
+    component.select('POSITION');
+    expect(selected).toEqual(['POSITION']);
+  });
+
   it('should ignore values outside its options', () => {
     const selected: string[] = [];
     component.valueChange.subscribe((value) => selected.push(value));

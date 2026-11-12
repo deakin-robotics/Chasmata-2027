@@ -18,8 +18,8 @@ The identified motor/driver combinations are GIM8108-48 + GDZ468, GIM4310-36 + G
 - `/estop` must be continuously published by the safety authority, including `false` when clear. A clear state expires after 500 ms.
 - Faults latch. Restored feedback or a new motion command cannot clear the latch.
 - `/arm/rearm` requires an enabled commissioning profile, a clear live E-stop, 500 ms of healthy feedback, stationary joints and no active trajectory.
-- Direct position and speed commands require refresh within 250 ms. Stream at least 10 Hz. Silence stops and latches the arm.
-- Direct commands are rejected during an active trajectory. Returning direct control to `CONTROLLER` requires another rearm and new goal, so an old controller target cannot resume.
+- Direct position and speed commands require refresh within 250 ms. Stream at least 10 Hz. Silence stops and latches the arm. Rover Control also refreshes a tokened ownership lease; losing it for 500 ms inhibits and latches the arm, including during locked trajectories.
+- Rover Control requests a measured-position ownership handoff for normal mode changes. In unlocked Position, direct wrist commands may run alongside proximal trajectories; locked Position reserves all joints for trajectories. Fault recovery remains explicit.
 - Missing encoder or motor status, reported motor faults, invalid feedback and measured overspeed inhibit all joints. After encoder loss, previous turn references are discarded because the arm could have moved while disconnected.
 - `/arm/confirm_folded_pose` resolves ambiguous encoder turns only after physical confirmation at a calibrated, supported folded pose with E-stop asserted. Configure per-joint references as described in the commissioning guide.
 - `/arm/set_home` is removed. It previously reset local state without verifying a motor acknowledgement. Folded confirmation does not redefine the encoder origin.
@@ -33,10 +33,15 @@ The identified motor/driver combinations are GIM8108-48 + GDZ468, GIM4310-36 + G
 | `/estop` | `std_msgs/msg/Bool` | Live stop-state heartbeat |
 | `/arm/rearm` | `std_srvs/srv/Trigger` | Deliberate recovery acknowledgement |
 | `/arm/confirm_folded_pose` | `std_srvs/srv/Trigger` | Confirm calibrated turn reference without motion |
-| `/arm_controller/follow_joint_trajectory` | `control_msgs/action/FollowJointTrajectory` | Trajectory execution with configured tolerances |
+| `/arm_real_controller/follow_joint_trajectory` | `control_msgs/action/FollowJointTrajectory` | Internal trajectory controller; Rover Control gates the public `/arm_controller/follow_joint_trajectory` action |
+| `/arm/control/handoff` | `dcr_arm_driver/srv/ArmHandoff` | Verified, tokened joint ownership handoff |
+| `/arm/control/trajectory_gate` | `dcr_arm_driver/srv/ArmTrajectoryGate` | Enable a newly accepted trajectory by goal UUID or inhibit it |
+| `/arm/control/lease` | `std_msgs/msg/UInt64` | Refresh the current ownership token |
 | `/arm/joint_states` | `sensor_msgs/msg/JointState` | Position in radians, speed in rad/s |
-| `/arm/control/status` | `telemetry_interfaces/msg/ArmControlStatus` | Readiness, freshness and inhibit reason |
+| `/arm/control/status` | `telemetry_interfaces/msg/ArmControlStatus` | Readiness, configured joint IDs and speed limits, and accepted direct-command request IDs |
 | `/motor_stat_1`, `/motor_stat_2` | `arm_interfaces` telemetry | Per-motor encoder and controller status |
+
+`direct_ready` reports readiness for direct control separately from the trajectory-related `motion_inhibited` flag. The status arrays share joint order; direct request IDs are nonzero only while the corresponding accepted speed command is fresh.
 
 Direct modes: `CONTROLLER=0` releases direct control and latches inhibition; `POSITION=1` commands an absolute angle in degrees; `SPEED=2` commands speed in RPM. All configured joints must be healthy; a secured single-motor test requires a matching one-joint URDF and controller profile, rather than synthetic feedback for disconnected joints.
 
@@ -82,6 +87,10 @@ cp "$(ros2 pkg prefix --share dcr_arm_driver)/config/single_joint_bench_controll
 ```
 
 Secure the motor/mechanism and provide an independent stop. Confirm its firmware, current limit and loss-of-CAN response. Inspect the measured encoder position before choosing a small permitted movement window around that position. Update **both** the joint `<limit lower/upper>` and command-interface `min/max` in the URDF. Do not home the motor to force it into the example window. Keep the test window narrower than one revolution to avoid an ambiguous turn reference.
+
+The driver launch now starts `arm_real_controller`; update both the controller-manager
+entry and the controller parameter section in any existing copied commissioning
+YAML that still uses `arm_controller`.
 
 For another joint, change its CAN ID. If renaming the joint, change every occurrence in both files, including the `<joint_name>_can_id` hardware parameter and the YAML constraint key. Configure exactly the connected joint; the driver requires fresh feedback from every configured joint. No disconnected joints need synthetic feedback.
 
@@ -174,7 +183,7 @@ After motion is enabled in the selected profile, feedback is healthy for at leas
 ros2 service call /arm/rearm std_srvs/srv/Trigger '{}'
 ```
 
-Require `success: true`. Rearm captures the measured pose and waits for a new command; it does not move the joint by itself. A rejected rearm includes the reason. The driver starts inhibited after every restart.
+Require `success: true`. Rearm captures the measured pose and waits for a new command; it does not move the joint by itself. A rejected rearm includes the reason. The driver starts inhibited after every restart. Successful rearm revokes previous ownership and its token; select a mode again before motion.
 
 ## Command motion
 
@@ -182,7 +191,7 @@ Choose either trajectories or direct control. The examples below are for the sin
 
 ### Small trajectory
 
-For the default example window, **only if the measured start is near 0 rad and the path to 0.02 rad is clear**, this requests a 0.02 rad target over two seconds:
+Start Rover Control with the real arm backend and a compatible Manual speed configuration. After rearm, request Position and wait for confirmed Position. For the default example window, **only if the measured start is near 0 rad and the path to 0.02 rad is clear**, this requests a 0.02 rad target over two seconds:
 
 ```bash
 ros2 action send_goal /arm_controller/follow_joint_trajectory \
@@ -197,11 +206,24 @@ Replace the target with a reviewed value near the measured position when using a
 
 Direct control bypasses the trajectory action and selects a motor by CAN ID. Use it for a secured, closely observed bench check. First confirm that the matching profile has motion enabled, fresh healthy feedback is present, the live clear E-stop heartbeat is running, and `/arm/rearm` returned success. There must be no active trajectory. Commands must be refreshed at least 10 Hz; each new message renews a 250 ms lease.
 
+For a standalone secured driver test without Rover Control, start a lease publisher
+with a fresh nonzero token in a separate terminal, then acquire Manual ownership.
+Do not run a competing Rover Control publisher:
+
+```bash
+ros2 topic pub --rate 10 /arm/control/lease std_msgs/msg/UInt64 '{data: 42}'
+# In another terminal:
+ros2 service call /arm/control/handoff dcr_arm_driver/srv/ArmHandoff '{mode: 1, request_id: 42}'
+```
+
+Keep the lease publisher running throughout the test; stopping it inhibits and
+latches the arm after 500 ms unless accepted direct commands refresh the lease.
+
 `mode: 2` commands speed in RPM. This example streams `0.1 RPM` to CAN ID `1` (`base_joint` in the supplied bench profile):
 
 ```bash
 ros2 topic pub --rate 10 /arm/direct_drive dcr_arm_driver/msg/DirectDrive \
-  '{id: 1, mode: 2, value: 0.1}'
+  '{id: 1, mode: 2, value: 0.1, request_id: 42}'
 ```
 
 Here `0.1 RPM` is approximately `0.01047 rad/s`. A speed command continues moving until stopped, timed out or limited by the configured joint velocity. Monitor the bench window and stop promptly.
@@ -210,12 +232,12 @@ Here `0.1 RPM` is approximately `0.01047 rad/s`. A speed command continues movin
 
 ```bash
 ros2 topic pub --rate 10 /arm/direct_drive dcr_arm_driver/msg/DirectDrive \\
-  '{id: 1, mode: 1, value: 1.0}'
+  '{id: 1, mode: 1, value: 1.0, request_id: 42}'
 ```
 
 The driver rejects targets outside that joint's position limits. Direct position and speed both need continued streaming, even when the desired target or speed is unchanged. `mode: 0` releases direct control; release latches inhibition so an old trajectory target cannot resume.
 
-Stop the publisher with Ctrl+C: after 250 ms without a command the driver clears direct control and latches inhibition. For an operator stop use the live E-stop authority and independent stop as appropriate. To return to trajectory control, stop the direct publisher, rearm and submit a new trajectory. Sending `mode: 0` also releases direct control and latches inhibition; rearm is still required.
+Stop the publisher with Ctrl+C: after 250 ms without a command the driver clears direct control and latches inhibition. For an operator stop use the live E-stop authority and independent stop as appropriate. If the lease expires or `mode: 0` is sent, the driver latches inhibition and requires rearm. For a normal mode change, Rover Control sends neutral commands and requests an ownership handoff before the lease expires; it does not call rearm.
 
 ### Inspect raw CAN traffic
 

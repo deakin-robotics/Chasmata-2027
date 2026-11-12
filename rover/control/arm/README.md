@@ -9,7 +9,7 @@ The driver starts inhibited. Its default hardware profile disables motion. Mock 
 ```mermaid
 flowchart LR
     moveit[MoveIt 2 or trajectory client]
-    trajectory[arm_controller<br/>JointTrajectoryController]
+    trajectory[arm_real_controller<br/>JointTrajectoryController]
     direct[/arm/direct_drive<br/>DirectDrive/]
     estop[/estop<br/>live safety heartbeat/]
 
@@ -97,7 +97,8 @@ The A4/Ae response layout and units are implemented in [`motor.cpp`](rover_ws/sr
 | `/estop` | `std_msgs/msg/Bool` | Live stop state; clear heartbeat expires after 500 ms |
 | `/arm/rearm` | `std_srvs/srv/Trigger` | Explicit recovery after healthy feedback, live clear E-stop and stationary arm |
 | `/arm/confirm_folded_pose` | `std_srvs/srv/Trigger` | Physically confirm calibrated encoder turn after feedback loss |
-| `/arm_controller/follow_joint_trajectory` | `control_msgs/action/FollowJointTrajectory` | Trajectory control in radians |
+| `/arm_controller/follow_joint_trajectory` | `control_msgs/action/FollowJointTrajectory` | Rover Control gated trajectory action in radians |
+| `/arm_real_controller/follow_joint_trajectory` | `control_msgs/action/FollowJointTrajectory` | Internal driver trajectory controller |
 | `/arm/joint_states` | `sensor_msgs/msg/JointState` | Measured position (rad) and velocity (rad/s) |
 | `/motor_stat_1`, `/motor_stat_2` | `arm_interfaces` messages | Motor encoder and controller telemetry |
 | `/arm/control/status` | `telemetry_interfaces/msg/ArmControlStatus` | Driver readiness, feedback freshness and inhibit reason |
@@ -106,6 +107,15 @@ The A4/Ae response layout and units are implemented in [`motor.cpp`](rover_ws/sr
 The driver latches inhibition on stale feedback/status (250 ms), reported motor fault, invalid or ambiguous encoder, overspeed, CAN error frame, asserted/unknown/stale E-stop, expired direct command, invalid controller target, and lifecycle shutdown/error. Inhibition requests zero speed and rejects motion. A stop request cannot cross a disconnected CAN bus or guarantee torque after power loss. The driver never homes automatically, resumes an old command after recovery, or clears motor faults automatically. See the commissioning guide for recovery steps and physical stop requirements.
 
 Wrapped encoder feedback may not identify a unique joint turn when multiple revolutions fit the configured range. The driver inhibits motion when it cannot establish an unambiguous reference. After encoder feedback is lost, it discards the prior turn reference because the arm may have moved while disconnected. The folded-pose confirmation service only restores a calibrated turn reference after a physical check; it does not move or home the arm.
+
+For arm-team commissioning, simulation does not verify physical joint directions,
+speed limits, encoder calibration or the loaded arm's response to ownership
+handoffs. With the commissioning safeguards in place, verify both Manual ↔
+Position directions, locked and unlocked wrist transfers (including trajectory
+cancellation), and stopping after communication or controller loss. Confirm
+that the measured pose is held and no previous target resumes after a handoff
+or deliberate recovery. Follow the driver commissioning guide for physical
+support and stop arrangements.
 
 ## Package layout
 

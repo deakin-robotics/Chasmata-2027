@@ -1,0 +1,2 @@
+# Copy to arm_hardware.yaml and use the commissioned, already configured CAN interface.
+can_interface: ""

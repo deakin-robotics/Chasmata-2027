@@ -12,7 +12,6 @@ export interface ArmJoyCommand {
 }
 
 export interface ArmJoyCommandOptions {
-  readonly suppressClearFaultButton?: boolean;
   readonly includeTriggers?: boolean;
 }
 
@@ -23,15 +22,11 @@ const ARM_BUTTON_COUNT = 12;
 const LEFT_BUMPER_BUTTON_INDEX = 4;
 const LEFT_TRIGGER_BUTTON_INDEX = 6;
 const RIGHT_TRIGGER_BUTTON_INDEX = 7;
-const CLEAR_FAULTS_BUTTON_INDEX = 10;
 const STOP_COMMAND: ArmJoyCommand = {
   axes: new Array(ARM_AXES_COUNT).fill(0),
   buttons: new Array(ARM_BUTTON_COUNT).fill(0),
 };
-const CLEAR_FAULTS_COMMAND: ArmJoyCommand = {
-  axes: [...STOP_COMMAND.axes],
-  buttons: STOP_COMMAND.buttons.map((_, index) => (index === CLEAR_FAULTS_BUTTON_INDEX ? 1 : 0)),
-};
+
 
 /** Adapts Arm Joy commands to the ROS /arm/joy protocol. */
 @Service()
@@ -64,12 +59,7 @@ export class ArmCommandPublisher {
       commandAxes[9] = rawButtons[LEFT_TRIGGER_BUTTON_INDEX] ?? 0;
     }
 
-    const buttons = [...this.toButtons(snapshot)];
-    if (options.suppressClearFaultButton) {
-      buttons[CLEAR_FAULTS_BUTTON_INDEX] = 0;
-    }
-
-    return { axes: commandAxes, buttons };
+    return { axes: commandAxes, buttons: this.toButtons(snapshot) };
   }
 
   /** Publishes one validated Arm Joy command when Arm control is active. */
@@ -82,11 +72,6 @@ export class ArmCommandPublisher {
   /** Sends a zeroed Arm Joy command. */
   publishStop(): boolean {
     return this.publishCommand(STOP_COMMAND);
-  }
-
-  /** Publishes the old Home/PS button-10 clear-fault command once. */
-  publishClearFaults(): boolean {
-    return this.publishCommand(CLEAR_FAULTS_COMMAND);
   }
 
   /** Stops Arm output before releasing Arm control authority. */
@@ -137,7 +122,7 @@ export class ArmCommandPublisher {
       0,
       rawButtons[8] ?? 0,
       rawButtons[9] ?? 0,
-      rawButtons[16] ?? rawButtons[10] ?? 0,
+      0,
       rawButtons[11] ?? 0,
     ];
   }

@@ -1,0 +1,5 @@
+# Copy and set six positive, commissioned RPM limits before selecting the real arm.
+# Order: base, shoulder, elbow, yaw, pitch, roll. Zero intentionally disables startup.
+rover:
+  ros__parameters:
+    arm_manual_speed_rpm: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]

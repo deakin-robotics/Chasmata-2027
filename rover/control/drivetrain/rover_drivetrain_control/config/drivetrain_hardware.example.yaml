@@ -1,18 +1,18 @@
-# EXAMPLE hardware values for drivetrain.launch.py. NOT CONFIRMED.
-# Copy this file, replace every value with the confirmed one, and pass the copy as
-# hardware_config:=<path>. The launch has no default for it on purpose: no silent defaults for safety settings.
-serial_device: /dev/ttyUSB0  # one USB-to-RS485 adapter shared by all four drives
-baud_rate: 38400   # the plugin requires 38400; drives are at 9600 today
-parity: 'N'        # framing unverified
+# Bench configuration used on 12 November 2026. Copy this file and verify the
+# hardware and timing values for the actual rover before enabling bench motion.
+# With bench motion disabled, this example is not a production configuration.
+serial_device: /dev/ttyACM0  # CH343 USB-to-RS485 adapter; device name may differ
+baud_rate: 9600
+parity: 'N'
 data_bits: 8
 stop_bits: 1
-response_timeout_ms: 30  # the plugin's previous built-in value
-update_hz: 15      # integer: also used as the ros2_control rw_rate attribute
+response_timeout_ms: 100
+update_hz: 2       # integer: also used as the ros2_control rw_rate attribute
 upstream_timeout_ms: 110
 stop_deadline_ms: 300
-measured_stop_wire_budget_ms: 5   # NOT MEASURED: all four stop ACKs on the shared bus
-measured_worst_bus_cycle_ms: 30   # NOT MEASURED: full four-drive shared-bus cycle
-late_trigger_ms: 100
+measured_stop_wire_budget_ms: 250  # bench value; verify against measured stop ACKs
+measured_worst_bus_cycle_ms: 245   # bench value; verify the full shared-bus cycle
+late_trigger_ms: 750
 fl_id: 1           # slave-to-wheel mapping: confirm with Forrest
 rl_id: 2
 fr_id: 3
@@ -25,15 +25,7 @@ wheel_separation: 0.5   # PLACEHOLDER: metres
 # --- Bench motion test only (see README "Bench motion test") -----------------
 # Off by default. Set true or false; anything else makes the plugin refuse to start.
 bench_motion_enabled: false
-# The values below are read only when bench_motion_enabled is true. All are
-# PLACEHOLDERS with no plugin default; the 0 is deliberately invalid.
-pole_pairs: 0                 # PLACEHOLDER: from the motor datasheet and the probe on the 12th; 0 is refused
-bench_rpm_cap: 100            # PLACEHOLDER: motor RPM, at most 500; start low
-bench_stop_deadline_ms: 1500  # PLACEHOLDER: from the bench timing working in the README
-# In bench mode, also change these (values from the README working, PLACEHOLDERS until measured):
-#   baud_rate: 9600
-#   response_timeout_ms: 50
-#   update_hz: 2
-#   late_trigger_ms: 750
-#   measured_worst_bus_cycle_ms: 245   # refused below the 187.5 ms wire floor at 9600
-#   measured_stop_wire_budget_ms: 200  # refused below the 153.6 ms floor at 9600 with a 50 ms timeout
+# The values below are read only when bench_motion_enabled is true.
+pole_pairs: 2                 # verify against the connected motors
+bench_rpm_cap: 300            # motor RPM; at most 500
+bench_stop_deadline_ms: 1500  # bench budget, not a measured physical stop time

@@ -19,7 +19,7 @@
         role="radio"
         [class.active]="value() === option.value"
         [attr.aria-checked]="value() === option.value"
-        [disabled]="disabled()"
+        [disabled]="disabled() || !!option.disabled"
         (click)="select(option.value)"
       >
         {{ option.label }}

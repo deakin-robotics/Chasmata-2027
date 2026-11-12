@@ -90,6 +90,13 @@ state. Control commands and heartbeat monitoring also use the direct Rover
 connection. The FMA is unavailable when the Rover feed is not delivering state;
 local Driver and Arm selections are preserved across Rover disconnects.
 
+## Arm fault recovery
+
+The two-step **Clear Faults** action calls the Rover `/arm/rearm` Trigger
+service and displays its response. Recovery does not select an arm mode or
+resume a previous command; the operator can request the current mode again.
+The old button-10 fault-clear command is not sent on `/arm/joy`.
+
 ## Gamepad Joy contract
 
 The browser Gamepad API reports LT and RT as analogue button values. Before a

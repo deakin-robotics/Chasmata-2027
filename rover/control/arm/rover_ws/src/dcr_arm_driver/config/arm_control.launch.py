@@ -56,7 +56,7 @@ def launch_stack(context):
         Node(
             package='controller_manager',
             executable='spawner',
-            arguments=['arm_controller'],
+            arguments=['arm_real_controller'],
         ),
     ]
 

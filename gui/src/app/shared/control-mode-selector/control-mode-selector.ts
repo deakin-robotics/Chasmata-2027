@@ -3,6 +3,7 @@ import { Component, computed, input, output } from '@angular/core';
 export interface ControlModeOption {
   readonly label: string;
   readonly value: string;
+  readonly disabled?: boolean;
 }
 
 /** A reusable selector that always keeps one control mode active. */
@@ -16,6 +17,7 @@ export class ControlModeSelector {
   readonly options = input.required<readonly ControlModeOption[]>();
   readonly value = input.required<string>();
   readonly disabled = input(false);
+  readonly allowReselect = input(false);
   readonly valueChange = output<string>();
   readonly activeIndex = computed(() => {
     const index = this.options().findIndex((option) => option.value === this.value());
@@ -25,9 +27,9 @@ export class ControlModeSelector {
   select(value: string): void {
     if (this.disabled()) return;
 
-    if (value === this.value()) return;
+    if (value === this.value() && !this.allowReselect()) return;
 
-    if (this.options().some((option) => option.value === value)) {
+    if (this.options().some((option) => option.value === value && !option.disabled)) {
       this.valueChange.emit(value);
     }
   }

@@ -1,0 +1,8 @@
+# When enabled, UUID must identify a newly accepted trajectory goal.
+# Disabling inhibits trajectory output at measured positions.
+bool enable
+uint64 request_id
+uint8[16] goal_id
+---
+bool success
+string message

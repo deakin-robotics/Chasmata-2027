@@ -25,6 +25,7 @@ void RoverNode::request_mode(const std::string & subsystem, const std::string & 
       drive_backend_->cancel_mode_request();
       if (!drive_backend_->confirmed_mode_valid()) drive_mode_.clear();
     }
+    if (subsystem == "arm") arm_backend_->cancel_mode_request();
     rejected_modes_[subsystem] = mode;
     pending_modes_.erase(subsystem);
     rejection_clear_[subsystem] = std::chrono::steady_clock::now() + std::chrono::milliseconds(500);
@@ -34,6 +35,7 @@ void RoverNode::request_mode(const std::string & subsystem, const std::string & 
     pending_modes_[subsystem] = Pending{mode, std::chrono::steady_clock::now() +
       std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(ack_delay_))};
     if (subsystem == "drive") drive_backend_->request_mode(mode);
+    else arm_backend_->request_mode(mode);
   }
   publish_fma();
 }
@@ -78,8 +80,15 @@ void RoverNode::tick()
         rejection_clear_[subsystem] = now + std::chrono::milliseconds(500);
       }
       pending_modes_.erase(pending); publish_fma();
-    } else if (pending->second.due <= now) {
-      arm_mode_ = pending->second.value;
+    } else {
+      const auto result = arm_backend_->take_mode_result();
+      if (!result) continue;
+      if (*result) arm_mode_ = pending->second.value;
+      else {
+        if (!arm_backend_->confirmed_mode_valid()) arm_mode_.clear();
+        rejected_modes_[subsystem] = pending->second.value;
+        rejection_clear_[subsystem] = now + std::chrono::milliseconds(500);
+      }
       pending_modes_.erase(pending); publish_fma();
     }
   }
@@ -93,7 +102,15 @@ void RoverNode::tick()
   for (auto iterator = rejection_clear_.begin(); iterator != rejection_clear_.end();) {
     if (iterator->second <= now) { rejected_modes_.erase(iterator->first); iterator = rejection_clear_.erase(iterator); publish_fma(); } else ++iterator;
   }
-  publish_joint_state();
+  arm_backend_->tick();
+  if (const auto update = arm_backend_->take_mode_update()) {
+    arm_mode_ = *update;
+    publish_fma();
+  }
+  if (!arm_mode_.empty() && !arm_backend_->confirmed_mode_valid()) {
+    arm_mode_.clear();
+    publish_fma();
+  }
   if (std::chrono::duration<double>(now - last_fma_).count() >= 1.0) publish_fma();
 }
 

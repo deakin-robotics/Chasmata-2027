@@ -1,6 +1,6 @@
-> **Implementation update (11 November 2026):** this matrix preserves the earlier review and source requirements. See [hardware commissioning](hardware-commissioning.md) for the new fault latch, heartbeat leases, folded-reference recovery and default motion gate. Physical validation, GUI authority integration and hardware-specific calibration remain open.
+> **Historical review:** the control paths, findings and readiness assessments below describe the checkout at the time of the review; they are not the current implementation. Rover Control now provides the real Manual/Position adapter and mode handoffs, and Clear Faults calls `/arm/rearm`. See the [Rover startup guide](../../../rover/README.md) and [hardware commissioning](hardware-commissioning.md) for current setup. Physical validation and hardware-specific calibration remain open.
 
-## Current control paths
+## Control paths at the time of review
 
 ```text
 Manual GUI: /arm/joy

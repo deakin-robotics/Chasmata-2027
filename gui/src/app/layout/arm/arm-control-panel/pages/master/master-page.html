@@ -70,16 +70,21 @@
     class="clear-faults"
     label="Clear Faults"
     actionLabel="Clear"
-    [disabled]="!rosConnected()"
+    [disabled]="!rosConnected() || recoveryPending()"
     (activated)="clearArmFaults(clearFaultsButton)"
   />
 
+  @if (recoveryMessage(); as message) {
+    <span class="arm-recovery-message" role="status">{{ message }}</span>
+  }
+
   <app-control-mode-selector
     class="arm-mode-selector"
+    [allowReselect]="true"
     label="Arm control mode"
-    [options]="armModeOptions"
+    [options]="armModeOptions()"
     [value]="armMode()"
-    [disabled]="!rosConnected() || !baseStationAvailable()"
+    [disabled]="!rosConnected()"
     (valueChange)="selectArmMode($event)"
   />
 

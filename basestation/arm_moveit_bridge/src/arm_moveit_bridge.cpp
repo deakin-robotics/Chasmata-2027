@@ -30,6 +30,7 @@
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/empty.hpp>
+#include <std_msgs/msg/u_int8.hpp>
 #include <telemetry_interfaces/msg/arm_move_it_status.hpp>
 
 namespace
@@ -37,6 +38,7 @@ namespace
 constexpr char TARGET_TOPIC[] = "/arm/target_pose";
 constexpr char ORIENTATION_LOCK_TOPIC[] = "/arm/orientation_lock";
 constexpr char STATUS_TOPIC[] = "/arm/moveit/status";
+constexpr char OWNERSHIP_TOPIC[] = "/arm/position/ownership";
 constexpr char HEARTBEAT_TOPIC[] = "/basestation/heartbeat";
 constexpr char TRAJECTORY_ACTION[] = "/arm_controller/follow_joint_trajectory";
 constexpr char MOVEIT_PLANNING_ACTION[] = "/move_action";
@@ -196,6 +198,15 @@ int main(int argc, char * argv[])
   std::optional<TargetRequest> pending_target;
   std::optional<geometry_msgs::msg::Pose> latest_pose;
   std::atomic<bool> orientation_locked{false};
+  std::atomic<uint8_t> position_ownership{0};
+  std::atomic<int64_t> ownership_received_ns{0};
+  const auto ownership_subscription = node->create_subscription<std_msgs::msg::UInt8>(
+    OWNERSHIP_TOPIC, rclcpp::QoS(1).reliable(),
+    [&](const std_msgs::msg::UInt8 & message) {
+      position_ownership.store(message.data);
+      ownership_received_ns.store(std::chrono::steady_clock::now().time_since_epoch().count());
+    });
+  (void)ownership_subscription;
   std::atomic<std::uint64_t> latest_request_id{0};
   std::atomic<std::uint64_t> latest_generation{0};
   std::atomic<std::uint64_t> fallback_sequence{0};
@@ -319,6 +330,20 @@ int main(int argc, char * argv[])
       return latest_generation.load() > generation;
     };
 
+    auto waitForOwnership = [&](const TargetRequest & request) {
+      const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+      const uint8_t expected = request.orientation_locked ? 2 : 1;
+      while (rclcpp::ok() && std::chrono::steady_clock::now() < deadline &&
+             !is_superseded(request.generation)) {
+        const auto received = ownership_received_ns.load();
+        const auto age = std::chrono::steady_clock::now().time_since_epoch().count() - received;
+        if (received > 0 && age < std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::seconds(2)).count() &&
+            position_ownership.load() == expected) return true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      }
+      return false;
+    };
+
     auto planWithMoveIt = [&](const moveit_msgs::msg::MotionPlanRequest & motion_request,
         std::uint64_t generation,
         std::uint64_t request_id) -> std::optional<moveit_msgs::msg::RobotTrajectory> {
@@ -409,6 +434,11 @@ int main(int argc, char * argv[])
       publishStatus(status_publisher, request.request_id, "PLANNING");
 
       if (is_superseded(request.generation)) continue;
+      if (!waitForOwnership(request)) {
+        publishStatus(status_publisher, request.request_id,
+          is_superseded(request.generation) ? "CANCELED" : "FAILED", "Rover Position ownership is unavailable.");
+        continue;
+      }
 
       auto & move_group = request.orientation_locked ? full_move_group : position_move_group;
       const auto planning_group = request.orientation_locked
@@ -666,6 +696,12 @@ int main(int argc, char * argv[])
           request.request_id,
           "FAILED",
           "The rover trajectory action is unavailable.");
+        continue;
+      }
+
+      if (!waitForOwnership(request)) {
+        publishStatus(status_publisher, request.request_id,
+          is_superseded(request.generation) ? "CANCELED" : "FAILED", "Rover Position ownership is unavailable.");
         continue;
       }
 
