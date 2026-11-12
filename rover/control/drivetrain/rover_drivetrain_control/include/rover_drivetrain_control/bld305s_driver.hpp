@@ -84,10 +84,6 @@ public:
     std::uint8_t success_count_cycle{0};
   };
 
-  // True only for a valid Modbus exception reply with code 2 (illegal data
-  // address): the drive answered, but does not support that register for this function.
-  [[nodiscard]] static bool isIllegalDataAddress(const Result & result) noexcept;
-
   static constexpr int TARGET_BAUD_RATE = 38400;  // target baud, bench-gated
   using SlaveIds = std::array<std::uint8_t, 4>;
 
@@ -161,7 +157,8 @@ public:
   [[nodiscard]] Result readPolePairsRaw(
     std::uint8_t slave_id, std::uint16_t & raw_pole_pairs);
 
-  // The manual lists 0x0136 for FC 06 only; a read may return an exception.
+  // Probe selector 10 only. The manual lists 0x0136 for FC 06 only, and our
+  // controllers do not answer reads of it (times out, bench 2026-11-12).
   [[nodiscard]] Result readControlModeRaw(
     std::uint8_t slave_id, std::uint16_t & raw_mode);
 
