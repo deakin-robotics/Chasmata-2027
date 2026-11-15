@@ -13,7 +13,7 @@ stop_deadline_ms: 300
 measured_stop_wire_budget_ms: 250  # bench value; verify against measured stop ACKs
 measured_worst_bus_cycle_ms: 245   # bench value; verify the full shared-bus cycle
 late_trigger_ms: 750
-fl_id: 1           # slave-to-wheel mapping: confirm with Forrest
+fl_id: 1           # IDs set and checked on the bench, 12 Nov 2026 (FL 1, RL 2, FR 3, RR 4)
 rl_id: 2
 fr_id: 3
 rr_id: 4
@@ -25,7 +25,11 @@ wheel_separation: 0.5   # PLACEHOLDER: metres
 # --- Bench motion test only (see README "Bench motion test") -----------------
 # Off by default. Set true or false; anything else makes the plugin refuse to start.
 bench_motion_enabled: false
+# With bench mode off, these bench values (9600 baud, 2 Hz) are refused at
+# start-up: production requires 38400 baud and 15 Hz.
 # The values below are read only when bench_motion_enabled is true.
-pole_pairs: 2                 # verify against the connected motors
+pole_pairs: 2                 # verify against the connected motors: controller 1 had 5
+                              # saved, controller 2 had 2; both spin, true motor value
+                              # unconfirmed (check motor label)
 bench_rpm_cap: 300            # motor RPM; at most 500
 bench_stop_deadline_ms: 1500  # bench budget, not a measured physical stop time
