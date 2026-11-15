@@ -53,12 +53,12 @@ ros2 launch rover_drivetrain_control diagnostics.launch.py
 ros2 topic echo /drivetrain_diagnostics/telemetry
 ```
 
-For an explicitly enabled workshop probe, provide the confirmed adapter settings. Example framing and baud below are placeholders; all four drives must share them. Only one process may own the adapter at a time.
+For an explicitly enabled workshop probe, provide the confirmed adapter settings. The values below are the ones used on the bench on 12 Nov 2026; all four drives must share them. Only one process may own the adapter at a time.
 
 ```bash
 ros2 launch rover_drivetrain_control diagnostics.launch.py \
-  enable_readonly_probe:=true serial_device:=/dev/ttyUSB0 \
-  baud_rate:=9600 parity:=N data_bits:=8 stop_bits:=1 response_timeout_ms:=30
+  enable_readonly_probe:=true serial_device:=/dev/ttyACM0 \
+  baud_rate:=9600 parity:=N data_bits:=8 stop_bits:=1 response_timeout_ms:=100
 ```
 
 Every drive ships as address 1. Until the IDs are set to 1–4, connect and probe one drive at a time, because several drives at the same address will answer together and corrupt the reply.
@@ -79,13 +79,13 @@ Every selector is a function code 03 read. The service returns the raw register 
 |---|---|---|---|
 | 1 | `0x0096` | Driver internal temperature | Manual-cited, bench check pending |
 | 2 | `0x00B6` | Actual motor current | Manual-cited, bench check pending |
-| 3 | `0x00C6` | Actual motor voltage | Manual-cited, bench check pending |
-| 4 | `0x00A6` | Drive address | Manual-cited, bench check pending |
-| 5 | `0x00F6` | Baud code (`01` = 9600, `04` = 38400) | Manual-cited, bench check pending |
-| 6 | `0x0076` | Fault code | Manual-cited, bench check pending |
-| 7 | `0x0066` | Running status (`0` stop, `1` forward, `2` reverse, `3` brake) | Manual-cited, bench check pending |
-| 8 | `0x005F` | Actual speed (raw) | Manual-cited, bench check pending |
-| 9 | `0x0116` | Motor pole pairs (manual default 5) | Manual-cited, bench check pending |
+| 3 | `0x00C6` | Actual motor voltage | Bench-checked 2026-11-12 |
+| 4 | `0x00A6` | Drive address | Bench-checked 2026-11-12 |
+| 5 | `0x00F6` | Baud code (`01` = 9600, `04` = 38400) | Bench-checked 2026-11-12 |
+| 6 | `0x0076` | Fault code | Bench-checked 2026-11-12 |
+| 7 | `0x0066` | Running status (`0` stop, `1` forward, `2` reverse, `3` brake) | Bench-checked 2026-11-12 (`0` means stop accepted, not stopped) |
+| 8 | `0x005F` | Actual speed (raw) | Bench-checked 2026-11-12 |
+| 9 | `0x0116` | Motor pole pairs (manual default 5) | Bench-checked 2026-11-12 |
 | 10 | `0x0136` | Control mode (`1` = internal, `0` = external) | 0x0136 does not answer reads on our controllers (times out, bench 2026-11-12); write-only, confirmed by write echo. This selector times out |
 
 The response `detail` can name the manual meaning of a value, such as a fault name, but `raw_value` is always the raw register. Selectors 6 and 8 also fill `raw_fault` and `measured_raw_speed` in the diagnostics telemetry. See [`docs/BLD305S_REGISTERS.md`](docs/BLD305S_REGISTERS.md) for every register the package touches, with manual page references. Running code must never write the baud register `0x00F6` or the save register `0x80FF`.
@@ -99,7 +99,7 @@ ros2 launch rover_drivetrain_control drivetrain.launch.py \
   hardware_config:=/path/to/drivetrain_hardware.yaml
 ```
 
-The config has one `serial_device` and `baud_rate`, shared serial framing, required timing values, and one unique slave ID per wheel. The example adapter path, timings, gearing, and RPM limits are placeholders. The launch runs in `/drivetrain`; twist drive and per-wheel drive share the same wheel interfaces, so only one controller can be active at a time. Per-wheel commands use `[front_left, rear_left, front_right, rear_right]` in rad/s.
+The config has one `serial_device` and `baud_rate`, shared serial framing, required timing values, and one unique slave ID per wheel. The example holds the 12 Nov 2026 bench values (adapter path, baud, timings and slave IDs); gearing, RPM limits and wheel geometry are placeholders. The launch runs in `/drivetrain`; twist drive and per-wheel drive share the same wheel interfaces, so only one controller can be active at a time. Per-wheel commands use `[front_left, rear_left, front_right, rear_right]` in rad/s.
 
 The hardware interface currently refuses configuration and activation for motion, unless the opt-in bench mode below is switched on. Do not remove that gate based on a successful build or a read-only Modbus reply. Before motion can be enabled, verify register meanings and scaling against the manufacturer manual and bench readings, confirm fault and stop behavior, add an independent hardware watchdog, and measure the full four-drive bus cycle and four stop acknowledgements. The example timing budgets are unmeasured; remeasure them on this single shared bus.
 
@@ -116,7 +116,7 @@ Every run:
 - **Low cap.** Start `bench_rpm_cap` well below the 500 RPM ceiling, for example 100.
 - **Someone holds a power cutoff on the motor controllers' supply** for the whole run. That cutoff is the hardware stop.
 - **Never unattended.**
-- **USB adapter latency timer at 1 ms** (see below).
+- **FTDI adapters only: latency timer at 1 ms** (our CH343 has none; see below).
 
 ### FTDI latency-timer check
 
@@ -130,11 +130,13 @@ cat /sys/bus/usb-serial/devices/ttyUSB0/latency_timer          # confirm 1
 
 The setting resets when the adapter is unplugged or the machine reboots, so check it every time. If the `latency_timer` file does not exist, the adapter is not FTDI (for example CH340 or CP210x): it has no such timer, so measure the bus cycle on the bench before trusting the timing below.
 
+Our adapter is a WCH CH343 (`/dev/ttyACM0`). It is not FTDI and has no latency timer, so this check does not apply to it.
+
 **EN is not a safety stop here.** EN is unwired on the rover, and the drives run in internal (Modbus) mode. The manual's EN start/stop behaviour, §7.2 p.5 (PDF p.6), describes terminal control, which we take to apply to external mode only; the manual does not say what EN does in internal mode. Every software stop is a Modbus command, so it fails if the bus fails. The power cutoff covers that case.
 
 ### Enabling it
 
-Copy `config/drivetrain_hardware.example.yaml` and set `bench_motion_enabled: true`, `pole_pairs` from the motor datasheet and the probe (selector 9), a low `bench_rpm_cap`, and the bench timing values listed at the end of that file. Production mode is unchanged: with bench mode off, configure and activate still refuse, and the plugin still requires 38400 baud and 15 Hz.
+Copy `config/drivetrain_hardware.example.yaml` and set `bench_motion_enabled: true`, `pole_pairs` from the motor datasheet and the probe (selector 9), and a low `bench_rpm_cap`. The example's main values (adapter, 9600 baud, 2 Hz and the timing budgets) are already the bench values. Production mode is unchanged: with bench mode off, configure and activate still refuse, and the plugin still requires 38400 baud and 15 Hz.
 
 ### What bench mode does
 
@@ -201,9 +203,9 @@ Four drives on one bus at 9600 baud, 8N1: 10 bits per character is 1.042 ms, and
 |---|---|---|---|---|---|
 | FC03 read, 1 register | 8 + 7 = 15 | 15.6 ms | 2 × 3.65 ms | 22.9 ms | ~30 ms |
 | FC06 write | 8 + 8 = 16 | 16.7 ms | 2 × 3.65 ms | 24.0 ms | ~31 ms |
-| Broadcast stop | 8 | 8.3 ms | 1 × 3.65 ms | 12.0 ms + 50 ms reply timeout | ~62 ms |
+| Broadcast stop | 8 | 8.3 ms | 1 × 3.65 ms | 12.0 ms + 100 ms reply timeout | ~112 ms |
 
-libmodbus 3.1.10 waits `response_timeout_ms` for a reply to a broadcast that never comes, which is why the broadcast row includes the timeout.
+libmodbus 3.1.10 waits `response_timeout_ms` for a reply to a broadcast that never comes, which is why the broadcast row includes the timeout. `response_timeout_ms` was raised from 50 to 100 because Windows/Docker setups saw occasional reply timeouts.
 
 The existing timing rule keeps the worst bus cycle at or below 50% of the period:
 
@@ -213,11 +215,21 @@ The existing timing rule keeps the worst bus cycle at or below 50% of the period
 
 Bench mode therefore runs at **2 Hz** (`update_hz: 2`) with alternating reads and one write per drive per cycle. The rest follows from that:
 
-- **Stop attempt:** broadcast 62 ms + 4 status reads × 30 ms = 182 ms, against a floor of 153.6 ms, so `measured_stop_wire_budget_ms: 200` until measured.
-- **Stop deadline:** upstream timeout 110 ms + 2 periods (1000 ms) + stop budget 200 ms = 1310 ms, so `bench_stop_deadline_ms: 1500`.
-- **Late trigger:** between one and two periods, and 110 + late + 200 ≤ 1500, so `late_trigger_ms: 750`.
-- **At 2 Hz:** each drive's fault code is read once a second; a silent drive is lost after 1.5 s; a start from stop takes 2 cycles (speed, then direction) and a reversal 3; the worst-case software stop is about 1.3 s. That is why the person on the power cutoff is the real stop.
+- **Stop attempt:** broadcast ≈ 12 + 100 = 112 ms, plus 4 status reads × 30 ms = 232 ms. The floor is 112 + 4 × 22.9 ≈ 204 ms. So `measured_stop_wire_budget_ms: 250` until measured.
+- **Stop deadline:** upstream timeout 110 ms + 2 periods (1000 ms) + stop budget 250 ms = 1360 ms ≤ 1500, so `bench_stop_deadline_ms: 1500`.
+- **Late trigger:** between one and two periods, and 110 + 750 + 250 = 1110 ms ≤ 1500, so `late_trigger_ms: 750`.
+- **At 2 Hz:** each drive's fault code is read once a second; a silent drive is lost after 1.5 s; a start from stop takes 2 cycles (speed, then direction) and a reversal 3; the worst-case software stop is about 1.4 s. That is why the person on the power cutoff is the real stop.
 
 The plugin refuses `measured_worst_bus_cycle_ms` or `measured_stop_wire_budget_ms` below the wire-only floors for the configured baud and framing. All of these numbers are placeholders until the bus is measured on the bench.
+
+### Bench results, 12 Nov 2026
+
+- Configure, activation, per-wheel drive and `diff_drive_controller` were verified on four controllers, plus driving from the GUI.
+- Speed feedback (`0x005F`) was correct.
+- Holding a wheel gave fault `8` (stalled), and the plugin stopped all four drives.
+- Status `0` means "stop accepted", not "stopped": motors were still at 300 RPM while status read `0`.
+- Faults latch until the controller is power-cycled.
+- Each launch starts in `diff_drive_controller`, so switch controllers (bench test step 1) before sending per-wheel commands.
+- Under WSL, run `usbipd attach` again after every replug of the adapter.
 
 See [`docs/VERIFICATION_MATRIX.md`](docs/VERIFICATION_MATRIX.md) for verification results and remaining checks.

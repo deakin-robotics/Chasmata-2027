@@ -6,7 +6,7 @@ Every BLD-305S Modbus register this package reads or writes, with its meaning an
 
 Pages are cited as the page number printed at the foot of the page, followed by the PDF page, which is one higher. For example, the register tables are on pp.6–7 (PDF pp.7–8).
 
-> **Status of every entry: manual-cited, not bench-verified.** An address, meaning or scaling taken from the manual still needs a bench read on a real drive before anything relies on it. A Modbus ACK proves a reply was received, not that the meaning is right.
+> **Status: manual-cited, not bench-verified, unless the Status column says otherwise.** An address, meaning or scaling taken from the manual still needs a bench read on a real drive before anything relies on it. A Modbus ACK proves a reply was received, not that the meaning is right.
 
 ## Bus settings: p.5 (PDF p.6)
 
@@ -28,15 +28,15 @@ No code in this package writes `0x00F6`, `0x00A6` or `0x80FF`, and no write meth
 
 | Register | Meaning | Values / scaling (manual) | Manual | Accessed by | Status |
 |---|---|---|---|---|---|
-| `0x005F` | Actual motor speed | Raw value. Example: `0x0BB8` = 3000 RPM. Actual speed = value × communication-setting pole pairs ÷ actual motor pole pairs. **This package does not apply that conversion.** | pp.6–7 (PDF pp.7–8) | `readActualSpeedRaw()`, probe selector 8, bench `read()` | Manual-cited, not bench-verified |
-| `0x0066` | Motor running status | `0` stop, `1` forward, `2` reverse, `3` stop brake | p.6 (PDF p.7) | `readRunningStatusRaw()`, probe selector 7, bench activation and stop confirmation | Manual-cited, not bench-verified |
-| `0x0076` | Fault code | `1` overcurrent, `2` over temperature, `3` overpressure, `4` undervoltage, `5` sensor abnormality, `6` overspeed, `8` stalled, `9` peak current. `0` and `7` are not listed. | p.7 (PDF p.8) | `readFaultRaw()`, probe selector 6, bench configure and `read()` | Manual-cited, not bench-verified |
+| `0x005F` | Actual motor speed | Raw value. Example: `0x0BB8` = 3000 RPM. Actual speed = value × communication-setting pole pairs ÷ actual motor pole pairs. **This package does not apply that conversion.** | pp.6–7 (PDF pp.7–8) | `readActualSpeedRaw()`, probe selector 8, bench `read()` | Bench-checked 2026-11-12: read 300 at a 300 RPM command |
+| `0x0066` | Motor running status | `0` stop, `1` forward, `2` reverse, `3` stop brake | p.6 (PDF p.7) | `readRunningStatusRaw()`, probe selector 7, bench activation and stop confirmation | Bench-checked 2026-11-12. `0` means "stop accepted", not "stopped": motors were still at 300 RPM while it read `0` |
+| `0x0076` | Fault code | `1` overcurrent, `2` over temperature, `3` overpressure, `4` undervoltage, `5` sensor abnormality, `6` overspeed, `8` stalled, `9` peak current. `0` and `7` are not listed. | p.7 (PDF p.8) | `readFaultRaw()`, probe selector 6, bench configure and `read()` | Bench-checked 2026-11-12: saw `0` and `8` |
 | `0x0096` | Driver internal temperature | Raw; no scaling given | p.7 (PDF p.8) | `readTemperatureRaw()`, probe selector 1 | Manual-cited, not bench-verified |
-| `0x00A6` | Driver address | Slave ID as stored by the drive | p.7 (PDF p.8) | `readDriveAddressRaw()`, probe selector 4, bench configure | Manual-cited, not bench-verified |
+| `0x00A6` | Driver address | Slave ID as stored by the drive | p.7 (PDF p.8) | `readDriveAddressRaw()`, probe selector 4, bench configure | Bench-checked 2026-11-12: read and written (IDs set to 1–4; this package still never writes it) |
 | `0x00B6` | Actual motor current | Raw; no scaling given | p.7 (PDF p.8) | `readCurrentRaw()`, probe selector 2 | Manual-cited, not bench-verified |
-| `0x00C6` | Actual motor voltage | Raw; no scaling given | p.7 (PDF p.8) | `readVoltageRaw()`, probe selector 3 | Manual-cited, not bench-verified |
-| `0x00F6` | Baud rate code | `00`=4800, `01`=9600, `02`=14400, `03`=19200, `04`=38400, `05`=56000, `06`=57600, `07`=115200, `08`=128000, `09`=230400, `10H`=256000. Codes above `10H` fall back to 9600. Default `01`. | pp.6–7 (PDF pp.7–8) | `readBaudCodeRaw()`, probe selector 5 | Manual-cited, not bench-verified |
-| `0x0116` | Number of motor pole pairs | `1`–`255`; default `05H`. This term appears in the actual-speed formula above. | pp.6–7 (PDF pp.7–8) | `readPolePairsRaw()`, probe selector 9, bench activation read-back | Manual-cited, not bench-verified |
+| `0x00C6` | Actual motor voltage | Raw; no scaling given | p.7 (PDF p.8) | `readVoltageRaw()`, probe selector 3 | Bench-checked 2026-11-12: read 91 raw = 22.75 V |
+| `0x00F6` | Baud rate code | `00`=4800, `01`=9600, `02`=14400, `03`=19200, `04`=38400, `05`=56000, `06`=57600, `07`=115200, `08`=128000, `09`=230400, `10H`=256000. Codes above `10H` fall back to 9600. Default `01`. | pp.6–7 (PDF pp.7–8) | `readBaudCodeRaw()`, probe selector 5 | Bench-checked 2026-11-12: read `1` = 9600 |
+| `0x0116` | Number of motor pole pairs | `1`–`255`; default `05H`. This term appears in the actual-speed formula above. | pp.6–7 (PDF pp.7–8) | `readPolePairsRaw()`, probe selector 9, bench activation read-back | Bench-checked 2026-11-12: read `2` and `5` |
 | `0x0136` | Internal/external control mode | `01` internal, `00` external; default `01`. The manual lists this register for FC `06` only. 0x0136 does not answer reads on our controllers (times out, bench 2026-11-12); write-only, confirmed by write echo. | p.6 (PDF p.7) | `readControlModeRaw()`, probe selector 10 (times out on our controllers) | Bench-checked: reads time out |
 | `0x0056` | Motor speed **setting** | The manual lists this register only for FC `06`; reading it back is not documented. It is a setpoint, not a measurement. | p.6 (PDF p.7) | `readSpeedRaw()` (no caller) | Manual-cited, not bench-verified |
 
