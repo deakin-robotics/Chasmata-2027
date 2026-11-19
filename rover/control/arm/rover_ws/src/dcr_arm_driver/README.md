@@ -8,7 +8,7 @@ ROS 2 Jazzy arm hardware plugin for six joints via `/socketcan_bridge/tx` and `/
 
 The legacy rover controller addresses joints in this order, which matches the current URDF: base `0x01`, shoulder `0x02`, elbow `0x03`, yaw `0x04`, pitch `0x05`, roll `0x06`. Its end-effector commands use `0x07`. These are historical software assignments, not a measurement of the devices currently connected. The legacy launch selected `can1`, and its startup script set that interface to 1 Mbit/s. The current URDF names `can0`; verify the actual adapter name and bitrate before connecting to the physical bus. The arm plugin's `can_interface` parameter does not configure the SocketCAN bridge.
 
-The operator confirmed **1:1 mechanical motor-to-joint conversion with no gearbox**: each motor directly drives its joint. The existing degrees/RPM conversion therefore requires no gearbox multiplier. Encoder zero, direction and controller firmware still need verification.
+The shipped URDF uses the historical 1:1 conversion. To discover addresses, review gear ratios, and map the assembled folded arm into ROS coordinates, run `ros2 run dcr_arm_driver configure_arm_motors ~/arm-setup --interface can0` after building and sourcing the package. [Motor setup and folded calibration](../../../docs/hardware-commissioning.md#configure-the-six-arm-motors)
 
 The identified motor/driver combinations are GIM8108-48 + GDZ468, GIM4310-36 + GDZ34, and GIM4305-10 + GDZ34. **Physical motion testing remains on hold** until the per-joint model and CAN ID assignment, firmware and command units, encoder direction and folded readings, motor-side communication watchdog, brake or mechanical support, current limits, and independent stop are confirmed. The legacy code does not establish those facts. Record the measurements in a reviewed bench profile and follow the [commissioning procedure](../../../docs/hardware-commissioning.md) before enabling motion.
 
@@ -21,7 +21,7 @@ The identified motor/driver combinations are GIM8108-48 + GDZ468, GIM4310-36 + G
 - Direct position and speed commands require refresh within 250 ms. Stream at least 10 Hz. Silence stops and latches the arm.
 - Direct commands are rejected during an active trajectory. Returning direct control to `CONTROLLER` requires another rearm and new goal, so an old controller target cannot resume.
 - Missing encoder or motor status, reported motor faults, invalid feedback and measured overspeed inhibit all joints. After encoder loss, previous turn references are discarded because the arm could have moved while disconnected.
-- `/arm/confirm_folded_pose` resolves ambiguous encoder turns only after physical confirmation at a calibrated, supported folded pose with E-stop asserted. Configure per-joint references as described in the commissioning guide.
+- With a generated setup profile, `/arm/confirm_folded_pose` captures measured multi-turn counts for all joints at the supported folded pose with E-stop asserted. With a legacy profile it resolves ambiguous wrapped encoder turns.
 - `/arm/set_home` is removed. It previously reset local state without verifying a motor acknowledgement. Folded confirmation does not redefine the encoder origin.
 - Position setpoints are slew-limited by the URDF velocity. This is not a replacement for hardware speed/current limits or collision avoidance.
 
@@ -32,7 +32,7 @@ The identified motor/driver combinations are GIM8108-48 + GDZ468, GIM4310-36 + G
 | `/arm/direct_drive` | `dcr_arm_driver/msg/DirectDrive` | Refreshed per-joint position in degrees or speed in RPM |
 | `/estop` | `std_msgs/msg/Bool` | Live stop-state heartbeat |
 | `/arm/rearm` | `std_srvs/srv/Trigger` | Deliberate recovery acknowledgement |
-| `/arm/confirm_folded_pose` | `std_srvs/srv/Trigger` | Confirm calibrated turn reference without motion |
+| `/arm/confirm_folded_pose` | `std_srvs/srv/Trigger` | Register the physically folded arm in software |
 | `/arm_controller/follow_joint_trajectory` | `control_msgs/action/FollowJointTrajectory` | Trajectory execution with configured tolerances |
 | `/arm/joint_states` | `sensor_msgs/msg/JointState` | Position in radians, speed in rad/s |
 | `/arm/control/status` | `telemetry_interfaces/msg/ArmControlStatus` | Readiness, freshness and inhibit reason |
@@ -148,13 +148,13 @@ Keep `motion_enabled` false during initial inspection. It suppresses movement co
 
 ### Full six-joint configuration
 
-After single-motor commissioning, the default launch selects `urdf/robot_arm.urdf` and `config/arm_controllers.yaml`, with motion disabled:
+After motor identification, launch with the generated profile and the shipped six-joint controller configuration:
 
 ```bash
-ros2 launch dcr_arm_driver arm_control.launch.py
+ros2 launch dcr_arm_driver arm_control.launch.py urdf:="$HOME/arm-setup/arm.urdf"
 ```
 
-For supported full-arm motion tests, copy those two files into a persistent commissioning directory, calibrate each joint and supply their absolute paths through `urdf:=... controllers:=...`, as in the bench launch below. All six configured joints must provide healthy feedback. The driver does not plan a collision-free unfolding path; review the physical path and provide new bounded trajectories from the measured folded pose. The supplied model has no validated collision geometry.
+Physically fold and support the arm, assert E-stop, then call `/arm/confirm_folded_pose`. All six joints must provide healthy feedback. The profile starts with motion disabled. For later motion tests, review the physical path and supply bounded trajectories from the measured pose. [Commissioning procedure](../../../docs/hardware-commissioning.md#configure-the-six-arm-motors)
 
 ## Start one transport
 
@@ -288,7 +288,7 @@ Arm requests use each motor's CAN ID (`0x01`–`0x06`) and status request bytes 
 
 ### Encoder startup ambiguity
 
-The `A4` feedback reports a wrapped encoder angle. The driver converts each sample into a joint position within the configured URDF limits. If more than one revolution value fits those limits, a wrapped angle alone cannot identify the physical turn. Startup remains inhibited when the sample is ambiguous; it does not automatically home the motor or assume the folded pose is zero. The driver can establish an initial turn reference when the configured range and sample identify one unique position.
+Generated profiles use `A3` multi-turn counts for joint position and `A4` for speed. The following wrapped-angle procedure applies to legacy profiles. Their `A4` feedback reports a wrapped encoder angle. If more than one revolution value fits the limits, a wrapped angle alone cannot identify the physical turn. The legacy driver path can establish an initial turn reference when the configured range and sample identify one unique position.
 
 If feedback is lost for more than 250 ms, the driver latches inhibition and discards the previous turn reference because the arm may have moved while disconnected. Restored CAN feedback alone cannot resolve that ambiguity. After physically supporting and confirming the arm at its calibrated folded pose, configure that joint's measured `<joint_name>_folded_reference_rad` in the URDF and follow the `/arm/confirm_folded_pose` procedure above. That service requires asserted E-stop, fresh stationary feedback, no active trajectory, and agreement with the configured reference; it resolves the encoder turn only and never commands a motor home operation.
 

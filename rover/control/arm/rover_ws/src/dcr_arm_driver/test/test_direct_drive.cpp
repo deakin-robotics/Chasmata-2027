@@ -33,6 +33,8 @@ protected:
       1304; // Nonzero folded startup pose (~0.5 rad), never assumed zero.
   int16_t rpm100 = 0;
   uint8_t fault = 0;
+  bool publish_multi_turn = false;
+  int32_t multi_turn_count = -49000;
   void SetUp() override {
     hardware.node = std::make_shared<rclcpp::Node>("arm_fault_test");
     executor.add_node(hardware.node);
@@ -103,6 +105,13 @@ protected:
         feedback->publish(f);
         f.data = {0xAE, 0x60, 0x09, 0, 0, 0, 0, fault};
         feedback->publish(f);
+        if (publish_multi_turn) {
+          f.dlc = 7;
+          f.data = {0xA3};
+          for (unsigned i = 0; i < 4; ++i)
+            f.data[3 + i] = uint32_t(multi_turn_count) >> (8 * i);
+          feedback->publish(f);
+        }
       }
     });
     run(650ms);
@@ -260,6 +269,56 @@ TEST_F(DirectDriveTest, FoldedConfirmationRequiresActualMatchingPose) {
   stop = true;
   run(120ms);
   EXPECT_FALSE(call(folded));
+}
+
+TEST_F(DirectDriveTest, CapturedFoldMapsMotorTurnsToJointCoordinatesAndBack) {
+  hardware.on_deactivate(rclcpp_lifecycle::State());
+  for (const auto &joint : params.hardware_info.joints) {
+    auto &p = params.hardware_info.hardware_parameters;
+    p[joint.name + "_folded_reference_rad"] = joint.name == "joint_1" ? "1.0" : "0.5";
+    p[joint.name + "_motor_turns_per_joint_turn"] = "-36";
+  }
+  ASSERT_EQ(hardware.on_init(params), hardware_interface::CallbackReturn::SUCCESS);
+  ASSERT_EQ(hardware.on_activate(rclcpp_lifecycle::State()), hardware_interface::CallbackReturn::SUCCESS);
+  stop = true;
+  run(100ms);
+  EXPECT_FALSE(call(folded)); // Missing A3, despite healthy wrapped feedback.
+  publish_multi_turn = true;
+  rpm100 = 3000;
+  run(80ms);
+  EXPECT_FALSE(call(folded)); // Joint is moving.
+  rpm100 = 0;
+  run(80ms);
+  ASSERT_TRUE(call(folded));
+  run(80ms);
+  auto states = hardware.export_state_interfaces();
+  EXPECT_DOUBLE_EQ(states[0].get_value(), 1.0);
+  EXPECT_DOUBLE_EQ(states[2].get_value(), 0.5);
+  stopped();
+  stop = false;
+  run(650ms);
+  ASSERT_TRUE(call(rearm));
+  run(40ms);
+  dcr_arm_driver::Motor motor;
+  EXPECT_EQ(latest().data, motor.position_counts(1, multi_turn_count).data);
+  command(DirectDrive::SPEED, 1);
+  EXPECT_EQ(latest().data, motor.speed_control(1, -36).data);
+  // A complete motor revolution leaves the wrapped position unchanged.
+  multi_turn_count += 16384;
+  rpm100 = 600;
+  run(40ms);
+  EXPECT_NEAR(states[0].get_value(), 1.0 - 2 * M_PI / 36, 1e-9);
+  EXPECT_NEAR(states[1].get_value(), -6 * 2 * M_PI / (60 * 36), 1e-9);
+  command(DirectDrive::POSITION, states[0].get_value() * 180 / M_PI);
+  EXPECT_EQ(latest().data, motor.position_counts(1, multi_turn_count).data);
+  publish_multi_turn = false;
+  run(300ms);
+  stopped();
+  publish_multi_turn = true;
+  rpm100 = 0;
+  run(650ms);
+  EXPECT_FALSE(status.feedback_fresh);
+  EXPECT_FALSE(call(rearm));
 }
 TEST_F(DirectDriveTest, OldStampedFeedbackDoesNotRenewFreshness) {
   ASSERT_TRUE(call(rearm));

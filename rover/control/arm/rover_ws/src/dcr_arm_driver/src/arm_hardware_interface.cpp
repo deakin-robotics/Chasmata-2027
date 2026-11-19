@@ -21,6 +21,17 @@ constexpr auto ESTOP_TIMEOUT = std::chrono::milliseconds(500);
 constexpr auto RECOVERY_DWELL = std::chrono::milliseconds(500);
 constexpr auto FEEDBACK_TIMEOUT = std::chrono::milliseconds(250);
 constexpr double DIRECT_SPEED_LIMIT_MARGIN_RADIANS = 0.02;
+constexpr double COUNTS_PER_RADIAN = 16384.0 / TWO_PI;
+
+double motor_counts(const JointInfo &joint, double position, int32_t origin) {
+  return origin + (position - joint.folded_reference) *
+                      joint.turns_per_joint_turn * COUNTS_PER_RADIAN;
+}
+
+bool fits_count(double value) {
+  return value >= std::numeric_limits<int32_t>::min() &&
+         value <= std::numeric_limits<int32_t>::max();
+}
 
 std::optional<double> normalize_encoder_angle(double angle_degrees,
                                               double lower_limit,
@@ -196,6 +207,35 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_init(
         return hardware_interface::CallbackReturn::ERROR;
       joint_info.folded_reference_configured = true;
     }
+    const auto scale = info.hardware_parameters.find(
+        joint.name + "_motor_turns_per_joint_turn");
+    if (scale != info.hardware_parameters.end()) {
+      try {
+        size_t end;
+        joint_info.turns_per_joint_turn = std::stod(scale->second, &end);
+        if (end != scale->second.size())
+          return hardware_interface::CallbackReturn::ERROR;
+      } catch (const std::exception &) {
+        return hardware_interface::CallbackReturn::ERROR;
+      }
+      const double max_motor_rpm = joint_info.max_velocity *
+          std::abs(joint_info.turns_per_joint_turn) / RPM_TO_RADIANS_PER_SECOND;
+      if (!joint_info.folded_reference_configured ||
+          !std::isfinite(joint_info.turns_per_joint_turn) ||
+          joint_info.turns_per_joint_turn == 0 ||
+          !fits_count(static_cast<float>(max_motor_rpm) * 100.0f)) {
+        RCLCPP_ERROR(rclcpp::get_logger("ArmHardwareInterface"),
+                     "Invalid folded reference or motor scaling for %s", joint.name.c_str());
+        return hardware_interface::CallbackReturn::ERROR;
+      }
+      joint_info.capture_folded_origin = true;
+    }
+    if (!joints_.empty() &&
+        joint_info.capture_folded_origin != joints_.front().capture_folded_origin) {
+      RCLCPP_ERROR(rclcpp::get_logger("ArmHardwareInterface"),
+                   "Folded motor calibration requires scaling for every configured joint");
+      return hardware_interface::CallbackReturn::ERROR;
+    }
     joints_.push_back(joint_info);
     RCLCPP_INFO(rclcpp::get_logger("ArmHardwareInterface"),
                 "Initialized joint '%s' with CAN ID 0x%02X", joint.name.c_str(),
@@ -286,6 +326,8 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_activate(
     joint.has_encoder_turn_reference = false;
     joint.folded_confirmed = false;
     joint.pending_feedback_time = {};
+    joint.folded_motor_count.reset();
+    joint.multi_turn_time = {};
   }
   trajectory_rearm_ready_ = false;
   trajectory_goal_active_ = false;
@@ -348,26 +390,50 @@ hardware_interface::CallbackReturn ArmHardwareInterface::on_activate(
                             "E-stop, configure all references, cancel goals";
         if (!active_ || !fault_latched_ || !estop_state_received_ ||
             !estop_asserted_.load() || now - last_estop_ > ESTOP_TIMEOUT ||
-            trajectory_goal_active_ || !all_motor_status_safe(now))
+            trajectory_goal_active_)
           return;
         for (const auto &joint : joints_) {
-          const auto position = normalize_encoder_angle(
-              joint.pending_angle_degrees, joint.position_min,
-              joint.position_max, joint.folded_reference, true);
+          if (!joint.has_motor_status2 || joint.motor_faulted ||
+              now - joint.last_motor_status2_time > FEEDBACK_TIMEOUT) {
+            response->message = "Need fresh fault-free motor status for " + joint.name;
+            return;
+          }
           if (!joint.folded_reference_configured ||
               joint.pending_feedback_time ==
                   std::chrono::steady_clock::time_point{} ||
               now - joint.pending_feedback_time > FEEDBACK_TIMEOUT ||
-              std::abs(joint.pending_speed_rpm * RPM_TO_RADIANS_PER_SECOND) >
-                  0.05 ||
-              !position || std::abs(*position - joint.folded_reference) > 0.05)
+              std::abs(joint.pending_speed_rpm * RPM_TO_RADIANS_PER_SECOND /
+                       joint.turns_per_joint_turn) > 0.05) {
+            response->message = "Need a folded angle and fresh stationary feedback for " + joint.name;
             return;
+          }
+          if (joint.capture_folded_origin) {
+            if (joint.multi_turn_time == std::chrono::steady_clock::time_point{} ||
+                now - joint.multi_turn_time > FEEDBACK_TIMEOUT ||
+                !fits_count(motor_counts(joint, joint.position_min, joint.multi_turn_count)) ||
+                !fits_count(motor_counts(joint, joint.position_max, joint.multi_turn_count))) {
+              response->message = "Missing multi-turn feedback or unrepresentable travel: " + joint.name;
+              return;
+            }
+          } else {
+            const auto position = normalize_encoder_angle(
+                joint.pending_angle_degrees, joint.position_min,
+                joint.position_max, joint.folded_reference, true);
+            if (!position || std::abs(*position - joint.folded_reference) > 0.05)
+              return;
+          }
         }
-        for (auto &joint : joints_)
-          joint.folded_confirmed = true;
+        for (auto &joint : joints_) {
+          if (joint.capture_folded_origin) {
+            joint.folded_motor_count = joint.multi_turn_count;
+            joint.has_position_feedback = false;  // read() reseeds the command interface.
+            joint.has_pending_status1 = true;
+          } else {
+            joint.folded_confirmed = true;
+          }
+        }
         response->success = true;
-        response->message = "Folded turn reference confirmed; coordinates "
-                            "unchanged; clear E-stop then rearm";
+        response->message = "Folded pose confirmed for all joints; motion inhibited";
       });
 
   trajectory_status_sub_ =
@@ -518,23 +584,38 @@ ArmHardwareInterface::read(const rclcpp::Time & /*time*/,
   std::lock_guard<std::mutex> lock(lifecycle_mutex_);
 
   for (auto &joint : joints_) {
+    const auto now = std::chrono::steady_clock::now();
+    if (joint.folded_motor_count &&
+        (now - joint.multi_turn_time > FEEDBACK_TIMEOUT ||
+         now - joint.pending_feedback_time > FEEDBACK_TIMEOUT)) {
+      latch_fault("folded encoder reference lost: " + joint.name, true);
+    }
     if (joint.has_position_feedback &&
-        std::chrono::steady_clock::now() - joint.last_feedback_time >
-            FEEDBACK_TIMEOUT) {
+        now - joint.last_feedback_time > FEEDBACK_TIMEOUT) {
       latch_fault("encoder feedback timeout: " + joint.name, true);
     }
-    if (joint.has_pending_status1) {
-      const auto position = normalize_encoder_angle(
-          joint.pending_angle_degrees, joint.position_min, joint.position_max,
-          joint.folded_confirmed ? joint.folded_reference : joint.position,
-          joint.folded_confirmed || joint.has_encoder_turn_reference);
-      if (position &&
-          std::chrono::steady_clock::now() - joint.pending_feedback_time <=
-              FEEDBACK_TIMEOUT) {
+    if (joint.has_pending_status1 &&
+        (!joint.capture_folded_origin || joint.folded_motor_count)) {
+      std::optional<double> position;
+      if (joint.capture_folded_origin) {
+        const double delta = double(joint.multi_turn_count) - *joint.folded_motor_count;
+        const double measured = joint.folded_reference +
+            delta / COUNTS_PER_RADIAN / joint.turns_per_joint_turn;
+        if (measured >= joint.position_min && measured <= joint.position_max)
+          position = measured;
+      } else {
+        position = normalize_encoder_angle(
+            joint.pending_angle_degrees, joint.position_min, joint.position_max,
+            joint.folded_confirmed ? joint.folded_reference : joint.position,
+            joint.folded_confirmed || joint.has_encoder_turn_reference);
+      }
+      if (position && now - joint.pending_feedback_time <= FEEDBACK_TIMEOUT) {
         joint.folded_confirmed = false;
         joint.position = *position;
         joint.has_encoder_turn_reference = true;
-        joint.last_feedback_time = joint.pending_feedback_time;
+        joint.last_feedback_time = joint.capture_folded_origin
+            ? std::min(joint.pending_feedback_time, joint.multi_turn_time)
+            : joint.pending_feedback_time;
         if (!joint.has_position_feedback) {
           joint.position_command = *position;
           joint.has_position_feedback = true;
@@ -562,7 +643,8 @@ ArmHardwareInterface::read(const rclcpp::Time & /*time*/,
             "limits or ambiguous without a turn reference",
             joint.pending_angle_degrees, joint.name.c_str());
       }
-      joint.velocity = joint.pending_speed_rpm * RPM_TO_RADIANS_PER_SECOND;
+      joint.velocity = joint.pending_speed_rpm * RPM_TO_RADIANS_PER_SECOND /
+                       joint.turns_per_joint_turn;
       if (std::abs(joint.velocity) > joint.max_velocity * 1.5 + 0.1) {
         latch_fault("measured overspeed: " + joint.name);
       }
@@ -571,6 +653,8 @@ ArmHardwareInterface::read(const rclcpp::Time & /*time*/,
     if (!can_pub_) {
       continue;
     }
+    if (joint.capture_folded_origin)
+      send_frame(motor_driver_->request_multi_turn(joint.can_id));
     auto status1_req = motor_driver_->send_status_1();
     status1_req.id = joint.can_id;
     send_frame(status1_req);
@@ -636,15 +720,6 @@ ArmHardwareInterface::write(const rclcpp::Time & /*time*/,
           estop_asserted || !estop_clear(now) || feedback_stale ||
           joint_motor_status_unsafe) {
         cmd_msg = motor_driver_->speed_control(joint.can_id, 0.0f);
-      } else if (motion_inhibited_ &&
-                 joint.direct_mode ==
-                     dcr_arm_driver::msg::DirectDrive::CONTROLLER) {
-        const double hold_position = std::clamp(
-            joint.estop_hold_position, joint.position_min, joint.position_max);
-        cmd_msg = motor_driver_->position_control(
-            joint.can_id,
-            static_cast<float>(hold_position / DEGREES_TO_RADIANS));
-
       } else if (joint.direct_mode == dcr_arm_driver::msg::DirectDrive::SPEED) {
         double speed_command = joint.direct_value;
         if ((speed_command > 0.0 &&
@@ -656,39 +731,25 @@ ArmHardwareInterface::write(const rclcpp::Time & /*time*/,
           speed_command = 0.0;
         }
         cmd_msg = motor_driver_->speed_control(
-            joint.can_id, static_cast<float>(speed_command));
-      } else if (joint.direct_mode ==
-                 dcr_arm_driver::msg::DirectDrive::POSITION) {
-        const double direct_position =
-            std::clamp(joint.direct_value * DEGREES_TO_RADIANS,
-                       joint.position_min, joint.position_max);
-        cmd_msg = motor_driver_->position_control(
-            joint.can_id,
-            static_cast<float>(direct_position / DEGREES_TO_RADIANS));
+            joint.can_id, static_cast<float>(speed_command * joint.turns_per_joint_turn));
       } else {
-        const double command =
-            std::isfinite(joint.position_command)
-                ? std::clamp(joint.position_command, joint.position_min,
-                             joint.position_max)
-                : joint.position;
-        cmd_msg = motor_driver_->position_control(
-            joint.can_id, static_cast<float>(command / DEGREES_TO_RADIANS));
-      }
-      if (cmd_msg.data[0] == 0xC2) {
-        const uint32_t bits = uint32_t(cmd_msg.data[1]) |
-                              (uint32_t(cmd_msg.data[2]) << 8) |
-                              (uint32_t(cmd_msg.data[3]) << 16) |
-                              (uint32_t(cmd_msg.data[4]) << 24);
-        const int32_t raw =
-            bits & 0x80000000U ? -1 - int32_t(~bits) : int32_t(bits);
-        const double target = raw * TWO_PI / 16384.0;
+        double target = joint.position_command;
+        if (joint.direct_mode == dcr_arm_driver::msg::DirectDrive::POSITION)
+          target = joint.direct_value * DEGREES_TO_RADIANS;
+        else if (motion_inhibited_)
+          target = joint.estop_hold_position;
+        target = std::clamp(target, joint.position_min, joint.position_max);
         const double step =
             joint.max_velocity * std::clamp(period.seconds(), 0.0, 0.04);
         const double bounded =
             std::clamp(target, joint.last_position_command - step,
                        joint.last_position_command + step);
-        cmd_msg = motor_driver_->position_control(joint.can_id,
-                                                  bounded / DEGREES_TO_RADIANS);
+        if (joint.folded_motor_count) {
+          const auto count = std::llround(motor_counts(joint, bounded, *joint.folded_motor_count));
+          cmd_msg = motor_driver_->position_counts(joint.can_id, static_cast<int32_t>(count));
+        } else {
+          cmd_msg = motor_driver_->position_control(joint.can_id, bounded / DEGREES_TO_RADIANS);
+        }
         joint.last_position_command = bounded;
       }
       send_frame(cmd_msg);
@@ -715,6 +776,9 @@ void ArmHardwareInterface::publish_status() {
       trajectory_rearm_ready_ && !fault_latched_ && motion_enabled_;
   if (!status.hardware_active)
     status.reason = "arm hardware inactive";
+  else if (!joints_.empty() && joints_.front().capture_folded_origin &&
+           !joints_.front().folded_motor_count)
+    status.reason = "awaiting physical folded pose confirmation";
   else if (!motion_enabled_)
     status.reason = "commissioning: motion disabled";
   else if (fault_latched_)
@@ -755,7 +819,7 @@ void ArmHardwareInterface::can_frame_callback(const can_msgs::msg::Frame &msg) {
     latch_fault("CAN error frame", true);
     return;
   }
-  if (msg.is_extended || msg.is_rtr || msg.dlc != 8) {
+  if (msg.is_extended || msg.is_rtr) {
     return;
   }
 
@@ -764,10 +828,21 @@ void ArmHardwareInterface::can_frame_callback(const can_msgs::msg::Frame &msg) {
     return;
   }
 
+  if (joint->capture_folded_origin && msg.dlc == 7 && msg.data[0] == 0xA3) {
+    if ((uint16_t(msg.data[1]) | (uint16_t(msg.data[2]) << 8)) >= 16384) {
+      latch_fault("invalid multi-turn encoder payload: " + joint->name, true);
+      return;
+    }
+    joint->multi_turn_count = motor_driver_->read_multi_turn(msg);
+    joint->multi_turn_time = std::chrono::steady_clock::now();
+    return;
+  }
+  if (msg.dlc != 8)
+    return;
   if (msg.data[0] == 0xA4) {
     // Status 1: temperature, current, speed, angle
     if ((uint16_t(msg.data[6]) | (uint16_t(msg.data[7]) << 8)) >= 16384) {
-      latch_fault("invalid encoder payload: " + joint->name);
+      latch_fault("invalid encoder payload: " + joint->name, joint->capture_folded_origin);
       return;
     }
     auto stat = motor_driver_->read_status_1(msg);
@@ -962,6 +1037,10 @@ void ArmHardwareInterface::latch_fault(const std::string &reason,
     joint.direct_value = 0;
     joint.estop_hold_position = joint.position;
     if (lost_reference) {
+      joint.folded_motor_count.reset();
+      joint.multi_turn_time = {};
+      joint.pending_feedback_time = {};
+      joint.has_pending_status1 = false;
       joint.folded_confirmed = false;
       joint.has_encoder_turn_reference = false;
       joint.has_position_feedback = false;

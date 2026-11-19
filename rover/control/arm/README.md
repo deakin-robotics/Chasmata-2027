@@ -4,6 +4,8 @@ ROS 2 Jazzy control stack for the rover's six degree of freedom arm. The arm use
 
 The driver starts inhibited. Its default hardware profile disables motion. Mock tests do not establish that a gravity loaded physical arm will remain supported after CAN, motor power or torque loss. Keep physical motion disabled until the commissioning gates are satisfied.
 
+To assign the six motors, run `ros2 run dcr_arm_driver configure_arm_motors ~/arm-setup --interface can0` with one motor connected at a time. After assembly, the generated profile lets the operator register the physically folded arm in joint coordinates. [Motor setup and folded calibration](docs/hardware-commissioning.md#configure-the-six-arm-motors)
+
 ## Architecture
 
 ```mermaid
@@ -55,7 +57,7 @@ Ranges and speeds below are read from `urdf/robot_arm.urdf`. The range entries a
 | `pitch_joint` | `0x05` | -0.0873 to 3.7525 | -5 to 215 | 1.0 rad/s |
 | `roll_joint` | `0x06` | -3.2288 to 3.2288 | -185 to 185 | 1.0 rad/s |
 
-The operator confirmed a 1:1 mechanical motor-to-joint ratio with no gearbox. Encoder zero, direction, firmware units and physical limits still need hardware confirmation. CAN ID assignments are the historical software mapping; verify the devices on the actual bus. CAN ID `0x07` is used by the separate end-effector controller.
+The table describes the historical 1:1 profile. A commissioned profile supplies the discovered addresses and operator-confirmed signed scales. CAN ID `0x07` is used by the separate end-effector controller.
 
 ## CAN commands and status
 
@@ -105,7 +107,7 @@ The A4/Ae response layout and units are implemented in [`motor.cpp`](rover_ws/sr
 
 The driver latches inhibition on stale feedback/status (250 ms), reported motor fault, invalid or ambiguous encoder, overspeed, CAN error frame, asserted/unknown/stale E-stop, expired direct command, invalid controller target, and lifecycle shutdown/error. Inhibition requests zero speed and rejects motion. A stop request cannot cross a disconnected CAN bus or guarantee torque after power loss. The driver never homes automatically, resumes an old command after recovery, or clears motor faults automatically. See the commissioning guide for recovery steps and physical stop requirements.
 
-Wrapped encoder feedback may not identify a unique joint turn when multiple revolutions fit the configured range. The driver inhibits motion when it cannot establish an unambiguous reference. After encoder feedback is lost, it discards the prior turn reference because the arm may have moved while disconnected. The folded-pose confirmation service only restores a calibrated turn reference after a physical check; it does not move or home the arm.
+Profiles created by the setup tool use multi-turn encoder feedback and capture a software origin for every joint at folded confirmation. In the historical 1:1 profile the same service resolves an ambiguous wrapped encoder turn. Both paths require a physical check and keep motion inhibited.
 
 ## Package layout
 

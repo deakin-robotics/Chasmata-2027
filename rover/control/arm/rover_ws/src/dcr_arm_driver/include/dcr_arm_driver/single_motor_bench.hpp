@@ -31,10 +31,7 @@ public:
           if (frame.id != motor_id_ || frame.is_error || frame.is_rtr ||
               frame.is_extended || frame.dlc != 7 || frame.data[0] != 0xA3)
             return;
-          const uint32_t bits = uint32_t(frame.data[3]) |
-              (uint32_t(frame.data[4]) << 8) | (uint32_t(frame.data[5]) << 16) |
-              (uint32_t(frame.data[6]) << 24);
-          const int64_t current = bits & 0x80000000U ? int64_t(bits) - 0x100000000LL : bits;
+          const int64_t current = motor_.read_multi_turn(frame);
           std_msgs::msg::Float64 position;
           position.data = current * 360.0 / 16384.0;
           position_->publish(position);
@@ -55,16 +52,9 @@ public:
             RCLCPP_ERROR(get_logger(), "Nearest target exceeds the motor count range");
             return;
           }
-          can_msgs::msg::Frame command;
-          command.id = motor_id_;
-          command.dlc = 5;
-          command.data[0] = 0xC2;
-          const uint32_t encoded = static_cast<uint32_t>(target);
-          for (unsigned b = 0; b < 4; ++b)
-            command.data[b + 1] = (encoded >> (8 * b)) & 0xFF;
           RCLCPP_INFO(get_logger(), "Current %.2f deg, goal %.2f deg: move %.2f deg",
               position.data, goal, delta * 360.0 / 16384.0);
-          publish(command);
+          publish(motor_.position_counts(motor_id_, static_cast<int32_t>(target)));
         });
     poll_ = create_wall_timer(std::chrono::milliseconds(200), [this] {
       if (pending_goal_ && std::chrono::steady_clock::now() - requested_at_ >
@@ -111,11 +101,7 @@ public:
 
 private:
   void request_position() {
-    can_msgs::msg::Frame frame;
-    frame.id = motor_id_;
-    frame.dlc = 1;
-    frame.data[0] = 0xA3;
-    publish(frame);
+    publish(motor_.request_multi_turn(motor_id_));
   }
   void publish(can_msgs::msg::Frame frame) {
     frame.header.stamp = now();

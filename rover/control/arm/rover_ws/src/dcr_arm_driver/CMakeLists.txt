@@ -68,6 +68,8 @@ add_executable(single_motor_bench src/single_motor_bench.cpp)
 target_link_libraries(single_motor_bench dcr_arm_driver_lib)
 ament_target_dependencies(single_motor_bench rclcpp std_msgs std_srvs can_msgs)
 install(TARGETS single_motor_bench DESTINATION lib/${PROJECT_NAME})
+install(PROGRAMS scripts/configure_arm_motors.py DESTINATION lib/${PROJECT_NAME}
+  RENAME configure_arm_motors)
 
 # Install headers
 install(
@@ -116,6 +118,8 @@ ament_export_dependencies(
 ament_export_dependencies(rosidl_default_runtime)
 
 if(BUILD_TESTING)
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_configure_arm_motors test/test_configure_arm_motors.py)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(test_direct_drive test/test_direct_drive.cpp)
   ament_add_gtest(test_single_motor_bench test/test_single_motor_bench.cpp)

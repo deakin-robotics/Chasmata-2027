@@ -25,8 +25,10 @@ can_msgs::msg::Frame Motor::set_home(uint32_t id) {
 
 // Position control: convert angle (degrees) to CAN frame
 can_msgs::msg::Frame Motor::position_control(uint32_t id, float angle) {
-  int32_t count = static_cast<int32_t>(angle / 360.0f * 16384.0f);
-  
+  return position_counts(id, static_cast<int32_t>(angle / 360.0f * 16384.0f));
+}
+
+can_msgs::msg::Frame Motor::position_counts(uint32_t id, int32_t count) {
   can_msgs::msg::Frame msg;
   msg.id = id;
   msg.dlc = 0x05;
@@ -75,6 +77,20 @@ can_msgs::msg::Frame Motor::send_status_2() {
   msg.dlc = 0x01;
   msg.data[0] = 0xAE;
   return msg;
+}
+
+can_msgs::msg::Frame Motor::request_multi_turn(uint32_t id) {
+  can_msgs::msg::Frame frame;
+  frame.id = id;
+  frame.dlc = 1;
+  frame.data[0] = 0xA3;
+  return frame;
+}
+
+int32_t Motor::read_multi_turn(const can_msgs::msg::Frame& frame) {
+  const uint32_t bits = uint32_t(frame.data[3]) | (uint32_t(frame.data[4]) << 8) |
+                        (uint32_t(frame.data[5]) << 16) | (uint32_t(frame.data[6]) << 24);
+  return bits & 0x80000000U ? -1 - int32_t(~bits) : int32_t(bits);
 }
 
 // Parse status 1 response

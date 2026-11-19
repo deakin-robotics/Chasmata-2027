@@ -4,7 +4,40 @@
 
 The driver now defaults to **motion disabled**. This is a software preparation for supported bench tests, not certification that the arm is safe to operate. A gravity-loaded arm can fall if a motor loses power, CAN, torque or its controller. A host-side zero-speed request cannot cross a broken CAN link and is not a verified brake or torque-disable command. Support the arm mechanically and verify motor-side watchdog/brake behavior before enabling motion. Do not intentionally disconnect an unsupported loaded arm.
 
-The operator confirmed that the motors directly drive the joints with a 1:1 mechanical ratio and no gearbox. No gearbox multiplier is required. The per-joint controller model, firmware, direction conventions, encoder zero, folded angles, braking behavior and current limits still require hardware confirmation. No automatic enable, disable or fault-clear motor opcode has been invented. The current protocol assumes its position and speed units are joint-side degrees and RPM. Do not enable a motor whose units differ until conversion is implemented and tested.
+The shipped URDF uses the historical 1:1 mapping. Each commissioned joint has its own CAN address, signed motor-to-joint scale and folded angle. Verify the encoder convention, physical limits, braking behavior and current limits on the installed hardware.
+
+## Configure the six arm motors
+
+1. Build and source `dcr_arm_driver` on Linux. Bring up the SocketCAN adapter at the verified motor bitrate. Stop the arm driver, bench controller and other senders on this bus. Connect only the motor named at each prompt. Two devices sharing one address can appear as a single responder.
+
+   ```bash
+   ros2 run dcr_arm_driver configure_arm_motors ~/arm-setup --interface can0
+   ```
+
+2. Review the responding CAN ID, reported gearbox ratio, pole pairs, torque constant, version codes, encoder counts, speed, currents, voltage, temperature, operating mode and fault byte. The tool reads GDZ commands B0, A0, A3, A4 and AE. Identify the physical joint from its installation or label. Enter the verified number of **CAN motor revolutions per positive joint revolution**, including the sign. For example, enter `-36` if positive joint motion corresponds to 36 negative CAN turns, or `1` for positive joint-side feedback. Verify whether the controller already accounts for the gearbox. Enter the joint's angle **in radians** at the folded fixture or measured pose. The tool checks that angle against the model limits. Physical folded angles must be supplied for this arm. [SteadyWin GDZ driver documents](https://steadywin-motor.com/products/document-download)
+
+3. Type `yes` to save each reviewed joint. The setup directory holds one JSON record per confirmed joint. Rerun the same command to resume an interrupted session. To redo an assignment, move that joint's record aside before resuming. A complete set produces `arm.urdf` with motion disabled. To revise an existing profile, move the generated URDF aside as well.
+
+4. Connect all six assigned motors. Mechanically support the arm and place it in the measured folded pose. Run the bridge and arm stack in separate sourced terminals, using your actual interface and the generated file.
+
+   ```bash
+   ros2 run nobleo_socketcan_bridge socketcan_bridge --ros-args -p interface:=can0
+   ```
+
+   ```bash
+   ros2 launch dcr_arm_driver arm_control.launch.py urdf:="$HOME/arm-setup/arm.urdf"
+   ```
+
+5. With E-stop actively asserted and trajectories canceled, confirm the physical pose and check the returned `success` field. Read the joint names and positions together to verify all six folded angles.
+
+   ```bash
+   ros2 service call /arm/confirm_folded_pose std_srvs/srv/Trigger '{}'
+   ros2 topic echo /arm/joint_states --once
+   ```
+
+   Capture requires fresh multi-turn position, stationary speed (within 0.05 joint rad/s), and fault-free status for every joint. It assigns each current motor count to its configured folded angle in one operation. Motor firmware settings stay intact and motion stays inhibited. The driver uses the same signed conversion for joint feedback, position targets and speed commands. Joint angles, travel limits and velocity limits remain in joint coordinates.
+
+The joint assignments and folded angles persist in the profile. The captured multi-turn origins last for the current activation because a motor can lose its turn count on restart. Repeat the physical fold and confirmation after activation or encoder feedback loss. Until confirmation succeeds, treat joint state positions as uncalibrated. Check the `feedback_fresh` field on `/arm/control/status` after capture. Follow the separate rearm procedure below for commissioned motion.
 
 ## New operating contract
 
@@ -34,7 +67,7 @@ DirectDrive position and speed commands must be streamed at least 10 Hz while he
 
 Only a newly accepted trajectory after rearm can release controller inhibition. The trajectory controller has path tolerance 0.15 rad, goal tolerance 0.02 rad and goal-time tolerance 1 s per the supplied profile. These are provisional commissioning values; validate them against the real mechanism. Clients can supply their own tolerances, so require approved action clients during testing.
 
-### Folded startup and movement during CAN loss
+### Folded startup with a legacy wrapped-encoder profile
 
 Startup uses measured encoder positions, never a fictitious all-zero pose. Do not call a home command to make a folded arm read zero. The previous `/arm/set_home` service was removed because it reset state without a verified motor acknowledgement and could silently change the coordinate frame.
 
@@ -111,7 +144,7 @@ The operator identified these combinations on 11 November 2026:
 
 The per-joint assignment and firmware versions have not yet been supplied. Do not infer gear ratios or joint mapping solely from these model strings.
 
-Manufacturer reference: [SteadyWin support downloads](https://steadywin.cn/en/col.jsp?id=124), GDZXXX driver documents `3.02_20250714.zip`, containing custom CAN protocol `V3.07b0`. Inspection confirms the little-endian C1/C2 command layouts and A4/AE feedback layouts used here. Its C2 count is described per motor revolution; the operator-confirmed 1:1 direct drive means this is also one joint revolution. Verify the deployed firmware and encoder convention during commissioning. The [GDZ34 release notes](https://steadywin.cn/pd.jsp?fromColId=0&id=179) associate A4 support with firmware V3028. Older firmware must not be assumed compatible. The protocol includes a brake-output command, but its presence does not prove a brake is fitted or establish safe electrical polarity. This change sends no brake command and claims no verified hardware watchdog. Record those details during commissioning.
+The GDZXXX driver documents `3.02_20250714.zip` contain custom CAN protocol `V3.07b0`. C2 uses 16,384 counts per CAN motor revolution. Confirm how that revolution relates to the installed joint before entering its signed scale. GDZ34 firmware added A4 in V3028. Brake installation, polarity and motor watchdog behavior require separate verification. [SteadyWin support downloads](https://steadywin.cn/en/col.jsp?id=124) and [GDZ34 release notes](https://steadywin.cn/pd.jsp?fromColId=0&id=179)
 
 ## Software validation on 11 November 2026
 

@@ -20,11 +20,14 @@ class Motor {
   // Motor control
   can_msgs::msg::Frame set_home(uint32_t id);
   can_msgs::msg::Frame position_control(uint32_t id, float angle);
+  can_msgs::msg::Frame position_counts(uint32_t id, int32_t count);
   can_msgs::msg::Frame speed_control(uint32_t id, float speed_cmd);
 
   // Status requests
   can_msgs::msg::Frame send_status_1();
   can_msgs::msg::Frame send_status_2();
+  can_msgs::msg::Frame request_multi_turn(uint32_t id);
+  int32_t read_multi_turn(const can_msgs::msg::Frame& frame);
 
   // Status parsing
   arm_interfaces::msg::MotorStat1 read_status_1(

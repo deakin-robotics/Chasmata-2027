@@ -5,6 +5,7 @@
 #include <chrono>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -33,6 +34,12 @@ struct JointInfo {
   double folded_reference = 0.0;
   bool folded_reference_configured = false;
   bool folded_confirmed = false;
+  // Commissioned joints use signed CAN turns per positive joint turn.
+  bool capture_folded_origin = false;
+  double turns_per_joint_turn = 1.0;
+  std::optional<int32_t> folded_motor_count;
+  int32_t multi_turn_count = 0;
+  std::chrono::steady_clock::time_point multi_turn_time{};
   double position = 0.0;
   double velocity = 0.0;
   double position_min = 0.0;
