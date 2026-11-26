@@ -22,6 +22,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <condition_variable>
+#include <thread>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -106,6 +108,9 @@ private:
   [[nodiscard]] hardware_interface::CallbackReturn benchActivate();
   [[nodiscard]] hardware_interface::CallbackReturn benchDeactivate();
   [[nodiscard]] hardware_interface::CallbackReturn benchShutdown(bool from_error);
+  void startBusWorker();
+  void stopBusWorker();
+  void busWorkerLoop();
   [[nodiscard]] hardware_interface::return_type benchRead();
   [[nodiscard]] hardware_interface::return_type benchWrite();
   // Latches the stop, then stops all four drives. Always returns ERROR for read()/write().
@@ -139,6 +144,20 @@ private:
 
   std::array<double, WHEEL_COUNT> command_velocity_rad_s_{};
   std::array<double, WHEEL_COUNT> state_velocity_rad_s_{};
+  std::array<double, WHEEL_COUNT> worker_commands_{};
+  std::array<double, WHEEL_COUNT> worker_velocities_{};
+  std::array<double, WHEEL_COUNT> pending_commands_{};
+  std::array<double, WHEEL_COUNT> cached_velocities_{};
+  std::mutex worker_snapshot_mutex_;
+  std::condition_variable worker_wake_;
+  std::thread bus_worker_;
+  std::atomic<bool> worker_stopping_{false};
+  bool worker_running_{false};
+  bool worker_failed_{false};
+  std::atomic<bool> worker_late_{false};
+  std::atomic<bool> urgent_stop_{false};
+  std::int64_t worker_cycle_started_ns_{0};
+  std::int64_t last_command_ns_{0};
 
   std::array<std::uint16_t, WHEEL_COUNT> raw_speed_state_{};
   std::array<bool, WHEEL_COUNT> raw_speed_state_valid_{};

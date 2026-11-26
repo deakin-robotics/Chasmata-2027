@@ -21,6 +21,13 @@
 #include <string>
 #include <thread>
 
+#ifdef DRIVETRAIN_DIRECT_CYCLE_TEST
+// The deterministic cycle tests exercise the same bus operations without a background thread.
+#define worker_commands_ command_velocity_rad_s_
+#define worker_velocities_ state_velocity_rad_s_
+#define worker_cycle_started_ns_ previous_read_tick_ns_
+#endif
+
 namespace rover_drivetrain_control
 {
 
@@ -46,6 +53,7 @@ std::string describe(const Bld305sDriver::Result & r)
 
 RoverHardwareInterface::~RoverHardwareInterface()
 {
+  stopBusWorker();
   if (!bench_motion_enabled_) {
     return;
   }
@@ -504,6 +512,88 @@ ReturnType RoverHardwareInterface::benchSafetyStop(const std::string & reason)
   return ReturnType::ERROR;
 }
 
+void RoverHardwareInterface::startBusWorker()
+{
+#ifdef DRIVETRAIN_DIRECT_CYCLE_TEST
+  return;
+#else
+  std::lock_guard<std::mutex> lock(worker_snapshot_mutex_);
+  pending_commands_.fill(0.0);
+  worker_commands_.fill(0.0);
+  worker_velocities_.fill(0.0);
+  cached_velocities_.fill(0.0);
+  worker_stopping_.store(false);
+  worker_failed_ = false;
+  worker_running_ = true;
+  worker_late_.store(false);
+  urgent_stop_.store(false);
+  last_command_ns_ = steadyNowNs();
+  bus_worker_ = std::thread(&RoverHardwareInterface::busWorkerLoop, this);
+#endif
+}
+
+void RoverHardwareInterface::stopBusWorker()
+{
+  {
+    std::lock_guard<std::mutex> lock(worker_snapshot_mutex_);
+    worker_stopping_ = true;
+    worker_running_ = false;
+  }
+  worker_wake_.notify_all();
+  if (bus_worker_.joinable()) bus_worker_.join();
+}
+
+void RoverHardwareInterface::busWorkerLoop()
+{
+  const auto period = std::chrono::nanoseconds(static_cast<std::int64_t>(1e9 / timing_.update_hz));
+  auto next = std::chrono::steady_clock::now();
+  for (;;) {
+    {
+      std::unique_lock<std::mutex> lock(worker_snapshot_mutex_);
+      worker_wake_.wait_until(lock, next, [this] { return worker_stopping_.load() || urgent_stop_.load(); });
+      if (worker_stopping_) return;
+      worker_commands_ = pending_commands_;
+      if (steadyNowNs() - last_command_ns_ > static_cast<std::int64_t>(timing_.late_trigger_ms * 1e6)) worker_late_.store(true);
+    }
+    const auto cycle_start = std::chrono::steady_clock::now();
+    if (urgent_stop_.exchange(false)) {
+      std::lock_guard<std::mutex> bus_lock(bench_mutex_);
+      if (!stopAllAndConfirm("commanded stop")) {
+        (void)benchSafetyStop("commanded stop not confirmed");
+        std::lock_guard<std::mutex> lock(worker_snapshot_mutex_);
+        worker_failed_ = true;
+        worker_running_ = false;
+        return;
+      }
+    }
+    worker_cycle_started_ns_ = steadyNowNs();
+    const auto read_result = benchRead();
+    if (worker_stopping_.load()) return;
+    {
+      std::lock_guard<std::mutex> lock(worker_snapshot_mutex_);
+      worker_commands_ = pending_commands_;
+      if (steadyNowNs() - last_command_ns_ > static_cast<std::int64_t>(timing_.late_trigger_ms * 1e6)) worker_late_.store(true);
+    }
+    ReturnType write_result = ReturnType::ERROR;
+    if (read_result == ReturnType::OK && worker_late_.load()) {
+      std::lock_guard<std::mutex> bus_lock(bench_mutex_);
+      (void)benchSafetyStop("command updates expired during a bus cycle");
+    } else if (read_result == ReturnType::OK) {
+      write_result = benchWrite();
+    }
+    {
+      std::lock_guard<std::mutex> lock(worker_snapshot_mutex_);
+      cached_velocities_ = worker_velocities_;
+      if (read_result != ReturnType::OK || write_result != ReturnType::OK) {
+        worker_failed_ = true;
+        worker_running_ = false;
+        return;
+      }
+    }
+    next = std::max(cycle_start + period, std::chrono::steady_clock::now());
+  }
+}
+
 ReturnType RoverHardwareInterface::benchRead()
 {
   std::lock_guard<std::mutex> lock(bench_mutex_);
@@ -513,7 +603,11 @@ ReturnType RoverHardwareInterface::benchRead()
   if (bench_stop_latched_) {
     return ReturnType::ERROR;
   }
+#ifdef DRIVETRAIN_DIRECT_CYCLE_TEST
   if (late_trigger_detected_) {
+#else
+  if (worker_late_.load()) {
+#endif
     return benchSafetyStop("late trigger: cycle gap exceeded late_trigger_ms");
   }
 
@@ -530,6 +624,13 @@ ReturnType RoverHardwareInterface::benchRead()
   // speed and fault code alternate.
   const bool speed_cycle = bench_cycle_index_ % core::BENCH_POLL_EVERY_CYCLES == 0;
   for (std::size_t w = 0; w < WHEEL_COUNT; ++w) {
+#ifndef DRIVETRAIN_DIRECT_CYCLE_TEST
+    if (worker_stopping_.load()) return ReturnType::ERROR;
+    if (urgent_stop_.exchange(false)) {
+      if (!stopAllAndConfirm("commanded stop")) return benchSafetyStop("commanded stop not confirmed");
+      return ReturnType::OK;
+    }
+#endif
     const auto & wheel = wheels_[w];
     std::uint16_t raw = 0;
     if (speed_cycle) {
@@ -538,7 +639,7 @@ ReturnType RoverHardwareInterface::benchRead()
       if (ok) {
         raw_speed_state_[w] = raw;
         raw_speed_state_valid_[w] = true;
-        state_velocity_rad_s_[w] = core::benchWheelSpeedFromRaw(
+        worker_velocities_[w] = core::benchWheelSpeedFromRaw(
           raw, wheel.gear_ratio, wheel.mirrored, bench_last_motion_direction_[w]);
         // Reads run before this cycle's writes, so any read in a later cycle
         // than the stop was taken after it.
@@ -597,7 +698,7 @@ ReturnType RoverHardwareInterface::benchRead()
     sample.header.stamp = get_clock()->now();
     for (std::size_t w = 0; w < WHEEL_COUNT; ++w) {
       sample.name.push_back(wheels_[w].joint_name);
-      sample.velocity.push_back(state_velocity_rad_s_[w]);
+      sample.velocity.push_back(worker_velocities_[w]);
     }
     telemetry_joint_publisher_->publish(sample);
   }
@@ -630,10 +731,17 @@ ReturnType RoverHardwareInterface::benchWrite()
 
   const auto now = steadyNowNs();
   for (std::size_t w = 0; w < WHEEL_COUNT; ++w) {
+#ifndef DRIVETRAIN_DIRECT_CYCLE_TEST
+    if (worker_stopping_.load()) return ReturnType::ERROR;
+    if (urgent_stop_.exchange(false)) {
+      if (!stopAllAndConfirm("commanded stop")) return benchSafetyStop("commanded stop not confirmed");
+      return ReturnType::OK;
+    }
+#endif
     const auto & wheel = wheels_[w];
     const double cap = std::min(bench_rpm_cap_, wheel.motor_rpm_limit);
     const auto target = core::benchMotorCommand(
-      command_velocity_rad_s_[w], wheel.gear_ratio, wheel.mirrored, cap);
+      worker_commands_[w], wheel.gear_ratio, wheel.mirrored, cap);
     core::BenchStartGate gate;
     gate.last_motion_direction = bench_last_motion_direction_[w];
     gate.reversal_clear = core::benchReversalClear(bench_near_zero_since_stop_[w],
@@ -690,20 +798,15 @@ ReturnType RoverHardwareInterface::benchWrite()
       [](auto state) { return state == Bld305sDriver::CommunicationState::HEALTHY; })) {
     std_msgs::msg::Bool message; message.data = false; communication_fault_publisher_->publish(message);
   }
-  // Poll one optional temperature or current register only while stationary and when the
+  // Poll one optional temperature or current register when the
   // remaining cycle budget covers two full response timeouts plus a margin.
   // This uses the existing bus owner, outside the mandatory control cycle.
   const auto telemetry_now = steadyNowNs();
   const auto period_ns = static_cast<std::int64_t>(1e9 / timing_.update_hz);
   const auto reserve_ns = 2 * std::chrono::duration_cast<std::chrono::nanoseconds>(
     bus_config_.response_timeout).count() + 25000000;
-  const bool stationary = std::all_of(command_velocity_rad_s_.begin(), command_velocity_rad_s_.end(),
-    [](double value) { return std::isfinite(value) && std::abs(value) < 1e-6; }) &&
-    std::all_of(raw_speed_state_valid_.begin(), raw_speed_state_valid_.end(), [](bool valid) { return valid; }) &&
-    std::all_of(raw_speed_state_.begin(), raw_speed_state_.end(),
-      [](std::uint16_t speed) { return speed <= core::BENCH_NEAR_ZERO_MOTOR_RPM; });
-  if (temperature_publisher_ && current_publisher_ && stationary && telemetry_now >= next_temperature_poll_ns_ &&
-      telemetry_now - previous_read_tick_ns_ + reserve_ns < period_ns) {
+  if (temperature_publisher_ && current_publisher_ && !urgent_stop_.load() && telemetry_now >= next_temperature_poll_ns_ &&
+      telemetry_now - worker_cycle_started_ns_ + reserve_ns < period_ns) {
     std::uint16_t raw = 0;
     const auto wheel = temperature_wheel_;
     const bool ok = poll_current_ ? static_cast<bool>(driver_->readCurrentRaw(wheels_[wheel].slave_id, raw)) :
@@ -714,7 +817,7 @@ ReturnType RoverHardwareInterface::benchWrite()
     else temperature_publisher_->publish(sample);
     if (poll_current_) temperature_wheel_ = (wheel + 1) % WHEEL_COUNT;
     poll_current_ = !poll_current_;
-    next_temperature_poll_ns_ = steadyNowNs() + 1000000000;
+    next_temperature_poll_ns_ = steadyNowNs() + 125000000;
   }
   return ReturnType::OK;
 }

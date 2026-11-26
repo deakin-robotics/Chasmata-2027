@@ -5,6 +5,7 @@
 #include <pluginlib/class_list_macros.hpp>
 #include <rclcpp/rclcpp.hpp>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
@@ -213,7 +214,9 @@ RoverHardwareInterface::on_activate(
   }
 
   if (bench_motion_enabled_) {
-    return benchActivate();
+    const auto result = benchActivate();
+    if (result == hardware_interface::CallbackReturn::SUCCESS) startBusWorker();
+    return result;
   }
 
   if (!operationally_ready_) {
@@ -240,6 +243,7 @@ RoverHardwareInterface::on_deactivate(
   (void)previous_state;
 
   if (bench_motion_enabled_) {
+    stopBusWorker();
     return benchDeactivate();
   }
 
@@ -265,6 +269,7 @@ RoverHardwareInterface::on_cleanup(
 {
   (void)previous_state;
 
+  stopBusWorker();
   active_ = false;
   operationally_ready_ = false;
   bench_configured_ = false;
@@ -282,6 +287,7 @@ RoverHardwareInterface::on_shutdown(
   if (!bench_motion_enabled_) {
     return hardware_interface::SystemInterface::on_shutdown(previous_state);
   }
+  stopBusWorker();
   return benchShutdown(false);
 }
 
@@ -292,6 +298,7 @@ RoverHardwareInterface::on_error(
   if (!bench_motion_enabled_) {
     return hardware_interface::SystemInterface::on_error(previous_state);
   }
+  stopBusWorker();
   return benchShutdown(true);
 }
 
@@ -351,7 +358,14 @@ RoverHardwareInterface::read(
   updateIoHeartbeat();
 
   if (bench_motion_enabled_) {
+#ifdef DRIVETRAIN_DIRECT_CYCLE_TEST
     return benchRead();
+#else
+    std::lock_guard<std::mutex> lock(worker_snapshot_mutex_);
+    if (late_trigger_detected_) worker_late_.store(true);
+    state_velocity_rad_s_ = cached_velocities_;
+    return worker_failed_ ? hardware_interface::return_type::ERROR : hardware_interface::return_type::OK;
+#endif
   }
 
   if (!active_ || !operationally_ready_ || late_trigger_detected_) {
@@ -386,7 +400,20 @@ RoverHardwareInterface::write(
   updateIoHeartbeat();
 
   if (bench_motion_enabled_) {
+#ifdef DRIVETRAIN_DIRECT_CYCLE_TEST
     return benchWrite();
+#else
+    std::lock_guard<std::mutex> lock(worker_snapshot_mutex_);
+    if (!worker_running_ || worker_failed_) return hardware_interface::return_type::ERROR;
+    const bool was_moving = std::any_of(pending_commands_.begin(), pending_commands_.end(),
+      [](double command) { return std::isfinite(command) && std::abs(command) > 1e-6; });
+    const bool stopping = std::all_of(command_velocity_rad_s_.begin(), command_velocity_rad_s_.end(),
+      [](double command) { return std::isfinite(command) && std::abs(command) <= 1e-6; });
+    pending_commands_ = command_velocity_rad_s_;
+    if (was_moving && stopping) { urgent_stop_.store(true); worker_wake_.notify_one(); }
+    last_command_ns_ = steadyNowNs();
+    return hardware_interface::return_type::OK;
+#endif
   }
 
   if (!active_ || !operationally_ready_) {

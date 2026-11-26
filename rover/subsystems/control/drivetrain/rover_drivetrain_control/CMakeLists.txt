@@ -105,11 +105,23 @@ if(BUILD_TESTING)
   add_executable(test_bench_motion test/test_bench_motion.cpp
     src/rover_hardware_interface.cpp src/rover_hardware_interface_bench.cpp
     src/bld305s_driver.cpp)
+  target_compile_definitions(test_bench_motion PRIVATE DRIVETRAIN_DIRECT_CYCLE_TEST)
   target_include_directories(test_bench_motion PRIVATE include ${LIBMODBUS_INCLUDE_DIRS})
   ament_target_dependencies(test_bench_motion
     hardware_interface pluginlib rclcpp rclcpp_lifecycle sensor_msgs std_msgs)
   target_link_libraries(test_bench_motion ${PROJECT_NAME}_core)
   add_test(NAME drivetrain_bench_motion COMMAND test_bench_motion)
+
+  # Exercise the real background worker with a deliberately slow telemetry response.
+  add_executable(test_bench_worker test/test_bench_motion.cpp
+    src/rover_hardware_interface.cpp src/rover_hardware_interface_bench.cpp
+    src/bld305s_driver.cpp)
+  target_compile_definitions(test_bench_worker PRIVATE DRIVETRAIN_ASYNC_WORKER_TEST)
+  target_compile_options(test_bench_worker PRIVATE -Wno-unused-function)
+  target_include_directories(test_bench_worker PRIVATE include ${LIBMODBUS_INCLUDE_DIRS})
+  ament_target_dependencies(test_bench_worker hardware_interface pluginlib rclcpp rclcpp_lifecycle sensor_msgs std_msgs)
+  target_link_libraries(test_bench_worker ${PROJECT_NAME}_core)
+  add_test(NAME drivetrain_background_worker COMMAND test_bench_worker)
 
   # Unpopulated telemetry must never claim success or valid data.
   add_executable(test_telemetry_defaults test/test_telemetry_defaults.cpp)

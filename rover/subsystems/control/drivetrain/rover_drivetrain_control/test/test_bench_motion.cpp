@@ -8,6 +8,7 @@
 #include <rcutils/logging.h>
 
 #include <array>
+#include <atomic>
 #include <cerrno>
 #include <cstdarg>
 #include <cstdio>
@@ -59,6 +60,9 @@ std::array<Drive, 5> drives;  // index = slave ID 1..4
 std::vector<WriteRecord> writes;      // since the last resetDrives()
 std::vector<WriteRecord> all_writes;  // whole run, for the forbidden-register check
 unsigned broadcasts{0};
+std::atomic<unsigned> broadcast_events{0};
+std::atomic<bool> delay_optional_read{false};
+std::atomic<bool> optional_read_started{false};
 unsigned bus_calls{0};  // every slave select, read and write
 std::map<int, unsigned> reads_by_address;  // since the last resetDrives()
 
@@ -114,6 +118,12 @@ int modbus_read_registers(modbus_t * m, int addr, int n, std::uint16_t * out)
   if (!d.present) {errno = ETIMEDOUT; return -1;}
   if (d.garbled) {errno = EMBBADCRC; return -1;}
   ++reads_by_address[addr];
+  if (addr == 0x0096 && delay_optional_read.exchange(false)) {
+    optional_read_started.store(true);
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    errno = ETIMEDOUT;
+    return -1;
+  }
   if (const auto it = d.read_errno.find(addr); it != d.read_errno.end()) {
     errno = it->second;  // libmodbus: exception N is MODBUS_ENOBASE + N
     return -1;
@@ -129,6 +139,7 @@ int modbus_write_register(modbus_t * m, int addr, const std::uint16_t value)
   all_writes.push_back({m->slave, addr, value});
   if (m->slave == 0) {
     ++broadcasts;
+    ++broadcast_events;
     for (int id = 1; id <= 4; ++id) {
       Drive & d = drives[id];
       if (d.present && !(d.stuck_running && value == 0)) d.regs[addr] = value;
@@ -245,7 +256,7 @@ struct ActiveBench
   }
 };
 
-void testTemperatureReadUsesExistingBusOnlyWhenStopped()
+void testTemperatureAndCurrentUseExistingBusWhileMoving()
 {
   resetDrives();
   auto executor = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
@@ -269,14 +280,16 @@ void testTemperatureReadUsesExistingBusOnlyWhenStopped()
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     CHECK(cycle(hw) == ReturnType::OK);
   }
-  CHECK(reads_by_address[0x00B6] == before_current + 1);
+  CHECK(reads_by_address[0x00B6] > before_current);
+  const auto moving_temp_before = reads_by_address[0x0096];
+  const auto moving_current_before = reads_by_address[0x00B6];
   (void)commands[0].set_value(0.5);
   for (int i = 0; i < 12; ++i) {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     CHECK(cycle(hw) == ReturnType::OK);
   }
-  CHECK(reads_by_address[0x0096] == before + 1);
-  CHECK(reads_by_address[0x00B6] == before_current + 1);
+  CHECK(reads_by_address[0x0096] > moving_temp_before);
+  CHECK(reads_by_address[0x00B6] > moving_current_before);
   CHECK(hw.on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
 }
 
@@ -1058,6 +1071,81 @@ void testReactivationWaitsForStandstill()
 
 }  // namespace
 
+#ifdef DRIVETRAIN_ASYNC_WORKER_TEST
+int main(int argc, char ** argv)
+{
+  rclcpp::init(argc, argv);
+  resetDrives();
+  auto executor = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
+  hardware_interface::HardwareComponentParams p;
+  p.hardware_info = params(true).hardware_info;
+  p.executor = executor;
+  p.clock = std::make_shared<rclcpp::Clock>();
+  Hardware hw;
+  CHECK(hw.init(p) == CallbackReturn::SUCCESS);
+  auto commands = hw.export_command_interfaces();
+  (void)hw.export_state_interfaces();
+  CHECK(hw.on_configure(lifecycle_state) == CallbackReturn::SUCCESS);
+  delay_optional_read.store(true);
+  optional_read_started.store(false);
+  CHECK(hw.on_activate(lifecycle_state) == CallbackReturn::SUCCESS);
+  for (auto & command : commands) (void)command.set_value(0.5);
+  const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(4);
+  while (!optional_read_started.load() && std::chrono::steady_clock::now() < until) {
+    CHECK(hw.read(t0, dt) == ReturnType::OK);
+    CHECK(hw.write(t0, dt) == ReturnType::OK);
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  }
+  CHECK(optional_read_started.load());
+  const auto started = std::chrono::steady_clock::now();
+  CHECK(hw.read(t0, dt) == ReturnType::OK);
+  CHECK(hw.write(t0, dt) == ReturnType::OK);
+  CHECK(std::chrono::steady_clock::now() - started < std::chrono::milliseconds(100));
+  const auto broadcasts_before_stop = broadcast_events.load();
+  for (auto & command : commands) (void)command.set_value(0.0);
+  CHECK(hw.write(t0, dt) == ReturnType::OK);
+  const auto stop_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while (broadcast_events.load() == broadcasts_before_stop && std::chrono::steady_clock::now() < stop_deadline) {
+    CHECK(hw.read(t0, dt) == ReturnType::OK);
+    CHECK(hw.write(t0, dt) == ReturnType::OK);
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  }
+  CHECK(broadcast_events.load() > broadcasts_before_stop);
+  for (auto & command : commands) (void)command.set_value(0.5);
+  const auto moving_until = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+  while (std::chrono::steady_clock::now() < moving_until) {
+    CHECK(hw.read(t0, dt) == ReturnType::OK);
+    CHECK(hw.write(t0, dt) == ReturnType::OK);
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  }
+  const auto before_stale_stop = broadcast_events.load();
+  const auto stale_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+  while (broadcast_events.load() == before_stale_stop && std::chrono::steady_clock::now() < stale_deadline) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  }
+  CHECK(broadcast_events.load() > before_stale_stop);
+  const auto failure_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while (hw.write(t0, dt) == ReturnType::OK && std::chrono::steady_clock::now() < failure_deadline) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  }
+  CHECK(hw.write(t0, dt) == ReturnType::ERROR);
+  CHECK(hw.on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
+  CHECK(reads_by_address[0x0096] > 0);
+  CHECK(reads_by_address[0x00B6] > 0);
+  CHECK(allStopped());
+  CHECK(hw.on_cleanup(lifecycle_state) == CallbackReturn::SUCCESS);
+  CHECK(hw.on_configure(lifecycle_state) == CallbackReturn::SUCCESS);
+  CHECK(hw.on_activate(lifecycle_state) == CallbackReturn::SUCCESS);
+  CHECK(hw.on_error(lifecycle_state) == CallbackReturn::SUCCESS);
+  CHECK(allStopped());
+  CHECK(hw.on_cleanup(lifecycle_state) == CallbackReturn::SUCCESS);
+  CHECK(hw.on_configure(lifecycle_state) == CallbackReturn::SUCCESS);
+  CHECK(hw.on_activate(lifecycle_state) == CallbackReturn::SUCCESS);
+  CHECK(hw.on_shutdown(lifecycle_state) == CallbackReturn::SUCCESS);
+  CHECK(allStopped());
+  rclcpp::shutdown();
+}
+#else
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
@@ -1065,7 +1153,7 @@ int main(int argc, char ** argv)
   testBenchParameterRefusals();
   testConfigureRefusals();
   testActivationSequence();
-  testTemperatureReadUsesExistingBusOnlyWhenStopped();
+  testTemperatureAndCurrentUseExistingBusWhileMoving();
   testConfigurePublishesReportedFault();
   testPolePairsMismatchRefusesAndStopsAll();
   testMotionConversionAndChangeOnlyWrites();
@@ -1103,3 +1191,5 @@ int main(int argc, char ** argv)
   rclcpp::shutdown();
   std::cout << "bench motion mock tests passed (" << all_writes.size() << " writes checked)\n";
 }
+
+#endif
