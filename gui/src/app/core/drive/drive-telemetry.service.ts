@@ -10,7 +10,7 @@ export class DriveTelemetryService implements OnDestroy {
   readonly rawTemperatures = this.temperatureState.asReadonly();
   private readonly currentState = signal<Readonly<Record<number, number>>>({});
   readonly rawCurrents = this.currentState.asReadonly();
-  private readonly odometryState = signal<{ x: number; speed: number } | null>(null);
+  private readonly odometryState = signal<{ x: number; speed: number; y?: number; heading?: number; angularSpeed?: number } | null>(null);
   readonly odometry = this.odometryState.asReadonly();
   private readonly linearCommandState = signal<number | null>(null);
   readonly linearCommand = this.linearCommandState.asReadonly();
@@ -91,7 +91,15 @@ export class DriveTelemetryService implements OnDestroy {
     const x = odom.pose?.pose?.position?.x;
     const speed = odom.twist?.twist?.linear?.x;
     if (typeof x !== 'number' || !Number.isFinite(x) || typeof speed !== 'number' || !Number.isFinite(speed)) return;
-    this.odometryState.set({ x, speed });
+    const pose = odom.pose?.pose as { position?: { y?: unknown }; orientation?: { x?: unknown; y?: unknown; z?: unknown; w?: unknown } } | undefined;
+    const twist = odom.twist?.twist as { angular?: { z?: unknown } } | undefined;
+    const q = pose?.orientation;
+    const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+    const result: { x: number; speed: number; y?: number; heading?: number; angularSpeed?: number } = { x, speed };
+    if (finite(pose?.position?.y)) result.y = pose.position.y;
+    if (q && finite(q.x) && finite(q.y) && finite(q.z) && finite(q.w)) result.heading = Math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z));
+    if (finite(twist?.angular?.z)) result.angularSpeed = twist.angular.z;
+    this.odometryState.set(result);
     if (this.odometryExpiry) clearTimeout(this.odometryExpiry);
     this.odometryExpiry = setTimeout(() => { this.odometryState.set(null); }, 1500);
   }

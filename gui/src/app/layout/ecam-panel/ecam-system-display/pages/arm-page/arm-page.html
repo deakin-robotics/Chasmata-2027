@@ -35,5 +35,9 @@
     <text class="label" x="645" y="495" text-anchor="middle">PLANNER</text>
     <text class="value" x="645" y="518" text-anchor="middle">{{ planner() ?? '--' }}</text>
   </svg>
-  <p class="telemetry-note">Joint, command and motor telemetry</p>
+  <div class="telemetry-note" aria-label="Arm motor readings">
+    @for (joint of ['base_joint', 'shoulder_joint', 'elbow_joint', 'yaw_joint', 'pitch_joint', 'roll_joint']; track joint; let i = $index) {
+      <div>J{{ i + 1 }} {{ motorReadout(joint) }}</div>
+    }
+  </div>
 </section>

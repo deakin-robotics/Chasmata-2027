@@ -12,6 +12,10 @@ export class DrivePage {
     const value = command ? this.telemetry.linearCommand() : this.telemetry.odometry()?.speed;
     return value == null ? '--' : value.toFixed(2);
   }
+  odometryValue(field: 'y' | 'heading' | 'angularSpeed'): string {
+    const value = this.telemetry.odometry()?.[field];
+    return value === undefined ? '--' : (field === 'heading' ? value * 180 / Math.PI : value).toFixed(2);
+  }
   displacement(): string {
     const value = this.telemetry.odometry()?.x;
     return value === undefined ? '--' : value.toFixed(2);

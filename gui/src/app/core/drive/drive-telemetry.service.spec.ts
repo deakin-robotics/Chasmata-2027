@@ -15,6 +15,17 @@ describe('DriveTelemetryService', () => {
     expect(service.wheelVelocities()).toBeNull();
   });
 
+  it('retains planar odometry and expires it', () => {
+    vi.useFakeTimers();
+    const service = TestBed.inject(DriveTelemetryService);
+    service.setOdometry({ pose: { pose: { position: { x: 2, y: 3 }, orientation: { x: 0, y: 0, z: Math.SQRT1_2, w: Math.SQRT1_2 } } }, twist: { twist: { linear: { x: 0.4 }, angular: { z: 0.2 } } } });
+    expect(service.odometry()?.y).toBe(3);
+    expect(service.odometry()?.heading).toBeCloseTo(Math.PI / 2);
+    expect(service.odometry()?.angularSpeed).toBe(0.2);
+    vi.advanceTimersByTime(1500);
+    expect(service.odometry()).toBeNull();
+  });
+
   it('clears wheel data on disconnect', () => {
     const service = TestBed.inject(DriveTelemetryService);
     service.setJointState(['front_left_wheel_joint'], [0]);
@@ -72,6 +83,19 @@ describe('ArmTelemetryService freshness', () => {
     expect(service.actualJointAngles()).toEqual({ base_joint: 1.5 });
     vi.advanceTimersByTime(1000);
     expect(service.actualJointAngles()).toBeNull();
+  });
+
+  it('retains and expires each motor bus reading independently', () => {
+    vi.useFakeTimers();
+    const service = TestBed.inject(ArmTelemetryService);
+    service.setMotorDetail(1, 24.5, 1.2, 'active');
+    service.setMotorDetail(2, 23, 0.5, 'active');
+    expect(service.motorDetails()[1].busVoltage).toBe(24.5);
+    vi.advanceTimersByTime(1000);
+    service.setMotorDetail(2, 23, 0.5, 'active');
+    vi.advanceTimersByTime(1500);
+    expect(service.motorDetails()[1]).toBeUndefined();
+    expect(service.motorDetails()[2].busCurrent).toBe(0.5);
   });
 
   it('expires motor temperature and current separately', () => {

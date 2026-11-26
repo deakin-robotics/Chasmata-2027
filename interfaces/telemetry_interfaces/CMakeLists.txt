@@ -17,6 +17,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/FmaModeState.msg"
   "msg/FmaState.msg"
   "msg/RecoveryMotorStatus.msg"
+  "msg/RecoveryMotorDetail.msg"
   "msg/RecoveryArmCommand.msg"
   "msg/RecoverySnapshot.msg"
   DEPENDENCIES builtin_interfaces sensor_msgs nav_msgs geometry_msgs

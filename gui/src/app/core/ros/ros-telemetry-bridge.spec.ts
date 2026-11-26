@@ -160,7 +160,7 @@ describe('RosTelemetryBridge', () => {
     roverFma.callback(fmaMessage(DriveMode.Velocity));
     expect(getDriveMode(fmaState)).toBe(DriveMode.Velocity);
     expect(fmaState.hasFmaTelemetry()).toBe(true);
-    expect(subscriptions).toHaveLength(13);
+    expect(subscriptions).toHaveLength(14);
     expect(subscriptions.every(({ topic }) => topic.ros === roverClient)).toBe(true);
 
     const recovery = subscriptions.find(({ topic }) => topic.name === '/telemetry/recovery_snapshot')!;
@@ -168,6 +168,8 @@ describe('RosTelemetryBridge', () => {
       fma_valid: true, fma: fmaMessage(DriveMode.Manual),
       arm_joint_valid: true, arm_joints: { name: ['base_joint'], position: [0.1] },
       arm_status_valid: true, arm_status: { hardware_active: true, feedback_fresh: true, joint_names: ['base_joint'], joint_can_ids: [1] },
+      arm_motors: [{ id: 1, temperature: 35, current: 1, speed: 2, angle: 30 }],
+      arm_motor_details: [{ id: 1, bus_voltage: 24, bus_current: 2, mode: 'Speed Control' }],
       arm_trajectory_valid: true, arm_trajectory: { name: ['base_joint'], position: [0.4] },
       drive_joint_valid: true, drive_joints: { name: ['front_left_wheel_joint'], velocity: [1.5] },
       drive_temperature_valid: [true, false, false, false], drive_temperature_raw: [32, 0, 0, 0],
@@ -176,6 +178,8 @@ describe('RosTelemetryBridge', () => {
     });
     expect(getDriveMode(fmaState)).toBe(DriveMode.Velocity);
     expect(armTelemetry.actualJointAngles()).toEqual({ base_joint: 0.1 });
+    expect(armTelemetry.motors()[1].angle).toBe(30);
+    expect(armTelemetry.motorDetails()[1].busVoltage).toBe(24);
     expect(armTelemetry.commandFor('base_joint')?.value).toBeCloseTo(0.4 * 180 / Math.PI);
     expect(driveTelemetry.wheelVelocities()?.['front_left_wheel_joint']).toBe(1.5);
     expect(driveTelemetry.rawTemperatures()[0]).toBe(32);

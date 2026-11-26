@@ -65,6 +65,7 @@ export class RosTelemetryBridge {
   private driveLinearCommandTopic: Topic | null = null;
   private armStatusTopic: Topic | null = null;
   private armMotorTopic: Topic | null = null;
+  private armMotorDetailTopic: Topic | null = null;
   private armCommandTopic: Topic | null = null;
   private armTrajectoryTopic: Topic | null = null;
   private recoveryTopic: Topic | null = null;
@@ -127,9 +128,17 @@ export class RosTelemetryBridge {
     this.armMotorTopic = armMotorTopic;
     armMotorTopic.subscribe((message) => {
       if (this.rosConnection.client() !== client || this.armMotorTopic !== armMotorTopic || !this.heartbeatMonitor.roverAvailable()) return;
-      const motor = message as { id?: unknown; temp?: unknown; current?: unknown };
+      const motor = message as { id?: unknown; temp?: unknown; current?: unknown; speed?: unknown; angle?: unknown };
       if (typeof motor.id === 'number') liveReceived.add(`arm_motor:${motor.id}`);
-      this.armTelemetry.setMotorStatus(motor.id, motor.temp, motor.current);
+      this.armTelemetry.setMotorStatus(motor.id, motor.temp, motor.current, motor.speed, motor.angle);
+    });
+    const armMotorDetailTopic = new Topic({ ros: client, name: '/telemetry/arm/motor_detail', messageType: 'arm_interfaces/msg/MotorStat2' });
+    this.armMotorDetailTopic = armMotorDetailTopic;
+    armMotorDetailTopic.subscribe((message) => {
+      if (this.rosConnection.client() !== client || this.armMotorDetailTopic !== armMotorDetailTopic || !this.heartbeatMonitor.roverAvailable()) return;
+      const motor = message as { id?: unknown; busv?: unknown; busc?: unknown; mode?: unknown };
+      if (typeof motor.id === 'number') liveReceived.add(`arm_motor_detail:${motor.id}`);
+      this.armTelemetry.setMotorDetail(motor.id, motor.busv, motor.busc, motor.mode);
     });
     const armCommandTopic = new Topic({ ros: client, name: '/telemetry/arm/commands', messageType: 'dcr_arm_driver/msg/DirectDrive' });
     this.armCommandTopic = armCommandTopic;
@@ -237,6 +246,7 @@ export class RosTelemetryBridge {
       driveLinearCommandTopic.unsubscribe();
       armStatusTopic.unsubscribe();
       armMotorTopic.unsubscribe();
+      armMotorDetailTopic.unsubscribe();
       armCommandTopic.unsubscribe();
       armTrajectoryTopic.unsubscribe();
       recoveryTopic.unsubscribe();
@@ -250,6 +260,7 @@ export class RosTelemetryBridge {
       if (this.driveLinearCommandTopic === driveLinearCommandTopic) this.driveLinearCommandTopic = null;
       if (this.armStatusTopic === armStatusTopic) this.armStatusTopic = null;
       if (this.armMotorTopic === armMotorTopic) this.armMotorTopic = null;
+      if (this.armMotorDetailTopic === armMotorDetailTopic) this.armMotorDetailTopic = null;
       if (this.armCommandTopic === armCommandTopic) this.armCommandTopic = null;
       if (this.armTrajectoryTopic === armTrajectoryTopic) this.armTrajectoryTopic = null;
       if (this.recoveryTopic === recoveryTopic) this.recoveryTopic = null;
@@ -281,7 +292,8 @@ export class RosTelemetryBridge {
       fma_valid?: unknown; fma?: unknown;
       arm_joint_valid?: unknown; arm_joints?: JointStateMessage;
       arm_status_valid?: unknown; arm_status?: { hardware_active?: unknown; feedback_fresh?: unknown; joint_names?: unknown; joint_can_ids?: unknown };
-      arm_motors?: Array<{ id?: unknown; temperature?: unknown; current?: unknown }>;
+      arm_motors?: Array<{ id?: unknown; temperature?: unknown; current?: unknown; speed?: unknown; angle?: unknown }>;
+      arm_motor_details?: Array<{ id?: unknown; bus_voltage?: unknown; bus_current?: unknown; mode?: unknown }>;
       arm_commands?: Array<{ id?: unknown; mode?: unknown; value?: unknown }>;
       arm_trajectory_valid?: unknown; arm_trajectory?: JointStateMessage;
       drive_joint_valid?: unknown; drive_joints?: JointStateMessage;
@@ -298,7 +310,10 @@ export class RosTelemetryBridge {
       this.armTelemetry.setJointMapping(snapshot.arm_status.joint_names, snapshot.arm_status.joint_can_ids);
     }
     if (Array.isArray(snapshot.arm_motors)) {
-      for (const motor of snapshot.arm_motors) if (!live.has(`arm_motor:${motor.id}`)) this.armTelemetry.setMotorStatus(motor.id, motor.temperature, motor.current);
+      for (const motor of snapshot.arm_motors) if (!live.has(`arm_motor:${motor.id}`)) this.armTelemetry.setMotorStatus(motor.id, motor.temperature, motor.current, motor.speed, motor.angle);
+    }
+    if (Array.isArray(snapshot.arm_motor_details)) {
+      for (const motor of snapshot.arm_motor_details) if (!live.has(`arm_motor_detail:${motor.id}`)) this.armTelemetry.setMotorDetail(motor.id, motor.bus_voltage, motor.bus_current, motor.mode);
     }
     if (Array.isArray(snapshot.arm_commands)) {
       for (const command of snapshot.arm_commands) if (!live.has(`arm_command:${command.id}`)) this.armTelemetry.setCommand(command.id, command.mode, command.value);

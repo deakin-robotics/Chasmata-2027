@@ -10,6 +10,7 @@ telemetry_interfaces/ArmControlStatus arm_status
 bool arm_planner_valid
 telemetry_interfaces/ArmMoveItStatus arm_planner
 telemetry_interfaces/RecoveryMotorStatus[] arm_motors
+telemetry_interfaces/RecoveryMotorDetail[] arm_motor_details
 telemetry_interfaces/RecoveryArmCommand[] arm_commands
 bool arm_trajectory_valid
 sensor_msgs/JointState arm_trajectory

@@ -12,8 +12,11 @@ export class ArmTelemetryService implements OnDestroy {
   private readonly plannerState = signal<string | null>(null);
   readonly planner = this.plannerState.asReadonly();
   private plannerExpiry: ReturnType<typeof setTimeout> | undefined;
-  private readonly motorState = signal<Readonly<Record<number, { temperature: number; current: number }>>>({});
+  private readonly motorState = signal<Readonly<Record<number, { temperature: number; current: number; speed?: number; angle?: number }>>>({});
   readonly motors = this.motorState.asReadonly();
+  private readonly motorDetailState = signal<Readonly<Record<number, { busVoltage: number; busCurrent: number; mode: string }>>>({});
+  readonly motorDetails = this.motorDetailState.asReadonly();
+  private readonly motorDetailExpiry = new Map<number, ReturnType<typeof setTimeout>>();
   private readonly motorExpiry = new Map<number, ReturnType<typeof setTimeout>>();
   private jointIds: Readonly<Record<string, number>> = {};
   private readonly commandState = signal<Readonly<Record<number, { mode: number; value: number }>>>({});
@@ -101,11 +104,14 @@ export class ArmTelemetryService implements OnDestroy {
     }, 1500));
   }
 
-  setMotorStatus(id: unknown, temperature: unknown, current: unknown): void {
+  setMotorStatus(id: unknown, temperature: unknown, current: unknown, speed?: unknown, angle?: unknown): void {
     if (typeof id !== 'number' || !Number.isInteger(id) || id <= 0 ||
         typeof temperature !== 'number' || !Number.isFinite(temperature) ||
         typeof current !== 'number' || !Number.isFinite(current)) return;
-    this.motorState.update((values) => ({ ...values, [id]: { temperature, current } }));
+    const sample: { temperature: number; current: number; speed?: number; angle?: number } = { temperature, current };
+    if (typeof speed === 'number' && Number.isFinite(speed)) sample.speed = speed;
+    if (typeof angle === 'number' && Number.isFinite(angle)) sample.angle = angle;
+    this.motorState.update((values) => ({ ...values, [id]: sample }));
     const previous = this.motorExpiry.get(id);
     if (previous) clearTimeout(previous);
     this.motorExpiry.set(id, setTimeout(() => {
@@ -117,6 +123,21 @@ export class ArmTelemetryService implements OnDestroy {
       this.motorExpiry.delete(id);
     }, 2500));
   }
+
+  setMotorDetail(id: unknown, voltage: unknown, current: unknown, mode: unknown): void {
+    if (typeof id !== 'number' || !Number.isInteger(id) || id <= 0 ||
+        typeof voltage !== 'number' || !Number.isFinite(voltage) ||
+        typeof current !== 'number' || !Number.isFinite(current) || typeof mode !== 'string') return;
+    this.motorDetailState.update(values => ({ ...values, [id]: { busVoltage: voltage, busCurrent: current, mode } }));
+    const previous = this.motorDetailExpiry.get(id);
+    if (previous) clearTimeout(previous);
+    this.motorDetailExpiry.set(id, setTimeout(() => {
+      this.motorDetailState.update(values => { const next = { ...values }; delete next[id]; return next; });
+      this.motorDetailExpiry.delete(id);
+    }, 2500));
+  }
+
+  motorId(name: string): number | undefined { return this.jointIds[name]; }
 
   /** Applies one valid JointState sample from the rover. */
   setJointState(state: ArmJointState): void {
@@ -161,6 +182,9 @@ export class ArmTelemetryService implements OnDestroy {
     if (this.statusExpiry) clearTimeout(this.statusExpiry);
     this.statusExpiry = undefined;
     this.feedbackStatusState.set(null);
+    for (const timer of this.motorDetailExpiry.values()) clearTimeout(timer);
+    this.motorDetailExpiry.clear();
+    this.motorDetailState.set({});
     for (const timer of this.motorExpiry.values()) clearTimeout(timer);
     this.motorExpiry.clear();
     this.motorState.set({});

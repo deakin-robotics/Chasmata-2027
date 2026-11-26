@@ -6,6 +6,7 @@
 #include <mutex>
 #include <vector>
 #include <arm_interfaces/msg/motor_stat1.hpp>
+#include <arm_interfaces/msg/motor_stat2.hpp>
 #include <dcr_arm_driver/msg/direct_drive.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include <nav_msgs/msg/odometry.hpp>
@@ -45,6 +46,10 @@ public:
     subscriptions_.push_back(node.create_subscription<arm_interfaces::msg::MotorStat1>("/telemetry/arm/motor_status", 100,
       [this](const arm_interfaces::msg::MotorStat1 & value) {
         std::lock_guard<std::mutex> lock(mutex_); motors_[value.id] = {value, Clock::now()};
+      }));
+    subscriptions_.push_back(node.create_subscription<arm_interfaces::msg::MotorStat2>("/telemetry/arm/motor_detail", 100,
+      [this](const arm_interfaces::msg::MotorStat2 & value) {
+        std::lock_guard<std::mutex> lock(mutex_); motor_details_[value.id] = {value, Clock::now()};
       }));
     subscriptions_.push_back(node.create_subscription<dcr_arm_driver::msg::DirectDrive>("/telemetry/arm/commands", 100,
       [this](const dcr_arm_driver::msg::DirectDrive & value) {
@@ -95,7 +100,13 @@ private:
     for (const auto & [id, sample] : motors_) if (fresh(sample, 2500ms)) {
       telemetry_interfaces::msg::RecoveryMotorStatus motor;
       motor.id = id; motor.temperature = sample.value.temp; motor.current = sample.value.current;
+      motor.speed = sample.value.speed; motor.angle = sample.value.angle;
       output.arm_motors.push_back(motor);
+    }
+    for (const auto & [id, sample] : motor_details_) if (fresh(sample, 2500ms)) {
+      telemetry_interfaces::msg::RecoveryMotorDetail detail;
+      detail.id = id; detail.bus_voltage = sample.value.busv; detail.bus_current = sample.value.busc; detail.mode = sample.value.mode;
+      output.arm_motor_details.push_back(detail);
     }
     for (const auto & [id, sample] : commands_) if (fresh(sample, 1500ms)) {
       telemetry_interfaces::msg::RecoveryArmCommand command;
@@ -109,7 +120,7 @@ private:
       if (output.drive_current_valid[i]) output.drive_current_raw[i] = currents_[i].value;
     }
     output.unavailable_fields = {"power", "link", "camera", "system_diagnostics", "takeoff_config",
-      "watchdog", "ecam_source_liveness", "arm_torque", "arm_can_health", "arm_joint_limits"};
+      "watchdog", "ecam_source_liveness", "arm_can_health", "arm_joint_limits"};
     publisher_->publish(output);
   }
   rclcpp::Node & node_;
@@ -123,6 +134,7 @@ private:
   Sample<telemetry_interfaces::msg::ArmMoveItStatus> arm_planner_;
   Sample<std_msgs::msg::Bool> estop_;
   std::map<std::int64_t, Sample<arm_interfaces::msg::MotorStat1>> motors_;
+  std::map<std::int64_t, Sample<arm_interfaces::msg::MotorStat2>> motor_details_;
   std::map<std::uint32_t, Sample<dcr_arm_driver::msg::DirectDrive>> commands_;
   std::array<Sample<std::int32_t>, 4> temperatures_{};
   std::array<Sample<std::int32_t>, 4> currents_{};

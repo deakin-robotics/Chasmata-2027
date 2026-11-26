@@ -14,6 +14,13 @@ export class ArmPage {
     const command = this.telemetry.commandFor(name);
     return command ? `${command.value.toFixed(1)} ${command.mode === 1 ? 'deg' : 'RPM'}` : '--';
   }
+  motorReadout(name: string): string {
+    const id = this.telemetry.motorId(name);
+    if (id === undefined) return 'I -- A  T -- deg C  BUS -- V / -- A';
+    const motor = this.telemetry.motors()[id];
+    const detail = this.telemetry.motorDetails()[id];
+    return `MOTOR ANGLE ${motor?.angle?.toFixed(1) ?? '--'} deg  SPEED ${motor?.speed?.toFixed(1) ?? '--'}  MODE ${detail?.mode || '--'}  I ${motor?.current.toFixed(1) ?? '--'} A  T ${motor?.temperature.toFixed(1) ?? '--'} deg C  BUS ${detail?.busVoltage.toFixed(1) ?? '--'} V / ${detail?.busCurrent.toFixed(1) ?? '--'} A`;
+  }
   motorValue(field: 'temperature' | 'current'): string {
     const motors = Object.values(this.telemetry.motors());
     if (motors.length === 0) return '--';

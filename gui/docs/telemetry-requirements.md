@@ -42,7 +42,7 @@ The rover must publish the following at 10 Hz:
 - Commanded and actual wheel velocity.
 - Wheel position and odometry.
 - Arm joint position and velocity.
-- Arm current/torque where available.
+- Arm motor current.
 - Gimbal position and movement/control state.
 - Network latency and link-quality measurements where available.
 
@@ -139,8 +139,8 @@ that do not yet have telemetry sources.
 
 | SD page | Required telemetry |
 |---|---|
-| `DRIVE` | Commanded/actual wheel velocity, odometry, and motor current/temperature. |
-| `ARM` | Joint position/velocity, current/torque where available, temperature, and planner state. Control mode, joint limits, and LAW/protection annunciation remain in the FMA. |
+| `DRIVE` | Commanded/actual wheel velocity, planar odometry (position, heading and speed), and raw motor current/temperature. |
+| `ARM` | Joint position/velocity and commands; per-motor angle, speed, current, temperature, bus voltage/current and motor mode; planner state. Control mode, joint limits, and LAW/protection annunciation remain in the FMA. |
 | `POWER` | Battery voltage/current, total power, and power-rail/subsystem health where available. |
 | `LINK` | Network latency, packet loss/link quality where available, ROS node/service health, controller connection, and watchdog state. |
 | `CAMERA` | Front, Arm, and Gimbal camera availability; stream health; reconnect state; latency where available; and Gimbal position/control state. Authoritative Gimbal ownership remains in the FMA. |

@@ -26,5 +26,5 @@
     <text class="value" x="400" y="255" text-anchor="middle"><tspan class="small-value-muted">ODOM X </tspan><tspan>{{ displacement() }} m</tspan></text>
 
   </svg>
-  <p class="telemetry-note">Wheel telemetry · temperature and current shown as raw values</p>
+  <p class="telemetry-note">ODOM Y {{ odometryValue('y') }} m | HEADING {{ odometryValue('heading') }} deg | TURN RATE {{ odometryValue('angularSpeed') }} rad/s<br>Wheel telemetry · temperature and current shown as raw values</p>
 </section>
