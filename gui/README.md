@@ -6,7 +6,7 @@ This project is an Angular replacement for the previous Next.js GUI. The new
 frontend preserves the rover's ROS topics, services, and gamepad mappings while
 using a native WebRTC/WHEP camera transport.
 
-> This project is currently in its migration stage. The existing Next.js GUI remains the working reference until this application reaches feature parity and passes rover testing.
+> This project is currently in its migration stage. The existing Next.js GUI remains the working reference until this application reaches feature parity and passes testing with the physical rover, radio link, controllers, and safety behaviour.
 
 ## 🧰 Technology stack
 
@@ -61,25 +61,17 @@ The mission-control interface is inspired by the Airbus glass cockpit philosophy
 
 ```mermaid
 flowchart LR
-    gamepad[Gamepad API] --> gui[Angular mission control]
-    gui[Hosted Angular mission control] -->|same-origin WebSocket| proxy[BaseStation operations web]
-    proxy -->|/ros/rover| rover[ Rover ROSbridge :9090]
-    proxy -->|/ros/basestation| base[BaseStation ROSbridge :9091]
-    gui -->|/media WHEP/WebRTC| streams[BaseStation MediaMTX]
+    rover[Rover] -->|Telemetry and camera streams| base[BaseStation]
+    base -->|Control commands| rover
+    base <-->|Controls, telemetry and video| driver[Driver GUI]
+    base <-->|Controls, telemetry and video| arm[Arm Operator GUI]
+    base <-->|Telemetry and shared alerts| ecam[ECAM and System Display GUI]
 ```
 
-In production, the GUI is served by the BaseStation and uses fixed same-origin
-paths. Operators never configure Rover or BaseStation endpoints:
-
-- Controls and telemetry use ROSLIB through the BaseStation proxy to Rover ROSbridge.
-- Shared ECAM state and BaseStation availability use the BaseStation ROSbridge path.
-- Camera video uses WHEP playback sessions from the base-station MediaMTX gateway.
-- Driver control publishes `sensor_msgs/Joy` on `/drive/joy`.
-- Arm control publishes remapped `sensor_msgs/Joy` on `/arm/joy`.
-- Driver and Arm Operator GUIs may both view and control the shared Gimbal camera.
-  Gimbal ownership is requested through the controller's **GIMBAL PRIORITY**
-  button and confirmed authoritatively by the rover.
-- The physical rover, radio link, controller, and safety behaviour must be tested before the Angular GUI replaces the existing interface.
+The BaseStation hosts the GUI and connects it to the Rover. It forwards operator
+commands, receives telemetry and camera streams, and shares them with the Driver,
+Arm Operator, and ECAM interfaces. Operators access the GUI through a browser
+without configuring Rover or BaseStation endpoints.
 
 ## 📋 Prerequisites
 
@@ -191,13 +183,3 @@ npm test -- --watch=false
 npx ng generate component features/example/example-panel
 npx ng generate service core/example/example
 ```
-
-## 🕰️ Existing GUI reference
-
-During migration, use the existing implementation in the sibling rover repository as a behavioural reference:
-
-```text
-../deakin_rover/dcr_base_station/gui
-```
-
-Do not remove or replace the existing GUI until the Angular application reaches feature parity and completes rover integration testing.
