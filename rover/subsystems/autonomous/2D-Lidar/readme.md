@@ -16,7 +16,7 @@ sudo apt install \
 
 ```bash
 # From repo root:
-cd rover/autonomous
+cd rover/subsystems/autonomous
 colcon build --symlink-install
 source install/setup.bash
 ```

@@ -1,6 +1,6 @@
 # USB rover hardware simulator
 
-The hardened arm driver defaults to motion disabled and requires live E-stop heartbeats, explicit rearming, and refreshed direct commands. Use a simulator-only profile with motion enabled for integration tests; follow the [current commissioning contract](../../rover/control/arm/docs/hardware-commissioning.md). The earlier verification harness in the archived evidence predates this contract.
+The hardened arm driver defaults to motion disabled and requires live E-stop heartbeats, explicit rearming, and refreshed direct commands. Use a simulator-only profile with motion enabled for integration tests; follow the [current commissioning contract](../../rover/subsystems/control/arm/docs/hardware-commissioning.md). The earlier verification harness in the archived evidence predates this contract.
 
 
 Flash this sketch onto an Arduino-compatible microcontroller and connect it to the ROS computer using **one USB data cable**. The board receives commands and returns simulated feedback for six arm joints and four drivetrain controllers. It requires no GPIO connections, external modules, or additional Arduino libraries.
@@ -104,7 +104,7 @@ Inspect feedback with:
 ros2 topic echo /motor_stat_1
 ```
 
-The normal arm driver's E-stop, feedback freshness, and command-rearming requirements still apply. Receiving feedback does not by itself enable movement commands. See the [arm driver documentation](../../rover/control/arm/rover_ws/src/dcr_arm_driver/README.md) for command and controller usage.
+The normal arm driver's E-stop, feedback freshness, and command-rearming requirements still apply. Receiving feedback does not by itself enable movement commands. See the [arm driver documentation](../../rover/subsystems/control/arm/rover_ws/src/dcr_arm_driver/README.md) for command and controller usage.
 
 ### Check arm feedback without starting the arm driver
 
@@ -139,7 +139,7 @@ fr_id: 3
 rr_id: 4
 ```
 
-The virtual port uses the drivetrain driver's 38400/8N1 settings while the bridge handles the physical USB link at 500000 baud. The snippet above is only the communication portion of the configuration. The [drivetrain example configuration](../../rover/control/drivetrain/rover_drivetrain_control/config/drivetrain_hardware.example.yaml) contains the other required fields.
+The virtual port uses the drivetrain driver's 38400/8N1 settings while the bridge handles the physical USB link at 500000 baud. The snippet above is only the communication portion of the configuration. The [drivetrain example configuration](../../rover/subsystems/control/drivetrain/rover_drivetrain_control/config/drivetrain_hardware.example.yaml) contains the other required fields.
 
 **Current driver limitation:** `RoverHardwareInterface::on_configure()` opens the transport, then refuses configuration because verified controller initialization and velocity conversion are unimplemented. Separately, `Bld305sDriver::readFaultRaw()` returns `UNSUPPORTED` without a wire request. The simulator supports raw communication checks; it does not make the production drivetrain controller activate or pass its full health checks.
 

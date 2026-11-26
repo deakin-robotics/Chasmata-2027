@@ -21,7 +21,7 @@ WORKDIR /src/gst-plugins-rs
 
 RUN cargo build --release --package gst-plugin-webrtc --no-default-features --features whip
 
-COPY src/camera/camera_supervisor.cpp /tmp/camera_supervisor.cpp
+COPY rover/subsystems/camera/camera_supervisor.cpp /tmp/camera_supervisor.cpp
 RUN g++ -std=c++17 -Wall -Wextra -O2 /tmp/camera_supervisor.cpp \
     -o /tmp/camera-supervisor $(pkg-config --cflags --libs gstreamer-1.0 glib-2.0)
 

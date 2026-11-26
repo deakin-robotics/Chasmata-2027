@@ -40,7 +40,7 @@ docker compose up --build
 ```
 
 For the production stack, configure the drivetrain as described in its README.
-In `rover/control/arm/config`, create these local, untracked files:
+In `rover/subsystems/control/arm/config`, create these local, untracked files:
 
 - `arm_hardware.yaml`: copy `arm_hardware.example.yaml` and set the actual,
   already configured SocketCAN interface.
@@ -54,10 +54,10 @@ In `rover/control/arm/config`, create these local, untracked files:
 For a first setup, run from the repository root, then edit the copied files:
 
 ```bash
-cp rover/control/arm/config/arm_hardware.example.yaml rover/control/arm/config/arm_hardware.yaml
-cp rover/rover/config/arm_manual.example.yaml rover/control/arm/config/arm_manual.yaml
-cp rover/control/arm/rover_ws/src/dcr_arm_driver/urdf/robot_arm.urdf rover/control/arm/config/robot_arm.urdf
-cp rover/control/arm/rover_ws/src/dcr_arm_driver/config/arm_controllers.yaml rover/control/arm/config/arm_controllers.yaml
+cp rover/subsystems/control/arm/config/arm_hardware.example.yaml rover/subsystems/control/arm/config/arm_hardware.yaml
+cp rover/rover/config/arm_manual.example.yaml rover/subsystems/control/arm/config/arm_manual.yaml
+cp rover/subsystems/control/arm/rover_ws/src/dcr_arm_driver/urdf/robot_arm.urdf rover/subsystems/control/arm/config/robot_arm.urdf
+cp rover/subsystems/control/arm/rover_ws/src/dcr_arm_driver/config/arm_controllers.yaml rover/subsystems/control/arm/config/arm_controllers.yaml
 ```
 
 Connect the real E-stop authority that continuously publishes `/estop`, and

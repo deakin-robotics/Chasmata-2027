@@ -120,7 +120,7 @@ support and stop arrangements.
 ## Package layout
 
 ```text
-rover/control/arm/
+rover/subsystems/control/arm/
 ├── README.md
 ├── docs/
 │   ├── ARM_RTM.md

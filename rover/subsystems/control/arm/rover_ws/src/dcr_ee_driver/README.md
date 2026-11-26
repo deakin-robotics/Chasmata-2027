@@ -74,7 +74,7 @@ Make sure `arm_interfaces` is built **first** (the driver includes
 `arm_interfaces/msg/ee_command.hpp`):
 
 ```bash
-cd <your_ws>              # e.g. rover/control/arm/rover_ws
+cd <your_ws>              # e.g. rover/subsystems/control/arm/rover_ws
 rosdep install --from-paths src --ignore-src -y
 colcon build --packages-select arm_interfaces dcr_ee_driver
 source install/setup.bash

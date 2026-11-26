@@ -1,9 +1,18 @@
 services:
+  operations-web:
+    build:
+      context: ..
+      dockerfile: basestation/operations-web/Dockerfile
+    network_mode: host
+    environment:
+      ROVER_HOST: 127.0.0.1
+    restart: unless-stopped
+
   camera-health:
     build: ./camera-health
     environment:
       MEDIAMTX_API_URL: http://media-gateway:9997/v3/paths/list
-      CAMERA_HEALTH_ALLOWED_ORIGINS: 'http://localhost:4200,http://127.0.0.1:4200'
+      CAMERA_HEALTH_ALLOWED_ORIGINS: 'http://localhost,http://127.0.0.1,http://localhost:4200,http://127.0.0.1:4200'
     ports:
       - "9998:9998"
     depends_on:
@@ -15,7 +24,7 @@ services:
     environment:
       MTX_APIADDRESS: ":9997"
       MTX_WEBRTCADDITIONALHOSTS: "localhost,127.0.0.1"
-      MTX_WEBRTCALLOWORIGINS: "http://localhost:4200,http://127.0.0.1:4200"
+      MTX_WEBRTCALLOWORIGINS: "http://localhost,http://127.0.0.1,http://localhost:4200,http://127.0.0.1:4200"
       MTX_AUTHINTERNALUSERS_2_USER: any
       MTX_AUTHINTERNALUSERS_2_PERMISSIONS_0_ACTION: api
     volumes:

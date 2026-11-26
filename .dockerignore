@@ -1,2 +1,4 @@
 rover/rover/.env
 rover/rover/.env.drive
+gui/node_modules
+gui/dist

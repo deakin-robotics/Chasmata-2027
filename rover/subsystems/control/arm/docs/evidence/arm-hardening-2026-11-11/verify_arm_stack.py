@@ -98,7 +98,7 @@ try:
     bridge=start('bridge',['python3','/source/microcontroller/mock_hardware/usb_mock_bridge.py','--ros-args','-p','port:=/dev/ttyUSB0'])
     assert wait(lambda:'Set drivetrain serial_device' in (OUT/'bridge.log').read_text())
     # Enable only this simulator-specific copy. The checked-in URDF stays gated.
-    src=Path('/source/rover/control/arm/rover_ws/src/dcr_arm_driver/urdf/robot_arm.urdf').read_text()
+    src=Path('/source/rover/subsystems/control/arm/rover_ws/src/dcr_arm_driver/urdf/robot_arm.urdf').read_text()
     (OUT/'mock.urdf').write_text(src.replace('<param name="motion_enabled">false','<param name="motion_enabled">true'))
     arm=start('arm',['ros2','launch','dcr_arm_driver','arm_control.launch.py',f'urdf:={OUT}/mock.urdf'])
     assert wait(lambda:len(joint)==6 and healthy(),20),'No healthy feedback'

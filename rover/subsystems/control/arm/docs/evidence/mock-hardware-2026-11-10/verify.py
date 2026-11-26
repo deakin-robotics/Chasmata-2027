@@ -144,7 +144,7 @@ try:
     hist=[x for x in status_history if x[0]>=begin]
     gaps={str(key):max((b-a for a,b in zip(ts,ts[1:])),default=0) for key,allts in rx_times.items() if (ts:=[t for t in allts if t>=begin])}
     check('steady arm feedback at 50 Hz',len(hist)>100 and all(fresh and safe for _,fresh,safe,_ in hist),{'status_samples':len(hist),'max_feedback_gap_s':max(gaps.values()),'per_channel_max_gap_s':gaps,'bad_samples':[x for x in hist if not (x[1] and x[2])]})
-    config=yaml.safe_load(Path('/source/rover/control/drivetrain/rover_drivetrain_control/config/drivetrain_hardware.example.yaml').read_text());config['serial_device']=port
+    config=yaml.safe_load(Path('/source/rover/subsystems/control/drivetrain/rover_drivetrain_control/config/drivetrain_hardware.example.yaml').read_text());config['serial_device']=port
     (OUT/'drivetrain.yaml').write_text(yaml.safe_dump(config))
     drive=start('drivetrain',['ros2','launch','rover_drivetrain_control','drivetrain.launch.py',f'hardware_config:={OUT}/drivetrain.yaml'])
     spin(10)

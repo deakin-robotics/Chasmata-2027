@@ -21,7 +21,7 @@ Build the remaining images and run the hosted-route and camera-recovery tests:
 ```bash
 docker build -f basestation/operations-web/Dockerfile -t basestation-web-ci .
 docker build -t basestation-camera-health-ci basestation/camera-health
-docker build -f rover/rover/Dockerfile.media-source -t rover-camera-ci rover/rover
+docker build -f rover/rover/Dockerfile.media-source -t rover-camera-ci .
 bash basestation/test/run_hosted_integration.sh
 ```
 

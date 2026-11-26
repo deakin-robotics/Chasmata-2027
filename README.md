@@ -64,8 +64,11 @@ npm start
 ```text
 gui/    Browser-based operator Mission Control interface
 rover/  Rover-side software
-  control/     Low-level hardware control and safety
-  autonomous/  Navigation, perception, and task autonomy
+  rover/       Rover-wide control and orchestration
+  subsystems/  Onboard subsystem software
+    control/     Low-level hardware control and safety
+    autonomous/  Navigation, perception, and task autonomy
+    camera/      Camera stream publishing
   shared/      Shared rover-side interfaces and utilities
 docs/   Project-wide documentation and competition references
 ```
@@ -83,8 +86,8 @@ For GUI installation, development commands, architecture, and ROS integration de
 ## 📚 Project documentation
 
 - [GUI documentation](gui/README.md)
-- [Control documentation](rover/control/README.md)
-- [Autonomy documentation](rover/autonomous/README.md)
+- [Control documentation](rover/subsystems/control/README.md)
+- [Autonomy documentation](rover/subsystems/autonomous/2D-Lidar/readme.md)
 - [Networking](docs/networking.md)
 - [Operator SOP (v0.1)](docs/operations/sop.md)
 - [Operator QRH (v0.1)](docs/operations/qrh.md)

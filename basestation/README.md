@@ -26,6 +26,16 @@ http://<base-station-lan-ip>/ecam
 `basestation.local` is an optional alias when it is provided by separate name
 resolution.
 
+For local development on the same computer as the rover stack, start the local
+BaseStation stack from this directory:
+
+```bash
+docker compose -f docker-compose.local.yml up --build
+```
+
+Open `http://localhost/driver`, `http://localhost/arm`, or
+`http://localhost/ecam` in a browser.
+
 ## Architecture
 
 ```text

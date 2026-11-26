@@ -39,11 +39,11 @@ services:
       ROS_DISCOVERY_SERVER: "127.0.0.1:11811"
     volumes:
       - type: bind
-        source: ../control/drivetrain/rover_drivetrain_control/config
+        source: ../subsystems/control/drivetrain/rover_drivetrain_control/config
         target: /etc/rover/drivetrain
         read_only: true
       - type: bind
-        source: ../control/arm/config
+        source: ../subsystems/control/arm/config
         target: /etc/rover/arm
         read_only: true
       - /dev:/dev
@@ -55,8 +55,8 @@ services:
 
   media-source:
     build:
-      context: .
-      dockerfile: Dockerfile.media-source
+      context: ../..
+      dockerfile: rover/rover/Dockerfile.media-source
     entrypoint: ["/bin/sh", "/run-test-sources.sh"]
     environment:
       BASE_STATION_MEDIA_HOST: "${BASE_STATION_MEDIA_HOST:-media-gateway}"

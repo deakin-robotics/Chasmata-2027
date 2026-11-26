@@ -64,9 +64,9 @@ Run these commands **inside the container, from the repository root**. Use the e
 source /opt/ros/jazzy/setup.bash
 colcon build --base-paths \
   interfaces/telemetry_interfaces \
-  rover/control/arm/rover_ws/src/arm_interfaces \
-  rover/control/arm/rover_ws/src/dcr_arm_driver \
-  rover/control/arm/rover_ws/src/nobleo_socketcan_bridge \
+  rover/subsystems/control/arm/rover_ws/src/arm_interfaces \
+  rover/subsystems/control/arm/rover_ws/src/dcr_arm_driver \
+  rover/subsystems/control/arm/rover_ws/src/nobleo_socketcan_bridge \
   --packages-up-to dcr_arm_driver nobleo_socketcan_bridge \
   --symlink-install
 source install/setup.bash
@@ -286,7 +286,7 @@ This only resolves the encoder turn; it does not home, enable or move the motor.
 Run regression checks in the sourced container after building:
 
 ```bash
-colcon test --base-paths rover/control/arm/rover_ws/src/dcr_arm_driver \
+colcon test --base-paths rover/subsystems/control/arm/rover_ws/src/dcr_arm_driver \
   --packages-select dcr_arm_driver
 colcon test-result --verbose
 (cd microcontroller/mock_hardware && python3 -m unittest test_usb_mock_bridge -v)

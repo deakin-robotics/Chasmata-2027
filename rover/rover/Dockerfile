@@ -17,8 +17,8 @@ RUN apt-get update \
 WORKDIR /workspace
 COPY interfaces/telemetry_interfaces /workspace/src/telemetry_interfaces
 COPY rover/shared/ecam_alerts /workspace/src/ecam_alerts
-COPY rover/control/arm/rover_ws/src/arm_interfaces /workspace/src/arm_interfaces
-COPY rover/control/arm/rover_ws/src/dcr_arm_driver /workspace/src/dcr_arm_driver
+COPY rover/subsystems/control/arm/rover_ws/src/arm_interfaces /workspace/src/arm_interfaces
+COPY rover/subsystems/control/arm/rover_ws/src/dcr_arm_driver /workspace/src/dcr_arm_driver
 COPY rover/rover /workspace/src/rover
 
 RUN source /opt/ros/jazzy/setup.bash \

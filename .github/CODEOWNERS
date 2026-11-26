@@ -3,6 +3,6 @@
 
 # Subsystem ownership.
 /gui/ @deakin-robotics @namanhtran99
-/rover/control/ @deakin-robotics @forrestnguyen27
-/rover/autonomous/ @deakin-robotics @T-Hari
+/rover/subsystems/control/ @deakin-robotics @forrestnguyen27
+/rover/subsystems/autonomous/ @deakin-robotics @T-Hari
 /rover/shared/ @deakin-robotics @forrestnguyen27 @T-Hari

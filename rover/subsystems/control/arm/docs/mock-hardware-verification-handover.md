@@ -235,8 +235,8 @@ docker exec chasmata-mock-verify bash -lc '
   source /opt/ros/jazzy/setup.bash
   mkdir -p /tmp/verify_ws
   cd /tmp/verify_ws
-  colcon build --base-paths /source/rover/control/arm/rover_ws/src \
-    /source/rover/control/drivetrain /source/interfaces \
+  colcon build --base-paths /source/rover/subsystems/control/arm/rover_ws/src \
+    /source/rover/subsystems/control/drivetrain /source/interfaces \
     --packages-up-to dcr_arm_driver rover_drivetrain_control --parallel-workers 2
 '
 ```
@@ -244,9 +244,9 @@ docker exec chasmata-mock-verify bash -lc '
 Copy the preserved harness into the container:
 
 ```bash
-docker cp rover/control/arm/docs/evidence/mock-hardware-2026-11-10/verify.py \
+docker cp rover/subsystems/control/arm/docs/evidence/mock-hardware-2026-11-10/verify.py \
   chasmata-mock-verify:/tmp/verify.py
-docker cp rover/control/arm/docs/evidence/mock-hardware-2026-11-10/paced_bridge.py \
+docker cp rover/subsystems/control/arm/docs/evidence/mock-hardware-2026-11-10/paced_bridge.py \
   chasmata-mock-verify:/tmp/paced_bridge.py
 ```
 
@@ -275,8 +275,8 @@ Run the existing unit tests separately:
 docker exec chasmata-mock-verify bash -lc '
   source /tmp/verify_ws/install/setup.bash
   cd /tmp/verify_ws
-  colcon test --base-paths /source/rover/control/arm/rover_ws/src \
-    /source/rover/control/drivetrain /source/interfaces \
+  colcon test --base-paths /source/rover/subsystems/control/arm/rover_ws/src \
+    /source/rover/subsystems/control/drivetrain /source/interfaces \
     --packages-select dcr_arm_driver rover_drivetrain_control
   colcon test-result --verbose
 '
