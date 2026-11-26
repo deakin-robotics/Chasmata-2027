@@ -77,7 +77,7 @@ jobs:
       - name: Build camera health image
         run: docker build -t basestation-camera-health-ci basestation/camera-health
       - name: Build mock camera image
-        run: docker build -f rover/rover/Dockerfile.media-source -t rover-camera-ci rover/rover
+        run: docker build -f rover/subsystems/camera/Dockerfile.media-source -t rover-camera-ci .
       - name: Run hosted integration tests
         run: |
           mkdir -p "$RUNNER_TEMP/basestation-test-results"

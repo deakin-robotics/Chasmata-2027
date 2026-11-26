@@ -63,7 +63,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build mock camera image
-        run: docker build -f rover/rover/Dockerfile.media-source -t rover-camera-ci rover/rover
+        run: docker build -f rover/subsystems/camera/Dockerfile.media-source -t rover-camera-ci .
 
       - name: Verify camera recovery after gateway restart
         run: bash .github/scripts/test-mock-camera-recovery.sh

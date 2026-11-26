@@ -56,7 +56,7 @@ services:
   media-source:
     build:
       context: ../..
-      dockerfile: rover/rover/Dockerfile.media-source
+      dockerfile: rover/subsystems/camera/Dockerfile.media-source
     entrypoint: ["/bin/sh", "/run-test-sources.sh"]
     environment:
       BASE_STATION_MEDIA_HOST: "${BASE_STATION_MEDIA_HOST:-media-gateway}"
@@ -66,7 +66,7 @@ services:
       MEDIA_BITRATE_KBPS: "${MEDIA_BITRATE_KBPS:-2500}"
       MEDIA_BUFFER_KBPS: "${MEDIA_BUFFER_KBPS:-5000}"
       MEDIA_KEYFRAME_INTERVAL: "${MEDIA_KEYFRAME_INTERVAL:-30}"
-    volumes: ["./run-test-sources.sh:/run-test-sources.sh:ro"]
+    volumes: ["../subsystems/camera/run-test-sources.sh:/run-test-sources.sh:ro"]
     networks: {local-media: {}}
     restart: unless-stopped
 

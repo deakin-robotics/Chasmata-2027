@@ -1,8 +1,9 @@
-# Mock rover
+# Rover Control
 
-`rover` is the rover-side GUI simulator. It provides the existing topics,
-FMA acknowledgement behavior, arm joint simulation, trajectory action,
-heartbeat, Rover ECAM aggregation, and ROSbridge launch.
+`rover` is the rover-side control and orchestration package. It handles operator
+requests, FMA state, arm and drive control, and the rover heartbeat. The stack
+also launches Rover ECAM aggregation and ROSbridge. Mock backends provide
+simulation for GUI development; real backends connect to the subsystem drivers.
 
 Drive mode requests and validated joystick input use a drive backend. The default
 backend confirms valid mode requests after the configured mock delay. C++ callers
