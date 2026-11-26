@@ -7,14 +7,18 @@ route.
 
 ```mermaid
 flowchart LR
-    cameras[Rover camera publishers<br/>front, gimbal, arm]
+    subgraph rover[Rover]
+        cameras[Front, Gimbal and Arm cameras]
+        publisher[GStreamer camera publisher]
+        cameras --> publisher
+    end
     gateway[BaseStation MediaMTX]
     driver[Driver GUI]
     arm[Arm Operator GUI]
 
-    cameras -->|WHIP signalling and WebRTC video| gateway
-    gateway -->|WebRTC video: arm, front, gimbal| driver
-    gateway -->|WebRTC video: arm, front, gimbal| arm
+    publisher -->|WHIP signalling TCP 8889<br/>WebRTC video UDP 8189| gateway
+    gateway -->|WebRTC video UDP 8189<br/>arm, front, gimbal| driver
+    gateway -->|WebRTC video UDP 8189<br/>arm, front, gimbal| arm
 ```
 
 The rover publishes to `http://<base-station-lan-ip>:8889/<camera>/whip`.
