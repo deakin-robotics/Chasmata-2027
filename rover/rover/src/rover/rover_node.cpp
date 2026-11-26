@@ -3,6 +3,8 @@
 #include "../drive/real_drive_backend.hpp"
 #include "../arm/mock_arm_backend.hpp"
 #include "../arm/real_arm_backend.hpp"
+#include "../telemetry/arm/backend.hpp"
+#include "../telemetry/drive/backend.hpp"
 
 namespace rover
 {
@@ -57,6 +59,18 @@ RoverNode::RoverNode(std::unique_ptr<DriveBackend> drive_backend, const rclcpp::
   else if (arm_backend == "real") arm_backend_ = std::make_unique<RealArmBackend>(*this);
   else if (arm_backend == "disabled") arm_backend_ = std::make_unique<DisabledArmBackend>();
   else throw std::invalid_argument("arm_backend must be mock, real or disabled");
+
+  if (arm_backend == "mock") arm_telemetry_ = std::make_unique<telemetry::arm::MockBackend>(*this,
+    [this] { return arm_backend_->confirmed_mode_valid() ? arm_mode_ : std::string{}; });
+  else if (arm_backend == "real") arm_telemetry_ = std::make_unique<telemetry::arm::RealBackend>(*this);
+  const auto drive_telemetry_backend = get_parameter("drive_backend").as_string();
+  if (drive_telemetry_backend == "mock") drive_telemetry_ = std::make_unique<telemetry::drive::MockBackend>(*this,
+    [this] { return !drive_mode_.empty() && drive_backend_->confirmed_mode_valid(); });
+  else if (drive_telemetry_backend == "real") drive_telemetry_ = std::make_unique<telemetry::drive::RealBackend>(*this,
+    get_parameter("drive_wheel_radius").as_double(), get_parameter("drive_wheel_separation").as_double(),
+    [this] { return drive_backend_->confirmed_mode_valid() ? drive_mode_ : std::string{}; });
+
+  recovery_snapshot_ = std::make_unique<telemetry::RecoverySnapshot>(*this);
 
   const auto retained = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
   fma_publisher_ = create_publisher<telemetry_interfaces::msg::FmaState>("/fma/state", retained);

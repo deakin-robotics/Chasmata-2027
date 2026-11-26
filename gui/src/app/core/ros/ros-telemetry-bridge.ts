@@ -2,6 +2,7 @@ import { Service, effect, inject } from '@angular/core';
 import { Topic } from 'roslib';
 
 import { ArmTelemetryService } from '../arm/telemetry/arm-telemetry.service';
+import { DriveTelemetryService } from '../drive/drive-telemetry.service';
 import { ArmJointState } from '../arm/ik/arm-ik-types';
 import { ArmOverrideCommand, ArmOverrideState } from '../control/arm/arm-override';
 import {
@@ -16,7 +17,7 @@ import { RosConnection } from './ros-connection';
 import { RosHeartbeatMonitor } from './ros-heartbeat-monitor';
 
 const FMA_STATE_TOPIC = '/fma/state';
-const JOINT_STATE_TOPIC = '/arm/joint_states';
+const JOINT_STATE_TOPIC = '/telemetry/arm/joint_states';
 const FMA_STATE_MESSAGE_TYPE = 'telemetry_interfaces/msg/FmaState';
 const JOINT_STATE_MESSAGE_TYPE = 'sensor_msgs/JointState';
 
@@ -50,9 +51,18 @@ export class RosTelemetryBridge {
   private readonly heartbeatMonitor = inject(RosHeartbeatMonitor);
   private readonly fmaState = inject(FmaStateService);
   private readonly armTelemetry = inject(ArmTelemetryService);
+  private readonly driveTelemetry = inject(DriveTelemetryService);
 
   private roverFmaTopic: Topic | null = null;
   private jointStateTopic: Topic | null = null;
+  private driveTelemetryTopic: Topic | null = null;
+  private driveCommandTopic: Topic | null = null;
+  private driveTemperatureTopic: Topic | null = null;
+  private armStatusTopic: Topic | null = null;
+  private armMotorTopic: Topic | null = null;
+  private armCommandTopic: Topic | null = null;
+  private armTrajectoryTopic: Topic | null = null;
+  private recoveryTopic: Topic | null = null;
 
   private readonly roverTelemetryEffect = effect((onCleanup) => {
     const client = this.rosConnection.client();
@@ -60,8 +70,10 @@ export class RosTelemetryBridge {
 
     if (!client || !roverAvailable) {
       this.armTelemetry.clear();
+      this.driveTelemetry.clear();
       return;
     }
+    const liveReceived = new Set<string>();
 
     const fmaTopic = new Topic({
       ros: client,
@@ -72,6 +84,81 @@ export class RosTelemetryBridge {
       ros: client,
       name: JOINT_STATE_TOPIC,
       messageType: JOINT_STATE_MESSAGE_TYPE,
+    });
+    const driveTelemetryTopic = new Topic({
+      ros: client,
+      name: '/telemetry/drive/joint_states',
+      messageType: JOINT_STATE_MESSAGE_TYPE,
+    });
+    const armStatusTopic = new Topic({
+      ros: client,
+      name: '/telemetry/arm/status',
+      messageType: 'telemetry_interfaces/msg/ArmControlStatus',
+    });
+    this.armStatusTopic = armStatusTopic;
+    armStatusTopic.subscribe((message) => {
+      if (this.rosConnection.client() !== client || this.armStatusTopic !== armStatusTopic || !this.heartbeatMonitor.roverAvailable()) return;
+      liveReceived.add('arm_status');
+      const status = message as { hardware_active?: unknown; feedback_fresh?: unknown; joint_names?: unknown; joint_can_ids?: unknown };
+      this.armTelemetry.setFeedbackStatus(status.hardware_active, status.feedback_fresh);
+      this.armTelemetry.setJointMapping(status.joint_names, status.joint_can_ids);
+    });
+    const armMotorTopic = new Topic({
+      ros: client, name: '/telemetry/arm/motor_status', messageType: 'arm_interfaces/msg/MotorStat1',
+    });
+    this.armMotorTopic = armMotorTopic;
+    armMotorTopic.subscribe((message) => {
+      if (this.rosConnection.client() !== client || this.armMotorTopic !== armMotorTopic || !this.heartbeatMonitor.roverAvailable()) return;
+      const motor = message as { id?: unknown; temp?: unknown; current?: unknown };
+      if (typeof motor.id === 'number') liveReceived.add(`arm_motor:${motor.id}`);
+      this.armTelemetry.setMotorStatus(motor.id, motor.temp, motor.current);
+    });
+    const armCommandTopic = new Topic({ ros: client, name: '/telemetry/arm/commands', messageType: 'dcr_arm_driver/msg/DirectDrive' });
+    this.armCommandTopic = armCommandTopic;
+    armCommandTopic.subscribe((message) => {
+      if (this.rosConnection.client() !== client || this.armCommandTopic !== armCommandTopic || !this.heartbeatMonitor.roverAvailable()) return;
+      const command = message as { id?: unknown; mode?: unknown; value?: unknown };
+      if (typeof command.id === 'number') liveReceived.add(`arm_command:${command.id}`);
+      this.armTelemetry.setCommand(command.id, command.mode, command.value);
+    });
+    const armTrajectoryTopic = new Topic({ ros: client, name: '/telemetry/arm/trajectory_commands', messageType: JOINT_STATE_MESSAGE_TYPE });
+    this.armTrajectoryTopic = armTrajectoryTopic;
+    armTrajectoryTopic.subscribe((message) => {
+      if (this.rosConnection.client() !== client || this.armTrajectoryTopic !== armTrajectoryTopic || !this.heartbeatMonitor.roverAvailable()) return;
+      liveReceived.add('arm_trajectory');
+      const command = message as JointStateMessage;
+      this.armTelemetry.setTrajectory(command.name, command.position);
+    });
+    const recoveryTopic = new Topic({ ros: client, name: '/telemetry/recovery_snapshot', messageType: 'telemetry_interfaces/msg/RecoverySnapshot' });
+    this.recoveryTopic = recoveryTopic;
+    let recovered = false;
+    recoveryTopic.subscribe((message) => {
+      if (this.rosConnection.client() !== client || this.recoveryTopic !== recoveryTopic || !this.heartbeatMonitor.roverAvailable() || recovered) return;
+      recovered = true;
+      this.applyRecoverySnapshot(message, liveReceived);
+    });
+    this.driveTelemetryTopic = driveTelemetryTopic;
+    driveTelemetryTopic.subscribe((message) => {
+      if (this.rosConnection.client() !== client || this.driveTelemetryTopic !== driveTelemetryTopic || !this.heartbeatMonitor.roverAvailable()) return;
+      liveReceived.add('drive_joints');
+      const state = message as JointStateMessage;
+      this.driveTelemetry.setJointState(state.name, state.velocity);
+    });
+    const driveCommandTopic = new Topic({ ros: client, name: '/telemetry/drive/commands', messageType: JOINT_STATE_MESSAGE_TYPE });
+    this.driveCommandTopic = driveCommandTopic;
+    driveCommandTopic.subscribe((message) => {
+      if (this.rosConnection.client() !== client || this.driveCommandTopic !== driveCommandTopic || !this.heartbeatMonitor.roverAvailable()) return;
+      liveReceived.add('drive_commands');
+      const command = message as JointStateMessage;
+      this.driveTelemetry.setCommands(command.name, command.velocity);
+    });
+    const driveTemperatureTopic = new Topic({ ros: client, name: '/telemetry/drive/temperature_raw', messageType: 'std_msgs/msg/Int32MultiArray' });
+    this.driveTemperatureTopic = driveTemperatureTopic;
+    driveTemperatureTopic.subscribe((message) => {
+      if (this.rosConnection.client() !== client || this.driveTemperatureTopic !== driveTemperatureTopic || !this.heartbeatMonitor.roverAvailable()) return;
+      const data = (message as { data?: unknown }).data;
+      if (Array.isArray(data) && typeof data[0] === 'number') liveReceived.add(`drive_temperature:${data[0]}`);
+      this.driveTelemetry.setTemperature(data);
     });
     this.roverFmaTopic = fmaTopic;
     this.jointStateTopic = jointStateTopic;
@@ -84,6 +171,7 @@ export class RosTelemetryBridge {
       )
         return;
 
+      liveReceived.add('fma');
       this.handleFmaMessage(message);
     });
     jointStateTopic.subscribe((message) => {
@@ -94,15 +182,33 @@ export class RosTelemetryBridge {
       )
         return;
 
+      liveReceived.add('arm_joints');
       this.handleJointStateMessage(message as JointStateMessage);
     });
 
     onCleanup(() => {
       fmaTopic.unsubscribe();
       jointStateTopic.unsubscribe();
+      driveTelemetryTopic.unsubscribe();
+      driveCommandTopic.unsubscribe();
+      driveTemperatureTopic.unsubscribe();
+      armStatusTopic.unsubscribe();
+      armMotorTopic.unsubscribe();
+      armCommandTopic.unsubscribe();
+      armTrajectoryTopic.unsubscribe();
+      recoveryTopic.unsubscribe();
       if (this.roverFmaTopic === fmaTopic) this.roverFmaTopic = null;
       if (this.jointStateTopic === jointStateTopic) this.jointStateTopic = null;
+      if (this.driveTelemetryTopic === driveTelemetryTopic) this.driveTelemetryTopic = null;
+      if (this.driveCommandTopic === driveCommandTopic) this.driveCommandTopic = null;
+      if (this.driveTemperatureTopic === driveTemperatureTopic) this.driveTemperatureTopic = null;
+      if (this.armStatusTopic === armStatusTopic) this.armStatusTopic = null;
+      if (this.armMotorTopic === armMotorTopic) this.armMotorTopic = null;
+      if (this.armCommandTopic === armCommandTopic) this.armCommandTopic = null;
+      if (this.armTrajectoryTopic === armTrajectoryTopic) this.armTrajectoryTopic = null;
+      if (this.recoveryTopic === recoveryTopic) this.recoveryTopic = null;
       this.armTelemetry.clear();
+      this.driveTelemetry.clear();
       this.fmaState.resetControlModes();
     });
   });
@@ -121,6 +227,45 @@ export class RosTelemetryBridge {
     if (system !== undefined) this.fmaState.setSystemMode(system);
     this.applyGimbalPriorityTelemetry(telemetry.gimbal_priority);
     this.fmaState.markFmaTelemetryReceived();
+  }
+
+  private applyRecoverySnapshot(message: unknown, live: ReadonlySet<string>): void {
+    if (!message || typeof message !== 'object') return;
+    const snapshot = message as {
+      fma_valid?: unknown; fma?: unknown;
+      arm_joint_valid?: unknown; arm_joints?: JointStateMessage;
+      arm_status_valid?: unknown; arm_status?: { hardware_active?: unknown; feedback_fresh?: unknown; joint_names?: unknown; joint_can_ids?: unknown };
+      arm_motors?: Array<{ id?: unknown; temperature?: unknown; current?: unknown }>;
+      arm_commands?: Array<{ id?: unknown; mode?: unknown; value?: unknown }>;
+      arm_trajectory_valid?: unknown; arm_trajectory?: JointStateMessage;
+      drive_joint_valid?: unknown; drive_joints?: JointStateMessage;
+      drive_command_valid?: unknown; drive_commands?: JointStateMessage;
+      drive_temperature_valid?: unknown; drive_temperature_raw?: unknown;
+    };
+    if (snapshot.fma_valid === true && !live.has('fma')) this.handleFmaMessage(snapshot.fma);
+    if (snapshot.arm_joint_valid === true && snapshot.arm_joints && !live.has('arm_joints')) this.handleJointStateMessage(snapshot.arm_joints);
+    if (snapshot.arm_status_valid === true && snapshot.arm_status && !live.has('arm_status')) {
+      this.armTelemetry.setFeedbackStatus(snapshot.arm_status.hardware_active, snapshot.arm_status.feedback_fresh);
+      this.armTelemetry.setJointMapping(snapshot.arm_status.joint_names, snapshot.arm_status.joint_can_ids);
+    }
+    if (Array.isArray(snapshot.arm_motors)) {
+      for (const motor of snapshot.arm_motors) if (!live.has(`arm_motor:${motor.id}`)) this.armTelemetry.setMotorStatus(motor.id, motor.temperature, motor.current);
+    }
+    if (Array.isArray(snapshot.arm_commands)) {
+      for (const command of snapshot.arm_commands) if (!live.has(`arm_command:${command.id}`)) this.armTelemetry.setCommand(command.id, command.mode, command.value);
+    }
+    if (snapshot.arm_trajectory_valid === true && snapshot.arm_trajectory && !live.has('arm_trajectory'))
+      this.armTelemetry.setTrajectory(snapshot.arm_trajectory.name, snapshot.arm_trajectory.position);
+    if (snapshot.drive_joint_valid === true && snapshot.drive_joints && !live.has('drive_joints'))
+      this.driveTelemetry.setJointState(snapshot.drive_joints.name, snapshot.drive_joints.velocity);
+    if (snapshot.drive_command_valid === true && snapshot.drive_commands && !live.has('drive_commands'))
+      this.driveTelemetry.setCommands(snapshot.drive_commands.name, snapshot.drive_commands.velocity);
+    const rawTemperatures = snapshot.drive_temperature_raw;
+    if (Array.isArray(snapshot.drive_temperature_valid) && Array.isArray(rawTemperatures)) {
+      snapshot.drive_temperature_valid.forEach((valid, wheel) => {
+        if (valid === true && !live.has(`drive_temperature:${wheel}`)) this.driveTelemetry.setTemperature([wheel, rawTemperatures[wheel]]);
+      });
+    }
   }
 
   private applyModeTelemetry(state: FmaModeState | undefined, subsystem: 'drive' | 'arm'): void {

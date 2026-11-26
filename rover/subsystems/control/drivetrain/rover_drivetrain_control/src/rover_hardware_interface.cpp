@@ -102,6 +102,12 @@ RoverHardwareInterface::on_init(
   }
 
   driver_ = std::make_unique<Bld305sDriver>(bus_config_);
+  if (auto node = get_node()) {
+    temperature_publisher_ = node->create_publisher<std_msgs::msg::Int32MultiArray>(
+      "/drivetrain/temperature_raw", 10);
+    telemetry_joint_publisher_ = node->create_publisher<sensor_msgs::msg::JointState>(
+      "/drivetrain/validated_joint_states", 10);
+  }
   if (bench_motion_enabled_) {
     driver_->setMandatoryExchangesPerCycle(1);  // one alternating read per cycle
     RCLCPP_WARN(logger(), "BENCH MOTION MODE requested (bench_motion_enabled=true). "

@@ -16,6 +16,7 @@ find_package(pluginlib REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 find_package(rover_drivetrain_interfaces REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBMODBUS REQUIRED IMPORTED_TARGET libmodbus)
@@ -38,7 +39,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 # Jazzy ament_target_dependencies uses the PLAIN target_link_libraries signature
 # internally. Avoid mixing with keyword PRIVATE/PUBLIC on this same target.
 ament_target_dependencies(${PROJECT_NAME}
-  hardware_interface pluginlib rclcpp rclcpp_lifecycle)
+  hardware_interface pluginlib rclcpp rclcpp_lifecycle sensor_msgs std_msgs)
 target_link_libraries(${PROJECT_NAME}
   ${PROJECT_NAME}_core
   PkgConfig::LIBMODBUS)
@@ -76,7 +77,7 @@ install(FILES README.md DESTINATION share/${PROJECT_NAME})
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_include_directories(include)
-ament_export_dependencies(hardware_interface pluginlib rclcpp rclcpp_lifecycle)
+ament_export_dependencies(hardware_interface pluginlib rclcpp rclcpp_lifecycle sensor_msgs std_msgs)
 
 if(BUILD_TESTING)
   enable_testing()
@@ -95,7 +96,7 @@ if(BUILD_TESTING)
   # One serial configuration must accept all four wheels without per-side buses.
   add_executable(test_hardware_configuration test/test_hardware_configuration.cpp)
   ament_target_dependencies(test_hardware_configuration
-    hardware_interface rclcpp rclcpp_lifecycle)
+    hardware_interface rclcpp rclcpp_lifecycle sensor_msgs std_msgs)
   target_link_libraries(test_hardware_configuration ${PROJECT_NAME})
   add_test(NAME drivetrain_hardware_configuration COMMAND test_hardware_configuration)
 
@@ -106,7 +107,7 @@ if(BUILD_TESTING)
     src/bld305s_driver.cpp)
   target_include_directories(test_bench_motion PRIVATE include ${LIBMODBUS_INCLUDE_DIRS})
   ament_target_dependencies(test_bench_motion
-    hardware_interface pluginlib rclcpp rclcpp_lifecycle)
+    hardware_interface pluginlib rclcpp rclcpp_lifecycle sensor_msgs std_msgs)
   target_link_libraries(test_bench_motion ${PROJECT_NAME}_core)
   add_test(NAME drivetrain_bench_motion COMMAND test_bench_motion)
 

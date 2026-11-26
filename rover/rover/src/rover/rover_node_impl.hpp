@@ -33,6 +33,8 @@
 #include "rover/drive_backend.hpp"
 #include "rover/arm_backend.hpp"
 #include "rover/rover_node.hpp"
+#include "../telemetry/telemetry_backend.hpp"
+#include "../telemetry/recovery_snapshot.hpp"
 
 namespace rover
 {
@@ -57,6 +59,8 @@ private:
 
   std::unique_ptr<DriveBackend> drive_backend_;
   std::unique_ptr<ArmBackend> arm_backend_;
+  std::unique_ptr<telemetry::Backend> arm_telemetry_, drive_telemetry_;
+  std::unique_ptr<telemetry::RecoverySnapshot> recovery_snapshot_;
   double ack_delay_{0.15};
   std::string drive_mode_, arm_mode_, law_{"NORMAL"}, override_state_{"INACTIVE"}, gimbal_priority_;
   bool rover_protection_{true}; uint64_t sequence_{0}; std::chrono::steady_clock::time_point last_fma_{std::chrono::steady_clock::now()};

@@ -128,6 +128,8 @@ void MockArmBackend::execute_trajectory(const std::shared_ptr<GoalHandleTrajecto
       }
       auto feedback = std::make_shared<FollowJointTrajectory::Feedback>();
       feedback->joint_names = names;
+      feedback->desired.positions = actual;
+      for (const auto & name : names) feedback->desired.velocities.push_back(velocities[name]);
       feedback->actual.positions = actual;
       for (const auto & name : names) feedback->actual.velocities.push_back(velocities[name]);
       goal_handle->publish_feedback(feedback);

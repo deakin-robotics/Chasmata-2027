@@ -132,6 +132,11 @@ not a rover result and is not included in the rover's `result` enumeration.
 
 ## System Display requirements
 
+The current ARM and DRIVE implementations provide a subset of the requirements
+below. See `rover/rover/src/telemetry/README.md` for the connected topics. A
+1 Hz recovery snapshot reports the available values and identifies categories
+that do not yet have telemetry sources.
+
 | SD page | Required telemetry |
 |---|---|
 | `DRIVE` | Commanded/actual wheel velocity, odometry, motor current/temperature, motor-driver state, faults, and RS485 health. |

@@ -118,6 +118,25 @@ protected:
 };
 
 // The default drive backend retains pending, delayed confirmation, and rejection behavior.
+TEST_F(RoverIntegrationTest, MockTelemetryPublishesJointFeedbackAndTimesOutDriveInput)
+{
+  std::vector<sensor_msgs::msg::JointState> arm_samples, drive_samples;
+  auto arm_sub = client_->create_subscription<sensor_msgs::msg::JointState>("/telemetry/arm/joint_states", 10,
+    [&](sensor_msgs::msg::JointState::SharedPtr message) { arm_samples.push_back(*message); });
+  auto drive_sub = client_->create_subscription<sensor_msgs::msg::JointState>("/telemetry/drive/joint_states", 10,
+    [&](sensor_msgs::msg::JointState::SharedPtr message) { drive_samples.push_back(*message); });
+  ASSERT_TRUE(wait_for([&] { return !arm_samples.empty() && !drive_samples.empty(); }, 2s));
+  EXPECT_EQ(arm_samples.back().name.size(), 6u);
+  ASSERT_EQ(drive_samples.back().velocity.size(), 4u);
+  std_msgs::msg::String mode; mode.data = "VELOCITY";
+  drive_mode_publisher_->publish(mode);
+  ASSERT_TRUE(wait_for([this] { return latest_fma().drive.confirmed == "VELOCITY"; }, 2s));
+  sensor_msgs::msg::Joy joy; joy.axes = {0.0f, -0.5f, 0.0f, 0.0f, 0.0f, 0.0f};
+  drive_joy_publisher_->publish(joy);
+  ASSERT_TRUE(wait_for([&] { return drive_samples.back().velocity[0] > 0.0; }, 1s));
+  EXPECT_TRUE(wait_for([&] { return drive_samples.back().velocity[0] == 0.0; }, 2s));
+}
+
 TEST_F(RoverIntegrationTest, DriveModesPreserveMockAcknowledgementAndRejection)
 {
   std_msgs::msg::String request;

@@ -18,7 +18,7 @@ describe('EcamSystemDisplay', () => {
 
   it('renders the DRIVE schematic by default', () => {
     expect(component.selectedPage()).toBe('DRIVE');
-    expect(fixture.nativeElement.textContent).toContain('DRIVE NORMAL');
+    expect(fixture.nativeElement.textContent).toContain('FL -- rad/s');
   });
 
   it('switches to the selected symbolic system page', () => {

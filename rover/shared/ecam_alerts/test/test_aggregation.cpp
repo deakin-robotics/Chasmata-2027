@@ -70,6 +70,38 @@ protected:
   rclcpp::executors::SingleThreadedExecutor executor_;
 };
 
+TEST_F(EcamAggregationTest, RoverPublishesRecoverySnapshotsWithoutChanges)
+{
+  auto rover = std::make_shared<ecam_alerts::EcamAlertAggregator>("rover", 0.6, "test_periodic_rover");
+  auto observer_node = std::make_shared<rclcpp::Node>("test_periodic_observer");
+  ecam_alerts::EcamAlertSource source(*observer_node, "rover");
+  int count = 0;
+  auto observer = observer_node->create_subscription<telemetry_interfaces::msg::EcamAlerts>(
+    ecam_alerts::kCombinedTopic, ecam_alerts::combined_qos(),
+    [&count](telemetry_interfaces::msg::EcamAlerts::SharedPtr message) { if (message->authority == "rover") ++count; });
+  executor_.add_node(rover);
+  executor_.add_node(observer_node);
+  EXPECT_TRUE(wait_for([&count] { return count >= 2; }, 3s));
+  executor_.remove_node(rover);
+  executor_.remove_node(observer_node);
+}
+
+TEST_F(EcamAggregationTest, RoverDoesNotPublishAnEmptySnapshotBeforeAnySource)
+{
+  auto rover = std::make_shared<ecam_alerts::EcamAlertAggregator>("rover", 0.6, "test_empty_rover");
+  auto observer_node = std::make_shared<rclcpp::Node>("test_empty_observer");
+  int count = 0;
+  auto observer = observer_node->create_subscription<telemetry_interfaces::msg::EcamAlerts>(
+    ecam_alerts::kCombinedTopic, ecam_alerts::combined_qos(),
+    [&count](telemetry_interfaces::msg::EcamAlerts::SharedPtr) { ++count; });
+  executor_.add_node(rover);
+  executor_.add_node(observer_node);
+  spin_for(1200ms);
+  EXPECT_EQ(count, 0);
+  executor_.remove_node(rover);
+  executor_.remove_node(observer_node);
+}
+
 TEST_F(EcamAggregationTest, RoverPrimaryFailsOverAndHandsBackReflectedSources)
 {
   auto rover = std::make_shared<ecam_alerts::EcamAlertAggregator>("rover", 0.6, "test_rover");

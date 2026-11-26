@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { Ros, Topic } from 'roslib';
 
 import { ArmTelemetryService } from '../arm/telemetry/arm-telemetry.service';
+import { DriveTelemetryService } from '../drive/drive-telemetry.service';
 import { ArmOverrideCommand, ArmOverrideState } from '../control/arm/arm-override';
 import { ArmMode, DriveMode, FmaColumn, FmaStateService, LawMode } from '../fma/fma-state.service';
 import { RosConnection } from './ros-connection';
@@ -115,6 +116,7 @@ describe('RosTelemetryBridge', () => {
     TestBed.inject(RosTelemetryBridge);
     const fmaState = TestBed.inject(FmaStateService);
     const armTelemetry = TestBed.inject(ArmTelemetryService);
+    const driveTelemetry = TestBed.inject(DriveTelemetryService);
 
     roverClientState.set(roverClient);
     roverAvailable.set(true);
@@ -124,14 +126,29 @@ describe('RosTelemetryBridge', () => {
       ({ topic }) => topic.ros === roverClient && topic.name === '/fma/state',
     )!;
     const roverJointStates = subscriptions.find(
-      ({ topic }) => topic.ros === roverClient && topic.name === '/arm/joint_states',
+      ({ topic }) => topic.ros === roverClient && topic.name === '/telemetry/arm/joint_states',
     )!;
 
     roverFma.callback(fmaMessage(DriveMode.Velocity));
     expect(getDriveMode(fmaState)).toBe(DriveMode.Velocity);
     expect(fmaState.hasFmaTelemetry()).toBe(true);
-    expect(subscriptions).toHaveLength(2);
+    expect(subscriptions).toHaveLength(10);
     expect(subscriptions.every(({ topic }) => topic.ros === roverClient)).toBe(true);
+
+    const recovery = subscriptions.find(({ topic }) => topic.name === '/telemetry/recovery_snapshot')!;
+    recovery.callback({
+      fma_valid: true, fma: fmaMessage(DriveMode.Manual),
+      arm_joint_valid: true, arm_joints: { name: ['base_joint'], position: [0.1] },
+      arm_status_valid: true, arm_status: { hardware_active: true, feedback_fresh: true, joint_names: ['base_joint'], joint_can_ids: [1] },
+      arm_trajectory_valid: true, arm_trajectory: { name: ['base_joint'], position: [0.4] },
+      drive_joint_valid: true, drive_joints: { name: ['front_left_wheel_joint'], velocity: [1.5] },
+      drive_temperature_valid: [true, false, false, false], drive_temperature_raw: [32, 0, 0, 0],
+    });
+    expect(getDriveMode(fmaState)).toBe(DriveMode.Velocity);
+    expect(armTelemetry.actualJointAngles()).toEqual({ base_joint: 0.1 });
+    expect(armTelemetry.commandFor('base_joint')?.value).toBeCloseTo(0.4 * 180 / Math.PI);
+    expect(driveTelemetry.wheelVelocities()?.['front_left_wheel_joint']).toBe(1.5);
+    expect(driveTelemetry.rawTemperatures()[0]).toBe(32);
 
     roverJointStates.callback({
       name: ['base_joint'],

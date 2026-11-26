@@ -245,6 +245,34 @@ struct ActiveBench
   }
 };
 
+void testTemperatureReadUsesExistingBusOnlyWhenStopped()
+{
+  resetDrives();
+  auto executor = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
+  hardware_interface::HardwareComponentParams p;
+  p.hardware_info = params(true).hardware_info;
+  p.executor = executor;
+  p.clock = std::make_shared<rclcpp::Clock>();
+  Hardware hw;
+  CHECK(hw.init(p) == CallbackReturn::SUCCESS);
+  CHECK(hw.get_node() != nullptr);
+  auto commands = hw.export_command_interfaces();
+  (void)hw.export_state_interfaces();
+  CHECK(hw.on_configure(lifecycle_state) == CallbackReturn::SUCCESS);
+  CHECK(hw.on_activate(lifecycle_state) == CallbackReturn::SUCCESS);
+  for (auto & command : commands) (void)command.set_value(0.0);
+  const auto before = reads_by_address[0x0096];
+  CHECK(cycle(hw) == ReturnType::OK);
+  CHECK(reads_by_address[0x0096] == before + 1);
+  (void)commands[0].set_value(0.5);
+  for (int i = 0; i < 12; ++i) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    CHECK(cycle(hw) == ReturnType::OK);
+  }
+  CHECK(reads_by_address[0x0096] == before + 1);
+  CHECK(hw.on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
+}
+
 void testDisabledRefusesAsToday()
 {
   for (bool explicit_false : {true, false}) {
@@ -1005,6 +1033,7 @@ int main(int argc, char ** argv)
   testBenchParameterRefusals();
   testConfigureRefusals();
   testActivationSequence();
+  testTemperatureReadUsesExistingBusOnlyWhenStopped();
   testPolePairsMismatchRefusesAndStopsAll();
   testMotionConversionAndChangeOnlyWrites();
   testFaultBroadcastsStop();

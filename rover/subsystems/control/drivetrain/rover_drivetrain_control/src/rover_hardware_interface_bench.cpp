@@ -565,6 +565,16 @@ ReturnType RoverHardwareInterface::benchRead()
         staleness(bench_speed_freshness_[w]));
     }
   }
+  if (speed_cycle && telemetry_joint_publisher_ &&
+      std::all_of(raw_speed_state_valid_.begin(), raw_speed_state_valid_.end(), [](bool valid) { return valid; })) {
+    sensor_msgs::msg::JointState sample;
+    sample.header.stamp = get_clock()->now();
+    for (std::size_t w = 0; w < WHEEL_COUNT; ++w) {
+      sample.name.push_back(wheels_[w].joint_name);
+      sample.velocity.push_back(state_velocity_rad_s_[w]);
+    }
+    telemetry_joint_publisher_->publish(sample);
+  }
   return ReturnType::OK;
 }
 
@@ -647,6 +657,29 @@ ReturnType RoverHardwareInterface::benchWrite()
     if (communication_state_[w] == Bld305sDriver::CommunicationState::LOST) {
       return benchSafetyStop(wheels_[w].joint_name + " (ID " + std::to_string(id) + ") lost");
     }
+  }
+  // Poll one optional temperature register only while stationary and when the
+  // remaining cycle budget covers two full response timeouts plus a margin.
+  // This uses the existing bus owner, outside the mandatory control cycle.
+  const auto telemetry_now = steadyNowNs();
+  const auto period_ns = static_cast<std::int64_t>(1e9 / timing_.update_hz);
+  const auto reserve_ns = 2 * std::chrono::duration_cast<std::chrono::nanoseconds>(
+    bus_config_.response_timeout).count() + 25000000;
+  const bool stationary = std::all_of(command_velocity_rad_s_.begin(), command_velocity_rad_s_.end(),
+    [](double value) { return std::isfinite(value) && std::abs(value) < 1e-6; }) &&
+    std::all_of(raw_speed_state_valid_.begin(), raw_speed_state_valid_.end(), [](bool valid) { return valid; }) &&
+    std::all_of(raw_speed_state_.begin(), raw_speed_state_.end(),
+      [](std::uint16_t speed) { return speed <= core::BENCH_NEAR_ZERO_MOTOR_RPM; });
+  if (temperature_publisher_ && stationary && telemetry_now >= next_temperature_poll_ns_ &&
+      telemetry_now - previous_read_tick_ns_ + reserve_ns < period_ns) {
+    std::uint16_t raw = 0;
+    const auto wheel = temperature_wheel_;
+    const bool ok = static_cast<bool>(driver_->readTemperatureRaw(wheels_[wheel].slave_id, raw));
+    std_msgs::msg::Int32MultiArray sample;
+    sample.data = {static_cast<std::int32_t>(wheel), ok ? static_cast<std::int32_t>(raw) : -1};
+    temperature_publisher_->publish(sample);
+    temperature_wheel_ = (wheel + 1) % WHEEL_COUNT;
+    next_temperature_poll_ns_ = steadyNowNs() + 1000000000;
   }
   return ReturnType::OK;
 }

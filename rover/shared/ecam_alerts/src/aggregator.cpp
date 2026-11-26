@@ -54,6 +54,9 @@ EcamAlertAggregator::EcamAlertAggregator(const std::string & role_override,
   combined_subscription_ = create_subscription<telemetry_interfaces::msg::EcamAlerts>(
     kCombinedTopic, combined_qos(),
     std::bind(&EcamAlertAggregator::on_combined_snapshot, this, std::placeholders::_1));
+  snapshot_timer_ = create_wall_timer(std::chrono::seconds(1), [this] {
+    if ((role_ == "rover" || taking_over_) && !source_state_.snapshots().empty()) publish_combined();
+  });
 
   if (role_ == "basestation") {
     base_station_alerts_ = std::make_unique<EcamAlertSource>(*this, "basestation");

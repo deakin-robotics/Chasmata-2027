@@ -11,6 +11,8 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
+find_package(arm_interfaces REQUIRED)
+find_package(action_msgs REQUIRED)
 find_package(control_msgs REQUIRED)
 find_package(dcr_arm_driver REQUIRED)
 find_package(geometry_msgs REQUIRED)
@@ -41,7 +43,7 @@ target_include_directories(rover_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 ament_target_dependencies(rover_node
-  control_msgs controller_manager_msgs dcr_arm_driver geometry_msgs rclcpp rclcpp_action sensor_msgs std_msgs std_srvs telemetry_interfaces)
+  action_msgs arm_interfaces control_msgs controller_manager_msgs dcr_arm_driver geometry_msgs rclcpp rclcpp_action sensor_msgs std_msgs std_srvs telemetry_interfaces)
 
 add_executable(rover src/rover/rover_main.cpp)
 target_link_libraries(rover rover_node)
@@ -65,6 +67,8 @@ if(BUILD_TESTING)
   find_package(can_msgs REQUIRED)
   find_package(arm_interfaces REQUIRED)
   find_package(action_msgs REQUIRED)
+  ament_add_gtest(test_telemetry_backends test/test_telemetry_backends.cpp)
+  ament_target_dependencies(test_telemetry_backends action_msgs arm_interfaces control_msgs dcr_arm_driver geometry_msgs rclcpp sensor_msgs std_msgs telemetry_interfaces)
   ament_add_gtest(test_joint_simulator test/test_joint_simulator.cpp)
   target_link_libraries(test_joint_simulator rover_simulation)
   ament_add_gtest(test_rover_integration test/test_rover_integration.cpp)

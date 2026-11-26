@@ -205,9 +205,12 @@ The current System Display page set is:
 
 ### Current System Display implementation
 
-The current GUI implementation provides the following six SD pages. The values
-shown in these screenshots are mock telemetry pending the live rover telemetry
-contract.
+The current GUI implementation provides the following six SD pages. The ARM
+page displays joint feedback, direct commands, sensor status, motor temperature and current, and
+the DRIVE page displays wheel velocities and commands, from the selected Rover
+telemetry backends. Other fields on
+those pages remain unavailable until their telemetry is connected. POWER, LINK,
+CAMERA and SYSTEM still show mock values. The screenshots illustrate the layouts.
 
 ![Current DRIVE System Display page](../assets/system_display/drive.png)
 

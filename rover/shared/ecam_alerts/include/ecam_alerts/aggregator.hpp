@@ -57,5 +57,6 @@ private:
   rclcpp::Subscription<telemetry_interfaces::msg::EcamAlerts>::SharedPtr combined_subscription_;
   rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr heartbeat_subscription_;
   rclcpp::TimerBase::SharedPtr liveness_timer_;
+  rclcpp::TimerBase::SharedPtr snapshot_timer_;
 };
 }  // namespace ecam_alerts

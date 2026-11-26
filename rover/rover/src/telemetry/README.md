@@ -1,0 +1,34 @@
+# Rover telemetry
+
+Telemetry backends are selected alongside the corresponding control backend.
+ARM and DRIVE publish the same topics in mock and real modes. Disabled control
+backends do not publish simulated subsystem telemetry.
+
+| Topic | Type | Source |
+| --- | --- | --- |
+| `/telemetry/arm/joint_states` | `sensor_msgs/msg/JointState` | Mock or real `/arm/joint_states` |
+| `/telemetry/arm/status` | `telemetry_interfaces/msg/ArmControlStatus` | Simulated status or real `/arm/control/status` |
+| `/telemetry/arm/motor_status` | `arm_interfaces/msg/MotorStat1` | Simulated data or real `/motor_stat_1` |
+| `/telemetry/arm/commands` | `dcr_arm_driver/msg/DirectDrive` | Simulated Manual commands or real direct-drive commands |
+| `/telemetry/arm/trajectory_commands` | `sensor_msgs/msg/JointState` | Desired positions from mock or real trajectory feedback |
+| `/telemetry/drive/joint_states` | `sensor_msgs/msg/JointState` | Simulated wheels or `/drivetrain/validated_joint_states` |
+| `/telemetry/drive/commands` | `sensor_msgs/msg/JointState` | Simulated commands or the active controller command stream |
+| `/telemetry/drive/temperature_raw` | `std_msgs/msg/Int32MultiArray` | Wheel index and raw temperature register, or `-1` on a failed read |
+| `/telemetry/recovery_snapshot` | `telemetry_interfaces/msg/RecoverySnapshot` | Fresh current data and explicit unavailable fields, once per second |
+
+The mock drive is a simple joystick-driven simulation in radians per second,
+not a hardware model. Real wheel values are those supplied by the active
+drivetrain's successful speed polls. Other DRIVE and ARM SD fields are not yet
+provided by these contracts. POWER, LINK, CAMERA and SYSTEM backends are
+scaffolding and are not started.
+
+The recovery snapshot includes FMA and ECAM state, available ARM and DRIVE
+values, per-field validity, and explicit unavailable categories. Stale samples
+are omitted or marked invalid. The GUI uses it on reconnection without
+overwriting newer live data. ECAM continues to use its own authority and
+failover path.
+
+The active bench driver polls one temperature register per second only while
+stationary and only when enough cycle time remains for two response timeouts
+and a margin. The values are raw register counts; the GUI does not assume a
+temperature conversion. No additional serial connection is opened.

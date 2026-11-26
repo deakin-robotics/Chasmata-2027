@@ -7,6 +7,8 @@
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>arm_interfaces</depend>
+  <depend>action_msgs</depend>
   <depend>control_msgs</depend>
   <depend>dcr_arm_driver</depend>
   <depend>geometry_msgs</depend>
@@ -26,8 +28,6 @@
   <test_depend>hardware_interface</test_depend>
   <test_depend>rclcpp_lifecycle</test_depend>
   <test_depend>can_msgs</test_depend>
-  <test_depend>arm_interfaces</test_depend>
-  <test_depend>action_msgs</test_depend>
 
   <export><build_type>ament_cmake</build_type></export>
 </package>

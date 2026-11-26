@@ -12,6 +12,9 @@
 #include <rclcpp/duration.hpp>
 #include <rclcpp/time.hpp>
 #include <rclcpp_lifecycle/state.hpp>
+#include <rclcpp/publisher.hpp>
+#include <std_msgs/msg/int32_multi_array.hpp>
+#include <sensor_msgs/msg/joint_state.hpp>
 
 #include <array>
 #include <atomic>
@@ -138,6 +141,10 @@ private:
 
   std::array<std::uint16_t, WHEEL_COUNT> raw_speed_state_{};
   std::array<bool, WHEEL_COUNT> raw_speed_state_valid_{};
+  rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr temperature_publisher_;
+  rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr telemetry_joint_publisher_;
+  std::size_t temperature_wheel_{0};
+  std::int64_t next_temperature_poll_ns_{0};
 
   std::array<Bld305sDriver::CommunicationState, WHEEL_COUNT>
     communication_state_{};
