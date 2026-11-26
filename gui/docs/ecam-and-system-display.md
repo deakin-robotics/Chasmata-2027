@@ -194,8 +194,8 @@ A local browser failure should identify its station. For example, a Driver brows
 
 The current System Display page set is:
 
-- `DRIVE` — wheel and motor status, commanded versus actual motion, controller health, and drive faults.
-- `ARM` — joint positions, soft limits, position-sensor validity, protection state, and planner status.
+- `DRIVE` — wheel telemetry, commanded versus actual motion, and odometry.
+- `ARM` — joint telemetry, motor current and temperature, and planner status.
 - `POWER` — battery voltage, current draw, power-rail health, and subsystem power where available.
 - `LINK` — ROS/network health, latency, packet loss, and controller connections.
 - `CAMERA` — feed availability and stream health.

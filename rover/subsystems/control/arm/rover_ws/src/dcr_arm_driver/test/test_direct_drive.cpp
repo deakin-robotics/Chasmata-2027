@@ -649,3 +649,13 @@ TEST(MotorProtocol, GdzV307CommandVectors) {
   const auto position = motor.position_control(1, 360);
   EXPECT_EQ(position.data, (std::array<uint8_t, 8>{0xc2,0,0x40,0,0,0,0,0}));
 }
+
+TEST(MotorProtocol, PreservesRawFaultBitsInStatus) {
+  dcr_arm_driver::Motor motor;
+  can_msgs::msg::Frame frame;
+  frame.id = 3;
+  frame.data[7] = 0x84;
+  const auto status = motor.read_status_2(frame);
+  EXPECT_EQ(status.id, 3);
+  EXPECT_EQ(status.fault_bits, 0x84);
+}

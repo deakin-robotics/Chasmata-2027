@@ -61,6 +61,8 @@ TEST(TelemetryBackends, SnapshotRecoversFreshDataAndExpiresStoppedSources)
   auto trajectory_input = node->create_publisher<sensor_msgs::msg::JointState>("/telemetry/arm/trajectory_commands", 10);
   auto motor_input = node->create_publisher<arm_interfaces::msg::MotorStat1>("/telemetry/arm/motor_status", 10);
   auto temp_input = node->create_publisher<std_msgs::msg::Int32MultiArray>("/telemetry/drive/temperature_raw", 10);
+  auto current_input = node->create_publisher<std_msgs::msg::Int32MultiArray>("/telemetry/drive/current_raw", 10);
+  auto odom_input = node->create_publisher<nav_msgs::msg::Odometry>("/telemetry/drive/odometry", 10);
   auto fma_input = node->create_publisher<telemetry_interfaces::msg::FmaState>("/fma/state", rclcpp::QoS(1).reliable().transient_local());
   auto ecam_input = node->create_publisher<telemetry_interfaces::msg::EcamAlerts>("/ecam/alerts", rclcpp::QoS(1).reliable().transient_local());
   std::vector<telemetry_interfaces::msg::RecoverySnapshot> received;
@@ -72,12 +74,14 @@ TEST(TelemetryBackends, SnapshotRecoversFreshDataAndExpiresStoppedSources)
   sensor_msgs::msg::JointState arm; arm.name = {"base_joint"}; arm.position = {0.4};
   arm_interfaces::msg::MotorStat1 motor; motor.id = 1; motor.temp = 45; motor.current = 1.2;
   std_msgs::msg::Int32MultiArray temp; temp.data = {0, 42};
+  std_msgs::msg::Int32MultiArray current; current.data = {0, 12};
+  nav_msgs::msg::Odometry odom; odom.pose.pose.position.x = 2.5;
   telemetry_interfaces::msg::FmaState fma; fma.drive.confirmed = "MANUAL";
   telemetry_interfaces::msg::EcamAlerts ecam; ecam.authority = "rover";
   const auto until = std::chrono::steady_clock::now() + 3s;
   while (received.empty() && std::chrono::steady_clock::now() < until) {
     input->publish(sample); arm_input->publish(arm); trajectory_input->publish(arm);
-    motor_input->publish(motor); temp_input->publish(temp); fma_input->publish(fma); ecam_input->publish(ecam);
+    motor_input->publish(motor); temp_input->publish(temp); current_input->publish(current); odom_input->publish(odom); fma_input->publish(fma); ecam_input->publish(ecam);
     rclcpp::spin_some(node); std::this_thread::sleep_for(20ms);
   }
   ASSERT_FALSE(received.empty());
@@ -92,6 +96,10 @@ TEST(TelemetryBackends, SnapshotRecoversFreshDataAndExpiresStoppedSources)
   EXPECT_EQ(received.back().arm_motors[0].temperature, 45);
   EXPECT_TRUE(received.back().drive_temperature_valid[0]);
   EXPECT_EQ(received.back().drive_temperature_raw[0], 42);
+  EXPECT_TRUE(received.back().drive_current_valid[0]);
+  EXPECT_EQ(received.back().drive_current_raw[0], 12);
+  EXPECT_TRUE(received.back().drive_odometry_valid);
+  EXPECT_DOUBLE_EQ(received.back().drive_odometry.pose.pose.position.x, 2.5);
   EXPECT_FALSE(received.back().unavailable_fields.empty());
   const auto previous = received.size();
   const auto stale_until = std::chrono::steady_clock::now() + 4s;

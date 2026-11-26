@@ -9,6 +9,9 @@ export class ArmTelemetryService implements OnDestroy {
   private statusExpiry: ReturnType<typeof setTimeout> | undefined;
   private readonly feedbackStatusState = signal<boolean | null>(null);
   readonly feedbackStatus = this.feedbackStatusState.asReadonly();
+  private readonly plannerState = signal<string | null>(null);
+  readonly planner = this.plannerState.asReadonly();
+  private plannerExpiry: ReturnType<typeof setTimeout> | undefined;
   private readonly motorState = signal<Readonly<Record<number, { temperature: number; current: number }>>>({});
   readonly motors = this.motorState.asReadonly();
   private readonly motorExpiry = new Map<number, ReturnType<typeof setTimeout>>();
@@ -25,6 +28,19 @@ export class ArmTelemetryService implements OnDestroy {
 
   readonly actualJointAngles = this.actualJointAnglesState.asReadonly();
   readonly actualJointVelocities = this.actualJointVelocitiesState.asReadonly();
+
+  setPlanner(value: unknown): void {
+    if (typeof value !== 'string' || !['PLANNING', 'EXECUTING', 'SUCCEEDED', 'CANCELED', 'FAILED'].includes(value)) return;
+    this.plannerState.set(value === 'FAILED' ? null : value);
+    if (this.plannerExpiry) clearTimeout(this.plannerExpiry);
+    this.plannerExpiry = setTimeout(() => this.clearPlanner(), 20000);
+  }
+
+  clearPlanner(): void {
+    if (this.plannerExpiry) clearTimeout(this.plannerExpiry);
+    this.plannerExpiry = undefined;
+    this.plannerState.set(null);
+  }
 
   setFeedbackStatus(active: unknown, fresh: unknown): void {
     if (typeof active !== 'boolean' || typeof fresh !== 'boolean') return;
@@ -159,5 +175,5 @@ export class ArmTelemetryService implements OnDestroy {
     this.actualJointVelocitiesState.set(null);
   }
 
-  ngOnDestroy(): void { this.clear(); }
+  ngOnDestroy(): void { this.clear(); this.clearPlanner(); }
 }

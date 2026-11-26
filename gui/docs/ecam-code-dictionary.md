@@ -28,12 +28,14 @@ will be added after the responsible leads confirm the required operator steps.
 |---|---|---|---|---|
 | `BASE_STATION_HEARTBEAT_LOST` | ARM | warning | BASE STATION HEARTBEAT LOST | The base-station heartbeat is no longer received. |
 | `ARM_CAN_FAULT` | ARM | fault | ARM CAN FAULT | Communication fault reported on the arm CAN interface. |
+| `ARM_CONTROL_FAULT` | ARM | fault | ARM CONTROL FAULT | The arm driver reports a latched control or safety fault. |
 | `ARM_JOINT_FAULT` | ARM | fault | ARM JOINT FAULT | One or more arm joints report a fault. |
 | `ARM_JOINT_LIMIT` | ARM | warning | ARM JOINT LIMIT | An arm joint reports a configured limit condition. |
 | `ARM_OVERTEMPERATURE` | ARM | warning | ARM OVERTEMPERATURE | Arm motor or joint temperature is above its permitted range. |
 | `ARM_PLANNER_FAULT` | ARM | fault | ARM PLANNER FAULT | The arm motion planner reports a fault. |
 | `ARM_PLANNER_TIMEOUT` | ARM | warning | ARM PLANNER TIMEOUT | The arm motion planner does not complete within its allowed time. |
 | `ARM_POSITION_SENSOR_INVALID` | ARM | fault | ARM POSITION SENSOR INVALID | Arm joint-position feedback is invalid, stale, or out of range. |
+| `ARM_POSITION_REQUEST_FAILED` | ARM | warning | ARM POSITION REQUEST FAILED | A requested arm position operation did not complete. |
 | `ARM_PROTECTION_UNAVAILABLE` | ARM | warning | ARM PROTECTION UNAVAILABLE | Required arm protection is unavailable. |
 | `ARM_TELEMETRY_UNAVAILABLE` | ARM | warning | ARM TELEMETRY UNAVAILABLE | Required arm telemetry is unavailable or stale. |
 | `CAMERA_ARM_LOST` | CAMERA | attention | ARM CAMERA LOST | The Arm camera is unavailable. |
@@ -92,6 +94,7 @@ will be added after the responsible leads confirm the required operator steps.
 | `SYSTEM_CRITICAL_FAULT` | SYSTEM | fault | SYSTEM CRITICAL FAULT | The system reports a critical fault requiring operator attention. |
 | `SYSTEM_DIAGNOSTICS_UNAVAILABLE` | SYSTEM | warning | SYSTEM DIAGNOSTICS UNAVAILABLE | Required system diagnostics are unavailable. |
 | `SYSTEM_ESTOP_ACTIVE` | SYSTEM | fault | E-STOP ACTIVE | The rover E-stop is active. |
+| `SYSTEM_ESTOP_UNAVAILABLE` | SYSTEM | fault | E-STOP STATUS UNAVAILABLE | The required E-stop heartbeat is missing or stale. |
 | `SYSTEM_LED_FAULT` | SYSTEM | warning | LED FAULT | A monitored system LED reports a fault. |
 | `SYSTEM_MEMORY_HIGH` | SYSTEM | warning | MEMORY USE HIGH | Memory usage exceeds the configured acceptable range. |
 | `SYSTEM_ROS_NODE_FAULT` | SYSTEM | fault | ROS NODE FAULT | A required ROS node reports a fault. |

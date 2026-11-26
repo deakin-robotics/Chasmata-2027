@@ -14,9 +14,11 @@
 #include <sensor_msgs/msg/joy.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/empty.hpp>
+#include <std_msgs/msg/int32_multi_array.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <std_srvs/srv/trigger.hpp>
 #include <telemetry_interfaces/msg/fma_state.hpp>
+#include <telemetry_interfaces/msg/ecam_alert_source_snapshot.hpp>
 #include <trajectory_msgs/msg/joint_trajectory_point.hpp>
 
 #include "rover/rover_node.hpp"
@@ -118,6 +120,25 @@ protected:
 };
 
 // The default drive backend retains pending, delayed confirmation, and rejection behavior.
+TEST_F(RoverIntegrationTest, MockSubsystemFaultsRaiseAndClearEcam)
+{
+  auto drive = client_->create_publisher<std_msgs::msg::Int32MultiArray>("/mock/drive/fault", 10);
+  auto arm = client_->create_publisher<std_msgs::msg::Int32MultiArray>("/mock/arm/fault", 10);
+  std::vector<std::string> codes;
+  auto alerts = client_->create_subscription<telemetry_interfaces::msg::EcamAlertSourceSnapshot>(
+    "/ecam/alerts/source", rclcpp::QoS(1).reliable().transient_local(),
+    [&](const telemetry_interfaces::msg::EcamAlertSourceSnapshot & message) { if (message.source == "rover") codes = message.active_codes; });
+  auto has = [&](const std::string & code) { return std::find(codes.begin(), codes.end(), code) != codes.end(); };
+  ASSERT_TRUE(wait_for([&] { return drive->get_subscription_count() > 0 && arm->get_subscription_count() > 0; }, 2s));
+  std_msgs::msg::Int32MultiArray drive_fault; drive_fault.data = {0, 2};
+  std_msgs::msg::Int32MultiArray arm_fault; arm_fault.data = {1, 4};
+  drive->publish(drive_fault); arm->publish(arm_fault);
+  ASSERT_TRUE(wait_for([&] { return has("DRIVE_FL_OVERTEMPERATURE") && has("ARM_OVERTEMPERATURE"); }, 3s));
+  drive_fault.data[1] = 0; arm_fault.data[1] = 0;
+  drive->publish(drive_fault); arm->publish(arm_fault);
+  EXPECT_TRUE(wait_for([&] { return !has("DRIVE_FL_OVERTEMPERATURE") && !has("ARM_OVERTEMPERATURE"); }, 3s));
+}
+
 TEST_F(RoverIntegrationTest, MockTelemetryPublishesJointFeedbackAndTimesOutDriveInput)
 {
   std::vector<sensor_msgs::msg::JointState> arm_samples, drive_samples;

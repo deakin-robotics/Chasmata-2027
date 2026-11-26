@@ -26,9 +26,10 @@ add_executable(ecam_alert_aggregator src/ecam_alert_aggregator_main.cpp)
 target_link_libraries(ecam_alert_aggregator ecam_alerts)
 ament_target_dependencies(ecam_alert_aggregator rclcpp)
 
-install(TARGETS ecam_alerts ecam_alert_aggregator
+install(TARGETS ecam_alerts
   EXPORT export_${PROJECT_NAME}
   ARCHIVE DESTINATION lib LIBRARY DESTINATION lib RUNTIME DESTINATION lib/${PROJECT_NAME})
+install(TARGETS ecam_alert_aggregator RUNTIME DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY include/ DESTINATION include)
 install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch)
 install(FILES README.md DESTINATION share/${PROJECT_NAME})

@@ -3,3 +3,4 @@ float64 busv
 float64 busc
 string mode
 string fault
+uint8 fault_bits

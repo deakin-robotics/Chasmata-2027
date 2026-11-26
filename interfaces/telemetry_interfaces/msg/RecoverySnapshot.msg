@@ -7,6 +7,8 @@ bool arm_joint_valid
 sensor_msgs/JointState arm_joints
 bool arm_status_valid
 telemetry_interfaces/ArmControlStatus arm_status
+bool arm_planner_valid
+telemetry_interfaces/ArmMoveItStatus arm_planner
 telemetry_interfaces/RecoveryMotorStatus[] arm_motors
 telemetry_interfaces/RecoveryArmCommand[] arm_commands
 bool arm_trajectory_valid
@@ -15,6 +17,14 @@ bool drive_joint_valid
 sensor_msgs/JointState drive_joints
 bool drive_command_valid
 sensor_msgs/JointState drive_commands
+bool drive_odometry_valid
+nav_msgs/Odometry drive_odometry
+bool drive_linear_command_valid
+geometry_msgs/TwistStamped drive_linear_command
 int32[4] drive_temperature_raw
 bool[4] drive_temperature_valid
+int32[4] drive_current_raw
+bool[4] drive_current_valid
+bool global_estop_valid
+bool global_estop_asserted
 string[] unavailable_fields

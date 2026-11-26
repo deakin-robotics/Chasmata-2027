@@ -8,6 +8,15 @@ export class DriveTelemetryService implements OnDestroy {
   readonly wheelCommands = this.commandState.asReadonly();
   private readonly temperatureState = signal<Readonly<Record<number, number>>>({});
   readonly rawTemperatures = this.temperatureState.asReadonly();
+  private readonly currentState = signal<Readonly<Record<number, number>>>({});
+  readonly rawCurrents = this.currentState.asReadonly();
+  private readonly odometryState = signal<{ x: number; speed: number } | null>(null);
+  readonly odometry = this.odometryState.asReadonly();
+  private readonly linearCommandState = signal<number | null>(null);
+  readonly linearCommand = this.linearCommandState.asReadonly();
+  private odometryExpiry: ReturnType<typeof setTimeout> | undefined;
+  private linearCommandExpiry: ReturnType<typeof setTimeout> | undefined;
+  private readonly currentExpiry = new Map<number, ReturnType<typeof setTimeout>>();
   private readonly temperatureExpiry = new Map<number, ReturnType<typeof setTimeout>>();
   private expiry: ReturnType<typeof setTimeout> | undefined;
   private commandExpiry: ReturnType<typeof setTimeout> | undefined;
@@ -54,7 +63,46 @@ export class DriveTelemetryService implements OnDestroy {
     this.temperatureExpiry.set(wheel, setTimeout(() => {
       this.temperatureState.update((values) => { const next = { ...values }; delete next[wheel]; return next; });
       this.temperatureExpiry.delete(wheel);
-    }, 8000));
+    }, 10000));
+  }
+
+  setCurrent(data: unknown): void {
+    if (!Array.isArray(data) || data.length !== 2) return;
+    const [wheel, raw] = data;
+    if (typeof wheel !== 'number' || !Number.isInteger(wheel) || wheel < 0 || wheel > 3 ||
+        typeof raw !== 'number' || !Number.isInteger(raw)) return;
+    const previous = this.currentExpiry.get(wheel);
+    if (previous) clearTimeout(previous);
+    if (raw < 0) {
+      this.currentState.update((values) => { const next = { ...values }; delete next[wheel]; return next; });
+      this.currentExpiry.delete(wheel);
+      return;
+    }
+    this.currentState.update((values) => ({ ...values, [wheel]: raw }));
+    this.currentExpiry.set(wheel, setTimeout(() => {
+      this.currentState.update((values) => { const next = { ...values }; delete next[wheel]; return next; });
+      this.currentExpiry.delete(wheel);
+    }, 10000));
+  }
+
+  setOdometry(message: unknown): void {
+    if (!message || typeof message !== 'object') return;
+    const odom = message as { pose?: { pose?: { position?: { x?: unknown } } }; twist?: { twist?: { linear?: { x?: unknown } } } };
+    const x = odom.pose?.pose?.position?.x;
+    const speed = odom.twist?.twist?.linear?.x;
+    if (typeof x !== 'number' || !Number.isFinite(x) || typeof speed !== 'number' || !Number.isFinite(speed)) return;
+    this.odometryState.set({ x, speed });
+    if (this.odometryExpiry) clearTimeout(this.odometryExpiry);
+    this.odometryExpiry = setTimeout(() => { this.odometryState.set(null); }, 1500);
+  }
+
+  setLinearCommand(message: unknown): void {
+    if (!message || typeof message !== 'object') return;
+    const speed = (message as { twist?: { linear?: { x?: unknown } } }).twist?.linear?.x;
+    if (typeof speed !== 'number' || !Number.isFinite(speed)) return;
+    this.linearCommandState.set(speed);
+    if (this.linearCommandExpiry) clearTimeout(this.linearCommandExpiry);
+    this.linearCommandExpiry = setTimeout(() => { this.linearCommandState.set(null); }, 1500);
   }
 
   clear(): void {
@@ -66,6 +114,14 @@ export class DriveTelemetryService implements OnDestroy {
     for (const timer of this.temperatureExpiry.values()) clearTimeout(timer);
     this.temperatureExpiry.clear();
     this.temperatureState.set({});
+    for (const timer of this.currentExpiry.values()) clearTimeout(timer);
+    this.currentExpiry.clear();
+    this.currentState.set({});
+    if (this.odometryExpiry) clearTimeout(this.odometryExpiry);
+    if (this.linearCommandExpiry) clearTimeout(this.linearCommandExpiry);
+    this.odometryExpiry = this.linearCommandExpiry = undefined;
+    this.odometryState.set(null);
+    this.linearCommandState.set(null);
     this.state.set(null);
   }
 

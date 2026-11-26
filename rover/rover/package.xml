@@ -10,8 +10,10 @@
   <depend>arm_interfaces</depend>
   <depend>action_msgs</depend>
   <depend>control_msgs</depend>
+  <depend>can_msgs</depend>
   <depend>dcr_arm_driver</depend>
   <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
   <depend>controller_manager_msgs</depend>
   <depend>ecam_alerts</depend>
   <depend>rclcpp</depend>
@@ -27,7 +29,6 @@
   <test_depend>ament_cmake_gtest</test_depend>
   <test_depend>hardware_interface</test_depend>
   <test_depend>rclcpp_lifecycle</test_depend>
-  <test_depend>can_msgs</test_depend>
 
   <export><build_type>ament_cmake</build_type></export>
 </package>

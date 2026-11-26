@@ -9,6 +9,7 @@ import { ArmTelemetryService } from '../../../../../core/arm/telemetry/arm-telem
 export class ArmPage {
   private readonly telemetry = inject(ArmTelemetryService);
   readonly feedbackStatus = this.telemetry.feedbackStatus;
+  readonly planner = this.telemetry.planner;
   command(name: string): string {
     const command = this.telemetry.commandFor(name);
     return command ? `${command.value.toFixed(1)} ${command.mode === 1 ? 'deg' : 'RPM'}` : '--';

@@ -70,6 +70,9 @@ RoverNode::RoverNode(std::unique_ptr<DriveBackend> drive_backend, const rclcpp::
     get_parameter("drive_wheel_radius").as_double(), get_parameter("drive_wheel_separation").as_double(),
     [this] { return drive_backend_->confirmed_mode_valid() ? drive_mode_ : std::string{}; });
 
+  fault_monitor_ = std::make_unique<telemetry::FaultMonitor>(*this,
+    arm_backend != "disabled", drive_telemetry_backend != "disabled", arm_backend == "real",
+    arm_backend == "real", drive_telemetry_backend == "real");
   recovery_snapshot_ = std::make_unique<telemetry::RecoverySnapshot>(*this);
 
   const auto retained = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();

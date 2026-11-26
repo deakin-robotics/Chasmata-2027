@@ -149,6 +149,7 @@ arm_interfaces::msg::MotorStat2 Motor::read_status_2(
   
   // Fault flags (byte 7)
   uint8_t fault = can_stat.data[7];
+  stat.fault_bits = fault;
   std::stringstream fault_stream;
   fault_stream << "Faults: ";
   

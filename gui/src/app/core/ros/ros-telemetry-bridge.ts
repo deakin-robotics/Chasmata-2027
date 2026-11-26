@@ -3,6 +3,7 @@ import { Topic } from 'roslib';
 
 import { ArmTelemetryService } from '../arm/telemetry/arm-telemetry.service';
 import { DriveTelemetryService } from '../drive/drive-telemetry.service';
+import { BaseStationConnection } from './base-station-connection';
 import { ArmJointState } from '../arm/ik/arm-ik-types';
 import { ArmOverrideCommand, ArmOverrideState } from '../control/arm/arm-override';
 import {
@@ -52,17 +53,34 @@ export class RosTelemetryBridge {
   private readonly fmaState = inject(FmaStateService);
   private readonly armTelemetry = inject(ArmTelemetryService);
   private readonly driveTelemetry = inject(DriveTelemetryService);
+  private readonly baseStation = inject(BaseStationConnection);
 
   private roverFmaTopic: Topic | null = null;
   private jointStateTopic: Topic | null = null;
   private driveTelemetryTopic: Topic | null = null;
   private driveCommandTopic: Topic | null = null;
   private driveTemperatureTopic: Topic | null = null;
+  private driveCurrentTopic: Topic | null = null;
+  private driveOdometryTopic: Topic | null = null;
+  private driveLinearCommandTopic: Topic | null = null;
   private armStatusTopic: Topic | null = null;
   private armMotorTopic: Topic | null = null;
   private armCommandTopic: Topic | null = null;
   private armTrajectoryTopic: Topic | null = null;
   private recoveryTopic: Topic | null = null;
+  private plannerTopic: Topic | null = null;
+
+  private readonly plannerEffect = effect((onCleanup) => {
+    const client = this.baseStation.client();
+    if (!client || !this.heartbeatMonitor.baseStationAvailable()) { this.armTelemetry.clearPlanner(); return; }
+    const topic = new Topic({ ros: client, name: '/arm/moveit/status', messageType: 'telemetry_interfaces/msg/ArmMoveItStatus' });
+    this.plannerTopic = topic;
+    topic.subscribe((message) => {
+      if (this.baseStation.client() !== client || this.plannerTopic !== topic || !this.heartbeatMonitor.baseStationAvailable()) return;
+      this.armTelemetry.setPlanner((message as { state?: unknown }).state);
+    });
+    onCleanup(() => { topic.unsubscribe(); if (this.plannerTopic === topic) this.plannerTopic = null; this.armTelemetry.clearPlanner(); });
+  });
 
   private readonly roverTelemetryEffect = effect((onCleanup) => {
     const client = this.rosConnection.client();
@@ -160,6 +178,28 @@ export class RosTelemetryBridge {
       if (Array.isArray(data) && typeof data[0] === 'number') liveReceived.add(`drive_temperature:${data[0]}`);
       this.driveTelemetry.setTemperature(data);
     });
+    const driveCurrentTopic = new Topic({ ros: client, name: '/telemetry/drive/current_raw', messageType: 'std_msgs/msg/Int32MultiArray' });
+    this.driveCurrentTopic = driveCurrentTopic;
+    driveCurrentTopic.subscribe((message) => {
+      if (this.rosConnection.client() !== client || this.driveCurrentTopic !== driveCurrentTopic || !this.heartbeatMonitor.roverAvailable()) return;
+      const data = (message as { data?: unknown }).data;
+      if (Array.isArray(data) && typeof data[0] === 'number') liveReceived.add(`drive_current:${data[0]}`);
+      this.driveTelemetry.setCurrent(data);
+    });
+    const driveOdometryTopic = new Topic({ ros: client, name: '/telemetry/drive/odometry', messageType: 'nav_msgs/msg/Odometry' });
+    this.driveOdometryTopic = driveOdometryTopic;
+    driveOdometryTopic.subscribe((message) => {
+      if (this.rosConnection.client() !== client || this.driveOdometryTopic !== driveOdometryTopic || !this.heartbeatMonitor.roverAvailable()) return;
+      liveReceived.add('drive_odometry');
+      this.driveTelemetry.setOdometry(message);
+    });
+    const driveLinearCommandTopic = new Topic({ ros: client, name: '/telemetry/drive/linear_command', messageType: 'geometry_msgs/msg/TwistStamped' });
+    this.driveLinearCommandTopic = driveLinearCommandTopic;
+    driveLinearCommandTopic.subscribe((message) => {
+      if (this.rosConnection.client() !== client || this.driveLinearCommandTopic !== driveLinearCommandTopic || !this.heartbeatMonitor.roverAvailable()) return;
+      liveReceived.add('drive_linear_command');
+      this.driveTelemetry.setLinearCommand(message);
+    });
     this.roverFmaTopic = fmaTopic;
     this.jointStateTopic = jointStateTopic;
 
@@ -192,6 +232,9 @@ export class RosTelemetryBridge {
       driveTelemetryTopic.unsubscribe();
       driveCommandTopic.unsubscribe();
       driveTemperatureTopic.unsubscribe();
+      driveCurrentTopic.unsubscribe();
+      driveOdometryTopic.unsubscribe();
+      driveLinearCommandTopic.unsubscribe();
       armStatusTopic.unsubscribe();
       armMotorTopic.unsubscribe();
       armCommandTopic.unsubscribe();
@@ -202,6 +245,9 @@ export class RosTelemetryBridge {
       if (this.driveTelemetryTopic === driveTelemetryTopic) this.driveTelemetryTopic = null;
       if (this.driveCommandTopic === driveCommandTopic) this.driveCommandTopic = null;
       if (this.driveTemperatureTopic === driveTemperatureTopic) this.driveTemperatureTopic = null;
+      if (this.driveCurrentTopic === driveCurrentTopic) this.driveCurrentTopic = null;
+      if (this.driveOdometryTopic === driveOdometryTopic) this.driveOdometryTopic = null;
+      if (this.driveLinearCommandTopic === driveLinearCommandTopic) this.driveLinearCommandTopic = null;
       if (this.armStatusTopic === armStatusTopic) this.armStatusTopic = null;
       if (this.armMotorTopic === armMotorTopic) this.armMotorTopic = null;
       if (this.armCommandTopic === armCommandTopic) this.armCommandTopic = null;
@@ -241,6 +287,9 @@ export class RosTelemetryBridge {
       drive_joint_valid?: unknown; drive_joints?: JointStateMessage;
       drive_command_valid?: unknown; drive_commands?: JointStateMessage;
       drive_temperature_valid?: unknown; drive_temperature_raw?: unknown;
+      drive_current_valid?: unknown; drive_current_raw?: unknown;
+      drive_odometry_valid?: unknown; drive_odometry?: unknown;
+      drive_linear_command_valid?: unknown; drive_linear_command?: unknown;
     };
     if (snapshot.fma_valid === true && !live.has('fma')) this.handleFmaMessage(snapshot.fma);
     if (snapshot.arm_joint_valid === true && snapshot.arm_joints && !live.has('arm_joints')) this.handleJointStateMessage(snapshot.arm_joints);
@@ -260,10 +309,18 @@ export class RosTelemetryBridge {
       this.driveTelemetry.setJointState(snapshot.drive_joints.name, snapshot.drive_joints.velocity);
     if (snapshot.drive_command_valid === true && snapshot.drive_commands && !live.has('drive_commands'))
       this.driveTelemetry.setCommands(snapshot.drive_commands.name, snapshot.drive_commands.velocity);
+    if (snapshot.drive_odometry_valid === true && !live.has('drive_odometry')) this.driveTelemetry.setOdometry(snapshot.drive_odometry);
+    if (snapshot.drive_linear_command_valid === true && !live.has('drive_linear_command')) this.driveTelemetry.setLinearCommand(snapshot.drive_linear_command);
     const rawTemperatures = snapshot.drive_temperature_raw;
     if (Array.isArray(snapshot.drive_temperature_valid) && Array.isArray(rawTemperatures)) {
       snapshot.drive_temperature_valid.forEach((valid, wheel) => {
         if (valid === true && !live.has(`drive_temperature:${wheel}`)) this.driveTelemetry.setTemperature([wheel, rawTemperatures[wheel]]);
+      });
+    }
+    const rawCurrents = snapshot.drive_current_raw;
+    if (Array.isArray(snapshot.drive_current_valid) && Array.isArray(rawCurrents)) {
+      snapshot.drive_current_valid.forEach((valid, wheel) => {
+        if (valid === true && !live.has(`drive_current:${wheel}`)) this.driveTelemetry.setCurrent([wheel, rawCurrents[wheel]]);
       });
     }
   }

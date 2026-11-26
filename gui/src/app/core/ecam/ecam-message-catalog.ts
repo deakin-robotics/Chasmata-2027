@@ -17,6 +17,12 @@ export const ECAM_MESSAGE_CATALOG: Readonly<Record<EcamAlertCode, EcamAlertDefin
     severity: 'fault',
     text: 'ARM CAN FAULT',
   },
+  ARM_CONTROL_FAULT: {
+    code: 'ARM_CONTROL_FAULT',
+    source: 'ARM',
+    severity: 'fault',
+    text: 'ARM CONTROL FAULT',
+  },
   ARM_JOINT_FAULT: {
     code: 'ARM_JOINT_FAULT',
     source: 'ARM',
@@ -52,6 +58,12 @@ export const ECAM_MESSAGE_CATALOG: Readonly<Record<EcamAlertCode, EcamAlertDefin
     source: 'ARM',
     severity: 'fault',
     text: 'ARM POSITION SENSOR INVALID',
+  },
+  ARM_POSITION_REQUEST_FAILED: {
+    code: 'ARM_POSITION_REQUEST_FAILED',
+    source: 'ARM',
+    severity: 'warning',
+    text: 'ARM POSITION REQUEST FAILED',
   },
   ARM_PROTECTION_UNAVAILABLE: {
     code: 'ARM_PROTECTION_UNAVAILABLE',
@@ -419,6 +431,12 @@ export const ECAM_MESSAGE_CATALOG: Readonly<Record<EcamAlertCode, EcamAlertDefin
     source: 'SYSTEM',
     severity: 'fault',
     text: 'E-STOP ACTIVE',
+  },
+  SYSTEM_ESTOP_UNAVAILABLE: {
+    code: 'SYSTEM_ESTOP_UNAVAILABLE',
+    source: 'SYSTEM',
+    severity: 'fault',
+    text: 'E-STOP STATUS UNAVAILABLE',
   },
   SYSTEM_LED_FAULT: {
     code: 'SYSTEM_LED_FAULT',

@@ -9,9 +9,37 @@ import { ArmMode, DriveMode, FmaColumn, FmaStateService, LawMode } from '../fma/
 import { RosConnection } from './ros-connection';
 import { RosHeartbeatMonitor } from './ros-heartbeat-monitor';
 import { RosTelemetryBridge } from './ros-telemetry-bridge';
+import { BaseStationConnection } from './base-station-connection';
 
 describe('RosTelemetryBridge', () => {
   afterEach(() => vi.restoreAllMocks());
+
+  it('receives planner telemetry over the BaseStation link without rendering failures as SD telemetry', () => {
+    const baseClient = {} as Ros;
+    const baseClientState = signal<Ros | null>(baseClient);
+    const baseAvailable = signal(true);
+    let callback: ((message: unknown) => void) | undefined;
+    vi.spyOn(Topic.prototype, 'subscribe').mockImplementation(function (this: Topic, handler) {
+      if (this.name === '/arm/moveit/status') callback = handler as (message: unknown) => void;
+    });
+    vi.spyOn(Topic.prototype, 'unsubscribe').mockImplementation(() => {});
+    TestBed.configureTestingModule({ providers: [
+      { provide: RosConnection, useValue: { client: signal(null).asReadonly() } },
+      { provide: BaseStationConnection, useValue: { client: baseClientState.asReadonly() } },
+      { provide: RosHeartbeatMonitor, useValue: { roverAvailable: signal(false).asReadonly(), baseStationAvailable: baseAvailable.asReadonly() } },
+    ] });
+    TestBed.inject(RosTelemetryBridge);
+    TestBed.flushEffects();
+    const arm = TestBed.inject(ArmTelemetryService);
+    expect(callback).toBeDefined();
+    callback!({ state: 'PLANNING' });
+    expect(arm.planner()).toBe('PLANNING');
+    callback!({ state: 'FAILED' });
+    expect(arm.planner()).toBeNull();
+    baseAvailable.set(false);
+    TestBed.flushEffects();
+    expect(arm.planner()).toBeNull();
+  });
 
   it('keeps LAW and Arm Override telemetry independent', () => {
     const connected = signal(false);
@@ -132,7 +160,7 @@ describe('RosTelemetryBridge', () => {
     roverFma.callback(fmaMessage(DriveMode.Velocity));
     expect(getDriveMode(fmaState)).toBe(DriveMode.Velocity);
     expect(fmaState.hasFmaTelemetry()).toBe(true);
-    expect(subscriptions).toHaveLength(10);
+    expect(subscriptions).toHaveLength(13);
     expect(subscriptions.every(({ topic }) => topic.ros === roverClient)).toBe(true);
 
     const recovery = subscriptions.find(({ topic }) => topic.name === '/telemetry/recovery_snapshot')!;
@@ -143,12 +171,16 @@ describe('RosTelemetryBridge', () => {
       arm_trajectory_valid: true, arm_trajectory: { name: ['base_joint'], position: [0.4] },
       drive_joint_valid: true, drive_joints: { name: ['front_left_wheel_joint'], velocity: [1.5] },
       drive_temperature_valid: [true, false, false, false], drive_temperature_raw: [32, 0, 0, 0],
+      drive_current_valid: [true, false, false, false], drive_current_raw: [12, 0, 0, 0],
+      drive_odometry_valid: true, drive_odometry: { pose: { pose: { position: { x: 2 } } }, twist: { twist: { linear: { x: 0.5 } } } },
     });
     expect(getDriveMode(fmaState)).toBe(DriveMode.Velocity);
     expect(armTelemetry.actualJointAngles()).toEqual({ base_joint: 0.1 });
     expect(armTelemetry.commandFor('base_joint')?.value).toBeCloseTo(0.4 * 180 / Math.PI);
     expect(driveTelemetry.wheelVelocities()?.['front_left_wheel_joint']).toBe(1.5);
     expect(driveTelemetry.rawTemperatures()[0]).toBe(32);
+    expect(driveTelemetry.rawCurrents()[0]).toBe(12);
+    expect(driveTelemetry.odometry()).toEqual({ x: 2, speed: 0.5 });
 
     roverJointStates.callback({
       name: ['base_joint'],

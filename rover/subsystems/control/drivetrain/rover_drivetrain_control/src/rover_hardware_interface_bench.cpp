@@ -271,6 +271,7 @@ CallbackReturn RoverHardwareInterface::benchConfigure()
     std::uint16_t address = 0;
     auto r = driver_->readDriveAddressRaw(wheel.slave_id, address);
     if (!r) {
+      if (communication_fault_publisher_) { std_msgs::msg::Bool message; message.data = true; communication_fault_publisher_->publish(message); }
       RCLCPP_ERROR(logger(), "Bench configure refused: %s (ID %u) gave no valid drive-address "
         "reply (%s). No reply, a garbled reply, or several drives answering at one address.",
         wheel.joint_name.c_str(), static_cast<unsigned>(wheel.slave_id), describe(r).c_str());
@@ -287,11 +288,17 @@ CallbackReturn RoverHardwareInterface::benchConfigure()
     std::uint16_t fault = 0xFFFF;
     r = driver_->readFaultRaw(wheel.slave_id, fault);
     if (!r) {
+      if (communication_fault_publisher_) { std_msgs::msg::Bool message; message.data = true; communication_fault_publisher_->publish(message); }
       RCLCPP_ERROR(logger(), "Bench configure refused: %s (ID %u) gave no valid fault-code "
         "reply (%s).", wheel.joint_name.c_str(), static_cast<unsigned>(wheel.slave_id),
         describe(r).c_str());
       closeDriver();
       return CallbackReturn::ERROR;
+    }
+    if (fault_publisher_) {
+      std_msgs::msg::Int32MultiArray sample;
+      sample.data = {static_cast<std::int32_t>(&wheel - wheels_.data()), static_cast<std::int32_t>(fault)};
+      fault_publisher_->publish(sample);
     }
     if (fault != 0) {
       RCLCPP_ERROR(logger(), "Bench configure refused: %s (ID %u) reports fault code %u "
@@ -302,6 +309,7 @@ CallbackReturn RoverHardwareInterface::benchConfigure()
     }
   }
 
+  if (communication_fault_publisher_) { std_msgs::msg::Bool message; message.data = false; communication_fault_publisher_->publish(message); }
   bench_configured_ = true;
   RCLCPP_WARN(logger(), "BENCH MODE configured: all four drives answered at their own address "
     "with no fault. Nothing has been written. Motion stays locked until activation.");
@@ -327,6 +335,7 @@ CallbackReturn RoverHardwareInterface::benchActivate()
     RCLCPP_ERROR(logger(), "Bench activation refused: not all four drives accepted the initial "
       "stop. Nothing else was written.");
     bench_stop_latched_ = true;
+    if (safety_fault_publisher_) { std_msgs::msg::Bool message; message.data = true; safety_fault_publisher_->publish(message); }
     return CallbackReturn::ERROR;
   }
 
@@ -356,6 +365,7 @@ CallbackReturn RoverHardwareInterface::benchActivate()
         static_cast<unsigned>(core::BENCH_NEAR_ZERO_MOTOR_RPM), bench_stop_deadline_ms_,
         still_turning.c_str());
       bench_stop_latched_ = true;
+      if (safety_fault_publisher_) { std_msgs::msg::Bool message; message.data = true; safety_fault_publisher_->publish(message); }
       return CallbackReturn::ERROR;
     }
   }
@@ -402,6 +412,7 @@ CallbackReturn RoverHardwareInterface::benchActivate()
       RCLCPP_ERROR(logger(), "Bench activation refused: %s (ID %u): %s.",
         wheel.joint_name.c_str(), static_cast<unsigned>(wheel.slave_id), failure.c_str());
       bench_stop_latched_ = true;
+      if (safety_fault_publisher_) { std_msgs::msg::Bool message; message.data = true; safety_fault_publisher_->publish(message); }
       (void)stopAllAndConfirm("activation refused");
       return CallbackReturn::ERROR;
     }
@@ -425,9 +436,13 @@ CallbackReturn RoverHardwareInterface::benchActivate()
   }
   previous_read_tick_ns_ = 0;
   late_trigger_detected_ = false;
+  temperature_wheel_ = 0;
+  poll_current_ = false;
+  next_temperature_poll_ns_ = 0;
   read_blocked_logged_.store(false, std::memory_order_release);
   write_blocked_logged_.store(false, std::memory_order_release);
   active_ = true;
+  if (safety_fault_publisher_) { std_msgs::msg::Bool message; message.data = false; safety_fault_publisher_->publish(message); }
   RCLCPP_WARN(logger(), "BENCH MOTION ACTIVE: cap %.0f motor RPM, %.0f Hz, stop deadline %.0f ms. "
     "Wheels off the ground; someone must hold the power cutoff.", bench_rpm_cap_,
     timing_.update_hz, bench_stop_deadline_ms_);
@@ -442,6 +457,7 @@ CallbackReturn RoverHardwareInterface::benchDeactivate()
   }
   bench_stop_latched_ = true;  // no motion commands from here on
   if (!stopAllAndConfirm("deactivate")) {
+    if (safety_fault_publisher_) { std_msgs::msg::Bool message; message.data = true; safety_fault_publisher_->publish(message); }
     // FAILURE keeps the framework's lifecycle state at active, matching active_.
     RCLCPP_ERROR(logger(), "Deactivation failed: not all four drives accepted the stop "
       "(status 0) within %.0f ms. The hardware stays active with motion latched off: read() and "
@@ -468,6 +484,7 @@ CallbackReturn RoverHardwareInterface::benchShutdown(bool from_error)
       accepted = keepBroadcastingStop(reason);
     }
   }
+  if (!accepted && safety_fault_publisher_) { std_msgs::msg::Bool message; message.data = true; safety_fault_publisher_->publish(message); }
   if (!accepted && from_error) {
     // Keep the bus open: a repeated on_error, a retry or the destructor can
     // still broadcast stop. Every repeat returns FAILURE until a stop is accepted.
@@ -481,6 +498,7 @@ CallbackReturn RoverHardwareInterface::benchShutdown(bool from_error)
 
 ReturnType RoverHardwareInterface::benchSafetyStop(const std::string & reason)
 {
+  if (safety_fault_publisher_) { std_msgs::msg::Bool message; message.data = true; safety_fault_publisher_->publish(message); }
   bench_stop_latched_ = true;
   (void)stopAllAndConfirm(reason);
   return ReturnType::ERROR;
@@ -503,6 +521,7 @@ ReturnType RoverHardwareInterface::benchRead()
   std::array<std::uint8_t, WHEEL_COUNT> ids{};
   for (std::size_t w = 0; w < WHEEL_COUNT; ++w) ids[w] = wheels_[w].slave_id;
   if (!driver_->beginCycle(ids)) {
+    if (communication_fault_publisher_) { std_msgs::msg::Bool message; message.data = true; communication_fault_publisher_->publish(message); }
     return benchSafetyStop("could not start a bus cycle");
   }
   bench_cycle_open_ = true;
@@ -536,6 +555,11 @@ ReturnType RoverHardwareInterface::benchRead()
     } else {
       const bool ok = static_cast<bool>(driver_->readFaultRaw(wheel.slave_id, raw));
       core::recordPoll(bench_fault_freshness_[w], ok, steadyNowNs());
+      if (ok && fault_publisher_) {
+        std_msgs::msg::Int32MultiArray sample;
+        sample.data = {static_cast<std::int32_t>(w), static_cast<std::int32_t>(raw)};
+        fault_publisher_->publish(sample);
+      }
       if (ok && raw != 0) {
         return benchSafetyStop(wheel.joint_name + " (ID " + std::to_string(wheel.slave_id) +
           ") fault code " + std::to_string(raw));
@@ -557,10 +581,12 @@ ReturnType RoverHardwareInterface::benchRead()
     const std::string wheel = wheels_[w].joint_name + " (ID " +
       std::to_string(wheels_[w].slave_id) + ")";
     if (core::pollsStale(bench_fault_freshness_[w], now, bench_poll_stale_after_ns_)) {
+      if (communication_fault_publisher_) { std_msgs::msg::Bool message; message.data = true; communication_fault_publisher_->publish(message); }
       return benchSafetyStop(wheel + " fault code not confirmed: " +
         staleness(bench_fault_freshness_[w]));
     }
     if (core::pollsStale(bench_speed_freshness_[w], now, bench_poll_stale_after_ns_)) {
+      if (communication_fault_publisher_) { std_msgs::msg::Bool message; message.data = true; communication_fault_publisher_->publish(message); }
       return benchSafetyStop("speed feedback lost on " + wheel + ": " +
         staleness(bench_speed_freshness_[w]));
     }
@@ -596,6 +622,7 @@ ReturnType RoverHardwareInterface::benchWrite()
     std::array<std::uint8_t, WHEEL_COUNT> ids{};
     for (std::size_t w = 0; w < WHEEL_COUNT; ++w) ids[w] = wheels_[w].slave_id;
     if (!driver_->beginCycle(ids)) {
+      if (communication_fault_publisher_) { std_msgs::msg::Bool message; message.data = true; communication_fault_publisher_->publish(message); }
       return benchSafetyStop("could not start a bus cycle");
     }
     bench_cycle_open_ = true;
@@ -655,10 +682,15 @@ ReturnType RoverHardwareInterface::benchWrite()
     // No NaN when telemetry turns invalid (2 missed cycles): the velocity stays
     // at its last good value, and the third miss or a stale poll stops all four.
     if (communication_state_[w] == Bld305sDriver::CommunicationState::LOST) {
+      if (communication_fault_publisher_) { std_msgs::msg::Bool message; message.data = true; communication_fault_publisher_->publish(message); }
       return benchSafetyStop(wheels_[w].joint_name + " (ID " + std::to_string(id) + ") lost");
     }
   }
-  // Poll one optional temperature register only while stationary and when the
+  if (communication_fault_publisher_ && std::all_of(communication_state_.begin(), communication_state_.end(),
+      [](auto state) { return state == Bld305sDriver::CommunicationState::HEALTHY; })) {
+    std_msgs::msg::Bool message; message.data = false; communication_fault_publisher_->publish(message);
+  }
+  // Poll one optional temperature or current register only while stationary and when the
   // remaining cycle budget covers two full response timeouts plus a margin.
   // This uses the existing bus owner, outside the mandatory control cycle.
   const auto telemetry_now = steadyNowNs();
@@ -670,15 +702,18 @@ ReturnType RoverHardwareInterface::benchWrite()
     std::all_of(raw_speed_state_valid_.begin(), raw_speed_state_valid_.end(), [](bool valid) { return valid; }) &&
     std::all_of(raw_speed_state_.begin(), raw_speed_state_.end(),
       [](std::uint16_t speed) { return speed <= core::BENCH_NEAR_ZERO_MOTOR_RPM; });
-  if (temperature_publisher_ && stationary && telemetry_now >= next_temperature_poll_ns_ &&
+  if (temperature_publisher_ && current_publisher_ && stationary && telemetry_now >= next_temperature_poll_ns_ &&
       telemetry_now - previous_read_tick_ns_ + reserve_ns < period_ns) {
     std::uint16_t raw = 0;
     const auto wheel = temperature_wheel_;
-    const bool ok = static_cast<bool>(driver_->readTemperatureRaw(wheels_[wheel].slave_id, raw));
+    const bool ok = poll_current_ ? static_cast<bool>(driver_->readCurrentRaw(wheels_[wheel].slave_id, raw)) :
+      static_cast<bool>(driver_->readTemperatureRaw(wheels_[wheel].slave_id, raw));
     std_msgs::msg::Int32MultiArray sample;
     sample.data = {static_cast<std::int32_t>(wheel), ok ? static_cast<std::int32_t>(raw) : -1};
-    temperature_publisher_->publish(sample);
-    temperature_wheel_ = (wheel + 1) % WHEEL_COUNT;
+    if (poll_current_) current_publisher_->publish(sample);
+    else temperature_publisher_->publish(sample);
+    if (poll_current_) temperature_wheel_ = (wheel + 1) % WHEEL_COUNT;
+    poll_current_ = !poll_current_;
     next_temperature_poll_ns_ = steadyNowNs() + 1000000000;
   }
   return ReturnType::OK;

@@ -38,8 +38,25 @@ describe('DriveTelemetryService', () => {
     const service = TestBed.inject(DriveTelemetryService);
     service.setTemperature([0, 42]);
     expect(service.rawTemperatures()[0]).toBe(42);
-    vi.advanceTimersByTime(8000);
+    vi.advanceTimersByTime(10000);
     expect(service.rawTemperatures()[0]).toBeUndefined();
+  });
+
+  it('tracks current and odometry with independent expiration', () => {
+    vi.useFakeTimers();
+    const service = TestBed.inject(DriveTelemetryService);
+    service.setCurrent([1, 52]);
+    service.setOdometry({ pose: { pose: { position: { x: 2.5 } } }, twist: { twist: { linear: { x: 0.3 } } } });
+    service.setLinearCommand({ twist: { linear: { x: 0.4 } } });
+    expect(service.rawCurrents()[1]).toBe(52);
+    expect(service.odometry()).toEqual({ x: 2.5, speed: 0.3 });
+    expect(service.linearCommand()).toBe(0.4);
+    vi.advanceTimersByTime(1500);
+    expect(service.odometry()).toBeNull();
+    expect(service.linearCommand()).toBeNull();
+    expect(service.rawCurrents()[1]).toBe(52);
+    vi.advanceTimersByTime(8500);
+    expect(service.rawCurrents()[1]).toBeUndefined();
   });
 });
 

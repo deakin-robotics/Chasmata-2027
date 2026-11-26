@@ -262,15 +262,47 @@ void testTemperatureReadUsesExistingBusOnlyWhenStopped()
   CHECK(hw.on_activate(lifecycle_state) == CallbackReturn::SUCCESS);
   for (auto & command : commands) (void)command.set_value(0.0);
   const auto before = reads_by_address[0x0096];
+  const auto before_current = reads_by_address[0x00B6];
   CHECK(cycle(hw) == ReturnType::OK);
   CHECK(reads_by_address[0x0096] == before + 1);
+  for (int i = 0; i < 12; ++i) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    CHECK(cycle(hw) == ReturnType::OK);
+  }
+  CHECK(reads_by_address[0x00B6] == before_current + 1);
   (void)commands[0].set_value(0.5);
   for (int i = 0; i < 12; ++i) {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     CHECK(cycle(hw) == ReturnType::OK);
   }
   CHECK(reads_by_address[0x0096] == before + 1);
+  CHECK(reads_by_address[0x00B6] == before_current + 1);
   CHECK(hw.on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
+}
+
+void testConfigurePublishesReportedFault()
+{
+  resetDrives();
+  drives[1].regs[0x0076] = 2;
+  auto executor = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
+  hardware_interface::HardwareComponentParams p;
+  p.hardware_info = params(true).hardware_info;
+  p.executor = executor;
+  p.clock = std::make_shared<rclcpp::Clock>();
+  Hardware hw;
+  CHECK(hw.init(p) == CallbackReturn::SUCCESS);
+  auto observer = std::make_shared<rclcpp::Node>("bench_fault_observer");
+  std::vector<std::int32_t> received;
+  auto sub = observer->create_subscription<std_msgs::msg::Int32MultiArray>("/drivetrain/fault_raw",
+    rclcpp::QoS(4).reliable().transient_local(), [&](const std_msgs::msg::Int32MultiArray & message) { received = message.data; });
+  executor->add_node(observer);
+  CHECK(hw.on_configure(lifecycle_state) == CallbackReturn::ERROR);
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while (received.empty() && std::chrono::steady_clock::now() < deadline) {
+    executor->spin_some(); std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+  CHECK(received.size() == 2 && received[0] == 0 && received[1] == 2);
+  executor->remove_node(observer);
 }
 
 void testDisabledRefusesAsToday()
@@ -1034,6 +1066,7 @@ int main(int argc, char ** argv)
   testConfigureRefusals();
   testActivationSequence();
   testTemperatureReadUsesExistingBusOnlyWhenStopped();
+  testConfigurePublishesReportedFault();
   testPolePairsMismatchRefusesAndStopsAll();
   testMotionConversionAndChangeOnlyWrites();
   testFaultBroadcastsStop();

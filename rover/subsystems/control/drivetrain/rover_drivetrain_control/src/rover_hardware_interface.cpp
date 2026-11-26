@@ -105,6 +105,14 @@ RoverHardwareInterface::on_init(
   if (auto node = get_node()) {
     temperature_publisher_ = node->create_publisher<std_msgs::msg::Int32MultiArray>(
       "/drivetrain/temperature_raw", 10);
+    current_publisher_ = node->create_publisher<std_msgs::msg::Int32MultiArray>(
+      "/drivetrain/current_raw", 10);
+    fault_publisher_ = node->create_publisher<std_msgs::msg::Int32MultiArray>(
+      "/drivetrain/fault_raw", rclcpp::QoS(4).reliable().transient_local());
+    communication_fault_publisher_ = node->create_publisher<std_msgs::msg::Bool>(
+      "/drivetrain/communication_fault", rclcpp::QoS(1).reliable().transient_local());
+    safety_fault_publisher_ = node->create_publisher<std_msgs::msg::Bool>(
+      "/drivetrain/safety_fault", rclcpp::QoS(1).reliable().transient_local());
     telemetry_joint_publisher_ = node->create_publisher<sensor_msgs::msg::JointState>(
       "/drivetrain/validated_joint_states", 10);
   }
