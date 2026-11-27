@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 #include <rclcpp/rclcpp.hpp>
 #include "../src/telemetry/drive/backend.hpp"
+#include "../src/telemetry/drive/live_demand.hpp"
 #include "../src/telemetry/arm/backend.hpp"
 #include "../src/telemetry/recovery_snapshot.hpp"
 
@@ -88,6 +89,7 @@ TEST(TelemetryBackends, SnapshotRecoversFreshDataAndExpiresStoppedSources)
   }
   ASSERT_FALSE(received.empty());
   EXPECT_TRUE(received.back().drive_joint_valid);
+  EXPECT_LT(received.back().drive_joint_age_ms, 1000u);
   EXPECT_DOUBLE_EQ(received.back().drive_joints.velocity[0], 1.25);
   EXPECT_TRUE(received.back().arm_joint_valid);
   EXPECT_TRUE(received.back().arm_trajectory_valid);
@@ -100,6 +102,7 @@ TEST(TelemetryBackends, SnapshotRecoversFreshDataAndExpiresStoppedSources)
   ASSERT_EQ(received.back().arm_motor_details.size(), 1u);
   EXPECT_DOUBLE_EQ(received.back().arm_motor_details[0].bus_voltage, 24);
   EXPECT_TRUE(received.back().drive_temperature_valid[0]);
+  EXPECT_LT(received.back().drive_temperature_age_ms[0], 10000u);
   EXPECT_EQ(received.back().drive_temperature_raw[0], 42);
   EXPECT_TRUE(received.back().drive_current_valid[0]);
   EXPECT_EQ(received.back().drive_current_raw[0], 12);
@@ -145,5 +148,36 @@ TEST(TelemetryBackends, ArmTrajectoryFeedbackProducesDesiredJointCommands)
     status_input->publish(finished); rclcpp::spin_some(node); std::this_thread::sleep_for(20ms);
   }
   EXPECT_TRUE(cleared);
+  rclcpp::shutdown();
+}
+
+TEST(TelemetryBackends, DriveDemandCombinesViewersAndExpiresLeases)
+{
+  int argc = 0; rclcpp::init(argc, nullptr);
+  auto node = std::make_shared<rclcpp::Node>("drive_demand_test");
+  rover::telemetry::drive::LiveDemand demand(*node);
+  auto requests = node->create_publisher<telemetry_interfaces::msg::DriveTelemetryDemand>("/telemetry/drive/demand", 10);
+  auto source = node->create_publisher<sensor_msgs::msg::JointState>("/telemetry/drive/joint_states", 10);
+  int live_count = 0; bool active = false;
+  auto live = node->create_subscription<sensor_msgs::msg::JointState>("/telemetry/drive/live/joint_states", 10,
+    [&](const sensor_msgs::msg::JointState &) { ++live_count; });
+  auto state = node->create_subscription<std_msgs::msg::Bool>("/drivetrain/telemetry_live", 10,
+    [&](const std_msgs::msg::Bool & msg) { active = msg.data; });
+  auto pump = [&](std::chrono::milliseconds duration) {
+    const auto until = std::chrono::steady_clock::now() + duration;
+    while (std::chrono::steady_clock::now() < until) {
+      sensor_msgs::msg::JointState msg; msg.name = {"wheel"}; msg.velocity = {1}; source->publish(msg);
+      rclcpp::spin_some(node); std::this_thread::sleep_for(10ms);
+    }
+  };
+  pump(200ms); EXPECT_FALSE(active); EXPECT_EQ(live_count, 0);
+  telemetry_interfaces::msg::DriveTelemetryDemand first; first.client_id = "first"; first.active = true;
+  auto second = first; second.client_id = "second";
+  requests->publish(first); requests->publish(second); pump(450ms);
+  EXPECT_TRUE(active); EXPECT_GT(live_count, 0); EXPECT_LE(live_count, 6);
+  first.active = false; requests->publish(first); pump(300ms); EXPECT_TRUE(active);
+  const int before = live_count; pump(3100ms);
+  EXPECT_FALSE(active); EXPECT_GT(live_count, before);
+  const int after = live_count; pump(200ms); EXPECT_EQ(live_count, after);
   rclcpp::shutdown();
 }

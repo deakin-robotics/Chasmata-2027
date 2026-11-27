@@ -4,6 +4,7 @@ import { Ros, Topic } from 'roslib';
 
 import { ArmTelemetryService } from '../arm/telemetry/arm-telemetry.service';
 import { DriveTelemetryService } from '../drive/drive-telemetry.service';
+import { DriveViewService } from '../drive/drive-view.service';
 import { ArmOverrideCommand, ArmOverrideState } from '../control/arm/arm-override';
 import { ArmMode, DriveMode, FmaColumn, FmaStateService, LawMode } from '../fma/fma-state.service';
 import { RosConnection } from './ros-connection';
@@ -185,6 +186,18 @@ describe('RosTelemetryBridge', () => {
     expect(driveTelemetry.rawTemperatures()[0]).toBe(32);
     expect(driveTelemetry.rawCurrents()[0]).toBe(12);
     expect(driveTelemetry.odometry()).toEqual({ x: 2, speed: 0.5 });
+    recovery.callback({ drive_joint_valid: true, drive_joints: { name: ['front_left_wheel_joint'], velocity: [2.5] } });
+    expect(driveTelemetry.wheelVelocities()?.['front_left_wheel_joint']).toBe(2.5);
+    TestBed.inject(DriveViewService).active.set(true);
+    const liveDrive = subscriptions.find(({ topic }) => topic.name === '/telemetry/drive/live/joint_states')!;
+    liveDrive.callback({ name: ['front_left_wheel_joint'], velocity: [5] });
+    recovery.callback({ drive_joint_valid: true, drive_joints: { name: ['front_left_wheel_joint'], velocity: [3] } });
+    expect(driveTelemetry.wheelVelocities()?.['front_left_wheel_joint']).toBe(5);
+    recovery.callback({ drive_joint_valid: true, drive_joint_age_ms: 1000, drive_joints: { name: ['front_left_wheel_joint'], velocity: [1] } });
+    expect(driveTelemetry.wheelVelocities()?.['front_left_wheel_joint']).toBe(5);
+    TestBed.inject(DriveViewService).active.set(false);
+    recovery.callback({ drive_joint_valid: true, drive_joints: { name: ['front_left_wheel_joint'], velocity: [4] } });
+    expect(driveTelemetry.wheelVelocities()?.['front_left_wheel_joint']).toBe(4);
 
     roverJointStates.callback({
       name: ['base_joint'],

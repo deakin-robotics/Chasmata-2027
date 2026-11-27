@@ -49,3 +49,12 @@ For mock-only fault testing, publish `[wheel index, fault code]` to
 ID, fault bits]` to `/mock/arm/fault` (IDs 1–6). Both use
 `std_msgs/msg/Int32MultiArray`. Set the second value to zero to clear that
 simulated fault. These inputs exist only in the mock telemetry backends.
+
+DRIVE viewers publish `/telemetry/drive/demand` with a unique client ID and
+refresh it every second. The Rover expires missing clients after three seconds
+and publishes `/drivetrain/telemetry_live` while any viewer remains. Internal
+telemetry continues to serve the snapshot and ECAM. The `/telemetry/drive/live/*`
+topics relay fresh samples at no more than 10 Hz per field while requested.
+Optional current and temperature polling uses a slower baseline without a viewer.
+The 10 Hz ceiling is not a guarantee; control, stop and fault traffic retain
+priority and the existing speed/fault polling remains independent of the page.

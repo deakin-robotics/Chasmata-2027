@@ -8,8 +8,10 @@ validation, and safety enforcement of that telemetry.
 
 ## Delivery rules
 
-Telemetry is divided into immediate state-change updates, 10 Hz dynamic
-telemetry, 1 Hz operational telemetry, and a complete 1 Hz recovery snapshot.
+Telemetry is divided into immediate state-change updates, dynamic telemetry,
+operational telemetry, and a complete 1 Hz recovery snapshot. DRIVE live
+telemetry is requested while any GUI displays the DRIVE page and is capped at
+10 Hz; actual updates depend on bus capacity.
 
 Every telemetry value must include validity or staleness information. When ROS
 is connected, the GUI must show unavailable or unknown state when data is stale
@@ -37,7 +39,9 @@ The rover must publish the following immediately whenever they change:
 
 ### 10 Hz dynamic telemetry
 
-The rover must publish the following at 10 Hz:
+The following dynamic telemetry has a 10 Hz target where available. DRIVE live
+updates are requested while the DRIVE page is open and capped at 10 Hz, subject
+to bus capacity:
 
 - Commanded and actual wheel velocity.
 - Wheel position and odometry.

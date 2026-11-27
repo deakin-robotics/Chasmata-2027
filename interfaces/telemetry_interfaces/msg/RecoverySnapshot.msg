@@ -14,6 +14,12 @@ telemetry_interfaces/RecoveryMotorDetail[] arm_motor_details
 telemetry_interfaces/RecoveryArmCommand[] arm_commands
 bool arm_trajectory_valid
 sensor_msgs/JointState arm_trajectory
+uint32 drive_joint_age_ms
+uint32 drive_command_age_ms
+uint32 drive_odometry_age_ms
+uint32 drive_linear_command_age_ms
+uint32[4] drive_temperature_age_ms
+uint32[4] drive_current_age_ms
 bool drive_joint_valid
 sensor_msgs/JointState drive_joints
 bool drive_command_valid

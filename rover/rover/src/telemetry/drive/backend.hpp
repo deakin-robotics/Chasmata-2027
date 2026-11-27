@@ -14,6 +14,7 @@
 #include <nav_msgs/msg/odometry.hpp>
 #include <std_msgs/msg/float64_multi_array.hpp>
 #include <std_msgs/msg/int32_multi_array.hpp>
+#include <std_msgs/msg/bool.hpp>
 
 namespace rover::telemetry::drive
 {
@@ -148,7 +149,13 @@ public:
       linear.twist.linear.x = linear_speed;
       linear_commands_->publish(linear);
     });
-    temperature_timer_ = node.create_wall_timer(std::chrono::seconds(1), [this] {
+    live_subscriber_ = node.create_subscription<std_msgs::msg::Bool>("/drivetrain/telemetry_live", 10,
+      [this](const std_msgs::msg::Bool & message) { live_ = message.data; });
+    temperature_timer_ = node.create_wall_timer(std::chrono::milliseconds(100), [this] {
+      const auto now = std::chrono::steady_clock::now();
+      if (last_optional_ != std::chrono::steady_clock::time_point{} &&
+          now - last_optional_ < (live_ ? std::chrono::milliseconds(100) : std::chrono::milliseconds(1000))) return;
+      last_optional_ = now;
       for (std::int32_t wheel = 0; wheel < 4; ++wheel) {
         std_msgs::msg::Int32MultiArray sample;
         sample.data = {wheel, 30 + wheel};
@@ -179,5 +186,8 @@ private:
   rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr fault_injection_;
   rclcpp::TimerBase::SharedPtr timer_;
   rclcpp::TimerBase::SharedPtr temperature_timer_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr live_subscriber_;
+  std::chrono::steady_clock::time_point last_optional_{};
+  bool live_{false};
 };
 }

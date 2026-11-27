@@ -170,6 +170,8 @@ private:
   std::size_t temperature_wheel_{0};
   bool poll_current_{false};
   std::int64_t next_temperature_poll_ns_{0};
+  std::atomic<std::int64_t> live_demand_ns_{0};
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr live_demand_subscriber_;
 
   std::array<Bld305sDriver::CommunicationState, WHEEL_COUNT>
     communication_state_{};

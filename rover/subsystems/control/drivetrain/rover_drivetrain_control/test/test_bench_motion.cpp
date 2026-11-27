@@ -294,8 +294,20 @@ void testTemperatureAndCurrentUseExistingBusWhileMoving()
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     CHECK(cycle(hw) == ReturnType::OK);
   }
-  CHECK(reads_by_address[0x0096] > moving_temp_before);
-  CHECK(reads_by_address[0x00B6] > moving_current_before);
+  CHECK(reads_by_address[0x0096] > moving_temp_before ||
+    reads_by_address[0x00B6] > moving_current_before);
+  auto observer = std::make_shared<rclcpp::Node>("bench_demand_observer");
+  executor->add_node(observer);
+  auto live = observer->create_publisher<std_msgs::msg::Bool>("/drivetrain/telemetry_live", 10);
+  std_msgs::msg::Bool demand; demand.data = true;
+  const auto before_live = reads_by_address[0x0096] + reads_by_address[0x00B6];
+  for (int i = 0; i < 16; ++i) {
+    live->publish(demand); executor->spin_some();
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    CHECK(cycle(hw) == ReturnType::OK);
+  }
+  CHECK(reads_by_address[0x0096] + reads_by_address[0x00B6] >= before_live + 3);
+  executor->remove_node(observer);
   CHECK(hw.on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
 }
 

@@ -74,6 +74,7 @@ RoverNode::RoverNode(std::unique_ptr<DriveBackend> drive_backend, const rclcpp::
     arm_backend != "disabled", drive_telemetry_backend != "disabled", arm_backend == "real",
     arm_backend == "real", drive_telemetry_backend == "real");
   recovery_snapshot_ = std::make_unique<telemetry::RecoverySnapshot>(*this);
+  drive_live_demand_ = std::make_unique<telemetry::drive::LiveDemand>(*this);
 
   const auto retained = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
   fma_publisher_ = create_publisher<telemetry_interfaces::msg::FmaState>("/fma/state", retained);

@@ -103,6 +103,8 @@ RoverHardwareInterface::on_init(
 
   driver_ = std::make_unique<Bld305sDriver>(bus_config_);
   if (auto node = get_node()) {
+    live_demand_subscriber_ = node->create_subscription<std_msgs::msg::Bool>("/drivetrain/telemetry_live", 10,
+      [this](const std_msgs::msg::Bool & msg) { live_demand_ns_.store(msg.data ? steadyNowNs() : 0); });
     temperature_publisher_ = node->create_publisher<std_msgs::msg::Int32MultiArray>(
       "/drivetrain/temperature_raw", 10);
     current_publisher_ = node->create_publisher<std_msgs::msg::Int32MultiArray>(

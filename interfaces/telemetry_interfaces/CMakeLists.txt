@@ -20,6 +20,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/RecoveryMotorDetail.msg"
   "msg/RecoveryArmCommand.msg"
   "msg/RecoverySnapshot.msg"
+  "msg/DriveTelemetryDemand.msg"
   DEPENDENCIES builtin_interfaces sensor_msgs nav_msgs geometry_msgs
 )
 

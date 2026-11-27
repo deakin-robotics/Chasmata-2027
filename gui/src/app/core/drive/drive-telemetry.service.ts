@@ -21,7 +21,7 @@ export class DriveTelemetryService implements OnDestroy {
   private expiry: ReturnType<typeof setTimeout> | undefined;
   private commandExpiry: ReturnType<typeof setTimeout> | undefined;
 
-  setJointState(names: unknown, velocities: unknown): void {
+  setJointState(names: unknown, velocities: unknown, age = 0): void {
     if (!Array.isArray(names) || !Array.isArray(velocities) || names.length === 0 || names.length !== velocities.length) return;
     const values: Record<string, number> = {};
     names.forEach((name, index) => {
@@ -31,10 +31,10 @@ export class DriveTelemetryService implements OnDestroy {
     if (Object.keys(values).length === 0) return;
     this.state.set(values);
     if (this.expiry) clearTimeout(this.expiry);
-    this.expiry = setTimeout(() => { this.state.set(null); this.expiry = undefined; }, 1500);
+    this.expiry = setTimeout(() => { this.state.set(null); this.expiry = undefined; }, Math.max(0, 1500 - age));
   }
 
-  setCommands(names: unknown, velocities: unknown): void {
+  setCommands(names: unknown, velocities: unknown, age = 0): void {
     if (!Array.isArray(names) || !Array.isArray(velocities) || names.length === 0 || names.length !== velocities.length) return;
     const values: Record<string, number> = {};
     names.forEach((name, index) => {
@@ -44,10 +44,10 @@ export class DriveTelemetryService implements OnDestroy {
     if (Object.keys(values).length === 0) return;
     this.commandState.set(values);
     if (this.commandExpiry) clearTimeout(this.commandExpiry);
-    this.commandExpiry = setTimeout(() => { this.commandState.set(null); }, 1500);
+    this.commandExpiry = setTimeout(() => { this.commandState.set(null); }, Math.max(0, 1500 - age));
   }
 
-  setTemperature(data: unknown): void {
+  setTemperature(data: unknown, age = 0): void {
     if (!Array.isArray(data) || data.length !== 2) return;
     const [wheel, raw] = data;
     if (typeof wheel !== 'number' || !Number.isInteger(wheel) || wheel < 0 || wheel > 3 ||
@@ -63,10 +63,10 @@ export class DriveTelemetryService implements OnDestroy {
     this.temperatureExpiry.set(wheel, setTimeout(() => {
       this.temperatureState.update((values) => { const next = { ...values }; delete next[wheel]; return next; });
       this.temperatureExpiry.delete(wheel);
-    }, 10000));
+    }, Math.max(0, 10000 - age)));
   }
 
-  setCurrent(data: unknown): void {
+  setCurrent(data: unknown, age = 0): void {
     if (!Array.isArray(data) || data.length !== 2) return;
     const [wheel, raw] = data;
     if (typeof wheel !== 'number' || !Number.isInteger(wheel) || wheel < 0 || wheel > 3 ||
@@ -82,10 +82,10 @@ export class DriveTelemetryService implements OnDestroy {
     this.currentExpiry.set(wheel, setTimeout(() => {
       this.currentState.update((values) => { const next = { ...values }; delete next[wheel]; return next; });
       this.currentExpiry.delete(wheel);
-    }, 10000));
+    }, Math.max(0, 10000 - age)));
   }
 
-  setOdometry(message: unknown): void {
+  setOdometry(message: unknown, age = 0): void {
     if (!message || typeof message !== 'object') return;
     const odom = message as { pose?: { pose?: { position?: { x?: unknown } } }; twist?: { twist?: { linear?: { x?: unknown } } } };
     const x = odom.pose?.pose?.position?.x;
@@ -101,16 +101,16 @@ export class DriveTelemetryService implements OnDestroy {
     if (finite(twist?.angular?.z)) result.angularSpeed = twist.angular.z;
     this.odometryState.set(result);
     if (this.odometryExpiry) clearTimeout(this.odometryExpiry);
-    this.odometryExpiry = setTimeout(() => { this.odometryState.set(null); }, 1500);
+    this.odometryExpiry = setTimeout(() => { this.odometryState.set(null); }, Math.max(0, 1500 - age));
   }
 
-  setLinearCommand(message: unknown): void {
+  setLinearCommand(message: unknown, age = 0): void {
     if (!message || typeof message !== 'object') return;
     const speed = (message as { twist?: { linear?: { x?: unknown } } }).twist?.linear?.x;
     if (typeof speed !== 'number' || !Number.isFinite(speed)) return;
     this.linearCommandState.set(speed);
     if (this.linearCommandExpiry) clearTimeout(this.linearCommandExpiry);
-    this.linearCommandExpiry = setTimeout(() => { this.linearCommandState.set(null); }, 1500);
+    this.linearCommandExpiry = setTimeout(() => { this.linearCommandState.set(null); }, Math.max(0, 1500 - age));
   }
 
   clear(): void {

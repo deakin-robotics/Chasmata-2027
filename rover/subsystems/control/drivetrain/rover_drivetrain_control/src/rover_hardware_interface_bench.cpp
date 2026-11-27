@@ -620,8 +620,7 @@ ReturnType RoverHardwareInterface::benchRead()
   }
   bench_cycle_open_ = true;
 
-  // At 9600 baud there is time for one read per drive per cycle, so actual
-  // speed and fault code alternate.
+  // Actual speed and fault code alternate, independently of page demand.
   const bool speed_cycle = bench_cycle_index_ % core::BENCH_POLL_EVERY_CYCLES == 0;
   for (std::size_t w = 0; w < WHEEL_COUNT; ++w) {
 #ifndef DRIVETRAIN_DIRECT_CYCLE_TEST
@@ -817,7 +816,9 @@ ReturnType RoverHardwareInterface::benchWrite()
     else temperature_publisher_->publish(sample);
     if (poll_current_) temperature_wheel_ = (wheel + 1) % WHEEL_COUNT;
     poll_current_ = !poll_current_;
-    next_temperature_poll_ns_ = steadyNowNs() + 125000000;
+    const auto demand_ns = live_demand_ns_.load();
+    const bool live = demand_ns > 0 && steadyNowNs() - demand_ns < 3000000000LL;
+    next_temperature_poll_ns_ = steadyNowNs() + (live ? 125000000LL : 1000000000LL);
   }
   return ReturnType::OK;
 }

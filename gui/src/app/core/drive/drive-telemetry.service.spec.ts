@@ -26,6 +26,19 @@ describe('DriveTelemetryService', () => {
     expect(service.odometry()).toBeNull();
   });
 
+  it('expires snapshot readings according to their original age', () => {
+    vi.useFakeTimers();
+    const service = TestBed.inject(DriveTelemetryService);
+    service.setJointState(['wheel'], [1], 1400);
+    service.setTemperature([0, 30], 9900);
+    vi.advanceTimersByTime(99);
+    expect(service.wheelVelocities()?.['wheel']).toBe(1);
+    expect(service.rawTemperatures()[0]).toBe(30);
+    vi.advanceTimersByTime(1);
+    expect(service.wheelVelocities()).toBeNull();
+    expect(service.rawTemperatures()[0]).toBeUndefined();
+  });
+
   it('clears wheel data on disconnect', () => {
     const service = TestBed.inject(DriveTelemetryService);
     service.setJointState(['front_left_wheel_joint'], [0]);

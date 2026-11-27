@@ -1,6 +1,8 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
+#include <cstdint>
 #include <chrono>
 #include <map>
 #include <mutex>
@@ -93,6 +95,14 @@ private:
     output.arm_planner_valid = fresh(arm_planner_, 20000ms); if (output.arm_planner_valid) output.arm_planner = arm_planner_.value;
     output.global_estop_valid = fresh(estop_, 600ms); if (output.global_estop_valid) output.global_estop_asserted = estop_.value.data;
     output.arm_trajectory_valid = fresh(arm_trajectory_, 1500ms); if (output.arm_trajectory_valid) output.arm_trajectory = arm_trajectory_.value;
+    const auto age_ms = [](const auto & sample) -> std::uint32_t {
+      if (sample.received == Clock::time_point{}) return UINT32_MAX;
+      return static_cast<std::uint32_t>(std::min<std::int64_t>(UINT32_MAX, std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - sample.received).count()));
+    };
+    output.drive_joint_age_ms = age_ms(drive_joints_);
+    output.drive_command_age_ms = age_ms(drive_commands_);
+    output.drive_odometry_age_ms = age_ms(drive_odometry_);
+    output.drive_linear_command_age_ms = age_ms(drive_linear_command_);
     output.drive_joint_valid = fresh(drive_joints_, 1500ms); if (output.drive_joint_valid) output.drive_joints = drive_joints_.value;
     output.drive_command_valid = fresh(drive_commands_, 1500ms); if (output.drive_command_valid) output.drive_commands = drive_commands_.value;
     output.drive_odometry_valid = fresh(drive_odometry_, 1500ms); if (output.drive_odometry_valid) output.drive_odometry = drive_odometry_.value;
@@ -114,6 +124,8 @@ private:
       output.arm_commands.push_back(command);
     }
     for (std::size_t i = 0; i < temperatures_.size(); ++i) {
+      output.drive_temperature_age_ms[i] = age_ms(temperatures_[i]);
+      output.drive_current_age_ms[i] = age_ms(currents_[i]);
       output.drive_temperature_valid[i] = fresh(temperatures_[i], 10000ms);
       if (output.drive_temperature_valid[i]) output.drive_temperature_raw[i] = temperatures_[i].value;
       output.drive_current_valid[i] = fresh(currents_[i], 10000ms);
