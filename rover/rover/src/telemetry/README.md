@@ -22,9 +22,9 @@ backends do not publish simulated subsystem telemetry.
 | `/telemetry/recovery_snapshot` | `telemetry_interfaces/msg/RecoverySnapshot` | Fresh current data and explicit unavailable fields, once per second |
 
 The mock drive is a simple joystick-driven simulation in radians per second,
-not a hardware model. Mock DRIVE current is synthetic raw data that responds
-to speed and changes in speed; mock ARM current includes a holding load and
-rises with joint movement. These values are illustrative, not calibrated. Real wheel values are those supplied by the active
+and uses an illustrative motor model with inertia and drag. Mock DRIVE current
+is derived from simulated motor torque; mock ARM current uses joint movement
+and a gravity load. Model parameters are illustrative, not calibrated. Real wheel values are those supplied by the active
 drivetrain's successful speed polls. Other DRIVE and ARM SD fields are not yet
 provided by these contracts. POWER, LINK, CAMERA and SYSTEM backends are
 scaffolding and are not started.

@@ -126,26 +126,30 @@ public:
       });
     timer_ = node.create_wall_timer(std::chrono::milliseconds(100), [this] {
       if (!enabled_() || std::chrono::steady_clock::now() - last_input_ > std::chrono::milliseconds(300)) left_ = right_ = 0.0;
-      const std::array<double, 4> speeds{left_, left_, right_, right_};
-      for (std::size_t wheel = 0; wheel < speeds.size(); ++wheel) {
-        // Synthetic raw counts follow speed and increase briefly on changes in load.
-        const double target = enabled_() ? 5.0 + 35.0 * std::abs(speeds[wheel]) +
-          30.0 * std::abs(speeds[wheel] - previous_speeds_[wheel]) : 0.0;
-        mock_current_[wheel] += 0.4 * (target - mock_current_[wheel]);
-        previous_speeds_[wheel] = speeds[wheel];
+      const auto now = std::chrono::steady_clock::now();
+      const double dt = last_sample_ == std::chrono::steady_clock::time_point{} ? 0.1 :
+        std::clamp(std::chrono::duration<double>(now - last_sample_).count(), 0.001, 0.25);
+      last_sample_ = now;
+      const std::array<double, 4> targets{left_, left_, right_, right_};
+      for (std::size_t wheel = 0; wheel < targets.size(); ++wheel) {
+        // First-order motor response: torque accelerates an inertial wheel against drag.
+        constexpr double inertia = 0.35, drag = 0.25, response_time = 0.45;
+        const double acceleration = (targets[wheel] - wheel_speed_[wheel]) / response_time;
+        wheel_speed_[wheel] += acceleration * dt;
+        if (targets[wheel] == 0.0 && std::abs(wheel_speed_[wheel]) < 0.01) wheel_speed_[wheel] = 0.0;
+        const double torque = inertia * acceleration + drag * wheel_speed_[wheel];
+        // Raw counts are a synthetic current derived from motor torque, not joystick input.
+        mock_current_[wheel] = enabled_() ? std::abs(torque) * 80.0 : 0.0;
       }
       sensor_msgs::msg::JointState message;
       message.header.stamp = node_.now();
       message.name = {"front_left_wheel_joint", "rear_left_wheel_joint", "front_right_wheel_joint", "rear_right_wheel_joint"};
-      message.velocity = {left_, left_, right_, right_};
+      message.velocity.assign(wheel_speed_.begin(), wheel_speed_.end());
       publisher_->publish(message);
+      message.velocity.assign(targets.begin(), targets.end());
       commands_->publish(message);
-      const double linear_speed = (left_ + right_) * 0.05;  // mock wheel radius: 0.1 m
-      const auto now = std::chrono::steady_clock::now();
-      if (last_sample_ != std::chrono::steady_clock::time_point{}) {
-        position_ += linear_speed * std::chrono::duration<double>(now - last_sample_).count();
-      }
-      last_sample_ = now;
+      const double linear_speed = (wheel_speed_[0] + wheel_speed_[2]) * 0.05;
+      position_ += linear_speed * dt;
       nav_msgs::msg::Odometry odom;
       odom.header.stamp = message.header.stamp;
       odom.pose.pose.position.x = position_;
@@ -154,7 +158,7 @@ public:
       odometry_->publish(odom);
       geometry_msgs::msg::TwistStamped linear;
       linear.header.stamp = message.header.stamp;
-      linear.twist.linear.x = linear_speed;
+      linear.twist.linear.x = (left_ + right_) * 0.05;
       linear_commands_->publish(linear);
     });
     live_subscriber_ = node.create_subscription<std_msgs::msg::Bool>("/drivetrain/telemetry_live", 10,
@@ -180,7 +184,7 @@ private:
   std::function<bool()> enabled_;
   double left_{0.0}, right_{0.0};
   std::array<std::int32_t, 4> simulated_faults_{};
-  std::array<double, 4> mock_current_{}, previous_speeds_{};
+  std::array<double, 4> mock_current_{}, wheel_speed_{};
   double position_{0.0};
   std::chrono::steady_clock::time_point last_input_{};
   std::chrono::steady_clock::time_point last_sample_{};

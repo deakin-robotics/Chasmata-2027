@@ -81,15 +81,19 @@ public:
     joint_subscriber_ = node.create_subscription<sensor_msgs::msg::JointState>("/arm/joint_states", 10,
       [this](const sensor_msgs::msg::JointState & state) {
         static const std::array<std::string, 6> names{"base_joint", "shoulder_joint", "elbow_joint", "yaw_joint", "pitch_joint", "roll_joint"};
+        const auto now = std::chrono::steady_clock::now();
+        const double dt = last_joint_state_ == std::chrono::steady_clock::time_point{} ? 0.0 :
+          std::chrono::duration<double>(now - last_joint_state_).count();
         for (std::size_t i = 0; i < state.name.size(); ++i) {
           const auto found = std::find(names.begin(), names.end(), state.name[i]);
           if (found == names.end()) continue;
           const auto joint = static_cast<std::size_t>(std::distance(names.begin(), found));
           if (i < state.position.size() && std::isfinite(state.position[i])) positions_[joint] = state.position[i];
-          if (i < state.velocity.size() && std::isfinite(state.velocity[i])) velocities_[joint] = state.velocity[i];
-          else velocities_[joint] = 0.0;
+          const double previous = velocities_[joint];
+          velocities_[joint] = i < state.velocity.size() && std::isfinite(state.velocity[i]) ? state.velocity[i] : 0.0;
+          accelerations_[joint] = dt >= 0.005 && dt <= 2.0 ? std::clamp((velocities_[joint] - previous) / dt, -5.0, 5.0) : 0.0;
         }
-        last_joint_state_ = std::chrono::steady_clock::now();
+        last_joint_state_ = now;
       });
     joy_subscriber_ = node.create_subscription<sensor_msgs::msg::Joy>("/arm/joy", 10,
       [this](const sensor_msgs::msg::Joy & joy) {
@@ -123,9 +127,10 @@ public:
         const auto joint = static_cast<std::size_t>(id - 1);
         const bool feedback_fresh = last_joint_state_ != std::chrono::steady_clock::time_point{} &&
           std::chrono::steady_clock::now() - last_joint_state_ < std::chrono::seconds(2);
-        // Illustrative load, not a physical motor model: holding load plus movement.
-        motor.current = mode_().empty() || !feedback_fresh ? 0.0 :
-          0.3 + 0.7 * std::abs(std::sin(positions_[joint])) + 2.0 * std::min(std::abs(velocities_[joint]), 2.0);
+        // Synthetic torque from gravity, inertia and viscous resistance, converted to current.
+        const double torque = 0.15 + 0.35 * std::cos(positions_[joint]) +
+          0.4 * accelerations_[joint] + 0.6 * velocities_[joint];
+        motor.current = mode_().empty() || !feedback_fresh ? 0.0 : std::abs(torque) * 2.0;
         motor_publisher_->publish(motor);
         arm_interfaces::msg::MotorStat2 detail;
         detail.id = id;
@@ -138,7 +143,7 @@ public:
 private:
   std::function<std::string()> mode_;
   std::array<std::uint8_t, 6> simulated_faults_{};
-  std::array<double, 6> positions_{}, velocities_{};
+  std::array<double, 6> positions_{}, velocities_{}, accelerations_{};
   std::chrono::steady_clock::time_point last_joint_state_{};
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_subscriber_;
   rclcpp::Publisher<telemetry_interfaces::msg::ArmControlStatus>::SharedPtr status_publisher_;

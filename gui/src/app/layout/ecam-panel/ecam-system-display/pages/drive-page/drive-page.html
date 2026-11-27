@@ -9,20 +9,23 @@
     <circle class="component" cx="655" cy="145" r="38" />
     <circle class="component" cx="655" cy="257" r="38" />
 
-    <text class="label" x="145" y="151" text-anchor="middle">FL {{ value('front_left_wheel_joint') }} rad/s</text>
-    <text class="label" x="145" y="263" text-anchor="middle">RL {{ value('rear_left_wheel_joint') }} rad/s</text>
-    <text class="label" x="655" y="151" text-anchor="middle">FR {{ value('front_right_wheel_joint') }} rad/s</text>
-    <text class="label" x="655" y="263" text-anchor="middle">RR {{ value('rear_right_wheel_joint') }} rad/s</text>
+    <text class="value" x="145" y="147" text-anchor="middle">{{ value('front_left_wheel_joint') }}</text>
+    <text class="label" x="145" y="164" text-anchor="middle">rad/s</text>
+    <text class="value" x="145" y="259" text-anchor="middle">{{ value('rear_left_wheel_joint') }}</text>
+    <text class="label" x="145" y="276" text-anchor="middle">rad/s</text>
+    <text class="value" x="655" y="147" text-anchor="middle">{{ value('front_right_wheel_joint') }}</text>
+    <text class="label" x="655" y="164" text-anchor="middle">rad/s</text>
+    <text class="value" x="655" y="259" text-anchor="middle">{{ value('rear_right_wheel_joint') }}</text>
+    <text class="label" x="655" y="276" text-anchor="middle">rad/s</text>
     <text class="small-value" x="145" y="96" text-anchor="middle">CMD {{ value('front_left_wheel_joint', true) }} rad/s</text>
     <text class="small-value" x="145" y="314" text-anchor="middle">CMD {{ value('rear_left_wheel_joint', true) }} rad/s</text>
     <text class="small-value" x="655" y="96" text-anchor="middle">CMD {{ value('front_right_wheel_joint', true) }} rad/s</text>
     <text class="small-value" x="655" y="314" text-anchor="middle">CMD {{ value('rear_right_wheel_joint', true) }} rad/s</text>
-    <text class="small-value" x="145" y="78" text-anchor="middle">T {{ temperature(0) }} I {{ current(0) }} RAW</text>
-    <text class="small-value" x="145" y="332" text-anchor="middle">T {{ temperature(1) }} I {{ current(1) }} RAW</text>
-    <text class="small-value" x="655" y="78" text-anchor="middle">T {{ temperature(2) }} I {{ current(2) }} RAW</text>
-    <text class="small-value" x="655" y="332" text-anchor="middle">T {{ temperature(3) }} I {{ current(3) }} RAW</text>
+    <text class="small-value" x="145" y="78" text-anchor="middle">{{ temperature(0) }}&#176;C<tspan class="small-value-muted"> | </tspan>{{ current(0) }} A</text>
+    <text class="small-value" x="145" y="332" text-anchor="middle">{{ temperature(1) }}&#176;C<tspan class="small-value-muted"> | </tspan>{{ current(1) }} A</text>
+    <text class="small-value" x="655" y="78" text-anchor="middle">{{ temperature(2) }}&#176;C<tspan class="small-value-muted"> | </tspan>{{ current(2) }} A</text>
+    <text class="small-value" x="655" y="332" text-anchor="middle">{{ temperature(3) }}&#176;C<tspan class="small-value-muted"> | </tspan>{{ current(3) }} A</text>
     <text class="value" x="400" y="170" text-anchor="middle">DRIVE</text>
-    <text class="value" x="400" y="218" text-anchor="middle"><tspan class="small-value-muted">CMD </tspan><tspan>{{ linear(true) }} m/s</tspan><tspan class="small-value-muted"> · ACT </tspan><tspan>{{ linear() }} m/s</tspan></text>
     <text class="value" x="400" y="255" text-anchor="middle"><tspan class="small-value-muted">ODOM X </tspan><tspan>{{ displacement() }} m</tspan></text>
 
   </svg>

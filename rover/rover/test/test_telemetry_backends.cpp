@@ -191,6 +191,11 @@ TEST(TelemetryBackends, MockCurrentsRespondToMovementAndArmHolding)
   auto drive_input = node->create_publisher<sensor_msgs::msg::Joy>("/drive/joy", 10);
   auto arm_input = node->create_publisher<sensor_msgs::msg::JointState>("/arm/joint_states", 10);
   int wheel_current = -1; double arm_current = -1;
+  double measured_speed = -1, commanded_speed = -1;
+  auto wheel_speed_sub = node->create_subscription<sensor_msgs::msg::JointState>("/telemetry/drive/joint_states", 10,
+    [&](const sensor_msgs::msg::JointState & msg) { if (!msg.velocity.empty()) measured_speed = msg.velocity[0]; });
+  auto wheel_command_sub = node->create_subscription<sensor_msgs::msg::JointState>("/telemetry/drive/commands", 10,
+    [&](const sensor_msgs::msg::JointState & msg) { if (!msg.velocity.empty()) commanded_speed = msg.velocity[0]; });
   auto wheel_sub = node->create_subscription<std_msgs::msg::Int32MultiArray>("/telemetry/drive/current_raw", 10,
     [&](const std_msgs::msg::Int32MultiArray & msg) { if (msg.data.size() == 2 && msg.data[0] == 0) wheel_current = msg.data[1]; });
   auto arm_sub = node->create_subscription<arm_interfaces::msg::MotorStat1>("/telemetry/arm/motor_status", 10,
@@ -207,7 +212,10 @@ TEST(TelemetryBackends, MockCurrentsRespondToMovementAndArmHolding)
   pump(1300ms); ASSERT_GE(wheel_current, 0); ASSERT_GT(arm_current, 0.0);
   const auto wheel_idle = wheel_current; const auto arm_holding = arm_current;
   joy.axes[1] = -0.8f; joint.velocity[0] = 0.7;
-  pump(1300ms); EXPECT_GT(wheel_current, wheel_idle); EXPECT_GT(arm_current, arm_holding);
+  pump(220ms);
+  EXPECT_NEAR(commanded_speed, 0.8, 1e-5);
+  EXPECT_GT(measured_speed, 0.0); EXPECT_LT(measured_speed, commanded_speed);
+  pump(1080ms); EXPECT_GT(wheel_current, wheel_idle); EXPECT_GT(arm_current, arm_holding);
   joy.axes[1] = 0.0f; joint.velocity[0] = 0.0;
   pump(1300ms); EXPECT_LT(wheel_current, 25); EXPECT_NEAR(arm_current, arm_holding, 1e-6);
   rclcpp::shutdown();

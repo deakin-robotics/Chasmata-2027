@@ -27,10 +27,6 @@ export class DrivePage implements OnDestroy {
   });
   constructor() { this.view.active.set(true); }
   ngOnDestroy(): void { this.view.active.set(false); }
-  linear(command = false): string {
-    const value = command ? this.telemetry.linearCommand() : this.telemetry.odometry()?.speed;
-    return value == null ? '--' : value.toFixed(2);
-  }
   odometryValue(field: 'y' | 'heading' | 'angularSpeed'): string {
     const value = this.telemetry.odometry()?.[field];
     return value === undefined ? '--' : (field === 'heading' ? value * 180 / Math.PI : value).toFixed(2);
