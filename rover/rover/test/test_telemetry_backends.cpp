@@ -181,3 +181,34 @@ TEST(TelemetryBackends, DriveDemandCombinesViewersAndExpiresLeases)
   const int after = live_count; pump(200ms); EXPECT_EQ(live_count, after);
   rclcpp::shutdown();
 }
+
+TEST(TelemetryBackends, MockCurrentsRespondToMovementAndArmHolding)
+{
+  int argc = 0; rclcpp::init(argc, nullptr);
+  auto node = std::make_shared<rclcpp::Node>("mock_current_test");
+  rover::telemetry::drive::MockBackend drive(*node, [] { return true; });
+  rover::telemetry::arm::MockBackend arm(*node, [] { return std::string("MANUAL"); });
+  auto drive_input = node->create_publisher<sensor_msgs::msg::Joy>("/drive/joy", 10);
+  auto arm_input = node->create_publisher<sensor_msgs::msg::JointState>("/arm/joint_states", 10);
+  int wheel_current = -1; double arm_current = -1;
+  auto wheel_sub = node->create_subscription<std_msgs::msg::Int32MultiArray>("/telemetry/drive/current_raw", 10,
+    [&](const std_msgs::msg::Int32MultiArray & msg) { if (msg.data.size() == 2 && msg.data[0] == 0) wheel_current = msg.data[1]; });
+  auto arm_sub = node->create_subscription<arm_interfaces::msg::MotorStat1>("/telemetry/arm/motor_status", 10,
+    [&](const arm_interfaces::msg::MotorStat1 & msg) { if (msg.id == 1) arm_current = msg.current; });
+  sensor_msgs::msg::Joy joy; joy.axes = {0.0f, 0.0f};
+  sensor_msgs::msg::JointState joint; joint.name = {"base_joint"}; joint.position = {0.5}; joint.velocity = {0.0};
+  auto pump = [&](std::chrono::milliseconds duration) {
+    const auto until = std::chrono::steady_clock::now() + duration;
+    while (std::chrono::steady_clock::now() < until) {
+      drive_input->publish(joy); arm_input->publish(joint);
+      rclcpp::spin_some(node); std::this_thread::sleep_for(20ms);
+    }
+  };
+  pump(1300ms); ASSERT_GE(wheel_current, 0); ASSERT_GT(arm_current, 0.0);
+  const auto wheel_idle = wheel_current; const auto arm_holding = arm_current;
+  joy.axes[1] = -0.8f; joint.velocity[0] = 0.7;
+  pump(1300ms); EXPECT_GT(wheel_current, wheel_idle); EXPECT_GT(arm_current, arm_holding);
+  joy.axes[1] = 0.0f; joint.velocity[0] = 0.0;
+  pump(1300ms); EXPECT_LT(wheel_current, 25); EXPECT_NEAR(arm_current, arm_holding, 1e-6);
+  rclcpp::shutdown();
+}

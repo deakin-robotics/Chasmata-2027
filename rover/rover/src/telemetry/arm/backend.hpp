@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <iterator>
 #include <string>
 #include <utility>
 #include <arm_interfaces/msg/motor_stat1.hpp>
@@ -77,6 +78,19 @@ public:
         if (message.data.size() != 2 || message.data[0] < 1 || message.data[0] > 6 || message.data[1] < 0 || message.data[1] > 255) return;
         simulated_faults_[static_cast<std::size_t>(message.data[0] - 1)] = static_cast<std::uint8_t>(message.data[1]);
       });
+    joint_subscriber_ = node.create_subscription<sensor_msgs::msg::JointState>("/arm/joint_states", 10,
+      [this](const sensor_msgs::msg::JointState & state) {
+        static const std::array<std::string, 6> names{"base_joint", "shoulder_joint", "elbow_joint", "yaw_joint", "pitch_joint", "roll_joint"};
+        for (std::size_t i = 0; i < state.name.size(); ++i) {
+          const auto found = std::find(names.begin(), names.end(), state.name[i]);
+          if (found == names.end()) continue;
+          const auto joint = static_cast<std::size_t>(std::distance(names.begin(), found));
+          if (i < state.position.size() && std::isfinite(state.position[i])) positions_[joint] = state.position[i];
+          if (i < state.velocity.size() && std::isfinite(state.velocity[i])) velocities_[joint] = state.velocity[i];
+          else velocities_[joint] = 0.0;
+        }
+        last_joint_state_ = std::chrono::steady_clock::now();
+      });
     joy_subscriber_ = node.create_subscription<sensor_msgs::msg::Joy>("/arm/joy", 10,
       [this](const sensor_msgs::msg::Joy & joy) {
         if (mode_() != "MANUAL" || joy.axes.size() <= 9 || joy.buttons.size() <= 4) return;
@@ -106,10 +120,16 @@ public:
         arm_interfaces::msg::MotorStat1 motor;
         motor.id = id;
         motor.temp = 30 + id;
-        motor.current = 0.0;
+        const auto joint = static_cast<std::size_t>(id - 1);
+        const bool feedback_fresh = last_joint_state_ != std::chrono::steady_clock::time_point{} &&
+          std::chrono::steady_clock::now() - last_joint_state_ < std::chrono::seconds(2);
+        // Illustrative load, not a physical motor model: holding load plus movement.
+        motor.current = mode_().empty() || !feedback_fresh ? 0.0 :
+          0.3 + 0.7 * std::abs(std::sin(positions_[joint])) + 2.0 * std::min(std::abs(velocities_[joint]), 2.0);
         motor_publisher_->publish(motor);
         arm_interfaces::msg::MotorStat2 detail;
         detail.id = id;
+        detail.busc = motor.current * 0.8;
         detail.fault_bits = simulated_faults_[static_cast<std::size_t>(id - 1)];
         motor_detail_publisher_->publish(detail);
       }
@@ -118,6 +138,9 @@ public:
 private:
   std::function<std::string()> mode_;
   std::array<std::uint8_t, 6> simulated_faults_{};
+  std::array<double, 6> positions_{}, velocities_{};
+  std::chrono::steady_clock::time_point last_joint_state_{};
+  rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_subscriber_;
   rclcpp::Publisher<telemetry_interfaces::msg::ArmControlStatus>::SharedPtr status_publisher_;
   rclcpp::Publisher<arm_interfaces::msg::MotorStat1>::SharedPtr motor_publisher_;
   rclcpp::Publisher<arm_interfaces::msg::MotorStat2>::SharedPtr motor_detail_publisher_;
