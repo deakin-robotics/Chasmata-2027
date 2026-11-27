@@ -35,6 +35,7 @@
 #include "rover/rover_node.hpp"
 #include "../telemetry/telemetry_backend.hpp"
 #include "../telemetry/drive/live_demand.hpp"
+#include "../drive/mock_drivetrain.hpp"
 #include "../telemetry/recovery_snapshot.hpp"
 #include "../telemetry/fault_monitor.hpp"
 
@@ -62,6 +63,7 @@ private:
   std::unique_ptr<DriveBackend> drive_backend_;
   std::unique_ptr<ArmBackend> arm_backend_;
   std::unique_ptr<telemetry::Backend> arm_telemetry_, drive_telemetry_;
+  std::unique_ptr<MockDrivetrain> mock_drivetrain_;
   std::unique_ptr<telemetry::RecoverySnapshot> recovery_snapshot_;
   std::unique_ptr<telemetry::drive::LiveDemand> drive_live_demand_;
   std::unique_ptr<telemetry::FaultMonitor> fault_monitor_;

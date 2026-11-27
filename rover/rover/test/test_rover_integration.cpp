@@ -158,6 +158,34 @@ TEST_F(RoverIntegrationTest, MockTelemetryPublishesJointFeedbackAndTimesOutDrive
   EXPECT_TRUE(wait_for([&] { return drive_samples.back().velocity[0] == 0.0; }, 2s));
 }
 
+TEST_F(RoverIntegrationTest, MockDriveUsesConfirmedModeAndRoverCommands)
+{
+  sensor_msgs::msg::JointState command;
+  auto sub = client_->create_subscription<sensor_msgs::msg::JointState>("/telemetry/drive/commands", 10,
+    [&](const sensor_msgs::msg::JointState & message) { command = message; });
+  std_msgs::msg::String mode; mode.data = "MANUAL"; drive_mode_publisher_->publish(mode);
+  ASSERT_TRUE(wait_for([this] { return latest_fma().drive.confirmed == "MANUAL"; }, 2s));
+  sensor_msgs::msg::Joy joy; joy.axes = {0.9f, -0.9f, 0, 0, 0.25f, 0.75f}; joy.buttons.assign(4, 0);
+  drive_joy_publisher_->publish(joy);
+  ASSERT_TRUE(wait_for([&] { return command.velocity.size() == 4 && std::abs(command.velocity[0] - 0.25) < 1e-5; }, 2s));
+  EXPECT_NEAR(command.velocity[2], 0.75, 1e-5);
+  joy.buttons[3] = 1; drive_joy_publisher_->publish(joy);
+  ASSERT_TRUE(wait_for([&] { return command.velocity.size() == 4 && command.velocity[0] == 0 && command.velocity[2] == 0; }, 1s));
+  joy.buttons[3] = 0; drive_joy_publisher_->publish(joy);
+  wait_for([] { return false; }, 100ms);
+  EXPECT_EQ(command.velocity[0], 0);
+  joy.axes[4] = 0; joy.axes[5] = 0; drive_joy_publisher_->publish(joy);
+  wait_for([] { return false; }, 100ms);
+  joy.axes[4] = 0.4f; joy.axes[5] = 0.6f; drive_joy_publisher_->publish(joy);
+  ASSERT_TRUE(wait_for([&] { return command.velocity.size() == 4 && command.velocity[0] < -0.39; }, 2s));
+  EXPECT_NEAR(command.velocity[2], -0.6, 1e-5);
+  mode.data = "VELOCITY"; drive_mode_publisher_->publish(mode);
+  ASSERT_TRUE(wait_for([this] { return latest_fma().drive.confirmed == "VELOCITY"; }, 2s));
+  joy.axes = {0.0f, -0.5f, 0, 0, 0.9f, 0.1f}; drive_joy_publisher_->publish(joy);
+  ASSERT_TRUE(wait_for([&] { return command.velocity.size() == 4 && std::abs(command.velocity[0] - 0.5) < 1e-5; }, 2s));
+  EXPECT_NEAR(command.velocity[2], 0.5, 1e-5);
+}
+
 TEST_F(RoverIntegrationTest, DriveModesPreserveMockAcknowledgementAndRejection)
 {
   std_msgs::msg::String request;

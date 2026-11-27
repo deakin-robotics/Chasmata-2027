@@ -12,6 +12,7 @@
 #include <std_msgs/msg/float64_multi_array.hpp>
 
 #include "rover/drive_backend.hpp"
+#include "drive_input_mapper.hpp"
 
 namespace rover
 {
@@ -57,8 +58,6 @@ private:
   std::string previous_mode_;
   bool switch_sent_{false};
   bool confirmed_mode_valid_{true};
-  bool reverse_{false};
-  bool y_pressed_{false};
-  bool wait_for_release_{false};
+  DriveInputMapper input_mapper_;
 };
 }  // namespace rover

@@ -47,7 +47,10 @@ RoverNode::RoverNode(std::unique_ptr<DriveBackend> drive_backend, const rclcpp::
   ack_delay_ = std::max(get_parameter("mode_ack_delay_ms").as_double() / 1000.0, 0.0);
   if (!drive_backend_) {
     const auto backend = get_parameter("drive_backend").as_string();
-    if (backend == "mock") drive_backend_ = std::make_unique<MockDriveBackend>(ack_delay_);
+    if (backend == "mock") {
+      const auto configured_speed = get_parameter("drive_max_wheel_speed").as_double();
+      drive_backend_ = std::make_unique<MockDriveBackend>(*this, ack_delay_, std::isfinite(configured_speed) && configured_speed > 0.0 ? configured_speed : 1.0);
+    }
     else if (backend == "real") drive_backend_ = std::make_unique<RealDriveBackend>(*this, get_parameter("drive_max_wheel_speed").as_double(),
       get_parameter("drive_wheel_radius").as_double(), get_parameter("drive_wheel_separation").as_double());
     else if (backend == "disabled") drive_backend_ = std::make_unique<DisabledDriveBackend>();
@@ -64,8 +67,11 @@ RoverNode::RoverNode(std::unique_ptr<DriveBackend> drive_backend, const rclcpp::
     [this] { return arm_backend_->confirmed_mode_valid() ? arm_mode_ : std::string{}; });
   else if (arm_backend == "real") arm_telemetry_ = std::make_unique<telemetry::arm::RealBackend>(*this);
   const auto drive_telemetry_backend = get_parameter("drive_backend").as_string();
-  if (drive_telemetry_backend == "mock") drive_telemetry_ = std::make_unique<telemetry::drive::MockBackend>(*this,
-    [this] { return !drive_mode_.empty() && drive_backend_->confirmed_mode_valid(); });
+  if (drive_telemetry_backend == "mock") {
+    mock_drivetrain_ = std::make_unique<MockDrivetrain>(*this,
+      [this] { return !drive_mode_.empty() && drive_backend_->confirmed_mode_valid(); });
+    drive_telemetry_ = std::make_unique<telemetry::drive::MockBackend>(*this);
+  }
   else if (drive_telemetry_backend == "real") drive_telemetry_ = std::make_unique<telemetry::drive::RealBackend>(*this,
     get_parameter("drive_wheel_radius").as_double(), get_parameter("drive_wheel_separation").as_double(),
     [this] { return drive_backend_->confirmed_mode_valid() ? drive_mode_ : std::string{}; });

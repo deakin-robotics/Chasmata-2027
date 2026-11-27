@@ -172,37 +172,18 @@ void RealDriveBackend::on_joy(const sensor_msgs::msg::Joy & joy)
   const bool current_controller_in_control = stage_ == Stage::idle ||
     stage_ == Stage::waiting_services || stage_ == Stage::hardware || stage_ == Stage::controllers;
   if (!current_controller_in_control || !confirmed_mode_valid_ || active_mode_.empty()) return;
+  const auto wheels = input_mapper_.map(active_mode_, joy, max_wheel_speed_);
+  if (!wheels || input_mapper_.releaseStop()) { stop(); return; }
   if (active_mode_ == "VELOCITY") {
-    if (joy.axes.size() < 2 || !std::isfinite(joy.axes[0]) || !std::isfinite(joy.axes[1]) ||
-      std::abs(joy.axes[0]) > 1.0 || std::abs(joy.axes[1]) > 1.0) { stop(); return; }
-    const double forward = -joy.axes[1];
-    const double turn = -joy.axes[0];
-    const double scale = std::max(1.0, std::abs(forward) + std::abs(turn));
-    const double max_linear = max_wheel_speed_ * wheel_radius_;
     geometry_msgs::msg::TwistStamped command;
     command.header.stamp = clock_->now();
-    command.twist.linear.x = max_linear * forward / scale;
-    command.twist.angular.z = (2.0 * max_linear / wheel_separation_) * turn / scale;
+    command.twist.linear.x = ((*wheels)[0] + (*wheels)[2]) * wheel_radius_ / 2.0;
+    command.twist.angular.z = ((*wheels)[2] - (*wheels)[0]) * wheel_radius_ / wheel_separation_;
     velocity_publisher_->publish(command);
-    return;
+  } else {
+    std_msgs::msg::Float64MultiArray command;
+    command.data.assign(wheels->begin(), wheels->end());
+    publisher_->publish(command);
   }
-  const auto left = joy.axes.at(4);
-  const auto right = joy.axes.at(5);
-  const bool pressed = joy.buttons.size() > 3 && joy.buttons[3] == 1;
-  if (pressed && !y_pressed_) {
-    reverse_ = !reverse_;
-    if (left > 0.0 || right > 0.0) wait_for_release_ = true;
-  }
-  y_pressed_ = pressed;
-  if (wait_for_release_) {
-    if (left == 0.0 && right == 0.0) wait_for_release_ = false;
-    stop();
-    return;
-  }
-  const auto direction = reverse_ ? -1.0 : 1.0;
-  std_msgs::msg::Float64MultiArray command;
-  command.data = {direction * left * max_wheel_speed_, direction * left * max_wheel_speed_,
-    direction * right * max_wheel_speed_, direction * right * max_wheel_speed_};
-  publisher_->publish(command);
 }
 }  // namespace rover

@@ -21,13 +21,13 @@ backends do not publish simulated subsystem telemetry.
 | `/telemetry/drive/fault_raw` | `std_msgs/msg/Int32MultiArray` | Wheel index and reported drive fault code |
 | `/telemetry/recovery_snapshot` | `telemetry_interfaces/msg/RecoverySnapshot` | Fresh current data and explicit unavailable fields, once per second |
 
-The mock drive is a simple joystick-driven simulation in radians per second,
-and uses an illustrative motor model with inertia and drag. Mock DRIVE current
+Rover Control interprets Manual and Velocity inputs using the same mapping for
+real and mock drivetrains. The mock drivetrain receives wheel commands and uses
+an illustrative motor model with inertia and drag. Mock DRIVE current
 is derived from simulated motor torque; mock ARM current uses joint movement
-and a gravity load. Model parameters are illustrative, not calibrated. Real wheel values are those supplied by the active
-drivetrain's successful speed polls. Other DRIVE and ARM SD fields are not yet
-provided by these contracts. POWER, LINK, CAMERA and SYSTEM backends are
-scaffolding and are not started.
+and a gravity load. Model parameters are illustrative, not calibrated. Real
+wheel values come from the active drivetrain's successful speed polls. POWER,
+LINK, CAMERA and SYSTEM backends are scaffolding and are not started.
 
 The recovery snapshot includes FMA and ECAM state, available ARM and DRIVE
 values, per-field validity, and explicit unavailable categories. Stale samples
