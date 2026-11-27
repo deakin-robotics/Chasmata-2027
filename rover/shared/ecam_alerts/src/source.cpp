@@ -86,6 +86,21 @@ void EcamAlertSource::clear_all()
   }
 }
 
+void EcamAlertSource::set_active_codes(const std::vector<std::string> & codes)
+{
+  std::vector<std::string> normalized;
+  for (const auto & code : codes) {
+    const auto value = trim(code);
+    if (!value.empty()) normalized.push_back(value);
+  }
+  std::sort(normalized.begin(), normalized.end());
+  normalized.erase(std::unique(normalized.begin(), normalized.end()), normalized.end());
+  if (normalized != active_codes_) {
+    active_codes_ = std::move(normalized);
+    publish_snapshot();
+  }
+}
+
 void EcamAlertSource::publish_snapshot()
 {
   telemetry_interfaces::msg::EcamAlertSourceSnapshot message;

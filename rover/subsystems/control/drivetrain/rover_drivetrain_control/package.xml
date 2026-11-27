@@ -24,6 +24,7 @@
   <buildtool_depend>pkg-config</buildtool_depend>
 
   <depend>hardware_interface</depend>
+  <depend>ecam_alerts</depend>
   <depend>pluginlib</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_lifecycle</depend>

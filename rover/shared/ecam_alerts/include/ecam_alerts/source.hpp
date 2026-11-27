@@ -24,6 +24,7 @@ public:
   void raise_alert(const std::string & code);
   void clear(const std::string & code);
   void clear_all();
+  void set_active_codes(const std::vector<std::string> & codes);
   void publish_snapshot();
 
 private:

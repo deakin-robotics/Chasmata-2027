@@ -27,6 +27,11 @@ find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(telemetry_interfaces REQUIRED)
 
+# ARM and DRIVE fault interpretation belongs with the subsystem sources.
+include_directories(
+  ${CMAKE_CURRENT_SOURCE_DIR}/../subsystems/control/drivetrain/rover_drivetrain_control/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/../rover_drivetrain_control/include)
+
 add_library(rover_simulation SHARED src/arm/joint_simulator.cpp)
 target_include_directories(rover_simulation PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -73,7 +78,7 @@ if(BUILD_TESTING)
   ament_add_gtest(test_telemetry_backends test/test_telemetry_backends.cpp)
   ament_target_dependencies(test_telemetry_backends action_msgs arm_interfaces can_msgs control_msgs dcr_arm_driver ecam_alerts geometry_msgs nav_msgs rclcpp sensor_msgs std_msgs telemetry_interfaces)
   ament_add_gtest(test_fault_monitor test/test_fault_monitor.cpp)
-  ament_target_dependencies(test_fault_monitor arm_interfaces can_msgs ecam_alerts rclcpp sensor_msgs std_msgs telemetry_interfaces)
+  ament_target_dependencies(test_fault_monitor arm_interfaces can_msgs dcr_arm_driver ecam_alerts rclcpp sensor_msgs std_msgs telemetry_interfaces)
   ament_add_gtest(test_joint_simulator test/test_joint_simulator.cpp)
   target_link_libraries(test_joint_simulator rover_simulation)
   ament_add_gtest(test_rover_integration test/test_rover_integration.cpp)

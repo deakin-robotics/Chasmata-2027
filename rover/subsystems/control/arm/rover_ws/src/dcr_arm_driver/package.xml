@@ -22,6 +22,7 @@
   <depend>action_msgs</depend>
   <depend>urdf</depend>
   <depend>telemetry_interfaces</depend>
+  <depend>ecam_alerts</depend>
   <depend>hardware_interface</depend>
   <depend>pluginlib</depend>
   <depend>joint_state_broadcaster</depend>

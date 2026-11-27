@@ -3,8 +3,10 @@
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
 #include <stdexcept>
+#include <thread>
 
 #include "ecam_alerts/source.hpp"
+#include "ecam_alerts/reporter.hpp"
 #include "ecam_alerts/state.hpp"
 
 namespace
@@ -78,5 +80,46 @@ TEST(EcamAlertSource, ValidatesAndNormalizesCodes)
   source.clear_all();
   EXPECT_TRUE(source.active_codes().empty());
   node.reset();
+  rclcpp::shutdown();
+}
+
+TEST(EcamReporter, CombinesReportersAndRestoresAfterOwnerRestart)
+{
+  int argc = 0;
+  rclcpp::init(argc, nullptr);
+  auto node = std::make_shared<rclcpp::Node>("ecam_reporter_test");
+  auto subsystem = std::make_shared<rclcpp::Node>("ecam_subsystem_test");
+  auto owner = std::make_unique<ecam_alerts::RoverAlertOwner>(*node);
+  ecam_alerts::Reporter arm(*subsystem, "arm"), drive(*subsystem, "drive");
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(node);
+  executor.add_node(subsystem);
+  std::vector<std::string> codes;
+  auto subscription = node->create_subscription<telemetry_interfaces::msg::EcamAlertSourceSnapshot>(
+    ecam_alerts::kSourceTopic, ecam_alerts::snapshot_qos(),
+    [&](const telemetry_interfaces::msg::EcamAlertSourceSnapshot & message) {
+      if (message.source == "rover") codes = message.active_codes;
+    });
+  const auto wait = [&](const auto & condition) {
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(4);
+    while (!condition() && std::chrono::steady_clock::now() < deadline) {
+      executor.spin_some();
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    return condition();
+  };
+  arm.raise("SHARED_FAULT");
+  drive.raise("SHARED_FAULT");
+  drive.raise("DRIVE_FAULT");
+  ASSERT_TRUE(wait([&] { return codes.size() == 2; }));
+  arm.clear("SHARED_FAULT");
+  drive.clear("DRIVE_FAULT");
+  ASSERT_TRUE(wait([&] { return codes == std::vector<std::string>{"SHARED_FAULT"}; }));
+  owner.reset();
+  codes = {"waiting for owner"};
+  owner = std::make_unique<ecam_alerts::RoverAlertOwner>(*node);
+  ASSERT_TRUE(wait([&] { return codes == std::vector<std::string>{"SHARED_FAULT"}; }));
+  drive.clear("SHARED_FAULT");
+  ASSERT_TRUE(wait([&] { return codes.empty(); }));
   rclcpp::shutdown();
 }

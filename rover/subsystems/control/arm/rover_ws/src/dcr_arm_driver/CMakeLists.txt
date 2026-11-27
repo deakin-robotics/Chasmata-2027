@@ -19,6 +19,7 @@ find_package(std_srvs REQUIRED)
 find_package(action_msgs REQUIRED)
 find_package(urdf REQUIRED)
 find_package(telemetry_interfaces REQUIRED)
+find_package(ecam_alerts REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -108,6 +109,8 @@ ament_export_dependencies(
   std_srvs
   action_msgs
   urdf
+  ecam_alerts
+  telemetry_interfaces
 )
 
 ament_export_dependencies(rosidl_default_runtime)

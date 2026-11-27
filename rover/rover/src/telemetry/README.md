@@ -40,8 +40,9 @@ worker while driving or stationary, when enough cycle time remains for a respons
 and a margin. Control and stop requests take priority between transactions. The values are raw register counts; the GUI does not assume a
 temperature or current conversion. No additional serial connection is opened.
 
-Rover Control maps driver-reported ARM and DRIVE faults to the existing ECAM
-catalogue via a single `rover` alert source. Faults stay active until a fresh
+ARM and DRIVE fault monitors map driver reports to the existing ECAM catalogue.
+They report to Rover, which combines subsystem alerts into a single `rover`
+alert source. Faults stay active until a fresh
 report clears the relevant condition. Failed position requests, E-stop assertions, and
 telemetry loss also use the catalogue. The System Display shows telemetry;
 faults are annunciated in ECAM.
