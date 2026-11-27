@@ -54,9 +54,6 @@ std::string describe(const Bld305sDriver::Result & r)
 RoverHardwareInterface::~RoverHardwareInterface()
 {
   stopBusWorker();
-  if (!bench_motion_enabled_) {
-    return;
-  }
   std::lock_guard<std::mutex> lock(bench_mutex_);
   if ((active_ || bench_stop_unconfirmed_) && transport_open_) {
     (void)stopAllAndConfirm("hardware interface destroyed while active or with a stop unaccepted");
@@ -71,10 +68,9 @@ bool RoverHardwareInterface::parseBenchConfiguration()
   const auto pole_it = parameters.find("pole_pairs");
   const auto cap_it = parameters.find("bench_rpm_cap");
   const auto deadline_it = parameters.find("bench_stop_deadline_ms");
-  if (pole_it == parameters.end() || cap_it == parameters.end() ||
-      deadline_it == parameters.end()) {
-    RCLCPP_ERROR(logger(), "Bench mode requires pole_pairs, bench_rpm_cap and "
-      "bench_stop_deadline_ms; none has a default.");
+  if (pole_it == parameters.end() || (bench_motion_enabled_ &&
+      (cap_it == parameters.end() || deadline_it == parameters.end()))) {
+    RCLCPP_ERROR(logger(), "pole_pairs is required; the bench profile also requires bench_rpm_cap and bench_stop_deadline_ms.");
     return false;
   }
 
@@ -82,12 +78,17 @@ bool RoverHardwareInterface::parseBenchConfiguration()
     std::size_t used = 0;
     bench_pole_pairs_ = std::stoll(pole_it->second, &used, 10);
     if (used != pole_it->second.size()) throw std::invalid_argument("pole_pairs");
-    used = 0;
-    bench_rpm_cap_ = std::stod(cap_it->second, &used);
-    if (used != cap_it->second.size()) throw std::invalid_argument("bench_rpm_cap");
-    used = 0;
-    bench_stop_deadline_ms_ = std::stod(deadline_it->second, &used);
-    if (used != deadline_it->second.size()) throw std::invalid_argument("bench_stop_deadline_ms");
+    if (bench_motion_enabled_) {
+      used = 0;
+      bench_rpm_cap_ = std::stod(cap_it->second, &used);
+      if (used != cap_it->second.size()) throw std::invalid_argument("bench_rpm_cap");
+      used = 0;
+      bench_stop_deadline_ms_ = std::stod(deadline_it->second, &used);
+      if (used != deadline_it->second.size()) throw std::invalid_argument("bench_stop_deadline_ms");
+    } else {
+      bench_rpm_cap_ = std::numeric_limits<std::uint16_t>::max();
+      bench_stop_deadline_ms_ = timing_.stop_deadline_ms;
+    }
   } catch (const std::exception &) {
     RCLCPP_ERROR(logger(), "Bench parameters must be numbers: pole_pairs an integer, "
       "bench_rpm_cap and bench_stop_deadline_ms decimal.");
@@ -100,15 +101,14 @@ bool RoverHardwareInterface::parseBenchConfiguration()
     return false;
   }
   if (!std::isfinite(bench_rpm_cap_) || bench_rpm_cap_ <= 0.0 ||
-      bench_rpm_cap_ > core::BENCH_MAX_RPM_CAP) {
+      (bench_motion_enabled_ && bench_rpm_cap_ > core::BENCH_MAX_RPM_CAP)) {
     RCLCPP_ERROR(logger(), "bench_rpm_cap must be above 0 and at most %.0f motor RPM.",
       core::BENCH_MAX_RPM_CAP);
     return false;
   }
   if (!std::isfinite(bench_stop_deadline_ms_) || bench_stop_deadline_ms_ <= 0.0 ||
-      bench_stop_deadline_ms_ > core::BENCH_MAX_STOP_DEADLINE_MS) {
-    RCLCPP_ERROR(logger(), "bench_stop_deadline_ms must be above 0 and at most %.0f ms: a stop "
-      "blocks the calling thread for up to this long.", core::BENCH_MAX_STOP_DEADLINE_MS);
+      bench_stop_deadline_ms_ >= static_cast<double>(std::numeric_limits<std::int64_t>::max()) / 1e6) {
+    RCLCPP_ERROR(logger(), "The configured stop deadline must be positive and representable.");
     return false;
   }
 
@@ -319,7 +319,7 @@ CallbackReturn RoverHardwareInterface::benchConfigure()
 
   if (communication_fault_publisher_) { std_msgs::msg::Bool message; message.data = false; communication_fault_publisher_->publish(message); }
   bench_configured_ = true;
-  RCLCPP_WARN(logger(), "BENCH MODE configured: all four drives answered at their own address "
+  RCLCPP_WARN(logger(), "Drivetrain configured: all four drives answered at their own address "
     "with no fault. Nothing has been written. Motion stays locked until activation.");
   return CallbackReturn::SUCCESS;
 }
@@ -451,7 +451,7 @@ CallbackReturn RoverHardwareInterface::benchActivate()
   write_blocked_logged_.store(false, std::memory_order_release);
   active_ = true;
   if (safety_fault_publisher_) { std_msgs::msg::Bool message; message.data = false; safety_fault_publisher_->publish(message); }
-  RCLCPP_WARN(logger(), "BENCH MOTION ACTIVE: cap %.0f motor RPM, %.0f Hz, stop deadline %.0f ms. "
+  RCLCPP_WARN(logger(), "Drivetrain active: profile cap %.0f motor RPM, %.0f Hz, stop deadline %.0f ms. "
     "Wheels off the ground; someone must hold the power cutoff.", bench_rpm_cap_,
     timing_.update_hz, bench_stop_deadline_ms_);
   return CallbackReturn::SUCCESS;
@@ -799,12 +799,12 @@ ReturnType RoverHardwareInterface::benchWrite()
     std_msgs::msg::Bool message; message.data = false; communication_fault_publisher_->publish(message);
   }
   // Poll one optional temperature or current register when the
-  // remaining cycle budget covers two full response timeouts plus a margin.
+  // remaining cycle budget covers the response timeout plus a small wire margin.
   // This uses the existing bus owner, outside the mandatory control cycle.
   const auto telemetry_now = steadyNowNs();
   const auto period_ns = static_cast<std::int64_t>(1e9 / timing_.update_hz);
-  const auto reserve_ns = 2 * std::chrono::duration_cast<std::chrono::nanoseconds>(
-    bus_config_.response_timeout).count() + 25000000;
+  const auto reserve_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+    bus_config_.response_timeout).count() + 5000000;
   if (temperature_publisher_ && current_publisher_ && !urgent_stop_.load() && telemetry_now >= next_temperature_poll_ns_ &&
       telemetry_now - worker_cycle_started_ns_ + reserve_ns < period_ns) {
     std::uint16_t raw = 0;

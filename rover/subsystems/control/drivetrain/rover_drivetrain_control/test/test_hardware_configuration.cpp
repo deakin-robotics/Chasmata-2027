@@ -21,7 +21,8 @@ Params singleBusConfiguration()
     {"serial_device", "/dev/drivetrain-test-do-not-open"},
     {"baud_rate", "38400"}, {"parity", "N"}, {"data_bits", "8"}, {"stop_bits", "1"},
     {"update_hz", "15"}, {"upstream_timeout_ms", "110"}, {"stop_deadline_ms", "300"},
-    {"measured_stop_wire_budget_ms", "5"}, {"measured_worst_bus_cycle_ms", "30"},
+    {"response_timeout_ms", "10"}, {"pole_pairs", "4"},
+      {"measured_stop_wire_budget_ms", "48"}, {"measured_worst_bus_cycle_ms", "61"},
     {"late_trigger_ms", "100"}
   };
   const std::array<std::string, 4> names{
@@ -61,7 +62,7 @@ int main(int argc, char ** argv)
     CHECK(hardware.on_init(params) == CallbackReturn::ERROR);
     CHECK(hardware.export_command_interfaces().empty());
   }
-  for (const auto & key : {"serial_device", "baud_rate", "parity", "data_bits", "stop_bits"}) {
+  for (const auto & key : {"serial_device", "baud_rate", "parity", "data_bits", "stop_bits", "pole_pairs"}) {
     auto params = singleBusConfiguration();
     params.hardware_info.hardware_parameters.erase(key);
     Hardware hardware;
@@ -76,7 +77,7 @@ int main(int argc, char ** argv)
   {
     auto params = singleBusConfiguration();
     // The full shared-bus budget still has to fit the existing timing bounds.
-    params.hardware_info.hardware_parameters["measured_worst_bus_cycle_ms"] = "60";
+    params.hardware_info.hardware_parameters["measured_worst_bus_cycle_ms"] = "70";
     Hardware hardware;
     CHECK(hardware.on_init(params) == CallbackReturn::ERROR);
   }

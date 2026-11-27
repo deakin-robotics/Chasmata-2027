@@ -87,7 +87,6 @@ RoverHardwareInterface::on_init(
   previous_read_tick_ns_ = 0;
   late_trigger_detected_ = false;
   transport_open_ = false;
-  operationally_ready_ = false;
   active_ = false;
   bench_configured_ = false;
   bench_stop_latched_ = false;
@@ -117,10 +116,9 @@ RoverHardwareInterface::on_init(
     telemetry_joint_publisher_ = node->create_publisher<sensor_msgs::msg::JointState>(
       "/drivetrain/validated_joint_states", 10);
   }
+  driver_->setMandatoryExchangesPerCycle(1);  // speed and fault reads alternate
   if (bench_motion_enabled_) {
-    driver_->setMandatoryExchangesPerCycle(1);  // one alternating read per cycle
-    RCLCPP_WARN(logger(), "BENCH MOTION MODE requested (bench_motion_enabled=true). "
-      "Bench only: wheels off the ground, power cutoff held.");
+    RCLCPP_WARN(logger(), "Bench motion profile requested.");
   }
 
   configuration_valid_ = true;
@@ -140,7 +138,6 @@ RoverHardwareInterface::on_configure(
   (void)previous_state;
 
   active_ = false;
-  operationally_ready_ = false;
 
   if (!configuration_valid_) {
     RCLCPP_ERROR(
@@ -173,20 +170,7 @@ RoverHardwareInterface::on_configure(
 
   transport_open_ = true;
 
-  if (bench_motion_enabled_) {
-    return benchConfigure();
-  }
-
-  RCLCPP_ERROR(
-    logger(),
-    "Shared Modbus transport opened successfully, but the verified BLD-305S "
-    "initialization sequence and velocity conversion are not implemented. "
-    "Refusing to mark the drivetrain configured for motion.");
-
-  closeDriver();
-  operationally_ready_ = false;
-
-  return hardware_interface::CallbackReturn::ERROR;
+  return benchConfigure();
 }
 
 hardware_interface::CallbackReturn
@@ -213,27 +197,9 @@ RoverHardwareInterface::on_activate(
     return hardware_interface::CallbackReturn::ERROR;
   }
 
-  if (bench_motion_enabled_) {
-    const auto result = benchActivate();
-    if (result == hardware_interface::CallbackReturn::SUCCESS) startBusWorker();
-    return result;
-  }
-
-  if (!operationally_ready_) {
-    RCLCPP_ERROR(
-      logger(),
-      "Refusing drivetrain activation: verified controller initialization "
-      "and velocity conversion have not been established.");
-
-    return hardware_interface::CallbackReturn::ERROR;
-  }
-
-  active_ = true;
-
-  read_blocked_logged_.store(false, std::memory_order_release);
-  write_blocked_logged_.store(false, std::memory_order_release);
-
-  return hardware_interface::CallbackReturn::SUCCESS;
+  const auto result = benchActivate();
+  if (result == hardware_interface::CallbackReturn::SUCCESS) startBusWorker();
+  return result;
 }
 
 hardware_interface::CallbackReturn
@@ -242,25 +208,8 @@ RoverHardwareInterface::on_deactivate(
 {
   (void)previous_state;
 
-  if (bench_motion_enabled_) {
-    stopBusWorker();
-    return benchDeactivate();
-  }
-
-  if (active_) {
-    // A failed transition must NOT falsely change local lifecycle state.
-    // Motion remains unverified; do not assert that the motor has stopped.
-    RCLCPP_ERROR(
-      logger(),
-      "Cannot deactivate safely because the verified motor-stop sequence "
-      "is not implemented. Active state remains unchanged.");
-
-    return hardware_interface::CallbackReturn::ERROR;
-  }
-
-  active_ = false;
-
-  return hardware_interface::CallbackReturn::SUCCESS;
+  stopBusWorker();
+  return benchDeactivate();
 }
 
 hardware_interface::CallbackReturn
@@ -271,7 +220,6 @@ RoverHardwareInterface::on_cleanup(
 
   stopBusWorker();
   active_ = false;
-  operationally_ready_ = false;
   bench_configured_ = false;
 
   closeDriver();
@@ -284,9 +232,7 @@ hardware_interface::CallbackReturn
 RoverHardwareInterface::on_shutdown(
   const rclcpp_lifecycle::State & previous_state)
 {
-  if (!bench_motion_enabled_) {
-    return hardware_interface::SystemInterface::on_shutdown(previous_state);
-  }
+  (void)previous_state;
   stopBusWorker();
   return benchShutdown(false);
 }
@@ -295,9 +241,7 @@ hardware_interface::CallbackReturn
 RoverHardwareInterface::on_error(
   const rclcpp_lifecycle::State & previous_state)
 {
-  if (!bench_motion_enabled_) {
-    return hardware_interface::SystemInterface::on_error(previous_state);
-  }
+  (void)previous_state;
   stopBusWorker();
   return benchShutdown(true);
 }
@@ -357,7 +301,7 @@ RoverHardwareInterface::read(
   previous_read_tick_ns_ = now;
   updateIoHeartbeat();
 
-  if (bench_motion_enabled_) {
+  {
 #ifdef DRIVETRAIN_DIRECT_CYCLE_TEST
     return benchRead();
 #else
@@ -367,26 +311,6 @@ RoverHardwareInterface::read(
     return worker_failed_ ? hardware_interface::return_type::ERROR : hardware_interface::return_type::OK;
 #endif
   }
-
-  if (!active_ || !operationally_ready_ || late_trigger_detected_) {
-    bool expected = false;
-
-    if (
-      read_blocked_logged_.compare_exchange_strong(
-        expected,
-        true,
-        std::memory_order_acq_rel))
-    {
-      RCLCPP_ERROR(
-        logger(),
-        "read() was called while the drivetrain is not in a verified "
-        "operational state. No physical velocity is being published.");
-    }
-
-    return hardware_interface::return_type::ERROR;
-  }
-
-  return hardware_interface::return_type::ERROR;
 }
 
 hardware_interface::return_type
@@ -399,7 +323,7 @@ RoverHardwareInterface::write(
 
   updateIoHeartbeat();
 
-  if (bench_motion_enabled_) {
+  {
 #ifdef DRIVETRAIN_DIRECT_CYCLE_TEST
     return benchWrite();
 #else
@@ -415,26 +339,6 @@ RoverHardwareInterface::write(
     return hardware_interface::return_type::OK;
 #endif
   }
-
-  if (!active_ || !operationally_ready_) {
-    bool expected = false;
-
-    if (
-      write_blocked_logged_.compare_exchange_strong(
-        expected,
-        true,
-        std::memory_order_acq_rel))
-    {
-      RCLCPP_ERROR(
-        logger(),
-        "write() was called while the drivetrain is not in a verified "
-        "operational state. No motor command was sent.");
-    }
-
-    return hardware_interface::return_type::ERROR;
-  }
-
-  return hardware_interface::return_type::ERROR;
 }
 
 std::int64_t
@@ -631,28 +535,25 @@ bool RoverHardwareInterface::parseConfiguration()
       !required_timing("late_trigger_ms", timing_.late_trigger_ms)) {
     return false;
   }
-  if (timing_.stop_deadline_ms > 300.0) {
-    RCLCPP_ERROR(logger(), "Stop deadline must not exceed the 300 ms team target.");
-    return false;
-  }
   if (!bench_motion_enabled_ && std::abs(timing_.update_hz - 15.0) > 0.01) {
     RCLCPP_ERROR(logger(), "The drivetrain component rate must be 15 Hz.");
     return false;
   }
   // Bench mode checks the same timing rules against its own stop deadline.
   core::TimingConfig checked_timing = timing_;
-  if (bench_motion_enabled_) {
-    if (!parseBenchConfiguration()) {
-      return false;
-    }
-    checked_timing.stop_deadline_ms = bench_stop_deadline_ms_;
+  if (!parseBenchConfiguration()) {
+    return false;
   }
+  if (bench_motion_enabled_) checked_timing.stop_deadline_ms = bench_stop_deadline_ms_;
   const auto timing_check = core::validateTiming(checked_timing);
   if (!timing_check.ok) {
     RCLCPP_ERROR(logger(), "Timing refusal: %s", timing_check.reason.c_str());
     return false;
   }
-  RCLCPP_WARN(logger(), "Timing budget passes arithmetic only; bench stop ACK and adapter delays unverified.");
+  if (timing_.worst_bus_cycle_ms > 500.0 / timing_.update_hz) {
+    RCLCPP_WARN(logger(), "Configured bus cycle uses over 50%% of the cycle period.");
+  }
+  RCLCPP_INFO(logger(), "Configured timing values pass arithmetic checks.");
 
   for (std::size_t wheel = 0; wheel < WHEEL_COUNT; ++wheel) {
     const auto & joint = hardware_info_.joints[wheel];

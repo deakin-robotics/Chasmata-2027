@@ -27,7 +27,7 @@ wheel_separation: 0.5   # PLACEHOLDER: metres
 bench_motion_enabled: false
 # With bench mode off, these bench values (9600 baud, 2 Hz) are refused at
 # start-up: production requires 38400 baud and 15 Hz.
-# The values below are read only when bench_motion_enabled is true.
+# pole_pairs is required in both profiles; the RPM cap and bench stop deadline apply only in bench mode.
 pole_pairs: 2                 # verify against the connected motors: controller 1 had 5
                               # saved, controller 2 had 2; both spin, true motor value
                               # unconfirmed (check motor label)

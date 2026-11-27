@@ -33,6 +33,8 @@ int main()
   TimingConfig t{15.0, 110.0, 250.0, 5.0, 30.0, 100.0};
   CHECK(validateTiming(t).ok); // 110 + 133.33 + 5 = 248.33 ms
   t.worst_bus_cycle_ms = 40.0;
+  CHECK(validateTiming(t).ok);
+  t.worst_bus_cycle_ms = 70.0;
   CHECK(!validateTiming(t).ok);
   t.worst_bus_cycle_ms = 30.0;
   CHECK(validateTiming(t).ok);

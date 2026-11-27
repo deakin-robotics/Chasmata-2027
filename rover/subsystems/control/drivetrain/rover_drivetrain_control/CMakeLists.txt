@@ -123,6 +123,16 @@ if(BUILD_TESTING)
   target_link_libraries(test_bench_worker ${PROJECT_NAME}_core)
   add_test(NAME drivetrain_background_worker COMMAND test_bench_worker)
 
+  add_executable(test_production_worker test/test_bench_motion.cpp
+    src/rover_hardware_interface.cpp src/rover_hardware_interface_bench.cpp
+    src/bld305s_driver.cpp)
+  target_compile_definitions(test_production_worker PRIVATE DRIVETRAIN_ASYNC_WORKER_TEST DRIVETRAIN_PRODUCTION_WORKER_TEST)
+  target_compile_options(test_production_worker PRIVATE -Wno-unused-function)
+  target_include_directories(test_production_worker PRIVATE include ${LIBMODBUS_INCLUDE_DIRS})
+  ament_target_dependencies(test_production_worker hardware_interface pluginlib rclcpp rclcpp_lifecycle sensor_msgs std_msgs)
+  target_link_libraries(test_production_worker ${PROJECT_NAME}_core)
+  add_test(NAME drivetrain_normal_background_worker COMMAND test_production_worker)
+
   # Unpopulated telemetry must never claim success or valid data.
   add_executable(test_telemetry_defaults test/test_telemetry_defaults.cpp)
   ament_target_dependencies(test_telemetry_defaults rover_drivetrain_interfaces)

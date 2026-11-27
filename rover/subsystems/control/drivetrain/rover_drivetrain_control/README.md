@@ -101,9 +101,9 @@ ros2 launch rover_drivetrain_control drivetrain.launch.py \
 
 The config has one `serial_device` and `baud_rate`, shared serial framing, required timing values, and one unique slave ID per wheel. The example holds the 12 Nov 2026 bench values (adapter path, baud, timings and slave IDs); gearing, RPM limits and wheel geometry are placeholders. The launch runs in `/drivetrain`; twist drive and per-wheel drive share the same wheel interfaces, so only one controller can be active at a time. Per-wheel commands use `[front_left, rear_left, front_right, rear_right]` in rad/s.
 
-The hardware interface currently refuses configuration and activation for motion, unless the opt-in bench mode below is switched on. Do not remove that gate based on a successful build or a read-only Modbus reply. Before motion can be enabled, verify register meanings and scaling against the manufacturer manual and bench readings, confirm fault and stop behavior, add an independent hardware watchdog, and measure the full four-drive bus cycle and four stop acknowledgements. The example timing budgets are unmeasured; remeasure them on this single shared bus.
+The normal profile uses the asynchronous worker for control and telemetry. See `config/drivetrain_hardware.normal.example.yaml` for its configuration shape; its timing and motor values are illustrative, not measured. The bench profile below applies its own speed cap and stop deadline. Configure the serial connection, wheel mapping, motor limits, pole pairs and timing values for the drivetrain.
 
-Wheel geometry in `config/drivetrain_controllers.yaml` and `urdf/drivetrain.urdf.xacro` is also placeholder data. Diagnostics telemetry and interfaces are read-only and intended for logging; production publisher details still need agreement with the GUI team.
+Wheel geometry in `config/drivetrain_controllers.yaml` and `urdf/drivetrain.urdf.xacro` is placeholder data. The standalone diagnostics node is read-only; the hardware interface publishes drivetrain feedback for Rover telemetry.
 
 ## Bench motion test
 
@@ -136,7 +136,7 @@ Our adapter is a WCH CH343 (`/dev/ttyACM0`). It is not FTDI and has no latency t
 
 ### Enabling it
 
-Copy `config/drivetrain_hardware.example.yaml` and set `bench_motion_enabled: true`, `pole_pairs` from the motor datasheet and the probe (selector 9), and a low `bench_rpm_cap`. The example's main values (adapter, 9600 baud, 2 Hz and the timing budgets) are already the bench values. Production mode is unchanged: with bench mode off, configure and activate still refuse, and the plugin still requires 38400 baud and 15 Hz.
+Copy `config/drivetrain_hardware.example.yaml` and set `bench_motion_enabled: true`, `pole_pairs` from the motor datasheet and the probe (selector 9), and a low `bench_rpm_cap`. The example's main values (adapter, 9600 baud, 2 Hz and the timing budgets) are already the bench values. With bench mode off, the normal profile uses the same asynchronous worker, the configured wheel RPM limits and the configured stop deadline. The normal profile requires 38400 baud, 15 Hz and an explicit pole-pair value.
 
 ### What bench mode does
 

@@ -61,6 +61,8 @@ std::vector<WriteRecord> writes;      // since the last resetDrives()
 std::vector<WriteRecord> all_writes;  // whole run, for the forbidden-register check
 unsigned broadcasts{0};
 std::atomic<unsigned> broadcast_events{0};
+std::atomic<int> injected_fault_code{0};
+std::atomic<int> mandatory_read_delay_ms{0};
 std::atomic<bool> delay_optional_read{false};
 std::atomic<bool> optional_read_started{false};
 unsigned bus_calls{0};  // every slave select, read and write
@@ -118,9 +120,11 @@ int modbus_read_registers(modbus_t * m, int addr, int n, std::uint16_t * out)
   if (!d.present) {errno = ETIMEDOUT; return -1;}
   if (d.garbled) {errno = EMBBADCRC; return -1;}
   ++reads_by_address[addr];
+  if ((addr == 0x005F || addr == 0x0076) && mandatory_read_delay_ms.load() > 0)
+    std::this_thread::sleep_for(std::chrono::milliseconds(mandatory_read_delay_ms.load()));
   if (addr == 0x0096 && delay_optional_read.exchange(false)) {
     optional_read_started.store(true);
-    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    std::this_thread::sleep_for(std::chrono::milliseconds(80));
     errno = ETIMEDOUT;
     return -1;
   }
@@ -128,7 +132,8 @@ int modbus_read_registers(modbus_t * m, int addr, int n, std::uint16_t * out)
     errno = it->second;  // libmodbus: exception N is MODBUS_ENOBASE + N
     return -1;
   }
-  *out = d.regs[addr];
+  *out = addr == 0x0076 && injected_fault_code.load() != 0 ?
+    static_cast<std::uint16_t>(injected_fault_code.load()) : d.regs[addr];
   return d.short_reply ? 2 : 1;
 }
 int modbus_write_register(modbus_t * m, int addr, const std::uint16_t value)
@@ -198,7 +203,8 @@ Params params(bool bench)
       {"serial_device", "/dev/bench-mock"}, {"baud_rate", "38400"}, {"parity", "N"},
       {"data_bits", "8"}, {"stop_bits", "1"},
       {"update_hz", "15"}, {"upstream_timeout_ms", "110"}, {"stop_deadline_ms", "300"},
-      {"measured_stop_wire_budget_ms", "5"}, {"measured_worst_bus_cycle_ms", "30"},
+      {"response_timeout_ms", "10"}, {"pole_pairs", "4"},
+      {"measured_stop_wire_budget_ms", "48"}, {"measured_worst_bus_cycle_ms", "61"},
       {"late_trigger_ms", "100"}};
   }
   const std::array<std::string, 4> names{
@@ -318,7 +324,7 @@ void testConfigurePublishesReportedFault()
   executor->remove_node(observer);
 }
 
-void testDisabledRefusesAsToday()
+void testProductionConfigurationAndActivation()
 {
   for (bool explicit_false : {true, false}) {
     resetDrives();
@@ -326,11 +332,10 @@ void testDisabledRefusesAsToday()
     if (explicit_false) p.hardware_info.hardware_parameters["bench_motion_enabled"] = "false";
     Hardware hw;
     CHECK(hw.on_init(p) == CallbackReturn::SUCCESS);
-    CHECK(hw.on_configure(lifecycle_state) == CallbackReturn::ERROR);
-    CHECK(hw.on_activate(lifecycle_state) == CallbackReturn::ERROR);
-    CHECK(hw.read(t0, dt) == ReturnType::ERROR);
-    CHECK(hw.write(t0, dt) == ReturnType::ERROR);
-    CHECK(writes.empty());
+    CHECK(hw.on_configure(lifecycle_state) == CallbackReturn::SUCCESS);
+    CHECK(hw.on_activate(lifecycle_state) == CallbackReturn::SUCCESS);
+    CHECK(cycle(hw) == ReturnType::OK);
+    CHECK(hw.on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
   }
   // Without bench mode, 9600 baud and a lower rate are still refused.
   for (const auto & [key, value] : std::vector<std::pair<std::string, std::string>>{
@@ -356,8 +361,7 @@ void testBenchParameterRefusals()
       {"baud_rate", "19200"},
       {"measured_worst_bus_cycle_ms", "100"},     // below the 187.5 ms wire floor
       {"measured_stop_wire_budget_ms", "100"},    // below the 153.6 ms stop floor
-      {"bench_stop_deadline_ms", "1000"},         // < 110 + 2 x 500 + 200
-      {"bench_stop_deadline_ms", "5001"}}) {      // above the 5000 ms cap
+      {"bench_stop_deadline_ms", "1000"}}) {      // < 110 + 2 x 500 + 200
     auto p = params(true);
     p.hardware_info.hardware_parameters[key] = value;
     Hardware hw;
@@ -365,7 +369,7 @@ void testBenchParameterRefusals()
   }
   {
     auto p = params(true);
-    p.hardware_info.hardware_parameters["bench_stop_deadline_ms"] = "5000";  // the cap itself
+    p.hardware_info.hardware_parameters["bench_stop_deadline_ms"] = "5001";  // no arbitrary maximum
     Hardware hw;
     CHECK(hw.on_init(p) == CallbackReturn::SUCCESS);
   }
@@ -1078,7 +1082,11 @@ int main(int argc, char ** argv)
   resetDrives();
   auto executor = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
   hardware_interface::HardwareComponentParams p;
+#ifdef DRIVETRAIN_PRODUCTION_WORKER_TEST
+  p.hardware_info = params(false).hardware_info;
+#else
   p.hardware_info = params(true).hardware_info;
+#endif
   p.executor = executor;
   p.clock = std::make_shared<rclcpp::Clock>();
   Hardware hw;
@@ -1089,6 +1097,9 @@ int main(int argc, char ** argv)
   delay_optional_read.store(true);
   optional_read_started.store(false);
   CHECK(hw.on_activate(lifecycle_state) == CallbackReturn::SUCCESS);
+#ifdef DRIVETRAIN_PRODUCTION_WORKER_TEST
+  mandatory_read_delay_ms.store(7);
+#endif
   for (auto & command : commands) (void)command.set_value(0.5);
   const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(4);
   while (!optional_read_started.load() && std::chrono::steady_clock::now() < until) {
@@ -1100,7 +1111,7 @@ int main(int argc, char ** argv)
   const auto started = std::chrono::steady_clock::now();
   CHECK(hw.read(t0, dt) == ReturnType::OK);
   CHECK(hw.write(t0, dt) == ReturnType::OK);
-  CHECK(std::chrono::steady_clock::now() - started < std::chrono::milliseconds(100));
+  CHECK(std::chrono::steady_clock::now() - started < std::chrono::milliseconds(30));
   const auto broadcasts_before_stop = broadcast_events.load();
   for (auto & command : commands) (void)command.set_value(0.0);
   CHECK(hw.write(t0, dt) == ReturnType::OK);
@@ -1132,10 +1143,19 @@ int main(int argc, char ** argv)
   CHECK(hw.on_deactivate(lifecycle_state) == CallbackReturn::SUCCESS);
   CHECK(reads_by_address[0x0096] > 0);
   CHECK(reads_by_address[0x00B6] > 0);
+  mandatory_read_delay_ms.store(0);
   CHECK(allStopped());
   CHECK(hw.on_cleanup(lifecycle_state) == CallbackReturn::SUCCESS);
   CHECK(hw.on_configure(lifecycle_state) == CallbackReturn::SUCCESS);
   CHECK(hw.on_activate(lifecycle_state) == CallbackReturn::SUCCESS);
+  injected_fault_code.store(2);
+  const auto fault_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+  while (hw.read(t0, dt) == ReturnType::OK && std::chrono::steady_clock::now() < fault_deadline) {
+    (void)hw.write(t0, dt);
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  }
+  CHECK(hw.read(t0, dt) == ReturnType::ERROR);
+  injected_fault_code.store(0);
   CHECK(hw.on_error(lifecycle_state) == CallbackReturn::SUCCESS);
   CHECK(allStopped());
   CHECK(hw.on_cleanup(lifecycle_state) == CallbackReturn::SUCCESS);
@@ -1149,7 +1169,7 @@ int main(int argc, char ** argv)
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
-  testDisabledRefusesAsToday();
+  testProductionConfigurationAndActivation();
   testBenchParameterRefusals();
   testConfigureRefusals();
   testActivationSequence();

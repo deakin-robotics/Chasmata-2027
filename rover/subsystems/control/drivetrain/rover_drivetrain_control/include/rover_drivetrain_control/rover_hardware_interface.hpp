@@ -184,7 +184,6 @@ private:
 
   bool configuration_valid_{false};
   bool transport_open_{false};
-  bool operationally_ready_{false};
   bool active_{false};
 
   // Required safety settings: defaults would silently settle open decisions.

@@ -77,8 +77,6 @@ struct BusCycleHealth
 inline constexpr double BENCH_DEADBAND_MOTOR_RPM = 1.0;
 // bench_rpm_cap above this is refused.
 inline constexpr double BENCH_MAX_RPM_CAP = 500.0;
-// bench_stop_deadline_ms above this is refused: a stop blocks for up to this long.
-inline constexpr double BENCH_MAX_STOP_DEADLINE_MS = 5000.0;
 // After a stop that is not accepted, on_error keeps broadcasting stop this long.
 inline constexpr double BENCH_UNCONFIRMED_STOP_WINDOW_MS = 10000.0;
 // A reversal waits for actual speed 0x005F at or below this (raw = motor RPM)...

@@ -34,7 +34,7 @@ overwriting newer live data. ECAM continues to use its own authority and
 failover path.
 
 The active bench driver schedules temperature and current reads on its background bus
-worker while driving or stationary, when enough cycle time remains for two response timeouts
+worker while driving or stationary, when enough cycle time remains for a response timeout
 and a margin. Control and stop requests take priority between transactions. The values are raw register counts; the GUI does not assume a
 temperature or current conversion. No additional serial connection is opened.
 

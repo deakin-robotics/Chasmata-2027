@@ -46,7 +46,7 @@ The manual lists the baud code for 256000 as `10H`, after `09H`. It is unclear w
 
 ## Registers written (function code 06)
 
-Only bench mode (`bench_motion_enabled: true`, see the README "Bench motion test") calls these write methods. With bench mode off, the hardware interface refuses configuration and activation, and the diagnostics node has no write path.
+The hardware interface uses these write methods in both normal and bench profiles. The standalone diagnostics node has no write path.
 
 | Register | Meaning | Values / scaling (manual) | Manual | Accessed by | Status |
 |---|---|---|---|---|---|

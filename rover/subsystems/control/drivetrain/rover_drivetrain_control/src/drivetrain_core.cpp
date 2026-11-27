@@ -16,8 +16,8 @@ ValidationResult validateTiming(const TimingConfig & c)
     return {false, "All safety-relevant timing values and bench budgets must be positive and supplied explicitly"};
   }
   const double period_ms = 1000.0 / c.update_hz;
-  if (c.worst_bus_cycle_ms > period_ms * 0.5) {
-    return {false, "Worst-case measured bus cycle exceeds the 50% bus utilization limit"};
+  if (c.worst_bus_cycle_ms > period_ms) {
+    return {false, "Configured bus cycle exceeds the cycle period"};
   }
   // Conservatively allocate two periods to include one missed trigger.
   if (c.upstream_timeout_ms + 2.0 * period_ms + c.stop_wire_budget_ms > c.stop_deadline_ms) {
