@@ -17,17 +17,17 @@
     <text class="label" x="655" y="164" text-anchor="middle">rad/s</text>
     <text class="value" x="655" y="259" text-anchor="middle">{{ value('rear_right_wheel_joint') }}</text>
     <text class="label" x="655" y="276" text-anchor="middle">rad/s</text>
-    <text class="small-value" x="145" y="96" text-anchor="middle">CMD {{ value('front_left_wheel_joint', true) }} rad/s</text>
-    <text class="small-value" x="145" y="314" text-anchor="middle">CMD {{ value('rear_left_wheel_joint', true) }} rad/s</text>
-    <text class="small-value" x="655" y="96" text-anchor="middle">CMD {{ value('front_right_wheel_joint', true) }} rad/s</text>
-    <text class="small-value" x="655" y="314" text-anchor="middle">CMD {{ value('rear_right_wheel_joint', true) }} rad/s</text>
+    <text class="small-value command" x="145" y="96" text-anchor="middle">CMD {{ value('front_left_wheel_joint', true) }} rad/s</text>
+    <text class="small-value command" x="145" y="314" text-anchor="middle">CMD {{ value('rear_left_wheel_joint', true) }} rad/s</text>
+    <text class="small-value command" x="655" y="96" text-anchor="middle">CMD {{ value('front_right_wheel_joint', true) }} rad/s</text>
+    <text class="small-value command" x="655" y="314" text-anchor="middle">CMD {{ value('rear_right_wheel_joint', true) }} rad/s</text>
     <text class="small-value" x="145" y="78" text-anchor="middle">{{ temperature(0) }}&#176;C<tspan class="small-value-muted"> | </tspan>{{ current(0) }} A</text>
     <text class="small-value" x="145" y="332" text-anchor="middle">{{ temperature(1) }}&#176;C<tspan class="small-value-muted"> | </tspan>{{ current(1) }} A</text>
     <text class="small-value" x="655" y="78" text-anchor="middle">{{ temperature(2) }}&#176;C<tspan class="small-value-muted"> | </tspan>{{ current(2) }} A</text>
     <text class="small-value" x="655" y="332" text-anchor="middle">{{ temperature(3) }}&#176;C<tspan class="small-value-muted"> | </tspan>{{ current(3) }} A</text>
     <text class="value" x="400" y="170" text-anchor="middle">DRIVE</text>
-    <text class="value" x="400" y="255" text-anchor="middle"><tspan class="small-value-muted">ODOM X </tspan><tspan>{{ displacement() }} m</tspan></text>
+    <text class="value" x="400" y="255" text-anchor="middle"><tspan class="small-value-muted">ODOM X </tspan><tspan>{{ displacement() }} m</tspan><tspan class="small-value-muted"> | Y </tspan><tspan>{{ odometryValue('y') }} m</tspan></text>
 
   </svg>
-  <p class="telemetry-note">ODOM Y {{ odometryValue('y') }} m | HEADING {{ odometryValue('heading') }} deg | TURN RATE {{ odometryValue('angularSpeed') }} rad/s<br>Wheel telemetry · temperature and current shown as raw values</p>
+  <p class="telemetry-note">HEADING {{ odometryValue('heading') }} deg | TURN RATE {{ odometryValue('angularSpeed') }} rad/s</p>
 </section>

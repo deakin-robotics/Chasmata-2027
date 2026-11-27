@@ -1,1 +1,5 @@
 @use '../sd-page';
+
+.schematic .command {
+  fill: var(--dcr-color-info);
+}
