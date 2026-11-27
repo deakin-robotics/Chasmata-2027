@@ -183,6 +183,8 @@ TEST_F(EcamAggregationTest, BaseStationRaisesAndClearsHeartbeatLost)
 {
   auto base = std::make_shared<ecam_alerts::EcamAlertAggregator>("basestation", 0.2, "test_base_heartbeat");
   auto heartbeat_node = std::make_shared<rclcpp::Node>("test_heartbeat_source");
+  ecam_alerts::Reporter subsystem(*heartbeat_node, "base-test", "basestation");
+  subsystem.raise("BASE_FAULT");
   auto heartbeat = heartbeat_node->create_publisher<std_msgs::msg::Empty>(
     ecam_alerts::kRoverHeartbeatTopic, rclcpp::QoS(1));
   auto heartbeat_timer = heartbeat_node->create_wall_timer(50ms, [&heartbeat]() {
@@ -199,27 +201,70 @@ TEST_F(EcamAggregationTest, BaseStationRaisesAndClearsHeartbeatLost)
   heartbeat_timer->cancel();
   ASSERT_TRUE(wait_for([&observed] {
     return std::any_of(observed.rbegin(), observed.rend(), [](const auto & message) {
-      return has_code(message, "basestation", "basestation", ecam_alerts::kRoverHeartbeatLost);
+      return has_code(message, "basestation", "basestation", ecam_alerts::kRoverHeartbeatLost) &&
+        has_code(message, "basestation", "basestation", "BASE_FAULT");
     });
   }, 1s));
 
   heartbeat_timer->reset();
   ASSERT_TRUE(wait_for([&observed] {
-    return std::any_of(observed.rbegin(), observed.rend(), [](const auto & message) {
+    for (auto it = observed.rbegin(); it != observed.rend(); ++it) {
+      const auto & message = *it;
       if (message.authority != "basestation") {
-        return false;
+        continue;
       }
       for (const auto & snapshot : message.sources) {
         if (snapshot.source == "basestation") {
           return std::find(snapshot.active_codes.begin(), snapshot.active_codes.end(),
-                   ecam_alerts::kRoverHeartbeatLost) == snapshot.active_codes.end();
+                   ecam_alerts::kRoverHeartbeatLost) == snapshot.active_codes.end() &&
+            std::find(snapshot.active_codes.begin(), snapshot.active_codes.end(), "BASE_FAULT") != snapshot.active_codes.end();
         }
       }
-      return false;
-    });
+    }
+    return false;
   }, 1s));
   executor_.remove_node(base);
   executor_.remove_node(heartbeat_node);
+}
+
+TEST_F(EcamAggregationTest, BaseStationReportersShareOneSourceAndStaySeparateFromRover)
+{
+  auto base = std::make_shared<ecam_alerts::EcamAlertAggregator>("basestation", 3.0, "test_base_reporters");
+  auto node = std::make_shared<rclcpp::Node>("test_subsystem_reporters");
+  ecam_alerts::RoverAlertOwner rover_owner(*node);
+  ecam_alerts::Reporter first(*node, "first", "basestation");
+  ecam_alerts::Reporter second(*node, "second", "basestation");
+  ecam_alerts::Reporter rover(*node, "rover-test");
+  std::vector<std::string> base_codes, rover_codes;
+  auto subscription = node->create_subscription<telemetry_interfaces::msg::EcamAlertSourceSnapshot>(
+    ecam_alerts::kSourceTopic, rclcpp::QoS(20).reliable().transient_local(),
+    [&](const telemetry_interfaces::msg::EcamAlertSourceSnapshot & message) {
+      if (message.source == "basestation") base_codes = message.active_codes;
+      if (message.source == "rover") rover_codes = message.active_codes;
+    });
+  auto has = [](const auto & codes, const char * code) {
+    return std::find(codes.begin(), codes.end(), code) != codes.end();
+  };
+  executor_.add_node(base);
+  executor_.add_node(node);
+  first.raise("SHARED_FAULT");
+  second.raise("SHARED_FAULT");
+  second.raise("BASE_FAULT");
+  rover.raise("ROVER_FAULT");
+  ASSERT_TRUE(wait_for([&] {
+    return has(base_codes, "SHARED_FAULT") && has(base_codes, "BASE_FAULT") &&
+      has(rover_codes, "ROVER_FAULT");
+  }, 2s));
+  EXPECT_FALSE(has(base_codes, "ROVER_FAULT"));
+  EXPECT_FALSE(has(rover_codes, "BASE_FAULT"));
+  first.clear("SHARED_FAULT");
+  second.clear("BASE_FAULT");
+  ASSERT_TRUE(wait_for([&] { return !has(base_codes, "BASE_FAULT"); }, 2s));
+  EXPECT_TRUE(has(base_codes, "SHARED_FAULT"));
+  second.clear("SHARED_FAULT");
+  ASSERT_TRUE(wait_for([&] { return !has(base_codes, "SHARED_FAULT"); }, 2s));
+  executor_.remove_node(base);
+  executor_.remove_node(node);
 }
 
 }  // namespace

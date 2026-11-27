@@ -10,7 +10,7 @@
 #include <telemetry_interfaces/msg/ecam_alert_source_snapshot.hpp>
 #include <telemetry_interfaces/msg/ecam_alerts.hpp>
 
-#include "ecam_alerts/source.hpp"
+#include "ecam_alerts/reporter.hpp"
 #include "ecam_alerts/state.hpp"
 
 namespace ecam_alerts
@@ -35,6 +35,7 @@ private:
   void check_rover_liveness();
   void raise_rover_heartbeat_lost();
   void sync_base_station_source_snapshot();
+  void on_base_station_reporter(const telemetry_interfaces::msg::EcamAlertSourceSnapshot & message);
   void queue_all_non_rover_sources();
   void queue_source_replay(const std::string & source);
   void publish_next_replay_snapshot();
@@ -50,7 +51,10 @@ private:
   bool awaiting_rover_reflection_{false};
   SourceSnapshotStore source_state_;
   std::vector<std::string> source_replay_queue_;
-  std::unique_ptr<EcamAlertSource> base_station_alerts_;
+  std::unique_ptr<AlertOwner> base_station_owner_;
+  std::unique_ptr<Reporter> base_station_alerts_;
+  bool heartbeat_update_pending_{false};
+  bool heartbeat_alert_expected_{false};
   rclcpp::Publisher<telemetry_interfaces::msg::EcamAlertSourceSnapshot>::SharedPtr source_publisher_;
   rclcpp::Publisher<telemetry_interfaces::msg::EcamAlerts>::SharedPtr combined_publisher_;
   rclcpp::Subscription<telemetry_interfaces::msg::EcamAlertSourceSnapshot>::SharedPtr source_subscription_;

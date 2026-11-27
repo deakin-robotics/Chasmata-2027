@@ -59,7 +59,9 @@ EcamAlertAggregator::EcamAlertAggregator(const std::string & role_override,
   });
 
   if (role_ == "basestation") {
-    base_station_alerts_ = std::make_unique<EcamAlertSource>(*this, "basestation");
+    base_station_owner_ = std::make_unique<AlertOwner>(*this, "basestation",
+      [this](const auto & message) { on_base_station_reporter(message); });
+    base_station_alerts_ = std::make_unique<Reporter>(*this, "heartbeat", "basestation");
     heartbeat_subscription_ = create_subscription<std_msgs::msg::Empty>(
       kRoverHeartbeatTopic, rclcpp::QoS(rclcpp::KeepLast(1)).reliable(),
       std::bind(&EcamAlertAggregator::on_rover_heartbeat, this, std::placeholders::_1));
@@ -93,7 +95,7 @@ void EcamAlertAggregator::on_combined_snapshot(const telemetry_interfaces::msg::
     return;
   }
   const auto rover_state = store_from_combined(*message);
-  if (awaiting_rover_reflection_ && rover_state.reflects(source_state_)) {
+  if (awaiting_rover_reflection_ && !heartbeat_update_pending_ && rover_state.reflects(source_state_)) {
     awaiting_rover_reflection_ = false;
     taking_over_ = false;
     source_replay_queue_.clear();
@@ -140,12 +142,10 @@ void EcamAlertAggregator::check_rover_liveness()
     if (taking_over_) {
       awaiting_rover_reflection_ = true;
       queue_all_non_rover_sources();
-      if (base_station_alerts_ && std::binary_search(base_station_alerts_->active_codes().begin(),
-        base_station_alerts_->active_codes().end(), std::string(kRoverHeartbeatLost)))
-      {
+      if (base_station_alerts_) {
+        heartbeat_alert_expected_ = false;
+        heartbeat_update_pending_ = true;
         base_station_alerts_->clear(kRoverHeartbeatLost);
-        sync_base_station_source_snapshot();
-        queue_source_replay("basestation");
       }
       publish_combined();
       RCLCPP_INFO(get_logger(), "Rover heartbeat returned; synchronizing source snapshots");
@@ -163,17 +163,31 @@ void EcamAlertAggregator::check_rover_liveness()
 void EcamAlertAggregator::raise_rover_heartbeat_lost()
 {
   if (base_station_alerts_) {
-    base_station_alerts_->raise_alert(kRoverHeartbeatLost);
-    sync_base_station_source_snapshot();
+    heartbeat_alert_expected_ = true;
+    heartbeat_update_pending_ = true;
+    base_station_alerts_->raise(kRoverHeartbeatLost);
   }
 }
 
 void EcamAlertAggregator::sync_base_station_source_snapshot()
 {
-  if (base_station_alerts_) {
-    source_state_.update("basestation", base_station_alerts_->last_snapshot_timestamp(),
-      base_station_alerts_->active_codes());
+  if (base_station_owner_) {
+    const auto & source = base_station_owner_->source();
+    source_state_.update("basestation", source.last_snapshot_timestamp(), source.active_codes());
   }
+}
+
+void EcamAlertAggregator::on_base_station_reporter(
+  const telemetry_interfaces::msg::EcamAlertSourceSnapshot & message)
+{
+  sync_base_station_source_snapshot();
+  if (message.source == "heartbeat") {
+    const bool active = std::find(message.active_codes.begin(), message.active_codes.end(),
+      kRoverHeartbeatLost) != message.active_codes.end();
+    if (active == heartbeat_alert_expected_) heartbeat_update_pending_ = false;
+  }
+  if (awaiting_rover_reflection_) queue_source_replay("basestation");
+  if (taking_over_) publish_combined();
 }
 
 void EcamAlertAggregator::queue_all_non_rover_sources()

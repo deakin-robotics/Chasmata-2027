@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <functional>
 #include <map>
 #include <mutex>
 #include <set>
@@ -13,18 +14,26 @@
 
 namespace ecam_alerts
 {
-// Each reporter publishes only its own complete set; Rover merges all reporters.
+// Each reporter publishes its own set to its local alert owner.
 inline constexpr char kReporterTopic[] = "/ecam/rover/reporters";
+inline constexpr char kBaseStationReporterTopic[] = "/ecam/basestation/reporters";
+
+inline const char * reporter_topic(const std::string & role)
+{
+  if (role == "rover") return kReporterTopic;
+  if (role == "basestation") return kBaseStationReporterTopic;
+  throw std::invalid_argument("ECAM reporter role must be rover or basestation");
+}
 
 class Reporter
 {
 public:
-  Reporter(rclcpp::Node & node, std::string reporter)
+  Reporter(rclcpp::Node & node, std::string reporter, const std::string & role = "rover")
   : node_(node), reporter_(std::move(reporter))
   {
     if (reporter_.empty()) throw std::invalid_argument("ECAM reporter must have a name");
     publisher_ = node.create_publisher<telemetry_interfaces::msg::EcamAlertSourceSnapshot>(
-      kReporterTopic, snapshot_qos());
+      reporter_topic(role), snapshot_qos());
     timer_ = node.create_wall_timer(std::chrono::milliseconds(50), [this] { publish(); });
     publish();
   }
@@ -66,13 +75,16 @@ private:
   rclcpp::TimerBase::SharedPtr timer_;
 };
 
-class RoverAlertOwner
+class AlertOwner
 {
 public:
-  explicit RoverAlertOwner(rclcpp::Node & node) : source_(node, "rover")
+  using UpdateCallback = std::function<void(const telemetry_interfaces::msg::EcamAlertSourceSnapshot &)>;
+
+  AlertOwner(rclcpp::Node & node, const std::string & role, UpdateCallback on_update = {})
+  : source_(node, role), on_update_(std::move(on_update))
   {
     subscription_ = node.create_subscription<telemetry_interfaces::msg::EcamAlertSourceSnapshot>(
-      kReporterTopic, rclcpp::QoS(100).reliable().transient_local(),
+      reporter_topic(role), rclcpp::QoS(100).reliable().transient_local(),
       [this](const telemetry_interfaces::msg::EcamAlertSourceSnapshot & message) {
         if (message.source.empty()) return;
         reporters_[message.source] = std::set<std::string>(message.active_codes.begin(), message.active_codes.end());
@@ -81,12 +93,22 @@ public:
           combined.insert(reporter.second.begin(), reporter.second.end());
         }
         source_.set_active_codes({combined.begin(), combined.end()});
+        if (on_update_) on_update_(message);
       });
   }
 
+  const EcamAlertSource & source() const { return source_; }
+
 private:
   EcamAlertSource source_;
+  UpdateCallback on_update_;
   std::map<std::string, std::set<std::string>> reporters_;
   rclcpp::Subscription<telemetry_interfaces::msg::EcamAlertSourceSnapshot>::SharedPtr subscription_;
+};
+
+class RoverAlertOwner : public AlertOwner
+{
+public:
+  explicit RoverAlertOwner(rclcpp::Node & node) : AlertOwner(node, "rover") {}
 };
 }  // namespace ecam_alerts
